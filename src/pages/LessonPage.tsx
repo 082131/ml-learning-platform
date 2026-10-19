@@ -6,6 +6,7 @@ import { useProgress, useProgressStore } from '@/app/progress';
 import { LessonLayout } from '@/components/layout/LessonLayout';
 import type { SectionAnchor } from '@/components/layout/LessonSidebar';
 import { LessonBody } from '@/components/learning/LessonBody';
+import { References } from '@/components/learning/References';
 import { LEVEL_LABEL } from '@/components/learning/LessonCard';
 import { PrerequisiteList } from '@/components/learning/PrerequisiteList';
 import { Section } from '@/components/learning/Section';
@@ -80,6 +81,7 @@ export default function LessonPage() {
         ) : (
           <OutlineNotice onReady={collectSections} />
         )}
+        {written && meta.references?.length ? <References refs={meta.references} /> : null}
 
         <footer className={s.footer}>
           <div className={s.actions}>

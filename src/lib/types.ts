@@ -147,3 +147,77 @@ export const SECTION_KINDS = [
   'summary',
 ] as const;
 export type SectionKind = (typeof SECTION_KINDS)[number];
+
+/** One input of an experiment. `get` reads the control's value from state; `set` returns the next state. */
+export type Control<S> =
+  | {
+      kind: 'slider';
+      id: string;
+      label: string;
+      min: number;
+      max: number;
+      step?: number;
+      get: (s: S) => number;
+      set: (s: S, value: number) => S;
+      format?: (value: number) => string;
+    }
+  | {
+      kind: 'number';
+      id: string;
+      label: string;
+      min?: number;
+      max?: number;
+      step?: number;
+      get: (s: S) => number;
+      set: (s: S, value: number) => S;
+    }
+  | {
+      /** An editable grid of numbers, for example a matrix. Cells accept integers only when `integer` is set. */
+      kind: 'matrix-cell';
+      id: string;
+      label: string;
+      min?: number;
+      max?: number;
+      integer?: boolean;
+      get: (s: S) => number[][];
+      set: (s: S, i: number, j: number, value: number) => S;
+      /** Rows and columns to mark, for example the row of A that feeds the selected output cell. */
+      highlight?: (s: S) => { rows?: number[]; cols?: number[] };
+    }
+  | {
+      kind: 'select';
+      id: string;
+      label: string;
+      options: { value: string; label: string }[];
+      get: (s: S) => string;
+      set: (s: S, value: string) => S;
+    }
+  | {
+      kind: 'text';
+      id: string;
+      label: string;
+      maxLength?: number;
+      get: (s: S) => string;
+      set: (s: S, value: string) => S;
+    };
+
+/** A readout line computed from state and result, for example `C[0][1] = 64`. Only computed values. */
+export interface ReadoutItem {
+  label: string;
+  value: string;
+  /** 'diverged' or 'error' values are labeled, not just colored. */
+  status?: 'ok' | 'diverged' | 'error';
+}
+
+/** Shared state between a visualization, the code beside it and the readout (data-model.md, Experiments). */
+export interface ExperimentDef<S, R> {
+  id: string;
+  initial: S;
+  controls: Control<S>[];
+  /** Pure. Unit-tested against a hand-worked example. */
+  compute: (s: S) => R;
+  trace?: (s: S) => Trace;
+  /** The id of the code example `trace` steps through. StepThrough blocks for other examples ignore it. */
+  traceExample?: string;
+  readout?: (s: S, r: R) => ReadoutItem[];
+}

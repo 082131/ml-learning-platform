@@ -1,0 +1,80 @@
+.wrap {
+  width: 100%;
+  min-width: 0;
+}
+.wrap svg {
+  display: block;
+  overflow: visible;
+}
+.edge path {
+  fill: none;
+  stroke: var(--accent);
+  stroke-opacity: 0.55;
+  stroke-width: 1.5;
+}
+.edge .head {
+  fill: var(--accent);
+}
+.active path {
+  stroke-opacity: 1;
+  stroke-width: 2.5;
+}
+.edgeLabel {
+  fill: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.box {
+  fill: var(--surface);
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+.nodeLabel {
+  fill: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+}
+.detail {
+  fill: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.badge {
+  fill: var(--accent);
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+.badgeText {
+  fill: var(--accent-ink);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+}
+.ok .badge {
+  fill: var(--ok);
+}
+.warn .badge {
+  fill: var(--warn);
+}
+.error .badge {
+  fill: var(--err);
+}
+.error .box {
+  stroke: var(--err);
+}
+.active .box,
+.selected .box {
+  fill: var(--accent-soft);
+  stroke-width: 2.5;
+}
+.interactive {
+  cursor: pointer;
+}
+.interactive:focus-visible {
+  outline: none;
+}
+.interactive:focus-visible .box {
+  stroke: var(--ink);
+  stroke-width: 3;
+}

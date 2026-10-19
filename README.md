@@ -30,11 +30,11 @@ Every lesson in the curriculum already has a folder with a `meta.ts` (status `ou
 
 1. Open `content/tracks/<track>/<chapter>/<lesson>/`. Refine `meta.ts` if needed (title, minutes, objectives, prerequisites as full IDs, `concepts` as glossary IDs). The `id` must equal the folder path.
 2. Add `index.mdx`. Use only the components registered in `src/mdx-components.tsx`: wrap each part in `<Section kind="intuition" title="...">` (kinds follow the 12-part structure: `intuition`, `technical`, `visual`, `code`, `experiment`, `mistakes`, `practice`, `check`, `exercise`, `summary`; objectives and prerequisites are rendered from `meta.ts`). Use `<Term id="...">` for glossary terms and `<Callout kind="note|warning|simplification">`. Math uses `$...$` and `$$...$$` (KaTeX); tables use GitHub syntax. No layout markup or one-off styles.
-3. Add any new glossary terms to `content/glossary.ts` (`introducedIn` is the lesson that teaches it).
+3. Add any new glossary terms to your chapter's `content/tracks/<track>/<chapter>/glossary.ts` (merged into the glossary automatically; `introducedIn` is the lesson that teaches it).
 4. Set the lesson's status to `'written'` in `content/curriculum.ts`.
 5. Run `npm run check`. Validation fails on a folder/ID mismatch, a missing prerequisite or glossary term, a prerequisite cycle, a written lesson without `index.mdx`, an annotation range that is out of bounds or whose `match` no longer equals the code (in `code.ts`), or a malformed quiz answer (in `quiz.ts`).
 
-No app code changes are needed unless the lesson needs a new visualization component.
+No app code changes are needed unless the lesson needs a new visualization component. **[AUTHORING.md](AUTHORING.md)** is the full guide: it walks through the model lesson `ml/math/matrix-multiplication` and lists which shared files parallel threads may touch.
 
 ## Code and assessment components
 
@@ -63,6 +63,12 @@ import { questions, dotExercise } from './quiz';
 
 Python e2e tests are tagged `@network` because they download Pyodide. Offline, skip them with `npx playwright test --grep-invert @network`, or extract the `pyodide` npm package of the pinned version and set `PYODIDE_DIR=<its package folder>` to serve it locally.
 
+## Experiments and visualizations
+
+An experiment is a pure definition (`ExperimentDef` in `src/lib/types.ts`: initial state, controls, `compute`, optional `trace`, `readout`) built in `src/lib/` and exported from the lesson's `code.ts`. In MDX, `<Experiment def={...}>` renders the controls and a Reset button and gives its children the live state: visualizations, `Code` slots, `StepThrough` (fed `def.trace`, filtered by `def.traceExample`) and `<Readout />`. Every `<Experiment>` with the same `def.id` on one lesson page shares one state, so a visual section and a code section stay in sync; pass `controls={false}` where the controls would repeat.
+
+Visualizations live in `src/components/viz/<Name>/` and register themselves for MDX through that folder's `mdx.ts` (no edit to `mdx-components.tsx`; duplicate names fail the build): `VizFrame`, `MatrixGrid`, `MatMulGrid`, `LineChart`, `BarCompare`, `FlowDiagram`, `GradientDescent1D`, `VectorPlane`. Each has a table alternative. Their math is in `src/lib/math/`, `src/lib/viz/` and `src/lib/ml/`. The demo page `#/dev/viz` shows them all.
+
 ## Layout
 
 ```
@@ -70,10 +76,11 @@ content/            curriculum.ts, glossary.ts, tracks/<track>/<chapter>/<lesson
 src/app/            routes, content loading, progress and theme hooks
 src/components/ui/  design-system primitives (Button, Card, SectionLabel, Badge, Tabs, Slider, NumberField, Sheet, Popover, Tooltip)
 src/components/     layout/ (shell, nav, pixel grid, lesson layout), learning/ (Section, Term, Callout, cards), search/,
-                    code/ (Code, StepThrough, ProgressiveCode, PythonRunner), assessment/ (quiz, exercise, mistake, project)
-src/lib/            pure, tested logic: code/, trace/, python/, quiz/, curriculum/, progress/, search/, theme.ts, types.ts
+                    code/ (Code, StepThrough, ProgressiveCode, PythonRunner), assessment/ (quiz, exercise, mistake, project),
+                    experiment/ (Experiment, Readout), viz/ (one folder per visualization, each with mdx.ts)
+src/lib/            pure, tested logic: math/, ml/, viz/, experiment/, code/, trace/, python/, quiz/, curriculum/, progress/, search/, theme.ts, types.ts
 src/workers/        pyodide.worker.ts and harness.py (runs learner code, records traces, runs exercise tests)
-src/dev/            the #/dev/components demo page
+src/dev/            the #/dev/components and #/dev/viz demo pages
 src/pages/          one file per route
 src/styles/         tokens.css (design tokens) and base.css
 tests/e2e/          Playwright smoke, axe and crawl tests

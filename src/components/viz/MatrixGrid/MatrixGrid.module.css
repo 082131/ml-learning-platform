@@ -1,0 +1,94 @@
+.wrap {
+  display: inline-flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  min-width: 0;
+}
+.table {
+  border-collapse: separate;
+  border-spacing: 2px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-15);
+}
+.caption {
+  caption-side: bottom;
+  padding-top: var(--s-1);
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+  text-align: left;
+}
+.name {
+  font-weight: 600;
+  color: var(--ink);
+}
+.index {
+  min-width: 2ch;
+  padding: 0 var(--s-1);
+  font-weight: 400;
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+  text-align: center;
+  white-space: nowrap;
+}
+.index[data-highlight] {
+  color: var(--accent);
+  font-weight: 600;
+}
+/* Square brackets on the left and right edges, like written matrix notation. */
+.body tr > td:nth-child(2) {
+  border-left: 2px solid var(--ink);
+}
+.body tr > td:last-child {
+  border-right: 2px solid var(--ink);
+}
+.body tr:first-child > td {
+  border-top: 2px solid transparent;
+}
+.cell {
+  min-width: 3.5ch;
+  height: 36px;
+  padding: 0;
+  text-align: center;
+  background: var(--surface);
+  outline: 1px solid var(--line);
+  transition: background var(--motion);
+}
+.hot {
+  background: var(--accent-soft);
+  outline-color: var(--accent);
+}
+.selected {
+  outline: 2px solid var(--accent);
+}
+.value {
+  display: inline-block;
+  padding: 0 var(--s-2);
+}
+.input,
+.button {
+  width: 5ch;
+  height: 36px;
+  padding: 0 var(--s-1);
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: center;
+}
+.button {
+  width: auto;
+  min-width: 5ch;
+  cursor: pointer;
+}
+.button[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.input[aria-invalid='true'] {
+  outline: 2px solid var(--err);
+}
+.error {
+  margin: 0;
+  font-size: var(--fs-13);
+  color: var(--err);
+}

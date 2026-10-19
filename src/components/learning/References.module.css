@@ -1,0 +1,22 @@
+.refs {
+  max-width: var(--prose);
+  margin-top: var(--s-8);
+}
+.title {
+  margin: 0 0 var(--s-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
+}
+.list {
+  margin: 0;
+  padding-left: var(--s-4);
+}
+.version {
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}

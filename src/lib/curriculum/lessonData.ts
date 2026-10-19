@@ -1,4 +1,5 @@
 import { validateExample } from '../code/validate';
+import { isExperimentDef, validateExperiment } from '../experiment';
 import { validateAssessment } from '../quiz';
 import type { CodeExample, Exercise, QuizQuestion } from '../types';
 
@@ -21,7 +22,7 @@ const exportsOf = (mod: Record<string, unknown>) =>
 
 /**
  * Validates lesson `code.ts` and `quiz.ts` modules keyed by path: annotation ranges and drift
- * (validateExample) and quiz answers (validateAssessment). Run by `npm run validate` and the content test.
+ * (validateExample), experiments (validateExperiment) and quiz answers (validateAssessment). Run by `npm run validate` and the content test.
  */
 export function validateLessonData(codeModules: Modules, quizModules: Modules): string[] {
   const errors: string[] = [];
@@ -33,6 +34,8 @@ export function validateLessonData(codeModules: Modules, quizModules: Modules): 
       ids.add(ex.id);
       errors.push(...validateExample(ex).map((e) => `${path}: ${e}`));
     }
+    for (const def of exportsOf(mod).filter(isExperimentDef))
+      errors.push(...validateExperiment(def).map((e) => `${path}: ${e}`));
   }
   for (const [path, mod] of Object.entries(quizModules)) {
     const values = exportsOf(mod);

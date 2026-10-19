@@ -1,0 +1,53 @@
+.wrap {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  touch-action: none;
+  overflow-x: clip;
+}
+.svg {
+  display: block;
+  cursor: ew-resize;
+}
+.before {
+  fill: var(--line-strong);
+}
+.after {
+  fill: var(--accent);
+}
+.handleLine {
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+.handle {
+  position: absolute;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  cursor: ew-resize;
+}
+.grip {
+  width: 12px;
+  height: 22px;
+  background: var(--accent);
+  border: 3px solid var(--surface);
+  outline: 1px solid var(--accent);
+}
+.tag {
+  padding: 2px 4px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  white-space: nowrap;
+}
+.axis {
+  margin: var(--s-2) 0 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}

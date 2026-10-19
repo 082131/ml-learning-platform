@@ -1,0 +1,38 @@
+import type { GlossaryTerm } from '@/lib/types';
+
+// Glossary terms for the ml/math chapter (merged into the glossary by content/index.ts).
+// `introducedIn` is the lesson that first teaches the term.
+export default [
+  {
+    id: 'matrix',
+    term: 'Matrix',
+    short: 'A rectangular grid of numbers arranged in rows and columns.',
+    long: 'A matrix with m rows and n columns has shape (m, n). Entry A[i][j] sits in row i and column j, both counted from 0 in Python. In ML a matrix often holds a batch of examples (one per row) or the weights of a layer.',
+    introducedIn: 'ml/math/matrices',
+  },
+  {
+    id: 'shape',
+    term: 'Shape',
+    short: 'The size of an array along each of its dimensions, written as a tuple such as (2, 3).',
+    long: 'A matrix of shape (2, 3) has 2 rows and 3 columns. NumPy reports it as array.shape. Most matrix bugs show up first as a shape that differs from the one you expected.',
+    introducedIn: 'ml/math/matrices',
+    aliases: ['dimensions', 'size'],
+  },
+  {
+    id: 'dot-product',
+    term: 'Dot product',
+    short: 'The sum of the products of matching entries of two equal-length vectors: a·b = a₀b₀ + a₁b₁ + …',
+    long: 'The dot product of [1, 2, 3] and [7, 9, 11] is 1·7 + 2·9 + 3·11 = 58. It measures how much two vectors point the same way, and every entry of a matrix product is one dot product.',
+    introducedIn: 'ml/math/dot-product',
+    aliases: ['inner product', 'scalar product'],
+  },
+  {
+    id: 'matrix-multiplication',
+    term: 'Matrix multiplication',
+    short:
+      'Combining an (m, n) matrix A with an (n, p) matrix B into an (m, p) matrix C, where C[i][j] is row i of A dotted with column j of B.',
+    long: 'Written AB, or A @ B in NumPy. It is defined only when the inner sizes match, and AB usually differs from BA. A layer of a neural network multiplies a batch of inputs by a weight matrix.',
+    introducedIn: 'ml/math/matrix-multiplication',
+    aliases: ['matmul', 'matrix product', '@'],
+  },
+] satisfies GlossaryTerm[];

@@ -1,0 +1,106 @@
+.experiment {
+  display: flex;
+  flex-direction: column;
+  margin: 0 0 var(--s-6);
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--s-4) var(--s-6);
+  padding: var(--s-4) var(--s-3);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+}
+.control {
+  flex: 1 1 180px;
+  max-width: 280px;
+}
+.matrix {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  padding: var(--s-4) var(--s-3);
+  min-width: 0;
+}
+/* Code blocks inside an experiment already have their own frame and spacing. */
+.body > figure {
+  margin-bottom: 0;
+}
+.readout {
+  min-width: 0;
+}
+.readoutTitle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s-2);
+  margin: 0 0 var(--s-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.computed {
+  font-weight: 400;
+  color: var(--ink-2);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: 1px;
+  margin: 0;
+  border: 1px solid var(--line);
+  background: var(--line);
+}
+.item {
+  padding: var(--s-2) var(--s-3);
+  background: var(--surface);
+  min-width: 0;
+}
+.item dt {
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}
+.item dd {
+  margin: 0;
+  overflow-x: auto;
+}
+.value {
+  font-family: var(--font-mono);
+  font-size: var(--fs-15);
+  white-space: pre;
+}
+.flag {
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  color: var(--err);
+}
+.item[data-status='diverged'] .value,
+.item[data-status='error'] .value {
+  color: var(--err);
+}

@@ -1,0 +1,26 @@
+.wrap {
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+  touch-action: none;
+}
+.wrap svg {
+  display: block;
+  overflow: visible;
+}
+.handle {
+  cursor: grab;
+  outline: none;
+}
+.hit {
+  fill: transparent;
+}
+.dot {
+  fill: var(--surface);
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+.handle:focus-visible .hit {
+  stroke: var(--accent);
+  stroke-width: 2;
+}

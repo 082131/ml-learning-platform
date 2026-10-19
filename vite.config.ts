@@ -27,5 +27,7 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}', 'content/**/*.test.ts', 'scripts/**/*.test.ts'],
     css: false,
+    // The file-system transform cache keeps stale import.meta.glob results when lesson files are added.
+    fsModuleCache: false,
   },
 });

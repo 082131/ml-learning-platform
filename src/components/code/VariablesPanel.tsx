@@ -1,6 +1,7 @@
 import { changesFrom, formatNumber, formatValue, removedFrom, type VarChange } from '@/lib/trace/values';
 import type { TraceStep, TraceValue } from '@/lib/types';
-import { cx } from '@/components/ui';
+import { useRef } from 'react';
+import { cx, useOverflowFocus } from '@/components/ui';
 import s from './StepThrough.module.css';
 
 const CHANGE_LABEL: Record<VarChange, string> = { new: 'new', changed: 'changed', same: '' };
@@ -10,8 +11,10 @@ export function VariablesPanel({ step, prev }: { step: TraceStep; prev: TraceSte
   const changes = changesFrom(prev, step);
   const removed = removedFrom(prev, step);
   const names = Object.keys(step.vars);
+  const box = useRef<HTMLDivElement>(null);
+  useOverflowFocus(box);
   return (
-    <div className={s.vars}>
+    <div className={s.vars} ref={box}>
       <table className={s.table}>
         <caption className={s.caption}>Variables after this step</caption>
         <thead>

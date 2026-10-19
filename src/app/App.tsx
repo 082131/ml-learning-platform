@@ -15,6 +15,7 @@ const NotFound = lazy(() => import('@/pages/NotFound'));
 // Developer pages: in dev builds, and in the e2e build (VITE_DEV_PAGES=true). Removed from production builds.
 const SHOW_DEV_PAGES = import.meta.env.DEV || import.meta.env.VITE_DEV_PAGES === 'true';
 const ComponentsDemo = SHOW_DEV_PAGES ? lazy(() => import('@/dev/ComponentsDemo')) : null;
+const VizDemo = SHOW_DEV_PAGES ? lazy(() => import('@/dev/VizDemo')) : null;
 
 export function AppRoutes() {
   return (
@@ -27,6 +28,7 @@ export function AppRoutes() {
         <Route path="bookmarks" element={<BookmarksPage />} />
         <Route path="settings" element={<SettingsPage />} />
         {ComponentsDemo && <Route path="dev/components" element={<ComponentsDemo />} />}
+        {VizDemo && <Route path="dev/viz" element={<VizDemo />} />}
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

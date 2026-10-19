@@ -3,7 +3,7 @@ import { fillExample } from '@/lib/code/slots';
 import type { CodeExample, Trace, TraceSource } from '@/lib/types';
 import { Badge, SimulatedBadge } from '@/components/ui';
 import { PlainCode } from './PlainCode';
-import { SlotStateContext } from './slotState';
+import { ExperimentTraceContext, SlotStateContext } from './slotState';
 import { StepControls } from './StepControls';
 import { VariablesPanel } from './VariablesPanel';
 import { useRecordedTrace } from './useRecordedTrace';
@@ -14,7 +14,10 @@ export const PLAY_INTERVAL_MS = 1000;
 
 interface StepThroughProps {
   example: CodeExample;
-  /** A computed or simulated trace. Without one, a Python example can be recorded in Pyodide on demand. */
+  /**
+   * A computed or simulated trace. Inside an Experiment, its `def.trace(state)` is used when this is
+   * left out. Without either, a Python example can be recorded in Pyodide on demand.
+   */
   trace?: Trace;
   title?: string;
 }
@@ -34,7 +37,10 @@ export function StepThrough({ example, trace: given, title }: StepThroughProps) 
   const state = useContext(SlotStateContext);
   const { source } = useMemo(() => fillExample(example, state), [example, state]);
   const recorded = useRecordedTrace(source);
-  const trace = given ?? recorded.trace;
+  const linked = useContext(ExperimentTraceContext);
+  const fromExperiment =
+    linked && (!linked.exampleId || linked.exampleId === example.id) ? linked.trace : undefined;
+  const trace = given ?? fromExperiment ?? recorded.trace;
   const count = trace?.steps.length ?? 0;
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -108,7 +114,7 @@ export function StepThrough({ example, trace: given, title }: StepThroughProps) 
           />
         )}
       </div>
-      {!given && recorded.notice && (
+      {!given && !fromExperiment && recorded.notice && (
         <p role="status" className={s.error}>
           {recorded.notice}
         </p>

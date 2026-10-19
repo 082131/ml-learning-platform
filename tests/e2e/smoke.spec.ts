@@ -62,7 +62,12 @@ test('opens a lesson, follows a prerequisite, marks complete and keeps it after 
   await page.reload();
   await expect(page.getByRole('region', { name: 'Prerequisites' })).toContainText('✓ Complete');
   await page.goto('./#/');
-  await expect(page.getByRole('region', { name: 'Progress by track' })).toContainText('1 of 1');
+  // Content threads add written lessons, so only the completed count is fixed.
+  await expect(
+    page
+      .getByRole('region', { name: 'Progress by track' })
+      .getByRole('link', { name: /Machine Learning Engineer/ }),
+  ).toContainText(/T\.01\s*1 of [1-9]\d*\s*written/);
   await expect(page.getByRole('region', { name: 'Bookmarks and recent lessons' })).toContainText(
     'What AI, ML',
   );

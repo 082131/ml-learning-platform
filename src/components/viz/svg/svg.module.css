@@ -1,0 +1,57 @@
+/* Shared SVG styles. Colors come from tokens so both themes work. */
+.axis {
+  stroke: var(--ink-2);
+  stroke-width: 1;
+}
+.grid {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+.tick {
+  fill: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.axisLabel {
+  fill: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.label {
+  fill: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.accent {
+  stroke: var(--accent);
+  fill: var(--accent);
+}
+.ink {
+  stroke: var(--ink);
+  fill: var(--ink);
+}
+.muted {
+  stroke: var(--ink-2);
+  fill: var(--ink-2);
+}
+.err {
+  stroke: var(--err);
+  fill: var(--err);
+}
+.ok {
+  stroke: var(--ok);
+  fill: var(--ok);
+}
+.line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.dashed {
+  stroke-dasharray: 6 4;
+}
+.arrowLine {
+  fill: none;
+  stroke-width: 2;
+}

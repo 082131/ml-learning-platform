@@ -5,7 +5,8 @@ An interactive, static (no backend) learning site for ML, Data, AI and Inference
 ## Before you touch anything
 1. `.specify/memory/constitution.md`: the rules (accuracy, labeled simulations, one source of truth, tests per feature).
 2. `specs/001-learning-platform/tasks.md`: find **your thread's brief**. It lists which other spec files to read. Read only those.
-3. `specs/001-learning-platform/plan.md` → "Working agreement": clone the repo to local disk, work on a branch, fast-forward merge back. Never run `npm install` inside `/mnt/project-files`.
+3. Content threads: `AUTHORING.md` (how to write a lesson from the model lesson, and how to avoid conflicts).
+4. `specs/001-learning-platform/plan.md` → "Working agreement": clone the repo to local disk, work on a branch, fast-forward merge back. Never run `npm install` inside `/mnt/project-files`.
 
 ## Map
 - `specs/001-learning-platform/`: spec (what and why), plan (stack, structure, decisions), data-model (types), curriculum (every lesson ID), design-system (tokens and visual rules), tasks (thread briefs).

@@ -1,0 +1,217 @@
+import { experiment, linearLayer, loopMatmul, loopRunner, matmulStages, numpyMatmul } from './code';
+import { matmulExercise, questions } from './quiz';
+
+<Section kind="intuition" title="A shopping bill for several people at several stores">
+
+Two friends are shopping for the same three items: apples, bread and cheese. Friend 0 wants 1, 2 and 3 of them;
+friend 1 wants 4, 5 and 6. Two stores sell all three items at different prices. How much would each friend pay at
+each store?
+
+For one friend at one store, you pair each quantity with that store's price, multiply, and add:
+friend 0 at store 0 pays $1 \cdot 7 + 2 \cdot 9 + 3 \cdot 11 = 58$. Doing that for every friend and every store
+fills a small table of totals, one number per (friend, store) pair.
+
+|          | Store 0                    | Store 1                     |
+| -------- | -------------------------- | --------------------------- |
+| Friend 0 | 1·7 + 2·9 + 3·11 = **58**  | 1·8 + 2·10 + 3·12 = **64**  |
+| Friend 1 | 4·7 + 5·9 + 6·11 = **139** | 4·8 + 5·10 + 6·12 = **154** |
+
+That table is a <Term id="matrix-multiplication">matrix product</Term>. The quantities form one
+<Term id="matrix">matrix</Term> (a grid of numbers: a row per friend, a column per item), the prices form
+another (a row per item, a column per store), and the totals are the result. Each total is a
+<Term id="dot-product">dot product</Term>: pair up two lists of numbers, multiply the pairs, and add.
+
+The same pattern runs inside every neural network: a row of input features is combined with a column of weights,
+for every input and every output at once.
+
+</Section>
+
+<Section kind="technical" title="Row of A times column of B">
+
+Call the quantities $A$ and the prices $B$. $A$ has 2 rows and 3 columns, so its
+<Term id="shape">shape</Term> is $(2, 3)$. $B$ has shape $(3, 2)$.
+
+$$
+A = \begin{bmatrix} 1 & 2 & 3 \\ 4 & 5 & 6 \end{bmatrix}
+\qquad
+B = \begin{bmatrix} 7 & 8 \\ 9 & 10 \\ 11 & 12 \end{bmatrix}
+$$
+
+**Definition.** If $A$ has shape $(m, n)$ and $B$ has shape $(n, p)$, their product $C = AB$ has shape $(m, p)$,
+and the entry in row $i$, column $j$ is
+
+$$
+C_{ij} = \sum_{k=0}^{n-1} A_{ik} \, B_{kj} = A_{i0} B_{0j} + A_{i1} B_{1j} + \dots + A_{i,n-1} B_{n-1,j}
+$$
+
+In words: walk along row $i$ of $A$ and down column $j$ of $B$ at the same time, multiply the numbers you meet,
+and add the products. The index $k$ is the position you are at in both. Indices start at 0 here, as they do in
+Python.
+
+**Worked example.** $C_{10}$ uses row 1 of $A$, $[4, 5, 6]$, and column 0 of $B$, $[7, 9, 11]$:
+
+$$
+C_{10} = 4 \cdot 7 + 5 \cdot 9 + 6 \cdot 11 = 28 + 45 + 66 = 139
+$$
+
+Doing this for all four positions gives
+
+$$
+C = AB = \begin{bmatrix} 58 & 64 \\ 139 & 154 \end{bmatrix}, \quad \text{shape } (2, 2)
+$$
+
+**The shape rule.** Row $i$ of $A$ has $n$ numbers and column $j$ of $B$ has as many numbers as $B$ has rows,
+so pairing them only works when those counts are equal:
+
+$$
+\underbrace{(m, \; n)}_{A} \times \underbrace{(n, \; p)}_{B} \;\rightarrow\; \underbrace{(m, \; p)}_{C}
+$$
+
+The inner sizes must match and disappear; the outer sizes give the result. $(2, 3) \times (3, 2)$ gives
+$(2, 2)$, while $(2, 3) \times (2, 3)$ is not defined.
+
+**Order matters.** $BA$ has shape $(3, 3)$ here, a different matrix altogether. In general $AB \neq BA$, even
+when both exist.
+
+**Cost.** $C$ has $m \cdot p$ entries and each needs $n$ multiply-adds, so the product takes $m \cdot n \cdot p$
+multiply-adds: $2 \cdot 3 \cdot 2 = 12$ here. Counting each multiply and each add separately gives the
+$2mnp$ floating-point operations (FLOPs) that engineers use to estimate how long a layer takes.
+
+<Callout kind="simplification">
+  The loop in the experiment below shows the definition, not how libraries compute it. NumPy hands the work to
+  an optimized linear algebra library (a BLAS) that reorders and splits the multiply-adds for speed. The
+  result is the same up to floating-point rounding, which is why results for large float matrices can differ
+  in the last digits between machines.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Every entry is one row and one column">
+
+Select an entry of $C$ to see which row of $A$ and which column of $B$ produce it. Edit any number in $A$ or $B$:
+the product, the code in the next section and the step-through further down all use the same values.
+
+<Experiment def={experiment} title="Explore the product" controls={false}>
+  <MatMulGrid />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The same product in NumPy">
+
+In NumPy, matrices are arrays and `@` is matrix multiplication. Hover over, focus, or select a part of the code
+to see what it does. The literals in the code are the numbers in the grid above.
+
+<Experiment def={experiment} title="matmul.py, linked to the grid" controls={false}>
+  <Code example={numpyMatmul} title="matmul.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+The `@` operator hides three nested loops. The steps below show how the loop version turns into `A @ B`. Select a
+stage to see which lines changed.
+
+<ProgressiveCode example={matmulStages} title="From loops to @" />
+
+You can run the loop version in your browser and change it, for example by editing a number in `A` or by adding a
+row to `A`.
+
+<PythonRunner example={loopRunner} title="matmul_loops.py" />
+
+</Section>
+
+<Section kind="experiment" title="Step through every multiply-add">
+
+Change the sizes with the sliders, then step through the loop. Each step shows the line that runs, the numbers it
+multiplies (highlighted in `A`, `B` and `C`), and the running total. The grid in the Visual section changes with
+these sliders too.
+
+<Experiment def={experiment} title="Shapes and the triple loop">
+  <StepThrough example={loopMatmul} title="matmul_loops.py" />
+  <Readout />
+</Experiment>
+
+Things to try:
+
+- Set the shared size $n$ to 1. Each entry is then a single product, and $C$ is called an outer product.
+- Set $m = 1$ and $p = 1$. $A$ is a single row, $B$ a single column, and $C$ is their dot product.
+- Watch the multiply-add count as you change the sizes: it is always $m \cdot n \cdot p$.
+
+</Section>
+
+<Section kind="mistakes" title="Shape errors and the wrong operator">
+
+<CommonMistake
+  title="Multiplying matrices whose inner sizes differ"
+  wrong={'A = np.array([[1, 2, 3], [4, 5, 6]])  # shape (2, 3)\nA @ A'}
+  error="ValueError: matmul: Input operand 1 has a mismatch in its core dimension 0, with gufunc signature (n?,k),(k,m?)->(n?,m?) (size 2 is different from 3)"
+  cause="A @ B needs the column count of A to equal the row count of B. Here the left A has 3 columns but the right A has 2 rows. NumPy calls the shared size `k` in the signature."
+  fix={'A @ A.T  # (2, 3) @ (3, 2) -> (2, 2)'}
+/>
+
+<CommonMistake
+  title="Using * when you mean matrix multiplication"
+  wrong={
+    'A = np.array([[1, 2, 3], [4, 5, 6]])           # (2, 3)\nB = np.array([[7, 8], [9, 10], [11, 12]])     # (3, 2)\nA * B'
+  }
+  error="ValueError: operands could not be broadcast together with shapes (2,3) (3,2) "
+  cause="On NumPy arrays `*` multiplies element by element, so it needs arrays of the same shape (or shapes that broadcast). It never sums over a shared dimension."
+  fix={'A @ B  # matrix product, shape (2, 2)'}
+/>
+
+<Callout kind="warning">
+  Some mistakes raise no error. If `A` and `B` are both square, `A * B` and `B @ A` run fine but give a
+  different matrix from `A @ B`. Print `.shape` and check one entry by hand when a result looks wrong.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+A layer of a neural network multiplies a batch of inputs by a weight matrix. With 32 images of 784 pixels each and
+a layer with 128 outputs:
+
+<Code example={linearLayer} title="linear_layer.py" />
+
+The batch $X$ has shape $(32, 784)$ and the weights $W$ have shape $(784, 128)$, so $H = XW$ has shape
+$(32, 128)$: one row of 128 outputs per image. That takes $32 \cdot 784 \cdot 128 = 3{,}211{,}264$
+multiply-adds, which is why ML runs on hardware built to do many of them in parallel.
+
+| Where                             | Product                            | Shapes                                                                                            |
+| --------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------- |
+| A dense (fully connected) layer   | inputs × weights                   | $(\text{batch}, \text{in}) \times (\text{in}, \text{out}) \rightarrow (\text{batch}, \text{out})$ |
+| Attention scores in a transformer | queries × keys transposed          | $(\text{seq}, d) \times (d, \text{seq}) \rightarrow (\text{seq}, \text{seq})$                     |
+| Comparing many embeddings at once | embeddings × embeddings transposed | $(N, d) \times (d, N) \rightarrow (N, N)$                                                         |
+
+These come back in [Layers and forward propagation](#/learn/ml/deep/forward-propagation) and
+[Attention](#/learn/ml/deep/attention).
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Write matmul yourself">
+
+<MiniExercise exercise={matmulExercise}>
+  Write `matmul(A, B)` for matrices given as lists of rows, without NumPy. It should return a new list of rows
+  and raise `ValueError` when the number of columns of `A` differs from the number of rows of `B`. Run the
+  tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- $C = AB$ is defined when $A$ is $(m, n)$ and $B$ is $(n, p)$. The result is $(m, p)$.
+- Each entry $C_{ij}$ is the dot product of row $i$ of $A$ and column $j$ of $B$.
+- The product costs $m \cdot n \cdot p$ multiply-adds. Order matters: $AB \neq BA$ in general.
+- In NumPy, use `@`. `*` multiplies element by element.
+- Check `.shape` first when something goes wrong.
+
+Next: [Tensors and shapes](#/learn/ml/math/tensors) extends shapes to more than two dimensions, such as a batch
+of images, where the same row-by-column rule is applied to every item in the batch.
+
+</Section>
