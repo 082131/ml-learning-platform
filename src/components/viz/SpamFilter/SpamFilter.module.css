@@ -1,0 +1,108 @@
+.email {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding: var(--s-3);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: var(--fs-15);
+}
+.lhs {
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}
+.words {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.word {
+  display: inline-flex;
+  gap: var(--s-1);
+  padding: 2px var(--s-2);
+  border: 1px solid var(--line-strong);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+}
+.word[data-sign='1'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.score {
+  font-weight: 600;
+}
+.table {
+  width: 100%;
+  margin-top: var(--s-4);
+  border-collapse: collapse;
+  font-size: var(--fs-13);
+}
+.table caption {
+  padding-bottom: var(--s-1);
+  font-family: var(--font-mono);
+  color: var(--ink-2);
+  text-align: left;
+}
+.table th,
+.table td {
+  padding: var(--s-1) var(--s-2);
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+.table thead th {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.table tbody th {
+  font-family: var(--font-mono);
+  font-weight: 400;
+}
+.num {
+  font-family: var(--font-mono);
+  text-align: right;
+}
+.table [data-correct='false'] {
+  color: var(--err);
+  font-weight: 600;
+}
+/* On narrow screens each email becomes a block: the text, then its four values on labeled lines. */
+.tableWrap {
+  container-type: inline-size;
+}
+@container (max-width: 560px) {
+  .table,
+  .table caption,
+  .table tbody {
+    display: block;
+  }
+  .table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .table tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    padding: var(--s-2) 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .table tbody th {
+    grid-column: 1 / -1;
+  }
+  .table th,
+  .table td {
+    border-bottom: 0;
+    text-align: left;
+  }
+  .table td::before {
+    content: attr(data-label) ': ';
+    color: var(--ink-2);
+  }
+}

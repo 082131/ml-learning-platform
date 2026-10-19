@@ -71,7 +71,7 @@ For **each new visualization**: pure logic in `src/lib/<area>/` with unit tests 
 Close each content thread with: content validation green, `check`, `e2e` and `build` green, an axe scan of 3 of its lessons, screenshots of 2 lessons at both widths, and a preview publish.
 
 ## Thread 4: ML Foundations (`ml/foundations`, 10 entries)
-- [ ] M101 `what-is-ml` (replaces the shell's sample): rule-based vs learned spam toy (computed word counts and threshold).
+- [x] M101 `what-is-ml` (replaces the shell's sample): rule-based vs learned spam toy (computed word counts and threshold).
 - [ ] M102 `types-of-ml`: scenario-sorting exercise (`order` and `choice` checks).
 - [ ] M103 to M105 Python basics, control flow, collections: Pyodide runners, step-throughs of state changes (trace via Pyodide where possible, otherwise computed), and a slice visualizer.
 - [ ] M106 to M107 NumPy arrays and vectorization: shape explorer, broadcasting visualizer, loop vs vectorized timing measured live in Pyodide and labeled "measured in your browser".

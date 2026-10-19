@@ -1,36 +1,176 @@
-{/* Sample lesson from thread 1: only the intuition section, to prove the MDX pipeline. Thread 4 replaces it. */}
+import { experiment, spamCode, spamRunner } from './code';
+import { questions, scoresExercise } from './quiz';
 
 <Section kind="intuition" title="Rules you write vs rules a program learns">
 
-Imagine you have to sort email into spam and not spam. One way is to write the rules yourself: if the subject
-contains "FREE MONEY", or the email has more than ten links, mark it as spam. A program that follows hand-written
-rules like these is a classic form of <Term id="artificial-intelligence">artificial intelligence</Term>.
+Imagine you have to sort email into spam and normal email (often called "ham"). One way is to write the rules
+yourself: if the email contains "free" or "prize", call it spam. A program that follows hand-written rules like
+this is a <Term id="rule-based-system">rule-based system</Term>, a classic form of
+<Term id="artificial-intelligence">artificial intelligence</Term> (AI): the broad field of making computers do
+tasks we associate with intelligence.
 
-Hand-written rules break as soon as spammers change their wording, and nobody can write a rule for every case.
-<Term id="machine-learning">Machine learning</Term> takes a different route: you collect a
-<Term id="dataset">dataset</Term> of emails that are already marked as spam or not spam, describe each one with
-numbers called <Term id="feature">features</Term> (for example, how many links it has), and let a
-<Term id="training">training</Term> procedure find the rule that best separates the two groups.
+Hand-written rules break easily. "Are you free for lunch?" contains "free", and spammers simply switch to words
+nobody listed. <Term id="machine-learning">Machine learning</Term> (ML) takes a different route. You collect a
+<Term id="dataset">dataset</Term> of emails that people have already marked spam or ham (each mark is a
+<Term id="label">label</Term>), describe each email with <Term id="feature">features</Term> (here, its words), and
+let a <Term id="training">training</Term> procedure work out the rule from the examples.
 
 | | Hand-written rules | Machine learning |
 |---|---|---|
-| Who writes the rule | A person | A training procedure, from examples |
+| Who writes the rule | A person | A training procedure, from labeled examples |
 | What it needs | Knowledge of the problem | Many labeled examples |
 | When spam changes | Someone edits the rules | Retrain on newer examples |
 
-The learned rule is called a <Term id="model">model</Term>. In the simplest case it is a function from the features
-$x$ to a prediction $\hat{y}$:
+The learned rule is called a <Term id="model">model</Term>. Using the trained model on a new email is called
+<Term id="inference">inference</Term>. <Term id="deep-learning">Deep learning</Term> is machine learning where the
+model is a neural network with many layers; you will build one in the Deep Learning chapter. So deep learning is
+part of machine learning, which is part of AI.
+
+</Section>
+
+<Section kind="technical" title="What the spam filter learns">
+
+The filter below learns from 10 labeled training emails, 5 spam and 5 ham. Training is plain counting:
+
+1. Every word starts with a score of 0.
+2. For each spam email, every distinct word in it gets $+1$. For each ham email, every distinct word gets $-1$.
+
+"free" appears in 4 spam emails and 1 ham email ("are you free to talk later today"), so its score is
+$4 - 1 = 3$. "the" appears in 2 ham emails and no spam, so its score is $-2$. These scores are the model's
+learned numbers.
+
+To judge an email, the model adds up the scores of its words (a word it never saw counts 0) and compares the sum
+with a threshold $t$:
 
 $$
-\hat{y} = f(x)
+\text{score}(\text{email}) = \sum_{\text{word} \in \text{email}} \text{score}(\text{word}),
+\qquad
+\text{spam if } \text{score} > t
 $$
 
-Using the trained model on a new email is called <Term id="inference">inference</Term>.
-<Term id="deep-learning">Deep learning</Term> is machine learning where $f$ is a neural network with many layers.
+**Worked example.** "are you free for lunch today" scores
+$-1 + 0 + 3 + (-1) + (-1) + (-1) = -1$. With $t = 1$ that is not above the threshold, so the learned filter says
+ham. The hand-written rule sees "free" and says spam.
+
+**The threshold is learned too.** On the training emails, the ham scores go up to $-3$ and the spam scores start
+at $6$, so every whole-number threshold from $-3$ to $5$ gets all 10 right. The program takes the middle one,
+$t = 1$, so that a small change in an email's score does not flip the answer.
+
+**Judging a model.** Getting the training emails right is easy: the model was built from them. What matters is
+<Term id="generalization">generalization</Term>, how it does on emails it has never seen. That is why the lesson
+keeps 6 new emails out of training and measures both filters on them. Accuracy below means the share of emails a
+filter labels correctly.
 
 <Callout kind="simplification">
-Real spam filters combine both approaches: learned models for most decisions, plus hand-written rules for cases
-that must never slip through.
+  Real spam filters learn from millions of emails, use many more features than single words (links, sender
+  history, word pairs), and turn scores into probabilities, for example with naive Bayes or logistic regression.
+  They also keep some hand-written rules for cases that must never slip through. The idea is the same: numbers
+  learned from labeled examples, then a threshold.
 </Callout>
+
+</Section>
+
+<Section kind="visual" title="Try both filters on the same emails">
+
+Type an email, change the keywords of the hand-written rule, or move the learned filter's threshold. The word
+scores never change here, because they come from the training emails. The tables mark every wrong answer.
+
+<Experiment def={experiment} title="Hand-written rule vs learned filter">
+  <SpamFilter />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The same two filters in Python">
+
+Hover over, focus, or select a part of the code to see what it does. The keywords, the threshold and the email
+in the code are the ones you set above, and the readout shows what the two `print` lines print.
+
+<Experiment def={experiment} title="spam_filter.py, linked to the filters above" controls={false}>
+  <Code example={spamCode} title="spam_filter.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+</Section>
+
+<Section kind="experiment" title="Run the learned filter on the new emails">
+
+This program trains the filter, prints a few word scores, and judges the 6 new emails. Run it in your browser,
+then change it: try `threshold=0` in `is_spam`, or add `("free prize draw winner", "spam")` to `train` and run
+again to see how one more example changes what the model knows.
+
+<PythonRunner example={spamRunner} title="spam_new_emails.py" />
+
+Things to try in the filters above:
+
+- Set the threshold to 0. The learned filter now catches "prize draw winner announced today" (score 1) but also
+  calls "free for lunch tomorrow" spam (score 1 too).
+- Add "winner" to the keywords. The rule improves on new emails. That is how rule-based systems are maintained:
+  by people noticing what slipped through.
+- Type "the weekend project invoice". Every word has a negative score, so it scores well below any threshold.
+
+</Section>
+
+<Section kind="mistakes" title="A missing word, and judging on training data">
+
+<CommonMistake
+  title="Reading a dictionary entry that does not exist yet"
+  wrong={'scores = {}\nfor text, label in train:\n    for word in text.split():\n        scores[word] = scores[word] + 1'}
+  error="KeyError: 'win'"
+  cause="The first time a word is seen, it is not in the dictionary yet, so scores[word] on the right-hand side has nothing to read. Python raises KeyError with the missing key: 'win', the first word of the first training email."
+  fix={'scores[word] = scores.get(word, 0) + 1  # 0 for a word not seen yet'}
+/>
+
+<Callout kind="warning">
+  Some mistakes raise no error. Counting how many *training* emails the filter gets right prints "10 of 10",
+  because the model was built from those exact emails. That number says nothing about new email: on the 6 new
+  ones the same filter gets 4 right. Always measure on examples kept out of training. And "learned" does not mean
+  "correct": a word the filter never saw, such as "winner", counts 0.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+The same split between hand-written rules and learned models shows up everywhere:
+
+| Task | A hand-written rule | What a model learns from labeled examples |
+|---|---|---|
+| Spam filtering | Block emails with listed words | Word and sender scores |
+| Fraud detection | Flag payments over 10,000 euros | Which combinations of amount, place and time are unusual |
+| Product search | Exact keyword match | Which results people click for which queries |
+
+The learning steps are always the same: data with labels, features, training, then inference on new inputs,
+judged on examples kept out of training. The rest of this track teaches each step properly, starting with
+[Supervised, unsupervised and reinforcement learning](#/learn/ml/foundations/types-of-ml).
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Write the training step">
+
+<MiniExercise exercise={scoresExercise}>
+  Write `learn_scores(emails)`: for a list of `(text, label)` pairs, return a dict that gives each word `+1` for
+  every spam email it appears in and `-1` for every ham email, counting a word once per email. Run the tests to
+  check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- AI is the broad field. Machine learning is AI that learns its behavior from data. Deep learning is machine
+  learning with many-layered neural networks.
+- A rule-based system follows rules a person wrote. A model's rule is learned from labeled examples.
+- The learned spam filter's model is a score per word plus a threshold: spam if the summed score is above it.
+- A model is judged on new examples, not the ones it was trained on.
+
+Next: [Supervised, unsupervised and reinforcement learning](#/learn/ml/foundations/types-of-ml) sorts ML problems
+by what kind of examples you have.
 
 </Section>
