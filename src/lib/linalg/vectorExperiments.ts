@@ -136,7 +136,7 @@ export function dotProductExperiment(id: string, initial: DotState): ExperimentD
               value: `${formatNumber(r.cos)} ≈ ${formatNumber(r.dot + 0)} / (${formatNumber(r.normU)} × ${formatNumber(r.normV)})`,
             },
         ...(zero ? [] : [{ label: 'θ', value: `${formatNumber(r.angle)}°` }]),
-        { label: 'print(np.dot(u, v))', value: printDot(u, v, r.dot) },
+        { label: 'print(d)', value: printDot(u, v, r.dot) },
         {
           label: 'print(cos)',
           value: zero ? 'nan (NumPy also warns: invalid value encountered in scalar divide)' : pyRepr(r.cos),

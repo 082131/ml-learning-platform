@@ -1,0 +1,162 @@
+import { dotRunner, experiment, numpyDot, similarity } from './code';
+import { cosineExercise, questions } from './quiz';
+
+<Section kind="intuition" title="How much do two arrows agree?">
+
+Push a box with a rope. If you pull in the direction the box can slide, all your effort counts. Pull at an angle
+and only part of it does; pull straight sideways and none of it does. The
+<Term id="dot-product">dot product</Term> measures exactly this agreement between two
+<Term id="vector">vectors</Term>: large and positive when they point the same way, zero when they are at a right
+angle, negative when they point apart.
+
+In machine learning the same number answers "how similar are these two examples?" Two documents, two users or two
+word embeddings are vectors, and their dot product (scaled for length) says how alike they are.
+
+</Section>
+
+<Section kind="technical" title="Products, lengths and the angle">
+
+**Definition.** For two vectors with the same number of components,
+
+$$
+u \cdot v = \sum_{k=0}^{n-1} u_k v_k = u_0 v_0 + u_1 v_1 + \dots + u_{n-1} v_{n-1}
+$$
+
+The result is a scalar. For $u = (3, 1)$ and $v = (1, 2)$: $u \cdot v = 3 \cdot 1 + 1 \cdot 2 = 3 + 2 = 5$.
+
+**Length.** The dot product of a vector with itself is the sum of its squared components, so its square root is
+the arrow's length (Pythagoras), called the <Term id="norm">norm</Term>:
+
+$$
+\lVert u \rVert = \sqrt{u \cdot u} \qquad \lVert (3, 1) \rVert = \sqrt{9 + 1} = \sqrt{10} \approx 3.1623
+$$
+
+**Angle.** Geometry gives a second formula for the same number, with $\theta$ the angle between the arrows:
+
+$$
+u \cdot v = \lVert u \rVert \, \lVert v \rVert \cos\theta
+\quad\Longrightarrow\quad
+\cos\theta = \frac{u \cdot v}{\lVert u \rVert \, \lVert v \rVert}
+$$
+
+For the example, $\lVert v \rVert = \sqrt{1 + 4} = \sqrt{5}$, so
+$\cos\theta = 5 / (\sqrt{10} \cdot \sqrt{5}) = 5 / \sqrt{50} \approx 0.7071$, and $\theta = 45°$.
+
+Since lengths are positive, the sign of $u \cdot v$ is the sign of $\cos\theta$:
+
+| $u \cdot v$ | $\cos\theta$ | Angle             | Meaning                     |
+| ----------- | ------------ | ----------------- | --------------------------- |
+| $> 0$       | $(0, 1]$     | less than 90°     | roughly the same direction  |
+| $= 0$       | $0$          | exactly 90°       | <Term id="orthogonal">orthogonal</Term> (perpendicular) |
+| $< 0$       | $[-1, 0)$    | more than 90°     | roughly opposite directions |
+
+**Cosine similarity** is $\cos\theta$ used as a similarity score. It ignores length: $(1, 2)$ and $(2, 4)$ have
+similarity 1. A vector of length 0 has no direction, so its cosine is undefined.
+
+<Callout kind="simplification">
+  The angle picture is exact in 2-D and 3-D. In 300 dimensions you can't draw it, but the formula is the same,
+  and "angle" just means the number $\arccos(\cos\theta)$.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Drag the arrows and watch the angle">
+
+Drag the tip of $u$ or $v$ (or focus it and use the arrow keys). The readout recomputes the dot product, both
+lengths, $\cos\theta$ and $\theta$. The code in the next section uses the same vectors.
+
+<Experiment def={experiment} title="Dot product and angle">
+  <VectorPlane vectors={['u', 'v']} title="u and v" />
+  <Readout />
+</Experiment>
+
+Things to try:
+
+- Make $v = (-1, 3)$: $3 \cdot (-1) + 1 \cdot 3 = 0$, so the arrows are perpendicular.
+- Point $v$ the opposite way from $u$: the dot product turns negative and $\cos\theta$ approaches $-1$.
+- Lengthen $v$ along the same line: $u \cdot v$ grows, but $\cos\theta$ stays the same.
+- Drag $u$ to $(0, 0)$: the length is 0 and the angle is undefined.
+
+</Section>
+
+<Section kind="code" title="The same numbers in NumPy">
+
+<Experiment def={experiment} title="dot.py, linked to the plane" controls={false}>
+  <Code example={numpyDot} title="dot.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+`print(cos)` shows every digit a float needs to be identified exactly. Exact math says
+$\cos 45° = 1/\sqrt{2}$; the float closest to the computed value is `0.7071067811865475`. The same rounding is
+why $(1, 1)$ and $(-1, -1)$ print `-0.9999999999999998` instead of `-1.0`.
+
+The same computation in plain Python, which you can edit and run in your browser:
+
+<PythonRunner example={dotRunner} title="dot_plain.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Element-wise products and exact comparisons">
+
+<CommonMistake
+  title="Dot product of vectors with different lengths"
+  wrong={'np.dot(np.array([1, 2]), np.array([1, 2, 3]))'}
+  error="ValueError: shapes (2,) and (3,) not aligned: 2 (dim 0) != 3 (dim 0)"
+  cause="Every component of one vector needs a partner in the other. NumPy reports the two shapes and the sizes that disagree."
+  fix={'print(u.shape, v.shape)  # make both vectors use the same features'}
+/>
+
+<Callout kind="warning">
+  `u * v` is not the dot product. On arrays it is element-wise: `np.array([3, 1]) * np.array([1, 2])` gives
+  `[3 2]`, a vector. The dot product is the sum of that vector: `np.dot(u, v)`, `u @ v`, or `(u * v).sum()`.
+</Callout>
+
+<Callout kind="warning">
+  Don't compare a computed cosine with `==`. `cos == -1.0` is `False` for $(1, 1)$ and $(-1, -1)$, because the
+  float is `-0.9999999999999998`. Use `np.isclose(cos, -1.0)`, which is `True`.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Similarity search">
+
+Search engines, recommenders and retrieval systems turn items into vectors and rank them by
+<Term id="cosine-similarity">cosine similarity</Term>. Here three tiny documents are counted by word:
+
+<Code example={similarity} title="similarity.py" />
+
+Documents 0 and 1 use the same words in the same proportions, so their similarity is 1 even though one is longer.
+Document 2 is mostly about cars: its similarity with the others is $0.141$. Check one by hand: document 0 is
+$(2, 1, 0)$ and document 2 is $(0, 1, 3)$, so $\cos\theta = 1 / (\sqrt{5} \cdot \sqrt{10}) = 1/\sqrt{50} \approx 0.1414$.
+
+Every entry of a matrix product is one of these dot products, which is where
+[Matrices](#/learn/ml/math/matrices) and [Matrix multiplication](#/learn/ml/math/matrix-multiplication) come in.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Cosine similarity from scratch">
+
+<MiniExercise exercise={cosineExercise}>
+  Write `dot(u, v)` and `cosine(u, v)` for vectors given as Python lists, without NumPy. Both should raise
+  `ValueError` when the lengths differ, and `cosine` should also raise it when either vector has length 0.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- $u \cdot v = u_0 v_0 + u_1 v_1 + \dots$, a scalar. Both vectors need the same length.
+- $\lVert u \rVert = \sqrt{u \cdot u}$ is the vector's length.
+- $\cos\theta = u \cdot v / (\lVert u \rVert \lVert v \rVert)$: positive below 90°, 0 at 90°, negative beyond.
+- Cosine similarity compares directions and ignores length; it is undefined for a zero vector.
+- In NumPy use `np.dot(u, v)` or `u @ v`; `u * v` is element-wise. Compare floats with `np.isclose`.
+
+Next: [Matrices](#/learn/ml/math/matrices) stack vectors into a grid.
+
+</Section>

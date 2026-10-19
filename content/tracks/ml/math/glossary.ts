@@ -58,4 +58,28 @@ export default [
     introducedIn: 'ml/math/scalars-vectors',
     aliases: ['elementwise', 'component-wise'],
   },
+  {
+    id: 'norm',
+    term: 'Norm (length)',
+    short: 'The length of a vector: ‖u‖ = √(u · u), for example ‖(3, 4)‖ = 5.',
+    long: 'This is the Euclidean or L2 norm, what np.linalg.norm computes by default. Dividing a vector by its norm gives a unit vector (length 1) with the same direction.',
+    introducedIn: 'ml/math/dot-product',
+    aliases: ['length', 'magnitude', 'L2 norm', 'Euclidean norm'],
+  },
+  {
+    id: 'cosine-similarity',
+    term: 'Cosine similarity',
+    short: 'cos θ = u · v / (‖u‖‖v‖): how closely two vectors point the same way, from −1 to 1.',
+    long: 'It ignores length, so (1, 2) and (2, 4) have similarity 1. Retrieval and recommendation systems rank items by the cosine similarity of their vectors. It is undefined when either vector has length 0.',
+    introducedIn: 'ml/math/dot-product',
+    aliases: ['cosine', 'cos θ'],
+  },
+  {
+    id: 'orthogonal',
+    term: 'Orthogonal',
+    short: 'Perpendicular: two vectors are orthogonal when their dot product is 0.',
+    long: '(3, 4) and (4, −3) are orthogonal: 3·4 + 4·(−3) = 0. Orthogonal vectors share no direction, so their cosine similarity is 0.',
+    introducedIn: 'ml/math/dot-product',
+    aliases: ['perpendicular'],
+  },
 ] satisfies GlossaryTerm[];
