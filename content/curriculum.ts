@@ -91,7 +91,7 @@ export const tracks: Track[] = [
         title: 'Practical ML Engineering',
         level: 'advanced',
         lessons: [
-          { id: 'ml/practice/experiment-tracking', status: 'outline' },
+          { id: 'ml/practice/experiment-tracking', status: 'written' },
           { id: 'ml/practice/hyperparameter-tuning', status: 'outline' },
           { id: 'ml/practice/versioning', status: 'outline' },
           { id: 'ml/practice/ablations', status: 'outline' },

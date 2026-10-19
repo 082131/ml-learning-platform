@@ -1,7 +1,7 @@
 import { useRef, type KeyboardEvent, type ReactNode } from 'react';
 import type { Segment } from '@/lib/code/segments';
 import type { Annotation } from '@/lib/types';
-import { cx } from '@/components/ui';
+import { cx, useOverflowFocus } from '@/components/ui';
 import { KIND_LABEL } from './kinds';
 import s from './Code.module.css';
 
@@ -55,6 +55,9 @@ export function Tokens({ segments }: { segments: Segment[] }) {
 export function AnnotatedLines(props: AnnotatedLinesProps) {
   const { lines, annotations, focusId, activeId } = props;
   const refs = useRef(new Map<string, HTMLButtonElement>());
+  const pre = useRef<HTMLPreElement>(null);
+  // Code without annotations has no buttons to tab to; a long line must still be scrollable by keyboard.
+  useOverflowFocus(pre);
   const byId = new Map(annotations.map((a) => [a.id, a]));
   const order = readingOrder(annotations).map((a) => a.id);
   const spanIds = new Set(annotations.filter((a) => !isWholeLine(a)).map((a) => a.id));
@@ -120,7 +123,7 @@ export function AnnotatedLines(props: AnnotatedLinesProps) {
   );
 
   return (
-    <pre className={s.pre} role="group" aria-label={props.label} onKeyDown={onKeyDown}>
+    <pre ref={pre} className={s.pre} role="group" aria-label={props.label} onKeyDown={onKeyDown}>
       <code>
         {lines.map((segments, i) => {
           const lineNo = i + 1;

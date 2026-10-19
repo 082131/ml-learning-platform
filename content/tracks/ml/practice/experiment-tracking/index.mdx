@@ -1,0 +1,208 @@
+import { experiment, recordJson, trackingCode, trackingRunner, trackingStages } from './code';
+import { questions, summarizeExercise } from './quiz';
+
+<Section kind="intuition" title="A lab notebook for training runs">
+
+A chemist who writes "it worked" in a notebook, without the temperature, the amounts or the batch of reagent, has
+learned nothing anyone can use. Training a model is the same kind of experiment. A validation score of 31.2 means
+something only next to everything that produced it: which code, which data, which settings, and which roll of the
+dice.
+
+<Term id="experiment-tracking">Experiment tracking</Term> is the habit (and the tooling) of writing that down for
+every run, automatically. It answers three questions you will ask every week as an ML engineer:
+
+- **Can I get this result again?** That is <Term id="reproducibility">reproducibility</Term>.
+- **Which of my runs is actually better?** That needs runs you can line up side by side.
+- **What exactly is in the model we shipped?** That needs a record that outlives your memory and your laptop.
+
+</Section>
+
+<Section kind="technical" title="What determines a run">
+
+A training run is a function of its inputs. If you can list them all, you can rerun it:
+
+| Input | Example | How it is pinned |
+| --- | --- | --- |
+| Code | `train.py` at some commit | the git commit hash |
+| Data | the rows the run saw | a version or content hash (next lesson) |
+| Config | learning rate, epochs, batch size | a dict saved with the run |
+| Randomness | split, batch order, initial weights, dropout | a recorded <Term id="random-seed">seed</Term> |
+| Environment | Python, NumPy, PyTorch versions, GPU type | `pip freeze`, or the tracker's system info |
+
+**Randomness is an input.** Training uses a pseudo-random number generator (PRNG): a deterministic function that
+turns a starting value, the seed, into a long sequence of numbers that look random. Same seed, same sequence. The
+lesson's model draws on it twice: once to choose which quarter of the rows is held out for validation, and once
+per <Term id="training">training</Term> epoch (one full pass over the training rows) to shuffle the order of the
+mini-batches. Change the seed and both change, so the final score changes too, with the config held fixed.
+
+**The model.** Every lesson in this chapter uses the same small, synthetic dataset: 60 deliveries, each with a
+distance in km and a duration in minutes, generated from the known rule
+$\text{minutes} = 8 + 3 \cdot \text{km} + \varepsilon$ with noise $\varepsilon$ uniform in $[-6, 6)$. The model
+is a line, $\hat{y} = w \cdot \text{km} + b$, fitted by mini-batch stochastic gradient descent on the mean squared
+error (MSE), the average of $(\hat{y} - y)^2$. A batch of $B$ rows moves the two
+<Term id="parameter">parameters</Term> by
+
+$$
+w \leftarrow w - \eta \cdot \frac{2}{B} \sum_{i \in \text{batch}} (\hat{y}_i - y_i)\, \text{km}_i
+\qquad
+b \leftarrow b - \eta \cdot \frac{2}{B} \sum_{i \in \text{batch}} (\hat{y}_i - y_i)
+$$
+
+where $\eta$ is the learning rate. The score is the MSE on the 15 held-out validation rows.
+
+**A <Term id="run-record">run record</Term>** stores the inputs next to the outputs. In this lesson it is one line of JSON, shown here spread over several lines:
+
+<Code example={recordJson} title="run record (config A, seed 0)" />
+
+Reading it back tells you how to rebuild the run, and the metrics tell you whether the rebuild worked.
+
+<Callout kind="simplification">
+  Here a seed makes the run repeat to the last bit, because every operation is plain float arithmetic done in the
+  same order. On a GPU that is not guaranteed: some kernels add numbers in whatever order threads finish, and
+  floating-point addition is not associative, so sums can differ in the last bits between runs. PyTorch's notes
+  say "completely reproducible results are not guaranteed across PyTorch releases, individual commits, or
+  different platforms". You can ask for deterministic kernels with `torch.use_deterministic_algorithms(True)` and
+  `torch.backends.cudnn.benchmark = False`, at some cost in speed. Either way, record the seed: it removes the
+  biggest source of variation.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Same config, different seeds">
+
+The left chart follows the validation MSE of one run per config, epoch by epoch. The right chart shows where
+every seed's run ends up. Config A and config B differ only in the learning rate.
+
+<Experiment def={experiment} title="Two configs, ten seeds" controls={false}>
+  <RunComparison />
+</Experiment>
+
+With the starting values, B beats A on 7 of the 10 seeds, yet A has the lower mean, because B's seed 8 ends at
+44.1. Both statements are true. What is not true is any conclusion drawn from one seed: on seed 0 alone, B looks
+7.6 points better.
+
+</Section>
+
+<Section kind="code" title="The run and its record in Python">
+
+The function below is the whole training run. Every random choice goes through `rng`, which is created from the
+seed. The config literals are filled from the experiment's controls, and the readout shows exactly the line this
+code prints.
+
+<Experiment def={experiment} title="train_and_record.py, linked to the charts" controls={false}>
+  <Code example={trackingCode} title="train_and_record.py" />
+  <Readout title="What the code prints, and what the charts compute" />
+</Experiment>
+
+The program below is complete, with the generator and the dataset included. Run it to check that your browser's
+Python prints the same record as the readout above for config A, seed 0. Then change the seed and run it again.
+
+<PythonRunner example={trackingRunner} title="train_and_record.py (complete)" />
+
+Tracking usually grows in three steps. Select a stage to see what changes.
+
+<ProgressiveCode example={trackingStages} title="From print to a tracker" />
+
+The MLflow stage was run with MLflow 3.17.1: it created a local `mlflow.db` (SQLite) store, logged
+`val_mse = 31.1996` with the four parameters, and, because the script was inside a git checkout, tagged the run
+with the commit hash (`mlflow.source.git.commit`) on its own.
+
+</Section>
+
+<Section kind="experiment" title="Find the noise floor of your comparison">
+
+Every control changes both charts, the code literals above and the readout. The two learning rates are separate;
+epochs and batch size apply to both configs.
+
+<Experiment def={experiment} title="Two configs, several seeds">
+  <RunComparison />
+  <Readout />
+</Experiment>
+
+Things to try:
+
+- Set **Seeds to compare** to 1. With a single seed every comparison looks decisive. Raise it back to 10 and watch
+  the winner become a matter of degree.
+- Raise **B: learning rate** to 0.012, then 0.015. More seeds diverge (the run stops when $|w|$ passes $10^6$),
+  and the record says `"status": "diverged"` with the epoch.
+- Move **Seed of the printed run**. The record changes, the config does not. "Re-run from the record" stays
+  identical, because the seed is recorded.
+- Set the batch size to 1. Each epoch now makes 45 small updates instead of 6, so 20 epochs get much closer to the
+  true rule ($w = 3$, $b = 8$).
+
+</Section>
+
+<Section kind="mistakes" title="Seeds that are set, but not everywhere">
+
+<CommonMistake
+  title="Seeding one generator while another one does the shuffling"
+  wrong={'import random\nimport numpy as np\n\nrandom.seed(0)\norder = np.random.permutation(60)  # numpy has its own generator'}
+  error="No error. The split changes on every run, even though a seed is set."
+  cause="Python's random, NumPy's global generator and PyTorch's generator are separate. Seeding one does not seed the others, and libraries you call may use any of them."
+  fix={'rng = np.random.default_rng(seed)  # one explicit generator\norder = rng.permutation(60)\n# and in PyTorch: torch.manual_seed(seed) seeds the CPU and all CUDA devices'}
+/>
+
+<CommonMistake
+  title="Reporting the best seed"
+  wrong={'scores = {seed: train(config, seed, rows)["val_mse"] for seed in range(10)}\nprint("val MSE:", min(scores.values()))'}
+  error="No error. The reported 12.1 is the luckiest of ten splits; the typical run scores about 23."
+  cause="The minimum over seeds is an optimistic estimate: it selects for a lucky split and batch order, exactly like choosing a model on the test set."
+  fix={'vals = [scores[s] for s in range(10)]\nprint(f"val MSE: {statistics.mean(vals):.1f} ± {statistics.stdev(vals):.1f} over {len(vals)} seeds")'}
+/>
+
+<Callout kind="warning">
+  Comparing a new config on seed 3 with an old run on seed 0 mixes two changes: the config and the validation
+  split. Compare configs on the same seeds (here the seed picks the split), so each pair differs in the config
+  only.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="What a team's tracking looks like">
+
+On a real project the record is written by a tracker such as MLflow or Weights & Biases, and the questions it
+answers become routine:
+
+| Question | Where the answer comes from |
+| --- | --- |
+| Which commit trained the production model? | the run's git commit tag |
+| Did the new data change the score, or the new code? | two runs that differ in exactly one input |
+| Is the improvement real? | the same comparison over several seeds, with the spread |
+| Can we retrain it after a library upgrade? | the recorded environment, rerun, compared within the seed spread |
+
+Two habits make this work: log from the training script itself (never copy numbers by hand), and log failed and
+diverged runs too, because they show where a config stops working. The next lessons build on this record:
+[hyperparameter tuning](#/learn/ml/practice/hyperparameter-tuning) runs many configs and needs it to pick fairly,
+and [versioning](#/learn/ml/practice/versioning) replaces the data recipe with a hash of the data itself.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Summarize a run log">
+
+<MiniExercise exercise={summarizeExercise}>
+  Write `summarize(records)` for a list of run records like the one above. Group the records by config, and return
+  for each config its mean validation MSE over finished runs, the number of finished runs and the number of
+  diverged runs. Two configs with the same keys and values in a different order are the same config.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A run is a function of code, data, config, seed and environment. Record all five with the metrics.
+- A seed makes the random choices (split, batch order, initialization) repeatable. Seed every generator you use.
+- Seed-to-seed spread is often larger than the difference between two configs. Compare on the same seeds and
+  report mean and spread, never the best single run.
+- Bit-for-bit reproduction holds for seeded, deterministic code on one setup. Across GPUs and library versions,
+  check that a rerun lands within the seed spread.
+
+Next: [Hyperparameter tuning](#/learn/ml/practice/hyperparameter-tuning) searches over many configs, where
+fair comparison and a run log matter even more.
+
+</Section>
