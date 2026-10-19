@@ -1,0 +1,73 @@
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.button {
+  display: grid;
+  grid-template-columns: 3ch 1fr 6ch;
+  grid-template-areas: 'rank text score' '. track track';
+  gap: 2px var(--s-2);
+  width: 100%;
+  padding: var(--s-1) var(--s-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-15);
+  text-align: left;
+  cursor: pointer;
+}
+.button:hover {
+  border-color: var(--line-strong);
+}
+.button[aria-current='true'] {
+  border-color: var(--accent);
+}
+.rank {
+  grid-area: rank;
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}
+.text {
+  grid-area: text;
+  min-width: 0;
+}
+.self {
+  color: var(--ink-2);
+}
+.score {
+  grid-area: score;
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  text-align: right;
+}
+.track {
+  grid-area: track;
+  height: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+.bar {
+  display: block;
+  height: 100%;
+  background: var(--ink-2);
+}
+.top .bar {
+  background: var(--accent);
+}
+.top .rank {
+  font-weight: 600;
+  color: var(--accent);
+}
+.mapLabel {
+  paint-order: stroke;
+  stroke: var(--surface);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}

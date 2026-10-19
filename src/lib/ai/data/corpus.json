@@ -1,0 +1,223 @@
+{
+  "_about": "Source texts for the AI track lessons. scripts/ai/generate_embeddings.py embeds them; the lessons read them. The Lumen Notes help center is fictional, written for these lessons.",
+  "sentences": [
+    {
+      "id": "cat-mat",
+      "topic": "pets",
+      "text": "A cat was sitting on the mat."
+    },
+    {
+      "id": "kitten-rug",
+      "topic": "pets",
+      "text": "The kitten slept on the rug all afternoon."
+    },
+    {
+      "id": "dog-park",
+      "topic": "pets",
+      "text": "My dog loves chasing the ball in the park."
+    },
+    {
+      "id": "paycheck-bank",
+      "topic": "money",
+      "text": "I deposited my paycheck at the bank."
+    },
+    {
+      "id": "bank-rates",
+      "topic": "money",
+      "text": "The bank raised its interest rates this month."
+    },
+    {
+      "id": "savings-account",
+      "topic": "money",
+      "text": "She opened a savings account to buy a car next year."
+    },
+    {
+      "id": "river-picnic",
+      "topic": "river",
+      "text": "We had a picnic on the bank of the river."
+    },
+    {
+      "id": "river-flood",
+      "topic": "river",
+      "text": "The river overflowed its banks after the storm."
+    },
+    {
+      "id": "tomato-sauce",
+      "topic": "cooking",
+      "text": "Simmer the tomato sauce for twenty minutes."
+    },
+    {
+      "id": "pasta-salt",
+      "topic": "cooking",
+      "text": "Add a pinch of salt to the boiling pasta water."
+    },
+    {
+      "id": "soup-basil",
+      "topic": "cooking",
+      "text": "This soup recipe needs a handful of fresh basil."
+    },
+    {
+      "id": "rain-tomorrow",
+      "topic": "weather",
+      "text": "It is going to rain heavily tomorrow."
+    },
+    {
+      "id": "umbrella",
+      "topic": "weather",
+      "text": "Bring an umbrella, the forecast says showers."
+    },
+    {
+      "id": "heatwave",
+      "topic": "weather",
+      "text": "The heatwave pushed temperatures above 40 degrees."
+    },
+    {
+      "id": "keyerror",
+      "topic": "code",
+      "text": "The Python script crashed with a KeyError."
+    },
+    {
+      "id": "dictionary",
+      "topic": "code",
+      "text": "Use a dictionary to look up values by their key."
+    },
+    {
+      "id": "returns-none",
+      "topic": "code",
+      "text": "The function returns None when the list is empty."
+    },
+    {
+      "id": "movie-good",
+      "topic": "reviews",
+      "text": "The movie was good."
+    },
+    {
+      "id": "movie-not-good",
+      "topic": "reviews",
+      "text": "The movie was not good."
+    },
+    {
+      "id": "loved-film",
+      "topic": "reviews",
+      "text": "I loved this film from start to finish."
+    }
+  ],
+  "queries": [
+    {
+      "id": "q-kitten",
+      "text": "a small cat napping on a carpet"
+    },
+    {
+      "id": "q-savings",
+      "text": "Where should I keep the money I am saving?"
+    },
+    {
+      "id": "q-rain",
+      "text": "What should I take with me if it rains?"
+    },
+    {
+      "id": "q-keyerror",
+      "text": "How do I fix a missing key error?"
+    },
+    {
+      "id": "q-dinner",
+      "text": "ideas for an Italian dinner"
+    },
+    {
+      "id": "q-riverside",
+      "text": "sitting by the water on a sunny day"
+    },
+    {
+      "id": "q-bad-movie",
+      "text": "a terrible film"
+    }
+  ],
+  "docs": [
+    {
+      "id": "plans",
+      "title": "Plans and pricing",
+      "text": "Lumen Notes has three plans. The Free plan includes 2 GB of storage and works on up to 3 devices. The Plus plan costs $6 per month and includes 50 GB of storage on unlimited devices. The Team plan costs $10 per member per month. Each Team member gets 100 GB of storage, and the plan adds an admin console for managing members and shared notebooks. Paying yearly instead of monthly gives a 20% discount on Plus and Team. You can switch plans at any time from Settings, Billing. When you upgrade, the new storage limit applies immediately and you pay the difference for the rest of the billing period. When you downgrade, the change takes effect at the end of the current period, and notes above the new storage limit become read-only until you free up space."
+    },
+    {
+      "id": "refunds",
+      "title": "Refunds and cancellations",
+      "text": "You can cancel a paid plan at any time from Settings, Billing. Monthly plans are not refunded: after you cancel, you keep access until the end of the month you paid for, and you are not charged again. Yearly plans can be refunded in full within 14 days of purchase. After 14 days, a cancelled yearly plan stays active until the end of the year and is not renewed. Refunds go back to the original payment method and usually arrive within 5 to 10 business days, depending on your bank. If you were charged twice for the same period, contact support with both receipt numbers and we will refund the duplicate charge."
+    },
+    {
+      "id": "payments",
+      "title": "Payment errors",
+      "text": "If a payment fails, Lumen shows an error code that starts with B. Error B-402 means your card was declined by your bank; check the card details or try another card. Error B-409 means the payment was already processed, so you were not charged twice. Error B-503 means our payment provider is temporarily unavailable; wait a few minutes and try again. We retry a failed renewal payment three times over seven days. If all three attempts fail, your plan moves to Free and notes above the Free storage limit become read-only. Your notes are never deleted because of a failed payment."
+    },
+    {
+      "id": "security",
+      "title": "Account security",
+      "text": "To reset your password, choose Forgot password on the sign-in page and we will email you a reset link. The link is valid for 30 minutes and can be used once. We strongly recommend two-factor authentication, which asks for a six-digit code from an authenticator app each time you sign in on a new device. When you turn it on, you receive 10 recovery codes. Each recovery code works once, so store them somewhere safe and offline. After 5 failed sign-in attempts in a row, your account is locked for 15 minutes to slow down password guessing. Lumen staff will never ask you for your password or a recovery code."
+    },
+    {
+      "id": "email",
+      "title": "Email and notifications",
+      "text": "When you sign up, we send a verification email. The verification link is valid for 24 hours; after that, sign in and choose Resend email. You can choose which notifications you receive in Settings, Notifications. Shared notebook invitations are sent by email and expire after 7 days if they are not accepted. A weekly summary of your recent notes is sent every Monday unless you turn it off. We never send marketing email without your consent, and every message has an unsubscribe link at the bottom."
+    },
+    {
+      "id": "sync",
+      "title": "Sync, offline use and error codes",
+      "text": "Notes you edit offline are saved on your device and sync automatically when you reconnect. If the same note was changed on two devices while they were offline, Lumen keeps both versions and adds a conflicted copy next to the original, so no text is lost. Sync errors show a short code. Error E-402 means your storage quota is full: delete notes or attachments, or upgrade your plan, and sync resumes. Error E-409 means a sync conflict that Lumen could not resolve by itself; open the note and choose which version to keep. Error E-503 means our servers are temporarily unavailable; the app retries on its own with increasing delays, and you do not need to do anything."
+    },
+    {
+      "id": "api",
+      "title": "Export and the developer API",
+      "text": "You can export any notebook as Markdown files or as a single PDF from the notebook menu. Developers can also read and write notes through the Lumen API. Create an API token in Settings, Developer. Tokens expire after 90 days, and you can revoke one at any time. Each token can make up to 60 requests per minute. Requests above that limit receive HTTP status 429 Too Many Requests, with a Retry-After header that says how many seconds to wait. Attachments larger than 25 MB can't be uploaded through the API; use the desktop app for those. The API never returns notes from notebooks the token's owner can't open."
+    }
+  ],
+  "ragQueries": [
+    {
+      "id": "reset-link",
+      "text": "How long does a password reset link stay valid?",
+      "answer": "valid for 30 minutes",
+      "grounded": "The password reset link is valid for 30 minutes, and it can be used only once {cite}. If it has expired, request a new one from the sign-in page.",
+      "missing": "The provided context doesn't say how long a password reset link stays valid."
+    },
+    {
+      "id": "monthly-refund",
+      "text": "Can I get my money back if I cancel my monthly subscription?",
+      "answer": "Monthly plans are not refunded",
+      "grounded": "No. Monthly plans are not refunded {cite}. After you cancel, you keep access until the end of the month you paid for, and you won't be charged again.",
+      "missing": "The provided context doesn't say whether monthly subscriptions can be refunded."
+    },
+    {
+      "id": "e402",
+      "text": "What does error E-402 mean?",
+      "answer": "Error E-402 means your storage quota is full",
+      "grounded": "Error E-402 means your storage quota is full {cite}. Delete notes or attachments, or upgrade your plan, and sync will resume.",
+      "missing": "The provided context doesn't explain error E-402."
+    },
+    {
+      "id": "team-storage",
+      "text": "How much storage does each member of a team get?",
+      "answer": "Each Team member gets 100 GB",
+      "grounded": "Each member of the Team plan gets 100 GB of storage {cite}.",
+      "missing": "The provided context doesn't say how much storage a team member gets."
+    },
+    {
+      "id": "rate-limit",
+      "text": "How many API calls can I make per minute?",
+      "answer": "up to 60 requests per minute",
+      "grounded": "Each API token can make up to 60 requests per minute {cite}. Requests above that get HTTP 429 with a Retry-After header.",
+      "missing": "The provided context doesn't state an API rate limit."
+    },
+    {
+      "id": "offline-conflict",
+      "text": "What happens if I edit the same note on my laptop and phone while both are offline?",
+      "answer": "adds a conflicted copy",
+      "grounded": "Lumen keeps both versions: it adds a conflicted copy next to the original, so no text is lost {cite}.",
+      "missing": "The provided context doesn't say what happens when a note is edited on two offline devices."
+    },
+    {
+      "id": "handwriting",
+      "text": "Can Lumen turn my handwriting into text?",
+      "answer": "handwriting recognition",
+      "grounded": "Yes {cite}.",
+      "missing": "The provided context doesn't mention handwriting recognition, so I can't say whether Lumen supports it."
+    }
+  ]
+}
