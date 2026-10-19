@@ -303,7 +303,7 @@ export const tracks: Track[] = [
         id: 'memory',
         title: 'Memory',
         level: 'intermediate',
-        lessons: [{ id: 'inference/memory/memory-estimation', status: 'outline' }],
+        lessons: [{ id: 'inference/memory/memory-estimation', status: 'written' }],
       },
       {
         id: 'runtime',

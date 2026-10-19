@@ -1,0 +1,233 @@
+import { estimateCode, experiment, measureNbytes, paramCount } from './code';
+import { kvExercise, questions } from './quiz';
+
+<Section kind="intuition" title="A kitchen with one fixed shelf and a growing pile of notes">
+
+Picture a restaurant kitchen with one counter. The recipe books take up a fixed part of the counter, however many
+customers there are. Every order in progress also needs its own pile of notes, and each pile grows as the dish
+moves along. When the counter is full, the kitchen cannot take another order, no matter how fast the cooks are.
+
+A GPU serving a language model works the same way. Its memory, called <Term id="vram">VRAM</Term>, holds three
+things:
+
+- **The weights**: the model's <Term id="parameter">parameters</Term>, loaded once and shared by every request.
+  This is the recipe book.
+- **The <Term id="kv-cache">KV cache</Term>**: for each conversation, numbers the model has already computed for
+  every earlier token, so it does not compute them again for the next token. This is the pile of notes: one per
+  conversation, growing with every token.
+- **Activations**: the temporary results passed from one layer to the next while a request is being processed.
+  This is the space a cook needs to work, used and cleared moment by moment.
+
+If all three don't fit, the model does not run more slowly: it doesn't run at all. So the first question about
+any deployment is how much memory it needs, and the answer is arithmetic you can do before buying or renting a GPU.
+
+</Section>
+
+<Section kind="technical" title="Three terms, each from the model's config">
+
+We use Llama 3.1 8B as the running example. Its config gives everything we need: 32 layers, a hidden size of
+4,096, 32 query heads, 8 key/value heads, an MLP width of 14,336 and a vocabulary of 128,256 tokens.
+
+**1. Weights.** Count the parameters, then multiply by the bytes each one takes in the chosen precision:
+4 for FP32 (32-bit floating point), 2 for FP16 or BF16 (two 16-bit formats), 1 for INT8 (8-bit integers) and
+half a byte for INT4. The next lesson shows what these formats are.
+
+$$
+\text{weights} = \text{params} \times \text{bytes per weight}
+$$
+
+Each of the 32 layers has four attention matrices and three MLP matrices:
+
+$$
+\underbrace{2 \cdot 4096^2}_{Q,\ O} + \underbrace{2 \cdot 4096 \cdot 1024}_{K,\ V} + \underbrace{3 \cdot 4096 \cdot 14336}_{\text{MLP}} + \underbrace{2 \cdot 4096}_{\text{norms}} = 218{,}112{,}000
+$$
+
+Add the embedding table and the output head ($128{,}256 \cdot 4{,}096$ each) and a final norm (4,096):
+$32 \cdot 218{,}112{,}000 + 2 \cdot 525{,}336{,}576 + 4{,}096 = 8{,}030{,}261{,}248$ parameters, the count Meta
+publishes. In BF16 that is $8{,}030{,}261{,}248 \cdot 2 = 16{,}060{,}522{,}496$ bytes. Memory tools report
+<Term id="gibibyte">GiB</Term> ($2^{30}$ bytes), so this is $16{,}060{,}522{,}496 / 2^{30} = 14.96$ GiB, even
+though it is 16.06 GB.
+
+**2. KV cache.** In every layer, attention turns each token into a query, a key and a value vector. A new token's
+query must be compared with the keys of all earlier tokens and then mixes their values. Those keys and values
+never change, so instead of recomputing them for every new token, the server stores them:
+
+$$
+\text{KV cache} = 2 \times \text{layers} \times \text{kv\_heads} \times \text{head\_dim} \times \text{seq\_len} \times \text{batch} \times \text{bytes}
+$$
+
+The 2 is one key and one value. head_dim is hidden / heads = 4,096 / 32 = 128. Llama 3.1 8B uses
+<Term id="grouped-query-attention">grouped-query attention</Term>: its 32 query heads share 8 key/value heads, so
+only 8 are cached. In BF16, one token of one sequence costs $2 \cdot 32 \cdot 8 \cdot 128 \cdot 2 = 131{,}072$
+bytes (128 KiB). For one sequence of 8,192 tokens:
+
+$$
+131{,}072 \cdot 8{,}192 \cdot 1 = 1{,}073{,}741{,}824 \text{ bytes} = 1.00 \text{ GiB}
+$$
+
+The tensor has shape (layers, 2, batch, kv_heads, seq_len, head_dim) = (32, 2, 1, 8, 8192, 128): the formula is
+just the product of its sizes times the bytes per value.
+
+**3. Activations.** Generation has two phases (<Term id="prefill">prefill and decode</Term>). Prefill runs the
+whole prompt through the model at once; decode then produces one token per step, using the cache. Activations
+peak during prefill. Because the layers run one after another, only about one layer's intermediate tensors are
+alive at a time. At the widest point, inside the MLP, those are the layer's input and output (4,096 numbers per
+token each) and two intermediate tensors (14,336 each):
+
+$$
+\text{activations} \approx \text{batch} \times \text{seq\_len} \times (2 \cdot 4096 + 2 \cdot 14336) \times 2 = 1 \cdot 8192 \cdot 36{,}864 \cdot 2 = 603{,}979{,}776 \text{ bytes} = 0.56 \text{ GiB}
+$$
+
+**Total.** $14.96 + 1.00 + 0.56 = 16.52$ GiB, so one 8,192-token conversation fits on a 24 GiB GPU. Eight of
+them at once need $8 \cdot 1.00 = 8.00$ GiB of cache and $8 \cdot 0.56 = 4.50$ GiB of activations, 27.46 GiB in
+total, which does not.
+
+<Callout kind="simplification">
+  The activation term is a rough estimate of one layer's peak during prefill, assuming the attention kernel never
+  stores the full score matrix (fused kernels such as FlashAttention don't). Real frameworks keep a few extra
+  temporaries, the output layer's scores over the whole vocabulary (batch × vocabulary size values for the last
+  token) and their own working memory: the CUDA context, and memory PyTorch's caching allocator has reserved but
+  not handed out. Those depend on your software and hardware, so measure them: `torch.cuda.memory_allocated()`
+  counts live tensors and `torch.cuda.memory_reserved()` what the allocator holds.
+</Callout>
+
+<Callout kind="note">
+  This is an inference estimate. Training the same model needs far more: every layer's activations are kept for
+  backpropagation, and each weight also has a gradient and, with the Adam optimizer, two more numbers.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Where the memory goes">
+
+The bar shows the three terms against the GPU's memory, with the formula and numbers behind each. The chart
+shows how the total grows with batch size. Change the settings in the Experiment section below, or here: they are
+the same estimate.
+
+<Experiment def={experiment} title="Memory estimate" controls={false}>
+  <MemoryBreakdown />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The estimate in Python">
+
+The code below is the estimate the visual draws, with the current settings filled in. Select a part of it to see
+what it does. The readout shows exactly what it prints.
+
+<Experiment def={experiment} title="memory_estimate.py, linked to the chart" controls={false}>
+  <Code example={estimateCode} title="memory_estimate.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+Where does `params` come from? From the same shapes. This counts Llama 3.1 8B's parameters, and you can run it in
+your browser:
+
+<PythonRunner example={paramCount} title="count_params.py" />
+
+The formulas are not approximations of tensor sizes; they are the sizes. NumPy's `.nbytes` reports the bytes an
+array really occupies, and a KV cache built as one array has exactly the size the formula predicts:
+
+<PythonRunner example={measureNbytes} title="measure_nbytes.py" />
+
+</Section>
+
+<Section kind="experiment" title="Find the limits">
+
+Change the model, precisions, batch size, context length and GPU. Then step through the estimate line by line:
+every step shows the numbers it multiplies.
+
+<Experiment def={experiment} title="Memory estimator">
+  <StepThrough example={estimateCode} title="memory_estimate.py" />
+  <Readout />
+</Experiment>
+
+Things to try:
+
+- Raise the batch size with Llama 3.1 8B on 24 GB until it no longer fits. Only the KV cache and activations
+  grow; the weights stay at 14.96 GiB.
+- Set the sequence length to 131,072 (Llama 3.1's full context). The KV cache alone is 16 GiB for one sequence.
+- Switch the attention kernel to naive at 131,072 tokens. Storing $32 \cdot 131{,}072$ scores per token needs
+  over 1,000 GiB: this is why fused attention kernels exist.
+- Pick Llama 3.1 70B on 80 GB. In BF16 its weights (131.42 GiB) don't fit; in INT8 (65.71 GiB) or INT4
+  (32.85 GiB) they do.
+
+</Section>
+
+<Section kind="mistakes" title="Mistakes in units, types and sizes">
+
+<CommonMistake
+  title="Building a tensor size with / instead of //"
+  wrong={'hidden, heads = 4096, 32\nhead_dim = hidden / heads          # 128.0, a float\nnp.zeros((32, 2, 1, 8, 4096, head_dim), dtype=np.float16)'}
+  error="TypeError: 'float' object cannot be interpreted as an integer"
+  cause="In Python 3, `/` always returns a float, even when the division is exact. NumPy (and PyTorch) need whole numbers for sizes."
+  fix={'head_dim = hidden // heads         # 128, an int'}
+/>
+
+<CommonMistake
+  title="Allocating a cache for the full context and the largest batch"
+  wrong={'# Llama 3.1 70B: 80 layers, 8 KV heads, head_dim 128\nkv = np.zeros((80, 2, 64, 8, 131072, 128), dtype=np.float16)'}
+  error="numpy._core._exceptions._ArrayMemoryError: Unable to allocate 2.50 TiB for an array with shape (80, 2, 64, 8, 131072, 128) and data type float16"
+  cause="64 sequences of 131,072 tokens need 2 · 80 · 8 · 128 · 131,072 · 64 · 2 bytes = 2.50 TiB. On a GPU the same mistake gives a CUDA out-of-memory error. Do the arithmetic before allocating."
+  fix={'# Size the cache for the traffic you serve, for example 16 sequences of 8,192 tokens:\nkv = np.zeros((80, 2, 16, 8, 8192, 128), dtype=np.float16)   # 40 GiB'}
+/>
+
+<Callout kind="warning">
+  Two mistakes raise no error. NumPy's default dtype is float64, so `np.zeros((4096, 4096))` takes 134,217,728
+  bytes, twice the FP32 size and four times the FP16 size. And mixing GB with GiB makes a 7% error, enough to
+  turn "fits" into an out-of-memory crash near the limit. Print `.dtype` and `.nbytes`, and compare in GiB.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Planning capacity for a chat service">
+
+You want to serve Llama 3.1 8B in BF16 on one 80 GB GPU, with conversations of up to 8,192 tokens. After the
+weights (14.96 GiB), about 65 GiB are left. Each conversation needs 1.00 GiB of cache, and prefill activations
+add 0.56 GiB per sequence processed at once, so by this estimate about 41 conversations fit at full length. With
+the KV cache in INT8 each needs only 0.50 GiB.
+
+Real servers rarely reserve the full context for every conversation. vLLM, for example, stores the cache in
+fixed-size blocks and allocates them as a conversation grows (PagedAttention), so short conversations don't hold
+memory they never use. Many servers also process long prompts in chunks, which caps the activation peak. The
+formulas in this lesson are still how you size the GPU and set the limits on batch size and context length.
+
+| Decision                                  | Term it changes                             |
+| ----------------------------------------- | ------------------------------------------- |
+| Quantize the weights to INT8 or INT4      | weights (÷2 or ÷4), not the cache           |
+| Quantize the KV cache to INT8             | KV cache (÷2 from BF16)                     |
+| Pick a model with fewer key/value heads   | KV cache, in proportion to kv_heads         |
+| Cap the context length or the batch size  | KV cache and activations, linearly          |
+| Use a fused attention kernel              | activations: no seq_len × seq_len scores    |
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="How many conversations fit?">
+
+<MiniExercise exercise={kvExercise}>
+  Write `kv_cache_bytes(layers, kv_heads, head_dim, seq_len, batch, bytes_per_value)` and
+  `max_batch(gpu_bytes, weight_bytes, kv_bytes_per_sequence)`. `max_batch` returns the largest whole number of
+  sequences whose KV cache fits next to the weights, and 0 when the weights alone don't fit. Run the tests to
+  check them.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Weights = parameters × bytes per weight. They are a fixed cost, shared by all requests.
+- KV cache = 2 × layers × kv_heads × head_dim × tokens × sequences × bytes. It grows with traffic and is what
+  limits batch size and context length.
+- Inference activations are about one layer's worth at a time and peak during prefill; training keeps them all.
+- Compare in GiB, leave room for the framework, and measure with `.nbytes` or `torch.cuda.memory_allocated()`.
+
+Next: [FP32, FP16, BF16, INT8 and quantization error](#/learn/inference/precision/precision-quantization) looks
+inside the "bytes per weight" term: what fewer bits keep, what they lose, and how to measure the loss.
+
+</Section>
