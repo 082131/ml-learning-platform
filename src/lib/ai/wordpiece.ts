@@ -21,7 +21,8 @@ const isControl = (c: string) => !['\t', '\n', '\r'].includes(c) && /^[\p{Cc}\p{
 // BERT treats all ASCII symbols as punctuation, plus every Unicode punctuation character.
 const isPunctuation = (c: string) => {
   const cp = c.codePointAt(0)!;
-  const asciiSymbol = (cp >= 33 && cp <= 47) || (cp >= 58 && cp <= 64) || (cp >= 91 && cp <= 96) || (cp >= 123 && cp <= 126);
+  const asciiSymbol =
+    (cp >= 33 && cp <= 47) || (cp >= 58 && cp <= 64) || (cp >= 91 && cp <= 96) || (cp >= 123 && cp <= 126);
   return asciiSymbol || /^\p{P}$/u.test(c);
 };
 const CJK_RANGES: [number, number][] = [

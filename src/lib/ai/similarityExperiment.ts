@@ -29,7 +29,11 @@ export const TOP_K = 3;
  * Similarity search over the bundled sentence embeddings. Choosing a query re-ranks the sentences by
  * cosine similarity; the ranking, the map, the code's query literal and the readout share this state.
  */
-export function similarityExperiment(id: string, items: SimilarityItem[], query: string): ExperimentDef<SimilarityState, SimilarityResult> {
+export function similarityExperiment(
+  id: string,
+  items: SimilarityItem[],
+  query: string,
+): ExperimentDef<SimilarityState, SimilarityResult> {
   const sentences = items.filter((i) => i.kind === 'sentence');
   const map = { ...pca2d(items.map((i) => i.vector)), ids: items.map((i) => i.id) };
   const find = (qid: string) => {
@@ -58,7 +62,9 @@ export function similarityExperiment(id: string, items: SimilarityItem[], query:
       return { query: q, ranked: rankByCosine(q.vector, sentences), map };
     },
     readout: (_, r) =>
-      r.ranked.slice(0, TOP_K).map((x) => ({ label: `#${x.rank} · cosine ${x.score.toFixed(3)}`, value: x.item.text })),
+      r.ranked
+        .slice(0, TOP_K)
+        .map((x) => ({ label: `#${x.rank} · cosine ${x.score.toFixed(3)}`, value: x.item.text })),
   };
 }
 

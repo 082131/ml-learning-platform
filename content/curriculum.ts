@@ -212,7 +212,7 @@ export const tracks: Track[] = [
         id: 'representations',
         title: 'Representations',
         level: 'beginner',
-        lessons: [{ id: 'ai/representations/tokens-embeddings', status: 'outline' }],
+        lessons: [{ id: 'ai/representations/tokens-embeddings', status: 'written' }],
       },
       {
         id: 'llm',

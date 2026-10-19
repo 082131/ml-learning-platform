@@ -29,8 +29,12 @@ export function EmbeddingMap() {
   const pointOf = (id: string) => map.points[map.ids.indexOf(id)]!;
   const [x0, x1] = extent(map.points, (p) => p[0]) as [number, number];
   const [y0, y1] = extent(map.points, (p) => p[1]) as [number, number];
-  const x = scaleLinear().domain([x0, x1]).range([PAD, width - PAD]);
-  const y = scaleLinear().domain([y0, y1]).range([HEIGHT - PAD, PAD]);
+  const x = scaleLinear()
+    .domain([x0, x1])
+    .range([PAD, width - PAD]);
+  const y = scaleLinear()
+    .domain([y0, y1])
+    .range([HEIGHT - PAD, PAD]);
   const top = ranked.filter((r) => r.item.id !== query.id).slice(0, TOP_K);
   const kept = Math.round((map.explained[0] + map.explained[1]) * 100);
 
@@ -48,11 +52,23 @@ export function EmbeddingMap() {
       caption={`The two axes keep ${kept}% of the variance of the 384-dimension vectors, so nearby points are usually similar, but the ranking above is the exact answer. Lines join the query to its ${TOP_K} nearest sentences.`}
     >
       <div ref={ref}>
-        <svg width={width} height={HEIGHT} role="img" aria-label={`Map of ${all.length} texts; the query is the diamond`}>
+        <svg
+          width={width}
+          height={HEIGHT}
+          role="img"
+          aria-label={`Map of ${all.length} texts; the query is the diamond`}
+        >
           {top.map((r) => {
             const [a, b] = [pointOf(query.id), pointOf(r.item.id)];
             return (
-              <line key={r.item.id} className={cx(svg.accent, svg.dashed)} x1={x(a[0])} y1={y(a[1])} x2={x(b[0])} y2={y(b[1])} />
+              <line
+                key={r.item.id}
+                className={cx(svg.accent, svg.dashed)}
+                x1={x(a[0])}
+                y1={y(a[1])}
+                x2={x(b[0])}
+                y2={y(b[1])}
+              />
             );
           })}
           {items.map((i) => {

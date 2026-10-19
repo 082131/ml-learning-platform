@@ -24,8 +24,8 @@ export function SimilaritySearch() {
       }
       caption={
         <>
-          Query: <q>{query.text}</q>. Cosine similarity is between −1 and 1; higher means the two vectors point
-          more the same way. Select a sentence to use it as the query.
+          Query: <q>{query.text}</q>. Cosine similarity is between −1 and 1; higher means the two vectors
+          point more the same way. Select a sentence to use it as the query.
         </>
       }
     >

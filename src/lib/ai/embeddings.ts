@@ -20,7 +20,10 @@ export interface EmbeddedText {
 }
 
 /** Turns a generated table (texts plus float16 vectors) into texts with their vectors. */
-export function readTable<T extends { text: string }>(items: T[], vectorsBase64: string): (T & { vector: number[] })[] {
+export function readTable<T extends { text: string }>(
+  items: T[],
+  vectorsBase64: string,
+): (T & { vector: number[] })[] {
   const vectors = decodeFloat16Rows(vectorsBase64, items.length);
   return items.map((item, i) => ({ ...item, vector: vectors[i]! }));
 }

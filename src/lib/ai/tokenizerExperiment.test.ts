@@ -37,7 +37,9 @@ describe('tokenizerExperiment', () => {
     const out = def.readout!(def.initial, def.compute(def.initial));
     expect(out[0]!.value).toBe(fixtures.cases[0]!.printed);
     expect(out[1]!.value).toBe(`[${fixtures.cases[0]!.ids.join(', ')}]`);
-    expect(out[2]!.value).toBe('53 characters · 8 words and punctuation marks · 16 tokens (incl. [CLS], [SEP])');
+    expect(out[2]!.value).toBe(
+      '53 characters · 8 words and punctuation marks · 16 tokens (incl. [CLS], [SEP])',
+    );
   });
 
   it('keeps the selection inside a shorter text and has no word search for [SEP]', () => {

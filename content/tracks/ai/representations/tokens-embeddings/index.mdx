@@ -1,0 +1,217 @@
+import { cosineRunner, similarity, similarityCode, tokenizeCode, tokenizer, tokenizerStages } from './code';
+import { questions, topKExercise } from './quiz';
+
+<Section kind="intuition" title="Text has to become numbers">
+
+A neural network can only do arithmetic. Before a language model can read "Tokenizers split unbelievably long
+words into pieces.", two things happen:
+
+1. A <Term id="tokenizer">tokenizer</Term> cuts the text into <Term id="token">tokens</Term>, small pieces from a
+   fixed list called the vocabulary, and replaces each piece with its number, the <Term id="token-id">token ID</Term>.
+2. The model turns those IDs into vectors (lists of numbers) and computes with them. An embedding model goes one
+   step further and squeezes a whole text into one vector, a <Term id="sentence-embedding">sentence embedding</Term>,
+   built so that texts about similar things get vectors that point in similar directions.
+
+Think of a library. Tokenizing is spelling the request out in the library's alphabet; embedding is giving every book
+a position on a huge map, so that books on the same subject sit near each other. A search then means "find the books
+nearest to where my question lands", and <Term id="cosine-similarity">cosine similarity</Term> is the ruler.
+
+Everything in this lesson runs on a real, small, open model, `sentence-transformers/all-MiniLM-L6-v2`. The tokenizer
+below runs in your browser with the model's own vocabulary. The model itself is too big to load here, so its vectors
+for 27 texts were computed ahead of time and bundled with the lesson; the similarities between them are computed live
+as you click.
+
+</Section>
+
+<Section kind="technical" title="Subword tokens, IDs and one vector per text">
+
+**Why subwords.** A vocabulary of whole words can't cover every name, typo or new word, and a vocabulary of single
+characters makes texts very long. Subword tokenizers sit in between. all-MiniLM-L6-v2 uses
+<Term id="wordpiece">WordPiece</Term>, the tokenizer of BERT, with 30,522 entries. It works in three steps:
+
+1. **Normalize**: lowercase, remove accents ("Café" → "cafe"), and put spaces around Chinese characters.
+2. **Pre-tokenize**: split on whitespace and make every punctuation character its own word, so "E-402:" becomes
+   `e`, `-`, `402`, `:`.
+3. **WordPiece**: for each word, take the longest beginning that is in the vocabulary, then repeat on the rest. Pieces
+   after the first get a `##` prefix. "unbelievably" is not in the vocabulary, but `un` is, then `##bel`, `##ie`,
+   `##va` and `##bly`. If no piece fits, the whole word becomes `[UNK]` (unknown), which happens to emoji such as 🙂.
+
+Finally the tokenizer adds `[CLS]` (ID 101) at the start and `[SEP]` (ID 102) at the end, markers the model was
+trained with. The ID of a token is simply its line number in the vocabulary file, counting from 0.
+
+**From IDs to one vector.** The model looks up a learned vector for each ID, runs the sequence through 6 transformer
+layers, and outputs one 384-number vector per token: shape $(\text{tokens}, 384)$. To get one vector for the whole
+text, sentence-transformers averages the token vectors (mean pooling) and scales the result to length 1:
+
+$$
+e = \frac{m}{\lVert m \rVert}, \qquad m = \frac{1}{T} \sum_{t=1}^{T} h_t, \qquad e \in \mathbb{R}^{384}
+$$
+
+where $h_t$ is the vector of token $t$ and $T$ the number of tokens. Long or short, every text ends up as 384 numbers.
+
+**Comparing vectors.** The cosine similarity of two vectors $a$ and $b$ is
+
+$$
+\cos\theta = \frac{a \cdot b}{\lVert a \rVert \, \lVert b \rVert} = \frac{\sum_i a_i b_i}{\sqrt{\sum_i a_i^2}\,\sqrt{\sum_i b_i^2}}
+$$
+
+It is 1 when they point the same way, 0 when they are perpendicular and −1 when they are opposite. Because these
+embeddings have length 1, the denominator is 1 and the cosine is just the dot product. Two real values from the
+bundled table: "A cat was sitting on the mat." and "The kitten slept on the rug all afternoon." share almost no words
+but score 0.574, while "The movie was good." and "The movie was not good." score 0.80, even though they mean opposite
+things.
+
+<Callout kind="simplification">
+  The vectors here are stored as 16-bit floats to keep the download small (about 30 KB for 27 texts). Compared with
+  the full 32-bit vectors, that changes no cosine similarity in this lesson by more than 0.0001 (measured by the
+  generation script). Production vector stores often compress further, with similar small trade-offs.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="See the tokens">
+
+Type anything below. The token chips, their IDs, the Python code in the next section and its printed output all come
+from the same text. Select a token to see how WordPiece searched for it: it tries the longest piece first and shortens
+it until a piece is in the vocabulary.
+
+<Experiment def={tokenizer} title="Tokenizer playground (all-MiniLM-L6-v2 vocabulary)">
+  <TokenizerPlayground />
+</Experiment>
+
+Things to try: a long made-up word, a price like "$2.50", "Café", an emoji, or the same word with and without a
+capital letter.
+
+</Section>
+
+<Section kind="code" title="The same steps with the tokenizers and sentence-transformers libraries">
+
+In Python, Hugging Face's `tokenizers` library does what the playground does. The string in the code is the text you
+typed above; the readout shows what the two `print` calls print for it, computed by the in-browser tokenizer (its
+output is tested against the library's own on ten tricky texts).
+
+<Experiment def={tokenizer} title="tokenize.py, linked to the playground" controls={false}>
+  <Code example={tokenizeCode} title="tokenize.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+The three stages below build a tokenizer from scratch, from splitting on spaces to a tiny WordPiece with ten
+vocabulary entries. The printed output of each stage is in its note.
+
+<ProgressiveCode example={tokenizerStages} title="From split() to WordPiece" />
+
+Search uses embeddings instead of tokens. This code embeds the 20 example sentences and the query, scores every
+sentence with one matrix product, and prints the three best. The query is the one selected in the experiment below.
+
+<Experiment def={similarity} title="search.py, linked to the experiment" controls={false}>
+  <Code example={similarityCode} title="search.py" />
+  <Readout title="Top 3 for this query (computed from the bundled vectors)" />
+</Experiment>
+
+<Callout kind="note">
+  The readout is computed in your browser from the bundled vectors. Running `search.py` yourself gives the same
+  ranking; the scores can differ in the third decimal because the bundled vectors are stored as 16-bit floats and
+  your hardware may round differently.
+</Callout>
+
+Cosine similarity is short enough to write by hand. Run it, then change the toy vectors (three made-up numbers each,
+not real embeddings):
+
+<PythonRunner example={cosineRunner} title="cosine.py" />
+
+</Section>
+
+<Section kind="experiment" title="Search 20 sentences by meaning">
+
+Pick a query, or select any sentence to use it as the query. The ranking is the exact cosine similarity over all 384
+dimensions. The map squeezes the same vectors into 2 dimensions with principal component analysis (PCA), which keeps
+the two directions along which the vectors differ most; it shows clusters well but distorts distances.
+
+<Experiment def={similarity} title="Similarity search">
+  <SimilaritySearch />
+  <EmbeddingMap />
+</Experiment>
+
+Things to try:
+
+- "a small cat napping on a carpet" finds both cat sentences although it shares no word with "The kitten slept on the
+  rug all afternoon.". This is what embeddings are for.
+- Select "I deposited my paycheck at the bank." Its nearest sentence is the river-bank picnic (0.37), ahead of the
+  savings account (0.286). The shared word "bank" pulls harder than the shared topic of money.
+- Query "a terrible film". "The movie was not good." comes first, but "I loved this film from start to finish." still
+  scores 0.415: sentiment is only weakly separated.
+
+</Section>
+
+<Section kind="mistakes" title="Mixing models, and silent truncation">
+
+<CommonMistake
+  title="Comparing embeddings from two different models"
+  wrong={'a = small_model.encode("refund policy")   # shape (384,)\nb = large_model.encode("refund policy")   # shape (768,)\nprint(a @ b)'}
+  error="ValueError: matmul: Input operand 1 has a mismatch in its core dimension 0, with gufunc signature (n?,k),(k,m?)->(n?,m?) (size 768 is different from 384)"
+  cause="Each model has its own vector space. Here the sizes differ, so NumPy refuses. Worse: two models with the same size give a number without any error, but the number means nothing, because dimension 17 of one model has no relation to dimension 17 of the other."
+  fix={'# Embed the documents and every query with the same model, and store the model name with the vectors.\nb = small_model.encode("refund policy")'}
+/>
+
+<Callout kind="warning">
+  Upgrading the embedding model means re-embedding every stored document. Keep the model name and revision next to
+  your vectors, as the bundled table for this lesson does.
+</Callout>
+
+<CommonMistake
+  title="Embedding a whole document at once"
+  wrong={'vector = model.encode(open("handbook.txt").read())   # 20 pages'}
+  error="(no error: the text after the first 256 word pieces is silently ignored)"
+  cause="all-MiniLM-L6-v2 truncates input to 256 word pieces, as its model card states. A 20-page handbook is embedded from its first page or so, and questions about the rest never match."
+  fix={'# Split long documents into chunks, embed each chunk, and search the chunks.\nvectors = model.encode(chunks)'}
+/>
+
+Splitting documents into chunks is the first step of retrieval-augmented generation, the next lesson.
+
+</Section>
+
+<Section kind="practice" title="Where you will meet tokens and embeddings">
+
+| Task                                   | What you use                       | Why it matters                                                        |
+| -------------------------------------- | ---------------------------------- | --------------------------------------------------------------------- |
+| Estimating API cost and context limits | Token counts                       | Prices and limits are per token, and each model counts differently    |
+| Semantic search and RAG                | Embeddings + cosine similarity     | Finds text by meaning, not exact words                                |
+| Deduplicating support tickets          | Embeddings + a similarity cutoff   | Near-duplicates score close to 1                                      |
+| Exact codes, IDs and names             | Keyword search alongside embeddings | "E-402" and "B-402" look alike to an embedding model                  |
+| Checking a model on your data          | Pairs you know the answer for      | Negation and rare terms are where small embedding models go wrong     |
+
+A token count from this tokenizer is not the count a large language model will charge for: GPT-style and Claude
+models use their own tokenizers with different vocabularies. Always count with the tokenizer of the model you call.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Write a top-k search">
+
+<MiniExercise exercise={topKExercise}>
+  Write `top_k(query, vectors, k)` that returns the indices of the `k` vectors most similar to `query` by cosine
+  similarity, best first, without NumPy. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A tokenizer turns text into tokens from a fixed vocabulary and each token into an ID. WordPiece splits unknown
+  words into the longest known pieces, marking continuations with `##`.
+- A model only understands its own tokenizer's IDs, and token counts differ between models.
+- A sentence embedding is one fixed-length vector per text (384 numbers for all-MiniLM-L6-v2), made by averaging the
+  token vectors and scaling to length 1.
+- Cosine similarity compares directions; for unit vectors it is the dot product. Ranking by it finds text by topic and
+  wording, but it can miss negation and exact codes.
+- Compare only vectors from the same model, and split long texts before embedding them.
+
+Next: [Retrieval-augmented generation end to end](#/learn/ai/rag/rag-pipeline) uses exactly this search to find the
+passages a language model should answer from.
+
+</Section>

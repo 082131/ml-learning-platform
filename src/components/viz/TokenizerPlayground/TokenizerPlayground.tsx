@@ -17,7 +17,9 @@ function byStart(attempts: PieceAttempt[]) {
  * how WordPiece split its word. Use inside an Experiment made with tokenizerExperiment.
  */
 export function TokenizerPlayground() {
-  const { state, result, update } = useExperimentContext<TokenizerState, TokenizerResult>('TokenizerPlayground');
+  const { state, result, update } = useExperimentContext<TokenizerState, TokenizerResult>(
+    'TokenizerPlayground',
+  );
   const { tokens, words } = result.encoding;
   const current = selectedToken(state, result);
   const index = tokens.indexOf(current);
@@ -58,7 +60,9 @@ export function TokenizerPlayground() {
               , from the word <code>{result.search.word}</code>
             </>
           ) : (
-            current.word < 0 && <>, added by the tokenizer to mark the {index === 0 ? 'start' : 'end'} of the text</>
+            current.word < 0 && (
+              <>, added by the tokenizer to mark the {index === 0 ? 'start' : 'end'} of the text</>
+            )
           )}
         </p>
         {result.search && (
@@ -77,7 +81,9 @@ export function TokenizerPlayground() {
               </li>
             ))}
             {result.search.pieces.unknown && result.search.pieces.attempts.length > 0 && (
-              <li className={s.step}>No prefix of the rest is in the vocabulary, so the whole word becomes [UNK].</li>
+              <li className={s.step}>
+                No prefix of the rest is in the vocabulary, so the whole word becomes [UNK].
+              </li>
             )}
           </ol>
         )}

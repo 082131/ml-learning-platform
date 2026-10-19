@@ -36,7 +36,12 @@ export function computeTokenizer(s: TokenizerState, vocab: Vocab): TokenizerResu
  * The tokenizer playground: the learner's text is tokenized live with the model's real vocabulary.
  * The token list, the Python code's string literal and the printed output all come from this state.
  */
-export function tokenizerExperiment(id: string, text: string, selected: number, vocab: Vocab): ExperimentDef<TokenizerState, TokenizerResult> {
+export function tokenizerExperiment(
+  id: string,
+  text: string,
+  selected: number,
+  vocab: Vocab,
+): ExperimentDef<TokenizerState, TokenizerResult> {
   return {
     id,
     initial: { text, selected },

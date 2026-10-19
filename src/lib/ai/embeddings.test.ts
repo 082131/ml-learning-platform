@@ -45,13 +45,17 @@ describe('the bundled sentence embeddings', () => {
     ['cat-mat', 'kitten-rug', 0.574],
     ['paycheck-bank', 'river-picnic', 0.37],
     ['paycheck-bank', 'savings-account', 0.286],
+    ['q-bad-movie', 'loved-film', 0.415],
   ])('cos(%s, %s) ≈ %f', (a, b, expected) => {
     expect(cosine(byId(a).vector, byId(b).vector)).toBeCloseTo(expected, 3);
   });
 
   it('ranks the sentences for a query, best first', () => {
     const query = byId('q-kitten');
-    const ranked = rankByCosine(query.vector, table.filter((t) => t.id !== 'q-kitten' && !t.id.startsWith('q-')));
+    const ranked = rankByCosine(
+      query.vector,
+      table.filter((t) => t.id !== 'q-kitten' && !t.id.startsWith('q-')),
+    );
     expect(ranked.slice(0, 2).map((r) => r.item.id)).toEqual(['cat-mat', 'kitten-rug']);
     expect(ranked[0]!.score).toBeCloseTo(0.627, 3);
     expect(ranked.map((r) => r.rank)).toEqual(ranked.map((_, i) => i + 1));
@@ -97,7 +101,10 @@ describe('similarityExperiment', () => {
     const r = def.compute(def.initial);
     expect(r.ranked).toHaveLength(20);
     expect(r.map.points).toHaveLength(items.length);
-    expect(def.readout!(def.initial, r)[0]).toEqual({ label: '#1 · cosine 0.627', value: 'A cat was sitting on the mat.' });
+    expect(def.readout!(def.initial, r)[0]).toEqual({
+      label: '#1 · cosine 0.627',
+      value: 'A cat was sitting on the mat.',
+    });
   });
 
   it('ranks a sentence first against itself, with cosine 1', () => {
