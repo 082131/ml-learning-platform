@@ -1,0 +1,202 @@
+import { hashJoinRunner, joinSql, joins, lookup, lookupCode, planSql, schemaSql } from './code';
+import { leftJoinExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Two lists that point at each other">
+
+A small shop keeps two lists. One lists customers: Ada, Grace, Linus and Margaret, each with a number. The other
+lists orders, and instead of copying a customer's name and city onto every order, each order just says which
+customer number placed it. Order 105 was a guest checkout, so it has no customer number. Margaret has not ordered
+anything yet.
+
+To print "who bought what", you match each order to its customer by number. That matching is a
+<Term id="sql-join">join</Term>. The interesting questions are at the edges: should Margaret, with no orders,
+appear? Should the guest order, with no customer, appear? Different join types give different answers, and
+picking the wrong one silently drops or invents rows.
+
+The second question is speed. To find Linus's orders you could read every order and check its customer number.
+With five orders that is fine. With five hundred million it is not, and an <Term id="database-index">index</Term>
+lets the database jump straight to the right orders instead.
+
+</Section>
+
+<Section kind="technical" title="Keys, joins and indexes">
+
+**Schema.** A table has named, typed columns. The schema below gives `customers` a
+<Term id="primary-key">primary key</Term>, `id`, which is unique for every row, and gives `orders` a
+<Term id="foreign-key">foreign key</Term>, `customer_id`, which must hold an existing customer's `id` or
+<Term id="sql-null">NULL</Term> (unknown). One customer can have many orders, so the link sits on the orders
+side.
+
+<Code example={schemaSql} title="schema.sql" />
+
+**Joins.** A join pairs every row of the left table with every row of the right table and keeps the pairs where
+the `ON` condition is true. For `ON o.customer_id = c.id` with our data:
+
+| Join type | Keeps | Rows here |
+| --- | --- | --- |
+| `INNER JOIN` | matched pairs only | 4 |
+| `LEFT JOIN` | matched pairs, plus each left row with no match (right columns NULL) | 4 + 1 (Margaret) = 5 |
+| `FULL OUTER JOIN` | matched pairs, plus unmatched rows from both sides | 4 + 1 + 1 (order 105) = 6 |
+
+Two rules explain every edge case:
+
+- **NULL matches nothing.** `NULL = 3` is not true, and neither is `NULL = NULL`: comparisons with NULL give
+  NULL, which `ON` and `WHERE` treat as false. So order 105 never pairs with a customer.
+- **A match can repeat a row.** Ada has two orders, so she appears twice in every join. A join's row count is the
+  number of matching pairs, not the size of either table.
+
+**Indexes.** Without help, `WHERE customer_id = 3` must read all $n$ rows: a
+<Term id="full-table-scan">full table scan</Term>. An index keeps `(customer_id, row)` pairs sorted, so the
+database can binary search it. Each probe halves the range that could hold the first match, so finding it takes
+about $\log_2 n$ probes, then one read per match plus one to see the run has ended:
+
+$$
+\text{scan: } n \text{ reads} \qquad \text{index: } \approx \log_2 n + (\text{matches} + 1) \text{ reads}
+$$
+
+For $n = 1{,}000{,}000$ that is 1,000,000 reads against about $20 + 2$ for a customer with one order, since
+$2^{20} = 1{,}048{,}576$.
+
+**Query plans.** SQL describes the result, not the method. The database's planner chooses a
+<Term id="query-plan">query plan</Term>, and `EXPLAIN QUERY PLAN` shows it:
+
+<Code example={planSql} title="plan.sql" />
+
+Run against our `orders` table with SQLite 3.45, the plan's detail line is
+`SEARCH orders USING INDEX idx_orders_customer (customer_id=?)`. After `DROP INDEX idx_orders_customer` the same
+query's plan is `SCAN orders`: every row is read.
+
+<Callout kind="simplification">
+  The experiment models an index as a sorted Python list. Real databases use B-trees: each node holds hundreds
+  of sorted keys, so a lookup reads only 3 or 4 pages even for millions of rows, and the tree stays sorted as
+  rows are inserted. The idea, "sorted, so you can skip", is the same. We also count entries read, while real
+  cost depends on pages read from disk or memory.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Which rows survive each join">
+
+Pick a join type, then select a result row to see the input rows it came from. Change an order's `customer_id`
+(for example, give order 102 to Margaret, or set order 104 to NULL) and watch rows appear and disappear. The SQL
+and the printed rows in the next section use the same state.
+
+<Experiment def={joins} title="customers ⋈ orders">
+  <JoinVisualizer />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The join in SQL">
+
+The `{{join}}` keyword below follows the join type you picked. Hover over, focus or select a part of the query to
+see what it does. The readout lists the rows exactly as Python's `sqlite3` module prints them, one tuple per row,
+with `None` for NULL.
+
+<Experiment def={joins} title="join.sql, linked to the tables" controls={false}>
+  <Code example={joinSql} title="join.sql" />
+  <Readout title="Rows the query returns" />
+</Experiment>
+
+Databases do not literally compare every pair of rows. One common strategy is a hash join: build a hash table on
+one side's key, then look each row of the other side up in it. Here it is in plain Python, producing the
+`LEFT JOIN` rows. Run it, then try changing an order's customer.
+
+<PythonRunner example={hashJoinRunner} title="hash_join.py" />
+
+</Section>
+
+<Section kind="experiment" title="Scan vs index, entry by entry">
+
+The code generates an `orders` table of $n$ rows and an index sorted by `customer_id`, then looks up one customer
+either by scanning or through the index. Step through the method you picked: every read adds one to `touched`,
+and the highlighted row is the entry being read.
+
+<Experiment def={lookup} title="Find one customer's orders">
+  <StepThrough example={lookupCode} title="lookup.py" />
+  <Readout />
+</Experiment>
+
+Things to try:
+
+- Set $n$ to 32 and look up customer 3. The scan reads 32 entries; the index reads 10.
+- Set $n$ to 4 and look up customer 1. The index reads 5 entries and the scan only 4: on a tiny table an index
+  does not pay off, which is why planners sometimes ignore one.
+- Look up customer 9, who has no orders. The scan still reads everything; the index needs only its probes.
+
+</Section>
+
+<Section kind="mistakes" title="NULL comparisons, filters that undo a LEFT JOIN, unchecked keys">
+
+<CommonMistake
+  title="Testing for NULL with ="
+  wrong={"SELECT id FROM orders WHERE customer_id = NULL;"}
+  error="(no error, and no rows: the result is empty)"
+  cause="customer_id = NULL is NULL for every row, even for order 105, and WHERE keeps only rows where the condition is true."
+  fix={"SELECT id FROM orders WHERE customer_id IS NULL;  -- returns 105"}
+/>
+
+<CommonMistake
+  title="A WHERE filter on the right table turns a LEFT JOIN into an INNER JOIN"
+  wrong={"SELECT c.name, o.id\nFROM customers AS c\nLEFT JOIN orders AS o ON o.customer_id = c.id\nWHERE o.amount > 10;"}
+  error="(no error: Grace and Margaret are missing from the result)"
+  cause="WHERE runs after the join. Grace's only order has amount 8, and Margaret's padded row has amount NULL, so both rows fail the test and are removed."
+  fix={"SELECT c.name, o.id\nFROM customers AS c\nLEFT JOIN orders AS o ON o.customer_id = c.id AND o.amount > 10;"}
+/>
+
+<CommonMistake
+  title="Assuming SQLite enforces foreign keys"
+  wrong={"INSERT INTO orders VALUES (106, 9, 5);  -- there is no customer 9"}
+  error="(no error by default: the orphan row is stored)"
+  cause="SQLite parses REFERENCES but only enforces it when foreign key support is switched on for the connection. With PRAGMA foreign_keys = ON the same insert raises sqlite3.IntegrityError: FOREIGN KEY constraint failed."
+  fix={"PRAGMA foreign_keys = ON;  -- run once per connection, outside a transaction"}
+/>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+- **Building training data.** Features usually live in several tables: users, events, labels. A training set is a
+  join, and the join type decides which examples you keep. An inner join silently drops users with no events; a
+  left join keeps them with NULL features that you must then handle.
+- **Row counts as a check.** After a join, compare the row count with what you expect. More rows than the left
+  table means some keys matched several rows (a one-to-many join); fewer means an inner join dropped rows.
+- **Slow queries.** When a query is slow, read its plan first. A `SCAN` over a large table in a query that needs a
+  few rows usually means a missing index on the filter or join column.
+
+With the left join of the lesson, `SUM(o.amount)` per customer gives Ada 30 + 12 = 42, Grace 8, Linus 45 and
+Margaret NULL, not 0. Wrap it as `COALESCE(SUM(o.amount), 0)` when you want zero.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Write a left join in Python">
+
+<MiniExercise exercise={leftJoinExercise}>
+  Write `left_join(customers, orders)` without a database. `customers` holds `(id, name)` tuples and `orders`
+  holds `(order_id, customer_id, amount)` tuples. Return one `(customer_id, name, order_id, amount)` tuple per
+  matching order, and `(customer_id, name, None, None)` for a customer with no orders, keeping the customers'
+  order. An order whose `customer_id` is `None` matches nobody. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A primary key identifies a row; a foreign key points at another table's primary key, or is NULL.
+- `INNER JOIN` keeps matched pairs, `LEFT JOIN` adds unmatched left rows, `FULL OUTER JOIN` adds unmatched rows
+  from both sides, padding with NULL.
+- NULL equals nothing, not even NULL. Test with `IS NULL`, and put filters on the right table in `ON`, not
+  `WHERE`, to keep a left join's padded rows.
+- A full scan reads all $n$ rows; a sorted index needs about $\log_2 n$ probes plus the matches. `EXPLAIN QUERY
+  PLAN` shows which one the database chose.
+
+Next: [APIs, JSON, CSV, Parquet and ingestion](#/learn/data/ingestion/apis-formats) covers how data arrives in
+these tables in the first place.
+
+</Section>

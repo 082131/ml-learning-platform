@@ -6,6 +6,7 @@ import { StorageNotice } from '@/components/layout/StorageNotice';
 import { STORAGE_KEY } from '@/lib/progress/schema';
 import { createProgressStore } from '@/lib/progress/store';
 import { renderWithApp } from '@/test/render';
+import { tracks } from '../../content/curriculum';
 import { AppRoutes } from './App';
 import { useApplyTheme } from './useTheme';
 
@@ -52,7 +53,12 @@ describe('routes', () => {
     expect(await screen.findByRole('heading', { level: 1, name: /Data Engineering/ })).toBeInTheDocument();
     const lessonMap = screen.getByRole('region', { name: 'Data Engineering lesson map' });
     expect(within(lessonMap).getAllByRole('link')).toHaveLength(12);
-    expect(screen.getAllByText('Outline only').length).toBeGreaterThanOrEqual(12);
+    // Content threads write lessons over time, so count the outline lessons instead of assuming all 12.
+    const outlines = tracks
+      .find((t) => t.id === 'data')!
+      .chapters.flatMap((c) => c.lessons)
+      .filter((l) => l.status === 'outline').length;
+    expect(screen.getAllByText('Outline only').length).toBeGreaterThanOrEqual(outlines);
   });
 
   it('outline lesson shows objectives, prerequisites and the outline label, with no completion button', async () => {

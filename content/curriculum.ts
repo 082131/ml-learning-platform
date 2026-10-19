@@ -130,7 +130,7 @@ export const tracks: Track[] = [
         id: 'relational',
         title: 'Relational databases',
         level: 'beginner',
-        lessons: [{ id: 'data/relational/joins-indexes', status: 'outline' }],
+        lessons: [{ id: 'data/relational/joins-indexes', status: 'written' }],
       },
       {
         id: 'ingestion',

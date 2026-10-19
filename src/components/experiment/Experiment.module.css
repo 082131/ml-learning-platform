@@ -93,7 +93,10 @@
 .value {
   font-family: var(--font-mono);
   font-size: var(--fs-15);
-  white-space: pre;
+  /* Keep printed line breaks, but wrap a line that is wider than its cell instead of scrolling it
+     (a scrolling cell is not keyboard-focusable and fails axe's scrollable-region-focusable). */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .flag {
   font-family: var(--font-mono);
