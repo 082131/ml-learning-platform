@@ -1,0 +1,146 @@
+import { dataset, experiment, numpyMatrices, transposeRunner } from './code';
+import { questions, transposeExercise } from './quiz';
+
+<Section kind="intuition" title="A spreadsheet of numbers">
+
+A spreadsheet with one row per house and one column per feature is already a
+<Term id="matrix">matrix</Term>: a rectangular grid of numbers. Every row is one house's feature
+<Term id="vector">vector</Term>; every column is one feature across all houses.
+
+Three things you do with a spreadsheet carry straight over. You look up a cell by its row and column. You add two
+sheets of the same layout cell by cell. And you sometimes flip the sheet so rows become columns, which is called
+the <Term id="transpose">transpose</Term>.
+
+</Section>
+
+<Section kind="technical" title="Shape, indices, addition and transpose">
+
+**Shape.** A matrix with $m$ rows and $n$ columns has <Term id="shape">shape</Term> $(m, n)$, rows first.
+
+$$
+A = \begin{bmatrix} 1 & 2 & 3 \\ 4 & 5 & 6 \end{bmatrix} \quad \text{shape } (2, 3)
+$$
+
+**Indexing.** $A_{ij}$ is the entry in row $i$ and column $j$, both counted from 0 as in Python. Here
+$A_{02} = 3$ and $A_{10} = 4$. In NumPy that is `A[0, 2]` and `A[1, 0]`; `A[1]` is the whole row
+$[4, 5, 6]$ and `A[:, 1]` the whole column $[2, 5]$.
+
+**Addition** is <Term id="element-wise">element-wise</Term> and needs equal shapes:
+
+$$
+(A + B)_{ij} = A_{ij} + B_{ij}
+\qquad
+\begin{bmatrix} 1 & 2 & 3 \\ 4 & 5 & 6 \end{bmatrix} +
+\begin{bmatrix} 10 & 0 & -1 \\ 2 & 3 & 4 \end{bmatrix} =
+\begin{bmatrix} 11 & 2 & 2 \\ 6 & 8 & 10 \end{bmatrix}
+$$
+
+Multiplying by a scalar also works entry by entry: $(kA)_{ij} = k\,A_{ij}$.
+
+**Transpose.** $A^\top$ swaps rows and columns:
+
+$$
+(A^\top)_{ij} = A_{ji}
+\qquad
+A^\top = \begin{bmatrix} 1 & 4 \\ 2 & 5 \\ 3 & 6 \end{bmatrix} \quad \text{shape } (3, 2)
+$$
+
+Row 0 of $A$, $[1, 2, 3]$, is column 0 of $A^\top$. The shape $(m, n)$ becomes $(n, m)$, entries on the diagonal
+($i = j$) stay put, and transposing twice gives back $A$: $(A^\top)^\top = A$.
+
+<Callout kind="simplification">
+  NumPy's `A.T` doesn't copy any numbers. It returns a view that reads the same memory with the row and column
+  steps swapped, which is why it is instant even for huge arrays. Changing an entry of `A.T` changes `A`.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Swap rows and columns">
+
+Edit any number in $A$, or select an entry of $A^\top$: the highlighted row of $A$ is the highlighted column of
+$A^\top$. The sliders change the shape, and the second view adds $B$ to $A$. Both views, the code and the readout
+share one state.
+
+<Experiment def={experiment} title="Transpose and add">
+  <MatrixOps op="transpose" />
+  <MatrixOps op="add" />
+</Experiment>
+
+Things to try:
+
+- Make $A$ square (3 rows, 3 columns): $A$ and $A^\top$ have the same shape, but they are only equal if $A$ is
+  symmetric, $A_{ij} = A_{ji}$.
+- Set the shape to 1 row: $A$ is a row vector and $A^\top$ a column.
+- Change $B$ so every entry of $A + B$ is 0. Then $B = -A$.
+
+</Section>
+
+<Section kind="code" title="The same operations in NumPy">
+
+<Experiment def={experiment} title="matrices.py, linked to the grids" controls={false}>
+  <Code example={numpyMatrices} title="matrices.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+With plain lists, a matrix is a list of rows, so you index with two brackets and transpose with `zip`:
+
+<PythonRunner example={transposeRunner} title="matrices_lists.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Shapes that don’t match, indices that don’t exist">
+
+<CommonMistake
+  title="Adding a matrix to its transpose"
+  wrong={'A = np.array([[1, 2, 3], [4, 5, 6]])  # (2, 3)\nA + A.T'}
+  error="ValueError: operands could not be broadcast together with shapes (2,3) (3,2) "
+  cause="Element-wise addition pairs entries in the same position, so both matrices need the same shape. A.T has shape (3, 2)."
+  fix={'print(A.shape, A.T.shape)  # add only matrices with equal shapes'}
+/>
+
+<CommonMistake
+  title="Indexing past the last row"
+  wrong={'A = np.array([[1, 2, 3], [4, 5, 6]])\nA[2, 0]'}
+  error="IndexError: index 2 is out of bounds for axis 0 with size 2"
+  cause="A has 2 rows, numbered 0 and 1. Axis 0 is the row axis; NumPy tells you which axis and its size."
+  fix={'A[1, 0]  # the last row is A.shape[0] - 1'}
+/>
+
+</Section>
+
+<Section kind="practice" title="A dataset is a matrix">
+
+<Code example={dataset} title="dataset.py" />
+
+The mean of the area column is $(120 + 85 + 60 + 150) / 4 = 103.75$. Rows are examples and columns are features
+in nearly every ML library, so `X.shape` tells you at a glance how many examples and features you have. Transposes
+show up when shapes must line up for a product, for example $X^\top X$ in
+[Linear regression](#/learn/ml/classical/linear-regression).
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Transpose by hand">
+
+<MiniExercise exercise={transposeExercise}>
+  Write `transpose(M)` for a matrix given as a list of rows, without NumPy or `zip`. It should return a new list
+  and leave `M` unchanged.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A matrix of shape $(m, n)$ has $m$ rows and $n$ columns; `A[i, j]` is row $i$, column $j$, from 0.
+- Addition and scalar multiplication work entry by entry; addition needs equal shapes.
+- $A^\top$ swaps rows and columns: $(A^\top)_{ij} = A_{ji}$, shape $(n, m)$.
+- A dataset is a matrix with one row per example and one column per feature.
+
+Next: [Matrix multiplication, row × column](#/learn/ml/math/matrix-multiplication).
+
+</Section>

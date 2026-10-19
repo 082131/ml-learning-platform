@@ -36,7 +36,7 @@ export const tracks: Track[] = [
         lessons: [
           { id: 'ml/math/scalars-vectors', status: 'written' },
           { id: 'ml/math/dot-product', status: 'written' },
-          { id: 'ml/math/matrices', status: 'outline' },
+          { id: 'ml/math/matrices', status: 'written' },
           { id: 'ml/math/matrix-multiplication', status: 'written' },
           { id: 'ml/math/tensors', status: 'outline' },
           { id: 'ml/math/functions-derivatives', status: 'outline' },

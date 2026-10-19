@@ -1,0 +1,20 @@
+.equation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-3) var(--s-4);
+}
+.op {
+  font-family: var(--font-mono);
+  font-size: var(--fs-28);
+  color: var(--ink-2);
+}
+.note {
+  margin: var(--s-4) 0 0;
+  padding: var(--s-3);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-family: var(--font-mono);
+  font-size: var(--fs-15);
+  overflow-wrap: break-word;
+}

@@ -2,15 +2,28 @@ import type { LessonMeta } from '@/lib/types';
 
 export default {
   id: 'ml/math/matrices',
-  title: 'Matrices: dimensions, indexing, addition and transpose',
+  title: 'Matrices: dimensions, indexing, addition, transpose',
   level: 'beginner',
   minutes: 35,
   kind: 'lesson',
   objectives: [
-    'Read a matrix shape as rows × columns and index any cell',
-    'Add matrices and transpose a matrix, predicting the result shape',
-    'Explain how a dataset table maps to a matrix',
+    'Read a matrix’s shape and find any entry by its row and column index',
+    'Add two matrices and say when addition is defined',
+    'Transpose a matrix and predict the new shape',
+    'Lay out a dataset as a matrix with one row per example',
   ],
   prerequisites: ['ml/math/dot-product'],
-  concepts: [],
+  concepts: ['matrix', 'shape', 'transpose', 'element-wise'],
+  references: [
+    {
+      title: 'NumPy indexing on ndarrays',
+      url: 'https://numpy.org/doc/stable/user/basics.indexing.html',
+      version: 'NumPy 2.5',
+    },
+    {
+      title: 'numpy.ndarray.T',
+      url: 'https://numpy.org/doc/stable/reference/generated/numpy.ndarray.T.html',
+      version: 'NumPy 2.5',
+    },
+  ],
 } satisfies LessonMeta;

@@ -82,4 +82,12 @@ export default [
     introducedIn: 'ml/math/dot-product',
     aliases: ['perpendicular'],
   },
+  {
+    id: 'transpose',
+    term: 'Transpose',
+    short: 'Aᵀ swaps rows and columns: (Aᵀ)[i][j] = A[j][i], so shape (m, n) becomes (n, m).',
+    long: 'Row 0 of A becomes column 0 of Aᵀ. In NumPy it is A.T, which returns a view without copying. Transposing twice gives the original matrix.',
+    introducedIn: 'ml/math/matrices',
+    aliases: ['.T', 'Aᵀ'],
+  },
 ] satisfies GlossaryTerm[];
