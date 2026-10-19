@@ -1,0 +1,20 @@
+.notice {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-2) var(--s-6);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+  font-size: var(--fs-15);
+}
+.tag {
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  text-transform: uppercase;
+  color: var(--warn);
+  border: 1px solid currentColor;
+  padding: 0 var(--s-1);
+}
+.text {
+  flex: 1;
+}

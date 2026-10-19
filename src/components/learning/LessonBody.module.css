@@ -1,0 +1,10 @@
+.body {
+  display: flex;
+  flex-direction: column;
+}
+.status {
+  padding: var(--s-6) 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}

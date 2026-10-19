@@ -1,0 +1,27 @@
+.label {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-2);
+}
+.prefix {
+  white-space: nowrap;
+}
+.dash {
+  flex-shrink: 0;
+  width: 24px;
+  border-top: 1px solid var(--line-strong);
+}
+.text {
+  min-width: 0;
+  color: var(--ink);
+}
+.rule {
+  flex: 1;
+  min-width: var(--s-4);
+  border-top: 1px solid var(--line);
+}

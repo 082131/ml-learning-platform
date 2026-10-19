@@ -1,0 +1,65 @@
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-8);
+}
+.heading {
+  margin: 0 0 var(--s-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
+}
+.lessons,
+.sections {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lesson {
+  display: grid;
+  grid-template-columns: 32px 1fr 16px;
+  gap: var(--s-2);
+  padding: 6px var(--s-2);
+  border-left: 2px solid transparent;
+  color: var(--ink-2);
+  text-decoration: none;
+  font-size: var(--fs-15);
+  line-height: 1.35;
+}
+.lesson:hover {
+  color: var(--ink);
+  background: var(--surface-2);
+}
+.lesson[aria-current='page'] {
+  color: var(--ink);
+  border-left-color: var(--accent);
+  background: var(--accent-soft);
+}
+.num {
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  padding-top: 1px;
+}
+.mark {
+  font-family: var(--font-mono);
+  color: var(--ink-2);
+}
+.mark[data-done='true'] {
+  color: var(--ok);
+}
+.sectionLink {
+  display: block;
+  width: 100%;
+  padding: 4px var(--s-2);
+  background: none;
+  border: 0;
+  text-align: left;
+  font-size: var(--fs-15);
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.sectionLink:hover {
+  color: var(--accent);
+}

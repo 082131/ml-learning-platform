@@ -1,0 +1,36 @@
+{/* Sample lesson from thread 1: only the intuition section, to prove the MDX pipeline. Thread 4 replaces it. */}
+
+<Section kind="intuition" title="Rules you write vs rules a program learns">
+
+Imagine you have to sort email into spam and not spam. One way is to write the rules yourself: if the subject
+contains "FREE MONEY", or the email has more than ten links, mark it as spam. A program that follows hand-written
+rules like these is a classic form of <Term id="artificial-intelligence">artificial intelligence</Term>.
+
+Hand-written rules break as soon as spammers change their wording, and nobody can write a rule for every case.
+<Term id="machine-learning">Machine learning</Term> takes a different route: you collect a
+<Term id="dataset">dataset</Term> of emails that are already marked as spam or not spam, describe each one with
+numbers called <Term id="feature">features</Term> (for example, how many links it has), and let a
+<Term id="training">training</Term> procedure find the rule that best separates the two groups.
+
+| | Hand-written rules | Machine learning |
+|---|---|---|
+| Who writes the rule | A person | A training procedure, from examples |
+| What it needs | Knowledge of the problem | Many labeled examples |
+| When spam changes | Someone edits the rules | Retrain on newer examples |
+
+The learned rule is called a <Term id="model">model</Term>. In the simplest case it is a function from the features
+$x$ to a prediction $\hat{y}$:
+
+$$
+\hat{y} = f(x)
+$$
+
+Using the trained model on a new email is called <Term id="inference">inference</Term>.
+<Term id="deep-learning">Deep learning</Term> is machine learning where $f$ is a neural network with many layers.
+
+<Callout kind="simplification">
+Real spam filters combine both approaches: learned models for most decisions, plus hand-written rules for cases
+that must never slip through.
+</Callout>
+
+</Section>

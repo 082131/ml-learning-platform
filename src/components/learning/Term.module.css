@@ -1,0 +1,28 @@
+.trigger {
+  font-size: inherit;
+  line-height: inherit;
+  color: inherit;
+  text-decoration: underline dotted var(--accent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+.trigger:hover,
+.trigger[aria-expanded='true'] {
+  color: var(--accent);
+}
+.name {
+  display: block;
+  font-weight: 500;
+  margin-bottom: var(--s-1);
+}
+.short {
+  display: block;
+  margin-bottom: var(--s-2);
+  color: var(--ink-2);
+}
+.links {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  font-size: var(--fs-13);
+}

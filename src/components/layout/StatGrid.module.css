@@ -1,0 +1,26 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  margin: 0;
+  border-top: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+}
+.cell {
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: flex-end;
+  gap: var(--s-1);
+  padding: var(--s-4);
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.value {
+  margin: 0;
+  font-size: var(--fs-28);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+.label {
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}

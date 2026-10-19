@@ -98,3 +98,8 @@ ml-learning-platform/
 
 ## Decision log
 - 2026-10-19: Interview answered by Claude at the user's request (spec.md, Q1 to Q9).
+- 2026-10-19 (thread 1): `nextUp` treats an *outline* prerequisite as satisfied, because outline lessons can't be completed; otherwise a written lesson behind an unwritten one would never be recommended. Marking complete is only offered on written lessons.
+- 2026-10-19 (thread 1): Every lesson has a `meta.ts` from day one (objectives and prerequisites drafted from curriculum.md, minutes as 35/45/50 per level, 180 per project, 600 per capstone). Content threads refine them. Prerequisites in `meta.ts` are always full IDs.
+- 2026-10-19 (thread 1): Playwright pinned to 1.56.1 with an npm `overrides` entry for `playwright-core`, to match the preinstalled Chromium build. Tool versions installed: React 19.3, React Router 8.5, Vite 8.3, Vitest 5, TypeScript 6.0, ESLint 10.
+- 2026-10-19 (thread 1): The pixel band is dark in both themes, so it has its own fixed tokens (`--band-*` in tokens.css). Sections inside lessons get their `[NN/12]` number from the fixed 12-part order, not from their position in the file.
+

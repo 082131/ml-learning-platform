@@ -1,0 +1,39 @@
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  padding: var(--s-8) 0 0;
+  scroll-margin-top: calc(var(--nav-h) + var(--s-4));
+  outline: none;
+}
+.title {
+  font-size: var(--fs-28);
+  max-width: var(--prose);
+}
+.body {
+  max-width: var(--prose);
+}
+.body :is(ul, ol):not([class]) {
+  margin: 0 0 var(--s-4);
+  padding-left: var(--s-6);
+}
+.body table {
+  border-collapse: collapse;
+  margin: 0 0 var(--s-4);
+  font-size: var(--fs-15);
+  display: block;
+  overflow-x: auto;
+}
+.body :is(th, td) {
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--line);
+  text-align: left;
+}
+.body th {
+  background: var(--surface-2);
+  font-weight: 500;
+}
+.body :global(.katex-display) {
+  overflow-x: auto;
+  overflow-y: hidden;
+}

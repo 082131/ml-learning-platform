@@ -1,0 +1,119 @@
+.band {
+  --cell: 18px;
+  position: relative;
+  padding: var(--s-4) var(--s-6) var(--s-3);
+  background-color: var(--band);
+  /* Faint pixel grid behind the cells, as in reference 01. */
+  background-image:
+    linear-gradient(var(--band-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--band-line) 1px, transparent 1px);
+  background-size: 24px 24px;
+  color: var(--band-ink);
+  border-bottom: 1px solid var(--line);
+}
+.groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-4) var(--s-6);
+}
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+}
+.groupLabel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--band-ink);
+}
+.cells {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: var(--cell);
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cell {
+  display: block;
+  width: var(--cell);
+  height: var(--cell);
+  background: var(--band-cell);
+  border: 1px solid var(--band-line);
+  transition: background-color var(--motion);
+}
+.cell:hover {
+  border-color: var(--band-ink);
+}
+.cell:focus-visible {
+  outline: 2px solid var(--band-text);
+  outline-offset: 1px;
+}
+.cell[data-state='not-started'],
+.swatch[data-state='not-started'] {
+  border-color: var(--band-idle-line);
+  background: var(--band-idle);
+}
+.cell[data-state='in-progress'],
+.swatch[data-state='in-progress'] {
+  border: 2px solid var(--band-accent-2);
+  background: var(--band-cell);
+}
+.cell[data-state='complete'],
+.swatch[data-state='complete'] {
+  background: var(--band-accent);
+  border-color: var(--band-accent);
+}
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2) var(--s-6);
+  margin-top: var(--s-3);
+}
+.readout {
+  margin: 0;
+  min-height: 1.5em;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--band-text);
+}
+.readoutCode {
+  color: var(--band-code);
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-1) var(--s-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+}
+.swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  background: var(--band-cell);
+  border: 1px solid var(--band-line);
+}
+@media (max-width: 599px) {
+  .band {
+    --cell: 14px;
+    padding: var(--s-3) var(--s-4);
+  }
+}

@@ -1,0 +1,17 @@
+.title {
+  font-size: var(--fs-20);
+  line-height: 1.25;
+}
+.meta {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin-top: auto;
+  min-height: 24px;
+}

@@ -1,0 +1,108 @@
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  height: var(--nav-h);
+  padding: 0 var(--s-4) 0 var(--s-6);
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+}
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  color: var(--ink);
+  text-decoration: none;
+  flex-shrink: 0;
+}
+.wordmark {
+  font-weight: 500;
+  font-size: var(--fs-17);
+  letter-spacing: -0.02em;
+}
+.chips {
+  display: flex;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.chipsVertical {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.chipsVertical .chip {
+  display: flex;
+  min-height: 40px;
+  font-size: var(--fs-13);
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 var(--s-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.chip:hover {
+  border-color: var(--ink);
+}
+.chip[aria-current='page'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.chip[aria-current='page']::before {
+  content: '<';
+}
+.chip[aria-current='page']::after {
+  content: '>';
+}
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin-left: auto;
+}
+.kbd {
+  font-size: 11px;
+  color: var(--ink-2);
+  border: 1px solid var(--line);
+  padding: 0 4px;
+  border-radius: var(--radius);
+}
+.menuTheme {
+  margin-top: var(--s-6);
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--line);
+}
+.mobileOnly {
+  display: none;
+}
+
+@media (max-width: 1079px) {
+  .desktopOnly {
+    display: none;
+  }
+  .mobileOnly {
+    display: inline-flex;
+  }
+  .bar {
+    padding: 0 var(--s-3) 0 var(--s-4);
+  }
+}

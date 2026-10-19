@@ -1,0 +1,28 @@
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  min-width: 0;
+  padding: var(--s-4) var(--s-4) var(--s-4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--ink);
+}
+.link {
+  text-decoration: none;
+  transition: border-color var(--motion);
+}
+.link:hover {
+  border-color: var(--ink);
+}
+.number {
+  align-self: flex-end;
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}
+.slashes {
+  color: var(--ink-2);
+}

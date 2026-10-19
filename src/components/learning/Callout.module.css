@@ -1,0 +1,26 @@
+.callout {
+  margin: 0 0 var(--s-4);
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--ink-2);
+  background: var(--surface-2);
+  font-size: var(--fs-15);
+}
+.callout[data-kind='warning'] {
+  border-left-color: var(--warn);
+}
+.callout[data-kind='simplification'] {
+  border-left-color: var(--accent);
+}
+.label {
+  display: block;
+  margin-bottom: var(--s-1);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-2);
+}
+.body > :last-child {
+  margin-bottom: 0;
+}

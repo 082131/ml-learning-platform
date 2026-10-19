@@ -1,0 +1,21 @@
+.root {
+  position: relative;
+  display: inline-flex;
+}
+.tip {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  right: 0;
+  padding: var(--s-1) var(--s-2);
+  background: var(--ink);
+  color: var(--bg);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.tip[hidden] {
+  display: none;
+}
