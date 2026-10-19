@@ -1,0 +1,158 @@
+import { experiment, featureVector, listRunner, numpyVectors } from './code';
+import { questions, vectorExercise } from './quiz';
+
+<Section kind="intuition" title="Directions on a map">
+
+"Walk 3 blocks east and 1 block north" is a single instruction made of two numbers. The order matters (east
+first, then north), and together they describe a move with a direction and a length. That pair is a
+<Term id="vector">vector</Term>: an ordered list of numbers. A plain single number, such as a temperature or a
+learning rate, is a <Term id="scalar">scalar</Term>.
+
+Two moves in a row add up: 3 east and 1 north, then 1 east and 2 north, lands you 4 east and 3 north. Doing the
+same move one and a half times takes you 4.5 east and 1.5 north. Adding vectors and multiplying them by a scalar
+are the two operations everything else in linear algebra is built from.
+
+In machine learning, a vector usually describes one example. A house becomes [area, rooms, age]; an image becomes
+its pixel values in a long row. Each number is a <Term id="feature">feature</Term>, and its position says which
+feature it is.
+
+</Section>
+
+<Section kind="technical" title="Components, arrows and two operations">
+
+A vector with $n$ components is written $u = (u_0, u_1, \dots, u_{n-1})$. In NumPy it is a 1-D array of
+<Term id="shape">shape</Term> $(n,)$. A scalar has no components; NumPy reports its shape as $()$.
+
+**As an arrow.** A 2-D vector $u = (3, 1)$ is an arrow from the origin $(0, 0)$ to the point $(3, 1)$:
+3 along the x axis, 1 along the y axis. Vectors with more components can't be drawn, but the arithmetic is the
+same.
+
+**Addition** works component by component, which is called <Term id="element-wise">element-wise</Term>:
+
+$$
+u + v = (u_0 + v_0, \; u_1 + v_1) \qquad (3, 1) + (1, 2) = (3 + 1, \; 1 + 2) = (4, 3)
+$$
+
+Both vectors must have the same number of components. Geometrically, put the tail of $v$ at the tip of $u$: the
+sum is the arrow from the origin to where $v$ now ends.
+
+**Scaling** multiplies every component by the scalar $k$:
+
+$$
+k\,u = (k\,u_0, \; k\,u_1) \qquad 1.5 \cdot (3, 1) = (1.5 \cdot 3, \; 1.5 \cdot 1) = (4.5, 1.5)
+$$
+
+The arrow stays on the same line through the origin. $|k| > 1$ stretches it, $|k| < 1$ shrinks it, a negative
+$k$ flips it to point the other way, and $k = 0$ gives the zero vector $(0, 0)$.
+
+Subtraction is addition of a flipped vector: $u - v = u + (-1)\,v$, the arrow from the tip of $v$ to the tip
+of $u$.
+
+<Callout kind="simplification">
+  Here a vector is a list of numbers with an arrow picture. Mathematics defines vectors more generally (anything
+  you can add and scale following a few rules, including functions), but for ML code the list-of-numbers view is
+  the one you need.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Drag the arrows">
+
+Drag the tip of $u$ or $v$ (or focus a tip and use the arrow keys). The dashed arrows are $u + v$ and $k\,u$;
+the slider sets $k$. The code and the printed output in the next section use the same values.
+
+<Experiment def={experiment} title="Add and scale">
+  <VectorPlane vectors={['u', 'v']} show={['sum', 'scaled']} scaleKey="k" />
+  <Readout />
+</Experiment>
+
+Things to try:
+
+- Set $k$ to $-1$: $k\,u$ points exactly opposite to $u$.
+- Move $v$ to $(0, 0)$: $u + v$ lands on $u$, because adding the zero vector changes nothing.
+- Make $v$ equal to $u$: the sum is the same arrow as $2\,u$.
+
+</Section>
+
+<Section kind="code" title="The same vectors in NumPy">
+
+Select or focus a part of the code to see what it does. The literals are the arrows above.
+
+<Experiment def={experiment} title="vectors.py, linked to the plane" controls={false}>
+  <Code example={numpyVectors} title="vectors.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+NumPy prints arrays without commas and lines up the decimal points, so `[4.5 1.5]` is the vector $(4.5, 1.5)$.
+A trailing dot, as in `[6. 2.]`, means the array holds floats.
+
+Plain Python lists are not vectors. You can do the same arithmetic with a loop over the pairs; run this and
+compare the first line with the others:
+
+<PythonRunner example={listRunner} title="vectors_lists.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Lists that aren’t vectors, and lengths that don’t match">
+
+<CommonMistake
+  title="Adding vectors of different lengths"
+  wrong={'u = np.array([1, 2])\nv = np.array([1, 2, 3])\nu + v'}
+  error="ValueError: operands could not be broadcast together with shapes (2,) (3,) "
+  cause="Element-wise addition pairs component 0 with component 0, 1 with 1, and so on. A vector with 2 components has nothing to pair with the third component of the other."
+  fix={'print(u.shape, v.shape)  # check the shapes, then fix whichever vector is wrong'}
+/>
+
+<Callout kind="warning">
+  Lists raise no error, they just do something else. `[3, 1] + [1, 2]` gives `[3, 1, 1, 2]` (the lists joined)
+  and `[3, 1] * 2` gives `[3, 1, 3, 1]` (the list repeated). Convert to arrays with `np.array` before doing
+  vector arithmetic.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Every example is a vector">
+
+A model never sees "a house". It sees the house's <Term id="feature">features</Term> as a vector, and a
+batch of houses as a matrix with one row per house.
+
+<Code example={featureVector} title="features.py" />
+
+| Example        | Feature vector                             | Shape        |
+| -------------- | ------------------------------------------ | ------------ |
+| A house        | area, rooms, age                           | $(3,)$       |
+| A 28 × 28 image | its 784 pixel brightness values in one row | $(784,)$     |
+| A word         | an embedding learned by a model            | $(d,)$, often a few hundred |
+
+Adding and scaling feature vectors is meaningful only when every vector uses the same features in the same
+order. In [Dot product, length, angle, similarity](#/learn/ml/math/dot-product) you will measure how similar two
+such vectors are.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Vector arithmetic without NumPy">
+
+<MiniExercise exercise={vectorExercise}>
+  Write `add(u, v)` and `scale(k, u)` for vectors given as Python lists, without NumPy. `add` should raise
+  `ValueError` when the two vectors have different lengths. Run the tests to check.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A scalar is one number; a vector is an ordered list of numbers, shape $(n,)$ in NumPy.
+- A 2-D vector is an arrow from the origin to the point given by its components.
+- $u + v$ adds matching components and needs equal lengths; $k\,u$ multiplies every component by $k$.
+- Use NumPy arrays for vector arithmetic: on lists, `+` joins and `*` repeats.
+- In ML, each example is a feature vector, and a batch of examples is a matrix.
+
+Next: [Dot product, length, angle, similarity](#/learn/ml/math/dot-product).
+
+</Section>

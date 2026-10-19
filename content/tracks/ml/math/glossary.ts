@@ -35,4 +35,27 @@ export default [
     introducedIn: 'ml/math/matrix-multiplication',
     aliases: ['matmul', 'matrix product', '@'],
   },
+  {
+    id: 'scalar',
+    term: 'Scalar',
+    short: 'A single number, such as a learning rate or a temperature.',
+    long: 'A scalar has no components. NumPy reports its shape as (). Multiplying a vector by a scalar scales every component by the same amount.',
+    introducedIn: 'ml/math/scalars-vectors',
+  },
+  {
+    id: 'vector',
+    term: 'Vector',
+    short: 'An ordered list of numbers, such as (3, 1); in 2-D, an arrow from the origin to that point.',
+    long: 'A vector with n components has shape (n,) in NumPy. In ML, one example is usually a vector of its features. Vectors are added component by component and scaled by multiplying every component.',
+    introducedIn: 'ml/math/scalars-vectors',
+    aliases: ['1-D array', 'feature vector'],
+  },
+  {
+    id: 'element-wise',
+    term: 'Element-wise',
+    short: 'Applied to each pair of matching entries separately, as in u + v = (u₀ + v₀, u₁ + v₁).',
+    long: 'NumPy’s +, -, * and / on arrays are element-wise: they need equal shapes (or shapes that broadcast) and return an array of that shape. Matrix multiplication (@) is not element-wise.',
+    introducedIn: 'ml/math/scalars-vectors',
+    aliases: ['elementwise', 'component-wise'],
+  },
 ] satisfies GlossaryTerm[];

@@ -176,3 +176,31 @@ describe('shared experiment state', () => {
     expect(() => registry.get({ ...def, initial: { ...def.initial } })).toThrow(/Two different experiments/);
   });
 });
+
+describe('Readout overflow (thread 5)', () => {
+  it('makes a value cell focusable only while its value overflows', () => {
+    const proto = HTMLElement.prototype;
+    const original = Object.getOwnPropertyDescriptor(proto, 'scrollWidth');
+    let wide = 500;
+    Object.defineProperty(proto, 'scrollWidth', { configurable: true, get: () => wide });
+    try {
+      const { rerender } = render(
+        <Experiment def={def}>
+          <Readout />
+        </Experiment>,
+      );
+      const dd = screen.getByRole('region', { name: 'Result' }).querySelector('dd')!;
+      expect(dd).toHaveAttribute('tabindex', '0');
+      wide = 0;
+      rerender(
+        <Experiment def={def} title="Again">
+          <Readout />
+        </Experiment>,
+      );
+      expect(dd).not.toHaveAttribute('tabindex');
+    } finally {
+      if (original) Object.defineProperty(proto, 'scrollWidth', original);
+      else delete (proto as { scrollWidth?: number }).scrollWidth;
+    }
+  });
+});

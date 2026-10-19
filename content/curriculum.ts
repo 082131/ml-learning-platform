@@ -34,7 +34,7 @@ export const tracks: Track[] = [
         level: 'beginner',
         project: 'ml/math/project-math',
         lessons: [
-          { id: 'ml/math/scalars-vectors', status: 'outline' },
+          { id: 'ml/math/scalars-vectors', status: 'written' },
           { id: 'ml/math/dot-product', status: 'outline' },
           { id: 'ml/math/matrices', status: 'outline' },
           { id: 'ml/math/matrix-multiplication', status: 'written' },
