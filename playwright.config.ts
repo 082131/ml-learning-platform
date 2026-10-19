@@ -16,7 +16,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `npx vite build --logLevel warn && npx vite preview --port ${PORT} --strictPort`,
+    // VITE_DEV_PAGES adds the #/dev/components demo page, which production builds leave out.
+    command: `VITE_DEV_PAGES=true npx vite build --logLevel warn && npx vite preview --port ${PORT} --strictPort`,
     url: `http://localhost:${PORT}/`,
     // Always rebuild so tests never run against a stale dist/.
     reuseExistingServer: false,

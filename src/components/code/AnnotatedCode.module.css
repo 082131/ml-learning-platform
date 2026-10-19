@@ -1,0 +1,29 @@
+.container {
+  container-type: inline-size;
+}
+.grid {
+  display: grid;
+  gap: var(--s-3);
+  grid-template-columns: minmax(0, 1fr);
+}
+/* Wide enough: the explanation docks to the right of the code. */
+@container (min-width: 720px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr) 280px;
+    align-items: start;
+  }
+  .grid > :last-child {
+    position: sticky;
+    top: calc(var(--nav-h) + var(--s-4));
+  }
+}
+.phoneHint {
+  margin: 0;
+  font-size: var(--fs-15);
+  color: var(--ink-2);
+}
+.output {
+  display: block;
+  padding: 0 var(--s-4);
+  white-space: pre;
+}

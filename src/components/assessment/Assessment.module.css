@@ -1,0 +1,225 @@
+.check,
+.exercise,
+.project,
+.mistake {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  margin: 0 0 var(--s-6);
+}
+.question {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  padding: var(--s-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.prompt {
+  display: block;
+  margin: 0 0 var(--s-2);
+  padding: 0;
+  font-weight: 500;
+}
+.number {
+  font-family: var(--font-mono);
+  color: var(--ink-2);
+}
+.option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3);
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.option input {
+  margin-top: 0.3em;
+  accent-color: var(--accent);
+}
+.option:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.fieldset:disabled .option {
+  cursor: default;
+}
+.input {
+  width: 12ch;
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-mono);
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-3);
+}
+.meta {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}
+.error {
+  margin: 0;
+  font-size: var(--fs-15);
+  color: var(--err);
+}
+.feedback {
+  margin: 0;
+  padding: var(--s-3);
+  border-left: 3px solid var(--err);
+  background: var(--surface-2);
+  font-size: var(--fs-15);
+}
+.feedback[data-correct='true'] {
+  border-left-color: var(--ok);
+}
+.feedback[data-correct='true'] strong {
+  color: var(--ok);
+}
+.feedback[data-correct='false'] strong {
+  color: var(--err);
+}
+.order {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.orderItem {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-1) var(--s-1) var(--s-1) var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.orderText {
+  flex: 1;
+}
+.orderButtons {
+  display: inline-flex;
+  gap: var(--s-1);
+}
+.orderItem[data-right='true'] {
+  border-color: var(--ok);
+}
+.orderItem[data-right='false'] {
+  border-color: var(--err);
+}
+.mark {
+  font-weight: 700;
+}
+.orderItem[data-right='true'] .mark {
+  color: var(--ok);
+}
+.orderItem[data-right='false'] .mark {
+  color: var(--err);
+}
+.prose > :last-child {
+  margin-bottom: 0;
+}
+.codeBox {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.hints {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+.hint,
+.solution {
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  background: var(--surface);
+}
+.solution {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  border-left-color: var(--ok);
+}
+.hint p,
+.solution p {
+  margin: 0;
+}
+.hintLabel {
+  display: block;
+  margin-bottom: var(--s-1);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
+}
+.mistake {
+  padding: var(--s-4);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--err);
+  background: var(--surface);
+}
+.mistakeTitle,
+.sub {
+  margin: 0;
+  font-size: var(--fs-17);
+  font-weight: 600;
+}
+.mistake p {
+  margin: 0;
+}
+.errorText {
+  margin: 0;
+  padding: var(--s-3);
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--err);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  white-space: pre;
+}
+.rubric {
+  border-collapse: collapse;
+  font-size: var(--fs-15);
+}
+.rubric :is(th, td) {
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+.rubric thead th {
+  background: var(--surface-2);
+  font-weight: 500;
+}
+.details summary {
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  text-transform: uppercase;
+}
+.details p {
+  margin: var(--s-2) 0 0;
+}

@@ -9,3 +9,4 @@ export { Sheet } from './Sheet';
 export { Slider } from './Slider';
 export { Tabs, type TabItem } from './Tabs';
 export { Tooltip } from './Tooltip';
+export { useMediaQuery, PHONE_QUERY } from './useMediaQuery';

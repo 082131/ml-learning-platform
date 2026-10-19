@@ -11,6 +11,10 @@
   max-width: var(--prose);
 }
 .body {
+  max-width: var(--wide);
+}
+/* Prose keeps its reading width; code and visualization blocks (data-wide) may use up to 960px. */
+.body > :not([data-wide]) {
   max-width: var(--prose);
 }
 .body :is(ul, ol):not([class]) {

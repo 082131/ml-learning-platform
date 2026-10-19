@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { GlossaryTerm, LessonMeta, Track } from '../types';
 import { createCurriculum, lessonPath } from './index';
+import { validateLessonData } from './lessonData';
 import { findCycle, idFromPath, validateContent, type ContentInput } from './validate';
 
 const meta = (id: string, extra: Partial<LessonMeta> = {}): LessonMeta => ({
@@ -182,5 +183,52 @@ describe('createCurriculum', () => {
   });
   it('builds lesson paths', () => {
     expect(lessonPath('ml/c/a')).toBe('/learn/ml/c/a');
+  });
+});
+
+describe('validateLessonData', () => {
+  it('reports annotation drift and invalid quiz answers with the file path', () => {
+    const errors = validateLessonData(
+      {
+        '/content/tracks/ml/x/code.ts': {
+          ex: {
+            id: 'a',
+            language: 'python',
+            source: 'x = 1',
+            annotations: [
+              {
+                id: 'x',
+                range: { line: 1, startCol: 0, endCol: 1 },
+                match: 'y',
+                kind: 'variable',
+                title: 'x',
+                what: 'w',
+                why: 'y',
+              },
+            ],
+          },
+          helper: () => 1,
+        },
+      },
+      {
+        '/content/tracks/ml/x/quiz.ts': {
+          questions: [
+            {
+              id: 'q',
+              type: 'choice',
+              prompt: 'p',
+              options: [
+                { text: 'a', correct: false, explain: 'e' },
+                { text: 'b', correct: false, explain: 'e' },
+              ],
+            },
+          ],
+        },
+      },
+    );
+    expect(errors).toEqual([
+      '/content/tracks/ml/x/code.ts: a: annotation "x" match "y" does not equal the source slice "x"',
+      '/content/tracks/ml/x/quiz.ts: q: no option is marked correct',
+    ]);
   });
 });

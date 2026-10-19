@@ -14,6 +14,8 @@ export default defineConfig({
     { enforce: 'pre', ...mdx({ remarkPlugins: [remarkGfm, remarkMath], rehypePlugins: [rehypeKatex] }) },
     react({ include: /\.(mdx|tsx|ts)$/ }),
   ],
+  // The Pyodide worker imports the runtime from a URL at run time, which needs an ES module worker.
+  worker: { format: 'es' },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

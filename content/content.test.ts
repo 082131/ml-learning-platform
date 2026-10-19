@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { validateLessonData } from '@/lib/curriculum/lessonData';
 import { validateContent } from '@/lib/curriculum/validate';
 import { glossary, metaFiles, tracks } from './index';
 
@@ -9,6 +10,12 @@ const mdxPaths = Object.keys(import.meta.glob('./tracks/**/index.mdx')).map((p) 
 describe('content validation', () => {
   it('curriculum, lesson metadata and glossary are consistent', () => {
     expect(validateContent({ tracks, metaFiles, mdxPaths, glossary })).toEqual([]);
+  });
+
+  it('code examples and quizzes are valid: annotation ranges match their source, answers are well formed', () => {
+    const code = import.meta.glob<Record<string, unknown>>('./tracks/**/code.ts', { eager: true });
+    const quiz = import.meta.glob<Record<string, unknown>>('./tracks/**/quiz.ts', { eager: true });
+    expect(validateLessonData(code, quiz)).toEqual([]);
   });
 
   it('encodes every lesson from curriculum.md', () => {

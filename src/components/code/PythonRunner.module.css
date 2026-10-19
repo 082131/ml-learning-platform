@@ -1,0 +1,93 @@
+.editor {
+  display: flex;
+  flex-direction: column;
+}
+.textarea {
+  width: 100%;
+  min-height: 6em;
+  padding: var(--s-3);
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  line-height: 1.7;
+  resize: vertical;
+  tab-size: 4;
+  white-space: pre;
+  overflow-x: auto;
+}
+.textarea:focus-visible {
+  outline-offset: -2px;
+}
+.hint {
+  margin: 0;
+  padding: var(--s-1) var(--s-3);
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-3);
+  border-top: 1px solid var(--line);
+}
+.status {
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}
+.offline {
+  margin: 0;
+  padding: 0 var(--s-3) var(--s-3);
+  font-size: var(--fs-13);
+  color: var(--warn);
+}
+.output {
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+.outputHead {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
+}
+.stream {
+  margin: 0;
+  padding: 0 var(--s-3) var(--s-3);
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  background: transparent;
+  border: 0;
+  white-space: pre;
+}
+.stderr {
+  color: var(--warn);
+}
+.error {
+  color: var(--err);
+}
+.figure {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 var(--s-3) var(--s-3);
+  background: #fff; /* Matplotlib draws on white; keep it legible in dark mode */
+}
+.empty {
+  margin: 0;
+  padding: 0 var(--s-3) var(--s-3);
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}

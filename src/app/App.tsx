@@ -12,6 +12,10 @@ const BookmarksPage = lazy(() => import('@/pages/BookmarksPage'));
 const SettingsPage = lazy(() => import('@/pages/SettingsPage'));
 const NotFound = lazy(() => import('@/pages/NotFound'));
 
+// Developer pages: in dev builds, and in the e2e build (VITE_DEV_PAGES=true). Removed from production builds.
+const SHOW_DEV_PAGES = import.meta.env.DEV || import.meta.env.VITE_DEV_PAGES === 'true';
+const ComponentsDemo = SHOW_DEV_PAGES ? lazy(() => import('@/dev/ComponentsDemo')) : null;
+
 export function AppRoutes() {
   return (
     <Routes>
@@ -22,6 +26,7 @@ export function AppRoutes() {
         <Route path="glossary" element={<GlossaryPage />} />
         <Route path="bookmarks" element={<BookmarksPage />} />
         <Route path="settings" element={<SettingsPage />} />
+        {ComponentsDemo && <Route path="dev/components" element={<ComponentsDemo />} />}
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

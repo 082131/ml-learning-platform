@@ -1,6 +1,7 @@
 import { Component, Suspense, useEffect, type ReactNode } from 'react';
 import { lessonContent } from '@/app/content';
 import { mdxComponents } from '@/mdx-components';
+import { LessonIdContext } from './LessonContext';
 import s from './LessonBody.module.css';
 
 class LoadBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
@@ -32,7 +33,9 @@ export function LessonBody({ id, onReady }: { id: string; onReady: () => void })
     <LoadBoundary key={id}>
       <Suspense fallback={<p className={s.status}>Loading lesson…</p>}>
         <div className={s.body}>
-          <Content components={mdxComponents} />
+          <LessonIdContext.Provider value={id}>
+            <Content components={mdxComponents} />
+          </LessonIdContext.Provider>
         </div>
         <Ready onReady={onReady} />
       </Suspense>
