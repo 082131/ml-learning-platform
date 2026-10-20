@@ -1,0 +1,203 @@
+import { collapseCode, experiment, neuronCode, neuronRunner } from './code';
+import { neuronExercise, questions } from './quiz';
+
+<Section kind="intuition" title="A neuron weighs the evidence, then decides how strongly to respond">
+
+Think of a smoke alarm that listens to two sensors: one for smoke and one for heat. It does not treat them
+equally. It multiplies each reading by an importance number, adds the results, and adds a fixed offset that sets
+how easily it goes off. Then it turns that total into a response: quiet, a little alarmed, or fully on.
+
+That is a <Term id="neuron">neuron</Term>. The importance numbers are its **weights** $w$, the offset is its
+**bias** $b$, and the function that turns the total into a response is its
+<Term id="activation-function">activation function</Term> $f$. Weights and bias are the neuron's
+<Term id="parameter">parameters</Term>: the numbers training adjusts.
+
+If you have met logistic regression, you have already met a neuron: logistic regression computes a weighted sum
+and passes it through the sigmoid function. A <Term id="neural-network">neural network</Term> is many neurons
+wired in layers, each one feeding the next. This lesson is about one neuron, and about the activation function,
+the small step that makes stacking neurons worthwhile.
+
+</Section>
+
+<Section kind="technical" title="z = w · x + b, then a = f(z)">
+
+A neuron with $n$ inputs $x = (x_0, \dots, x_{n-1})$ has $n$ weights $w = (w_0, \dots, w_{n-1})$ and one bias $b$.
+It computes two things:
+
+$$
+z = w \cdot x + b = \sum_{i=0}^{n-1} w_i x_i + b \qquad\qquad a = f(z)
+$$
+
+$z$ is the <Term id="pre-activation">pre-activation</Term>: a <Term id="dot-product">dot product</Term> plus the
+bias. $a$ is the neuron's output, or activation. Here $x$ and $w$ both have shape $(2,)$ and $z$ and $a$ are single
+numbers.
+
+**Worked example.** With $x = (1, 2)$, $w = (0.5, -1)$ and $b = 0.5$:
+
+$$
+z = 0.5 \cdot 1 + (-1) \cdot 2 + 0.5 = 0.5 - 2 + 0.5 = -1
+$$
+
+**Three activation functions.** Each takes $z$ and returns $a$. The slope $f'(z)$ matters later: training
+(backpropagation) multiplies by it, so where an activation is flat, learning is slow.
+
+| Activation | Formula | Output range | Slope $f'(z)$ | At $z = -1$ |
+| --- | --- | --- | --- | --- |
+| Sigmoid | $\sigma(z) = \dfrac{1}{1 + e^{-z}}$ | $(0, 1)$ | $\sigma(z)\,(1 - \sigma(z))$, at most 0.25 | $1 / (1 + e^{1}) = 0.2689$ |
+| <Term id="tanh">Tanh</Term> | $\tanh(z) = \dfrac{e^{z} - e^{-z}}{e^{z} + e^{-z}}$ | $(-1, 1)$ | $1 - \tanh(z)^2$, at most 1 | $-0.7616$ |
+| <Term id="relu">ReLU</Term> | $\max(0, z)$ | $[0, \infty)$ | 1 if $z > 0$, 0 if $z < 0$ | $\max(0, -1) = 0$ |
+
+Sigmoid and tanh **saturate**: for large $|z|$ they flatten out and their slope goes to almost 0
+($\sigma'(8) \approx 0.0003$). ReLU does not saturate for positive $z$, which is one reason it is the usual default
+for hidden layers. Its slope is exactly 0 for negative $z$, so a ReLU neuron whose $z$ is negative for every input
+stops learning (a "dead" neuron).
+
+**Why the activation is needed.** Take two layers with no activation. Layer 1 maps $x$ to $h = xW_1 + b_1$ and
+layer 2 maps $h$ to $y = hW_2 + b_2$. Substituting:
+
+$$
+y = (xW_1 + b_1)W_2 + b_2 = x\,\underbrace{(W_1 W_2)}_{W} + \underbrace{(b_1 W_2 + b_2)}_{c}
+$$
+
+That is a single linear layer with weights $W$ and bias $c$. However many linear layers you stack, the result is
+one linear map, so depth adds nothing. Put a non-linear $f$ between them, $y = f(xW_1 + b_1)W_2 + b_2$, and the
+substitution no longer works: the network can bend its output. The experiment section shows this with numbers.
+
+<Callout kind="simplification">
+  "Neuron" is a loose analogy to brain cells; an artificial neuron is just the formula above. Real networks do not
+  compute neurons one at a time: a whole layer of neurons, for a whole batch of inputs, is one matrix
+  multiplication (next lesson). ReLU has no slope at exactly $z = 0$; PyTorch and this lesson use 0 there.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Move the sliders, watch z and a">
+
+Change the inputs, weights and bias, and pick an activation. The diagram shows the numbers flowing through the
+neuron, the plot marks where the current $z$ lands on the activation curve, and the arithmetic is written out
+below. The code and the step-through in the next section use the same values.
+
+<Experiment def={experiment} title="A single neuron">
+  <NeuronPlayground />
+</Experiment>
+
+Try this: set the bias to 3 with the sigmoid. $z$ moves far right, $a$ gets close to 1, and the slope readout in
+the next section drops toward 0: the neuron is saturated.
+
+</Section>
+
+<Section kind="code" title="The same neuron in NumPy">
+
+Hover over, focus or select a part of the code to see what it does. The numbers in the code are the slider values
+above, and the activation line changes when you pick a different activation.
+
+<Experiment def={experiment} title="neuron.py, linked to the sliders" controls={false}>
+  <Code example={neuronCode} title="neuron.py" />
+  <Readout title="What the code prints" />
+  <StepThrough example={neuronCode} title="neuron.py" />
+</Experiment>
+
+The same neuron in plain Python, without NumPy. It runs in your browser; try other inputs or add an activation.
+
+<PythonRunner example={neuronRunner} title="neuron_plain.py" />
+
+</Section>
+
+<Section kind="experiment" title="Stack two layers: with and without an activation">
+
+Below, the input $x$ from the sliders goes through two small layers with fixed weights: $W_1$ of shape $(2, 2)$
+maps it to two hidden values, and $W_2$ of shape $(2, 1)$ maps those to one output $y$. The activation you pick is
+applied between the layers. On the right, the same two layers are merged into one linear map
+$W = W_1 W_2$, $c = b_1 W_2 + b_2$.
+
+<Experiment def={experiment} title="Why non-linearity matters">
+  <LinearCollapse />
+</Experiment>
+
+Things to try:
+
+- Pick **None (identity)**. The two outputs are always equal, for every slider position, and the plotted line is
+  straight: the two layers really are one linear layer.
+- Pick **ReLU** with the starting input $x = (1, 2)$. The first hidden value is $-0.5$, ReLU turns it into 0, and
+  the output changes from $-1$ to $0$. The plot bends where a hidden value crosses 0.
+- Keep ReLU and move $x[0]$ to $-2$. Both hidden values are now positive, ReLU passes them through unchanged, and
+  the two outputs agree again. A ReLU network is linear piece by piece, with bends between the pieces.
+
+The same check in NumPy, with the starting input:
+
+<Code example={collapseCode} title="collapse.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Array mistakes and a silent one">
+
+<CommonMistake
+  title="Weights and inputs of different lengths"
+  wrong={'w = np.array([0.5, -1.0, 2.0])  # 3 weights\nx = np.array([1.0, 2.0])        # 2 inputs\nz = w @ x'}
+  error="ValueError: matmul: Input operand 1 has a mismatch in its core dimension 0, with gufunc signature (n?,k),(k,m?)->(n?,m?) (size 2 is different from 3)"
+  cause="A neuron needs exactly one weight per input. The dot product pairs w[i] with x[i], so the lengths must match."
+  fix={'w = np.array([0.5, -1.0])  # one weight per input\nz = w @ x'}
+/>
+
+<CommonMistake
+  title="Using math.exp on a NumPy array"
+  wrong={'import math\nz = np.array([-1.0, 0.5])\na = 1 / (1 + math.exp(-z))'}
+  error="TypeError: only 0-dimensional arrays can be converted to Python scalars"
+  cause="The `math` module works on single Python numbers. Once z holds several values (one per neuron or per example), use NumPy's element-wise `np.exp`."
+  fix={'a = 1 / (1 + np.exp(-z))  # about 0.2689 and 0.6225'}
+/>
+
+<CommonMistake
+  title="Writing ReLU with Python's max"
+  wrong={'z = np.array([-1.0, 0.5])\na = max(0, z)'}
+  error="ValueError: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()"
+  cause="Python's built-in `max` compares whole objects, so it asks whether the array is greater than 0, which has no single answer. `np.maximum` compares element by element."
+  fix={'a = np.maximum(0, z)  # [0.  0.5]'}
+/>
+
+<Callout kind="warning">
+  Leaving out the activation raises no error at all. The network still trains, but it can only learn a linear
+  function, however many layers it has. If a deep model does no better than linear regression, check that every
+  hidden layer applies an activation.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+- Every hidden unit of every dense network is this neuron. The next lesson computes a whole layer of them at once
+  with a matrix multiplication: $Z = XW + b$.
+- Output layers pick their activation by task: sigmoid for a yes/no probability, none (identity) for predicting a
+  number, softmax for choosing among several classes.
+- Hidden layers usually use ReLU or a smooth variant of it, such as GELU in transformers, because they keep a
+  useful slope for positive $z$.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Write a neuron in plain Python">
+
+<MiniExercise exercise={neuronExercise}>
+  Write `neuron(x, w, b, activation)` in plain Python, without NumPy. It returns the pair `(z, a)`. Support
+  `"sigmoid"`, `"tanh"` and `"relu"`; any other name means no activation, so `a = z`. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A neuron computes $z = w \cdot x + b$ and outputs $a = f(z)$. Weights and bias are its learned parameters.
+- Sigmoid squashes to $(0, 1)$, tanh to $(-1, 1)$, and ReLU keeps positive values and zeroes negative ones.
+- Sigmoid and tanh flatten out for large $|z|$, so their slope, and the learning signal, gets tiny there.
+- Without a non-linear activation, stacked layers collapse into one linear map: $W = W_1 W_2$, $c = b_1 W_2 + b_2$.
+- In NumPy, use `@`, `np.exp` and `np.maximum`, which work on whole arrays.
+
+Next: [Layers and forward propagation](#/learn/ml/deep/forward-propagation) puts many neurons side by side in a
+layer and runs a batch of inputs through a small network.
+
+</Section>

@@ -115,7 +115,10 @@ export function backward(net: Network, cache: ForwardCache, Y: Matrix, lossId: L
     const count = Yhat.length * Yhat[0]!.length;
     const dZ = fused
       ? Yhat.map((row, i) => row.map((p, j) => (p - Y[i]![j]!) / count))
-      : hadamard(dAs[l + 1]!, cache.Z[l]!.map((row) => row.map(act.df)));
+      : hadamard(
+          dAs[l + 1]!,
+          cache.Z[l]!.map((row) => row.map(act.df)),
+        );
     dZs[l] = dZ;
     grads[l] = { dW: matmul(transpose(cache.A[l]!), dZ), db: columnSums(dZ) };
     dAs[l] = matmul(dZ, transpose(net[l]!.W));

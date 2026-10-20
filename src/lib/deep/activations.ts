@@ -52,4 +52,5 @@ export const ACTIVATIONS: Record<ActivationId, Activation> = {
   },
 };
 
-export const activationOf = (id: string): Activation => ACTIVATIONS[id as ActivationId] ?? ACTIVATIONS.identity;
+export const activationOf = (id: string): Activation =>
+  ACTIVATIONS[id as ActivationId] ?? ACTIVATIONS.identity;
