@@ -1,4 +1,5 @@
 .table {
+  background: var(--surface);
   width: 100%;
   border-collapse: collapse;
   font-size: var(--fs-13);
