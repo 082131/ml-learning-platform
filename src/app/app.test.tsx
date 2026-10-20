@@ -7,6 +7,9 @@ import { STORAGE_KEY } from '@/lib/progress/schema';
 import { createProgressStore } from '@/lib/progress/store';
 import { renderWithApp } from '@/test/render';
 import { tracks } from '../../content/curriculum';
+import { metas } from '../../content/index';
+
+const escapeRegExp = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 import { AppRoutes } from './App';
 import { useApplyTheme } from './useTheme';
 
@@ -62,13 +65,26 @@ describe('routes', () => {
   });
 
   it('outline lesson shows objectives, prerequisites and the outline label, with no completion button', async () => {
-    renderWithApp(<AppRoutes />, { route: '/learn/ml/math/tensors' });
-    expect(await screen.findByRole('heading', { level: 1, name: /Tensors and shapes/ })).toBeInTheDocument();
-    expect(screen.getByText(/Reshape and transpose a tensor/)).toBeInTheDocument();
+    // Content threads write lessons over time, so pick an outline lesson with a prerequisite from the data
+    // instead of naming one that may get written.
+    const outline = tracks
+      .flatMap((t) => t.chapters.flatMap((c) => c.lessons))
+      .map((l) => ({ ref: l, meta: metas[l.id]! }))
+      .find(
+        ({ ref, meta }) => ref.status === 'outline' && meta.kind === 'lesson' && meta.prerequisites.length,
+      );
+    expect(outline).toBeDefined();
+    const { meta } = outline!;
+    const prereq = metas[meta.prerequisites[0]!]!;
+    renderWithApp(<AppRoutes />, { route: `/learn/${meta.id}` });
+    expect(
+      await screen.findByRole('heading', { level: 1, name: meta.title }, { timeout: 5000 }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(meta.objectives[0]!)).toBeInTheDocument();
     const prerequisites = screen.getByRole('region', { name: 'Prerequisites' });
     expect(
-      within(prerequisites).getByRole('link', { name: /Matrix multiplication, row × column/ }),
-    ).toHaveAttribute('href', '/learn/ml/math/matrix-multiplication');
+      within(prerequisites).getByRole('link', { name: new RegExp(escapeRegExp(prereq.title)) }),
+    ).toHaveAttribute('href', `/learn/${prereq.id}`);
     expect(screen.getByRole('note')).toHaveTextContent('outlined but not written yet');
     expect(screen.queryByRole('button', { name: 'Mark complete' })).toBeNull();
   });
