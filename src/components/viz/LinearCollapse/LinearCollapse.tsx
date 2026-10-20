@@ -13,6 +13,9 @@ import { MatrixGrid } from '../MatrixGrid/MatrixGrid';
 import svg from '../svg/svg.module.css';
 import s from './LinearCollapse.module.css';
 
+/** Every 0.25 along x[0]: fine enough to show the bends, short enough for the table view. */
+const CURVE_SAMPLES = 24;
+
 /**
  * Two layers (2 → 2 → 1) fed the neuron experiment's input x, with the experiment's activation
  * between them, next to the single linear map the two layers become when there is no activation.
@@ -21,7 +24,7 @@ export function LinearCollapse() {
   const { state, result } = useExperimentContext<NeuronState, NeuronResult>('LinearCollapse');
   const d = describeCollapse(state.x, state.act);
   const r = result.collapse;
-  const curve = collapseCurve(state.x[1], state.act);
+  const curve = collapseCurve(state.x[1], state.act, CURVE_SAMPLES);
   const label = ACTIVATIONS[state.act].label;
   return (
     <div className={s.wrap} data-collapse-same={d.same}>
@@ -58,7 +61,6 @@ export function LinearCollapse() {
             id: 'two',
             label: `Two layers with ${label}`,
             points: curve.map((p) => [p.x1, p.y] as const),
-            inTable: false,
           },
           {
             id: 'one',
@@ -66,7 +68,6 @@ export function LinearCollapse() {
             points: curve.map((p) => [p.x1, p.yLinear] as const),
             tone: 'muted',
             dashed: true,
-            inTable: false,
           },
         ]}
         overlay={(x, y) => (

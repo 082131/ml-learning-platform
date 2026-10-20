@@ -57,7 +57,10 @@ export function NeuronPlayground() {
         xDomain={[-Z_RANGE, Z_RANGE]}
         yDomain={yDomain}
         height={220}
-        series={[{ id: 'f', label: act.label, points: curve, inTable: false }]}
+        series={[
+          { id: 'f', label: act.label, points: curve, inTable: false },
+          { id: 'now', label: 'Current (z, a)', points: inRange ? [[result.z, result.a]] : [], tone: 'err', dots: true },
+        ]}
         overlay={(x, y) =>
           inRange ? (
             <g className={svg.err} aria-hidden="true">

@@ -18,7 +18,7 @@ describe('Python number formatting', () => {
       '-0.0',
       '0.2689414213699951',
     ]);
-    expect(pyRepr(12345678901234567)).toBe('1.2345678901234568e+16');
+    expect(pyRepr(12345678901234568)).toBe('1.2345678901234568e+16');
     expect(pyRepr(2.5e-7)).toBe('2.5e-07');
   });
 
