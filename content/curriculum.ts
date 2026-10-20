@@ -64,7 +64,7 @@ export const tracks: Track[] = [
           { id: 'ml/classical/fit-regularization', status: 'outline' },
           { id: 'ml/classical/cross-validation', status: 'outline' },
           { id: 'ml/classical/metrics-error-analysis', status: 'outline' },
-          { id: 'ml/classical/project-classification', status: 'outline' },
+          { id: 'ml/classical/project-classification', status: 'written' },
         ],
       },
       {

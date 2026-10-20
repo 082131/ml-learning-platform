@@ -1,0 +1,194 @@
+import { brief, compareScript, evaluationRunner, finalScript, pipelineEdges, pipelineNodes } from './code';
+import { evaluateExercise, questions } from './quiz';
+
+<Section kind="intuition" title="One honest answer to one question">
+
+Field biologists measure penguins all season: bill length, bill depth, flipper length, body mass. Telling a male
+from a female by eye is hard in many penguin species, so a useful question is: **can the measurements alone
+predict a penguin’s sex, and how often would that prediction be wrong for a penguin we have never measured?**
+
+This project answers that question from start to finish with the Palmer penguins
+<Term id="dataset">dataset</Term>. You will clean the data, set some of it aside, try several
+<Term id="model">models</Term>, pick one without peeking, and then measure it exactly once. The last part matters
+most: a score is only worth reporting if the model never had a chance to learn from the rows it is scored on.
+
+Everything you need has come up in this chapter. This page shows a complete reference run, explains each decision,
+and then hands the work to you with milestones and a rubric.
+
+</Section>
+
+<Section kind="technical" title="The plan, and why each step is there">
+
+The task is binary classification: each row is a penguin, the <Term id="feature">features</Term> are the four
+measurements plus `species` and `island`, and the <Term id="label">label</Term> is `sex`, coded male = 1 and
+female = 0.
+
+1. **Drop rows without a label.** 11 of the 344 penguins have no recorded sex, leaving 333 (168 male,
+   165 female). Two of those 11 also have no measurements at all.
+2. **Lock away a test set.** A stratified split keeps the male/female ratio equal in both parts:
+   $\lceil 0.2 \cdot 333 \rceil = 67$ test rows and $333 - 67 = 266$ training rows.
+3. **Choose using the training rows only.** Five-fold stratified cross-validation scores each candidate on
+   5 different validation folds of the 266 rows. The candidates are a <Term id="baseline-model">baseline</Term>
+   that always predicts the training majority, logistic regression, and a random forest.
+4. **Keep preprocessing inside the model.** Scaling and one-hot encoding learn from data (means, standard
+   deviations, the list of categories), so they go into a scikit-learn <Term id="ml-pipeline">pipeline</Term>
+   and are refitted on every training fold.
+5. **Refit and test once.** The chosen pipeline is fitted on all 266 training rows and scored on the 67 test
+   rows. Then the mistakes are studied one by one.
+
+**The reference run.** With the seeds shown in the code below, cross-validation on the training rows gives:
+
+| Model                       | Accuracy, mean ± std over 5 folds |
+| --------------------------- | --------------------------------- |
+| Baseline (most frequent)    | 0.504 ± 0.008                     |
+| Logistic regression         | 0.914 ± 0.035                     |
+| Random forest (300 trees)   | 0.910 ± 0.030                     |
+
+Both real models beat the baseline by about 0.4. Between them the gap is 0.004, roughly a tenth of the spread
+across folds, so they are tied. The reference run keeps logistic regression because it is simpler and faster,
+and its weights can be read.
+
+<Callout kind="simplification">
+  Accuracy is a fair headline metric here because the classes are almost balanced (168 vs 165). With imbalanced
+  classes it misleads, and precision, recall or the area under the ROC curve tell you more. The project reports
+  per-class precision and recall alongside it either way.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Where every row goes">
+
+The test rows leave the workflow at the split and come back only for the final score. Everything between those
+two points, including choosing the model, sees training rows only.
+
+<FlowDiagram
+  title="Classification workflow"
+  nodes={pipelineNodes}
+  edges={pipelineEdges}
+  caption="344 rows load, 333 keep a label, 266 train and 67 test. Model choice uses 5-fold cross-validation on the 266 training rows; the 67 test rows are scored once."
+/>
+
+</Section>
+
+<Section kind="code" title="The reference run">
+
+This script runs on your computer with Python and `pip install pandas==3.0.2 scikit-learn==1.8.0`. It needs
+`penguins.csv` in the same folder. Select a part of the code to see what it does. The output shown is from a real
+run with those versions.
+
+<Code example={compareScript} title="compare_models.py" />
+
+Continuing in the same script, the chosen pipeline is refitted on all the training rows and scored on the test
+set once:
+
+<Code example={finalScript} title="compare_models.py (continued)" />
+
+Reading the confusion matrix: rows are the true class and columns the predicted class, in the order female (0),
+male (1). Of 33 test females, 28 were predicted female and 5 male; of 34 test males, 33 were predicted male and
+1 female. Accuracy is $(28 + 33) / 67 = 0.910$, and recall for female is $28 / 33 = 0.848$.
+
+</Section>
+
+<Section kind="experiment" title="Recompute the scores yourself">
+
+The metrics in the report are just counts. The runner below holds the real test labels and the model’s
+predictions from the reference run, and recomputes the confusion matrix, accuracy, precision and recall in plain
+Python. It runs in your browser. Try changing a few predictions, or set every prediction to 1, and watch which
+numbers move.
+
+<PythonRunner example={evaluationRunner} title="evaluate.py" />
+
+Things to try:
+
+- Set every entry of `pred` to `1`. Recall becomes 1.0, but precision and accuracy fall to the baseline.
+- Flip one wrong prediction to right. Accuracy rises by $1/67 \approx 0.015$.
+
+</Section>
+
+<Section kind="mistakes" title="How projects like this go wrong">
+
+<CommonMistake
+  title="Scaling before splitting"
+  wrong={'X_scaled = StandardScaler().fit_transform(X[numeric])   # all 333 rows\nX_train, X_test, y_train, y_test = train_test_split(X_scaled, y, ...)'}
+  error="No error. The scores just come out slightly too optimistic."
+  cause="The scaler’s means and standard deviations include the test rows, so the model was prepared with information from data it is later scored on. The bigger the preprocessing step (feature selection, target encoding), the bigger the inflation."
+  fix={'model = make_pipeline(ColumnTransformer([...]), LogisticRegression(max_iter=1000))\ncross_val_score(model, X_train, y_train, cv=cv)   # refits the scaler on each training fold'}
+/>
+
+<CommonMistake
+  title="Passing text columns straight to the model"
+  wrong={'LogisticRegression().fit(X, y)   # X still has species and island'}
+  error="ValueError: could not convert string to float: 'Adelie'"
+  cause="scikit-learn models need numbers. The species and island columns are text."
+  fix={'OneHotEncoder(handle_unknown="ignore") inside the ColumnTransformer'}
+/>
+
+<CommonMistake
+  title="Forgetting stratify on a small dataset"
+  wrong={'train_test_split(X, y, test_size=0.2, random_state=42)'}
+  error="No error. The class balance of the test set depends on the shuffle."
+  cause="With 67 test rows, an unlucky shuffle can leave the test set noticeably more male or more female than the data, which shifts accuracy and makes per-class numbers noisy."
+  fix={'train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)'}
+/>
+
+<Callout kind="warning">
+  The quietest mistake is looking at the test score, changing something and looking again. Each look turns the
+  test set into a validation set. Decide everything with cross-validation first.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Your project">
+
+Build the same workflow yourself, then extend it. Tick the milestones as you go: they are saved in this browser.
+
+<Project brief={brief} />
+
+**Error analysis from the reference run.** The model made 6 mistakes on the test set (pandas row index, then
+the values):
+
+| Row | Species   | Island | Body mass (g) | True sex | Predicted | Mean mass of that species and sex (g) |
+| --- | --------- | ------ | ------------- | -------- | --------- | ------------------------------------- |
+| 297 | Chinstrap | Dream  | 3400          | male     | female    | 3939                                  |
+| 114 | Adelie    | Biscoe | 3900          | female   | male      | 3369                                  |
+| 252 | Gentoo    | Biscoe | 4850          | female   | male      | 4680                                  |
+| 225 | Gentoo    | Biscoe | 5200          | female   | male      | 4680                                  |
+| 343 | Chinstrap | Dream  | 3775          | female   | male      | 3527                                  |
+| 242 | Gentoo    | Biscoe | 4950          | female   | male      | 4680                                  |
+
+Every misclassified female is heavier than the average female of her species, and the misclassified male is
+lighter than the average male of his. The model leans on size, and these penguins are unusually sized for their
+sex. That suggests what to try next: a feature such as body mass relative to the species average, or accepting
+that some penguins can’t be told apart from these four measurements.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Write the evaluation yourself">
+
+<MiniExercise exercise={evaluateExercise}>
+  Write `evaluate(y_true, y_pred)` for lists of 0/1 labels where 1 is the positive class. Return
+  `(accuracy, precision, recall)`, use 0.0 for precision when nothing is predicted positive, and raise
+  `ValueError` when the lists have different lengths. The tests include the project’s real test set.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Lock the test set away first, choose with cross-validation on training rows, and score the test set once.
+- Put every preprocessing step that learns from data inside the pipeline, so it is refitted on each fold.
+- Always score a baseline. 0.91 means something only next to the 0.50 of always guessing the majority.
+- Compare models with the spread across folds in mind: 0.914 and 0.910 with a standard deviation near 0.03 are
+  a tie.
+- Read the confusion matrix and the misclassified rows; they tell you what to try next.
+
+Next: the [Deep Learning](#/learn/ml) chapter starts with [Neurons and activations](#/learn/ml/deep/neurons-activations),
+where logistic regression becomes the building block of a neural network.
+
+</Section>
