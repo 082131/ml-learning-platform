@@ -1,0 +1,76 @@
+.chart {
+  width: 100%;
+  min-width: 0;
+}
+.chart svg {
+  display: block;
+}
+.contour {
+  fill: none;
+  stroke: var(--line-strong);
+  stroke-width: 1;
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2) var(--s-4);
+  margin: var(--s-2) 0 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+.diverged {
+  margin: var(--s-3) 0 0;
+  padding: var(--s-3);
+  border: 1px solid var(--err);
+  color: var(--ink);
+}
+.diverged strong {
+  color: var(--err);
+}
+.update {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s-3);
+}
+@media (min-width: 900px) {
+  .update {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.card {
+  margin: 0;
+  padding: var(--s-3);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  min-width: 0;
+}
+.card h4 {
+  margin: 0 0 var(--s-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  text-transform: uppercase;
+  color: var(--ink-2);
+  font-weight: 500;
+}
+.eq {
+  margin: 0 0 var(--s-2);
+}
+.eq dt {
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}
+.eq dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  overflow-wrap: anywhere;
+}
