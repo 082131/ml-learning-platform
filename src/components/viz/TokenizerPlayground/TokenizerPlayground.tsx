@@ -43,10 +43,11 @@ export function TokenizerPlayground() {
               type="button"
               className={cx(s.chip, t.special && s.special)}
               aria-pressed={i === index}
-              aria-label={`Token ${i}: ${t.text}, ID ${t.id}`}
               onClick={() => update((st) => ({ ...st, selected: i }))}
             >
+              <span className="visually-hidden">Token {i}: </span>
               <span className={s.text}>{t.text}</span>
+              <span className="visually-hidden">, ID </span>
               <span className={s.id}>{t.id}</span>
             </button>
           </li>

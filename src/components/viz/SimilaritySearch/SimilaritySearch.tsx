@@ -35,7 +35,6 @@ export function SimilaritySearch() {
             <button
               type="button"
               className={s.button}
-              aria-label={`Rank ${r.rank}, cosine ${r.score.toFixed(3)}: ${r.item.text} (use as query)`}
               aria-current={r.item.id === query.id || undefined}
               onClick={() => update(() => ({ query: r.item.id }))}
             >
@@ -44,7 +43,10 @@ export function SimilaritySearch() {
                 {r.item.text}
                 {r.item.id === query.id && <span className={s.self}> (the query itself)</span>}
               </span>
-              <span className={s.score}>{r.score.toFixed(3)}</span>
+              <span className={s.score}>
+                <span className="visually-hidden">cosine </span>
+                {r.score.toFixed(3)}
+              </span>
               <span className={s.track} aria-hidden="true">
                 <span className={s.bar} style={{ width: `${Math.max(0, r.score) * 100}%` }} />
               </span>

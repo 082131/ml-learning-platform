@@ -77,7 +77,13 @@ export function EmbeddingMap() {
             return (
               <g key={i.id}>
                 <circle className={near ? svg.accent : svg.muted} cx={x(px)} cy={y(py)} r={RADIUS} />
-                <text className={cx(svg.tick, s.mapLabel)} x={x(px) + RADIUS + 2} y={y(py) + 4}>
+                <text
+                  className={cx(svg.tick, s.mapLabel)}
+                  // Labels in the right half go left of their point, so none is cut off at the edge.
+                  textAnchor={x(px) > width / 2 ? 'end' : 'start'}
+                  x={x(px) > width / 2 ? x(px) - RADIUS - 2 : x(px) + RADIUS + 2}
+                  y={y(py) + 4}
+                >
                   {i.id}
                 </text>
               </g>
