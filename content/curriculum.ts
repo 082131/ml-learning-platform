@@ -38,7 +38,7 @@ export const tracks: Track[] = [
           { id: 'ml/math/dot-product', status: 'written' },
           { id: 'ml/math/matrices', status: 'written' },
           { id: 'ml/math/matrix-multiplication', status: 'written' },
-          { id: 'ml/math/tensors', status: 'outline' },
+          { id: 'ml/math/tensors', status: 'written' },
           { id: 'ml/math/functions-derivatives', status: 'outline' },
           { id: 'ml/math/gradients-chain-rule', status: 'outline' },
           { id: 'ml/math/probability', status: 'outline' },

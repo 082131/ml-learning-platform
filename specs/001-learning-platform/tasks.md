@@ -80,7 +80,7 @@ Close each content thread with: content validation green, `check`, `e2e` and `bu
 
 ## Thread 5: ML Mathematical Foundations (`ml/math`, 11 entries; `matrix-multiplication` already done)
 - [x] M201 to M203 scalars-vectors, dot-product, matrices (VectorPlane, transpose visualizer).
-- [ ] M204 `tensors`: shape builder, reshape/transpose/batch dimension visual.
+- [x] M204 `tensors`: shape builder, reshape/transpose/batch dimension visual.
 - [ ] M205 to M206 derivatives (tangent slider, numerical vs analytic derivative), gradients and the chain rule (computation-graph step-through with computed local gradients).
 - [ ] M207 to M208 probability (sampling simulator with a seeded RNG, so results are reproducible), statistics (correlation vs causation with a confounder toggle).
 - [ ] M209 `loss-optimization` using GradientDescent1D plus a 2-D contour version.

@@ -1,0 +1,28 @@
+.layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-6);
+}
+.side {
+  min-width: 0;
+}
+.label {
+  margin: 0 0 var(--s-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}
+.stack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-3);
+}
+.note {
+  margin: var(--s-4) 0 0;
+  padding: var(--s-3);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-family: var(--font-mono);
+  font-size: var(--fs-15);
+  overflow-wrap: break-word;
+}

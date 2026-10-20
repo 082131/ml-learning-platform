@@ -1,0 +1,163 @@
+import { experiment, numpyTensor, realShapes } from './code';
+import { flattenExercise, questions } from './quiz';
+
+<Section kind="intuition" title="A stack of matrices">
+
+A <Term id="scalar">scalar</Term> is one number, a <Term id="vector">vector</Term> is a row of numbers, and a
+<Term id="matrix">matrix</Term> is a grid. Stack several grids and you have a box of numbers; stack boxes and you
+have a row of boxes. In ML all of these are called <Term id="tensor">tensors</Term>, and the only thing that
+distinguishes them is how many directions, or <Term id="axis">axes</Term>, you need to locate one number.
+
+Real data is rarely a single matrix. A model sees a <Term id="batch">batch</Term> of examples at once: 32 images,
+each with 3 color channels of 28 × 28 pixels, is a tensor with 4 axes. Most bugs in model code are shape bugs, so
+reading and changing shapes fluently is a core skill.
+
+</Section>
+
+<Section kind="technical" title="Axes, shapes, reshape and transpose">
+
+**Shape and ndim.** A tensor's <Term id="shape">shape</Term> lists the size of each axis, and its number of axes
+is `ndim`. The total number of entries, `size`, is the product of the sizes.
+
+| Tensor                 | ndim | Example shape     | Read it as                     |
+| ---------------------- | ---- | ----------------- | ------------------------------ |
+| Scalar                 | 0    | $()$              | one number                     |
+| Vector                 | 1    | $(784,)$          | one flattened image            |
+| Matrix                 | 2    | $(32, 784)$       | a batch of 32 flattened images |
+| 3-D tensor             | 3    | $(8, 10, 64)$     | batch, sequence, features      |
+| 4-D tensor             | 4    | $(32, 3, 28, 28)$ | batch, channels, height, width |
+
+By convention the batch axis comes first. Index a 3-D tensor $x$ of shape $(b, r, c)$ with three numbers:
+$x[i, j, k]$ is item $i$, row $j$, column $k$.
+
+**Row-major order.** In memory the entries sit in one long line. NumPy's default (C order) walks the last axis
+fastest, so in shape $(2, 2, 3)$ the entry $x[1, 0, 2]$ is at flat position
+$1 \cdot (2 \cdot 3) + 0 \cdot 3 + 2 = 8$.
+
+**Reshape** gives the same flat line of numbers a new shape. The sizes must multiply to the same total; `-1`
+means "work this size out". A reshape never reorders the numbers:
+
+$$
+(2, 2, 3) \xrightarrow{\text{reshape}(2,\,6)} (2, 6)
+\qquad
+(2, 2, 3) \xrightarrow{\text{reshape}(4,\,3)} (4, 3)
+$$
+
+**Transpose** reorders axes, which does move numbers. `x.transpose(0, 2, 1)` keeps axis 0 and swaps axes 1 and 2,
+so $y[i, k, j] = x[i, j, k]$ and the shape $(b, r, c)$ becomes $(b, c, r)$. Each item is transposed like a matrix.
+
+**Batched matrix multiplication.** `@` treats the last two axes as matrices and every earlier axis as a batch:
+
+$$
+\underbrace{(8, 10, 64)}_{X} \;@\; \underbrace{(64, 32)}_{W} \;\rightarrow\; (8, 10, 32)
+$$
+
+Each of the 8 items is a $(10, 64) \times (64, 32)$ product, with the same row-by-column rule as before.
+
+<Callout kind="simplification">
+  A NumPy reshape usually returns a view of the same memory, and transpose always does, by changing the step
+  (stride) taken along each axis. When the strides no longer fit a plain view, as after a transpose, a later
+  reshape has to copy. The numbers are the same either way; only speed and memory differ.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Follow one number through a reshape">
+
+Every entry of $x$ equals its flat position, so you can see where each number goes. Select an entry of $x$ to
+highlight where it lands in $y$. Change the sizes and the operation: reshapes keep the numbers in reading order,
+transpose rearranges them.
+
+<Experiment def={experiment} title="Shape builder">
+  <TensorShape />
+  <Readout />
+</Experiment>
+
+Things to try:
+
+- Pick "Merge batch and rows": the items are stacked into one tall matrix, a common step before a layer that
+  treats every row the same.
+- Set rows and columns equal and pick "Swap the last two axes": $y$ has the same shape as $x$, but the numbers
+  have moved. A shape check alone would not catch a wrong transpose.
+- Set the batch size to 1: $x$ is a single matrix with an extra axis of size 1.
+
+</Section>
+
+<Section kind="code" title="The same tensor in NumPy">
+
+<Experiment def={experiment} title="tensors.py, linked to the shape builder" controls={false}>
+  <Code example={numpyTensor} title="tensors.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+NumPy prints a 3-D array as its 2-D items, one after another, separated by a blank line. The number of opening
+brackets at the start tells you `ndim`.
+
+</Section>
+
+<Section kind="mistakes" title="Sizes that don’t add up, and reshape used as transpose">
+
+<CommonMistake
+  title="Reshaping to a different number of entries"
+  wrong={'x = np.arange(12).reshape(2, 2, 3)\nx.reshape(5, 2)'}
+  error="ValueError: cannot reshape array of size 12 into shape (5,2)"
+  cause="A reshape only relabels the same entries, so the new sizes must multiply to the same total: 2 · 2 · 3 = 12, but 5 · 2 = 10."
+  fix={'x.reshape(2, -1)  # let NumPy compute the missing size: (2, 6)'}
+/>
+
+<Callout kind="warning">
+  Reshape is not transpose. For `x = np.arange(12).reshape(2, 2, 3)`, both `x.reshape(2, 3, 2)` and
+  `x.transpose(0, 2, 1)` have shape `(2, 3, 2)`, but item 0 is `[[0 1] [2 3] [4 5]]` in the first and
+  `[[0 3] [1 4] [2 5]]` in the second. No error tells you which one you meant, so check a few values.
+</Callout>
+
+<CommonMistake
+  title="A batched product whose inner sizes differ"
+  wrong={'tokens = rng.normal(size=(8, 10, 64))\ntokens @ rng.normal(size=(32, 64))'}
+  error="ValueError: matmul: Input operand 1 has a mismatch in its core dimension 0, with gufunc signature (n?,k),(k,m?)->(n?,m?) (size 32 is different from 64)"
+  cause="The last axis of the left operand (64) must equal the second-to-last axis of the right one (32 here). The batch axis does not change this rule."
+  fix={'tokens @ rng.normal(size=(64, 32))  # (8, 10, 64) @ (64, 32) -> (8, 10, 32)'}
+/>
+
+</Section>
+
+<Section kind="practice" title="Shapes you will meet">
+
+<Code example={realShapes} title="shapes.py" />
+
+`images.size` is $32 \cdot 3 \cdot 28 \cdot 28 = 75{,}264$, and flattening each image gives
+$3 \cdot 28 \cdot 28 = 2{,}352$ numbers per row. Libraries disagree on axis order: PyTorch stores images as
+(batch, channels, height, width) and TensorFlow defaults to (batch, height, width, channels), so read the
+documentation of the library you use. Shapes come back in
+[Layers and forward propagation](#/learn/ml/deep/forward-propagation) and
+[Attention](#/learn/ml/deep/attention), where every step is a batched product.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Find an entry in memory">
+
+<MiniExercise exercise={flattenExercise}>
+  Write `flat_index(index, shape)`: the position of `index` (a tuple) when an array of `shape` is flattened in
+  row-major order. For example, `flat_index((1, 0, 2), (2, 2, 3))` is 8.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A tensor is an array with any number of axes; `ndim` counts them and `shape` gives their sizes.
+- Batch comes first: $(N, C, H, W)$ for images in PyTorch, $(N, T, D)$ for sequences.
+- `reshape` keeps the flat order and needs the same total size; `-1` fills in one size.
+- `transpose` reorders axes and moves the numbers.
+- `@` multiplies the last two axes as matrices and treats the rest as a batch.
+
+Next: [Functions and derivatives as slope](#/learn/ml/math/functions-derivatives) starts the calculus that
+training is built on.
+
+</Section>
