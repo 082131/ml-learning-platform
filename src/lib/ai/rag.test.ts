@@ -100,6 +100,16 @@ describe('ragExperiment', () => {
     expect(r.promptTokens).toBeGreaterThan(100);
   });
 
+  it('matches the other cases the lesson describes', () => {
+    const long = computeRag({ ...base, size: 80, keywordWeight: 0 }, data);
+    expect(long.answerCosineRank).toBe(3);
+    const answerChunk = long.chunks.find((c) => c.text.includes(long.query.answer))!.text;
+    expect(answerChunk).toContain('E-409');
+    const offline = computeRag({ ...base, query: 'offline-conflict', size: 20, keywordWeight: 0 }, data);
+    expect(offline.answerCosineRank).toBe(4);
+    expect(offline.response.grounded).toBe(false);
+  });
+
   it('answers "not in the context" for a question the help center does not cover', () => {
     const r = computeRag({ ...base, query: 'handwriting', k: 5 }, data);
     expect(r.answerCosineRank).toBeUndefined();

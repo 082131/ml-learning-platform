@@ -1,0 +1,115 @@
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-13);
+}
+.table th,
+.table td {
+  padding: var(--s-1) var(--s-2);
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+  vertical-align: top;
+  font-family: var(--font-mono);
+}
+.table thead th {
+  color: var(--ink-2);
+  font-weight: 400;
+  white-space: nowrap;
+}
+.table .chunkCell {
+  min-width: 240px;
+  text-align: left;
+  font-family: var(--font-sans);
+}
+.inPrompt {
+  background: var(--accent-soft);
+}
+.inPrompt th {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-1) var(--s-2);
+  margin-bottom: 2px;
+}
+.tag {
+  font-family: var(--font-mono);
+  color: var(--accent);
+}
+.answer {
+  color: var(--ok);
+}
+.snippet {
+  display: block;
+  color: var(--ink-2);
+}
+.promptWrap {
+  display: grid;
+  gap: var(--s-4);
+  margin: 0 0 var(--s-6);
+}
+.panel {
+  min-width: 0;
+  padding: var(--s-3);
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.panelTitle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  margin: 0 0 var(--s-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.prompt {
+  margin: 0;
+  max-height: 360px;
+  overflow: auto;
+  padding: var(--s-3);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.response {
+  margin: 0 0 var(--s-2);
+  font-size: var(--fs-17);
+}
+.note {
+  margin: 0;
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}
+.chunks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.chunk {
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: var(--fs-15);
+}
+.chunk[data-has-answer] {
+  border-color: var(--ok);
+  box-shadow: inset 3px 0 0 var(--ok);
+}
+.chunkId {
+  color: var(--ink-2);
+}
+.overlap {
+  text-decoration: underline dotted var(--accent);
+  text-underline-offset: 3px;
+  color: var(--ink-2);
+}

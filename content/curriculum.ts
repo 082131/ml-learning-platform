@@ -237,7 +237,7 @@ export const tracks: Track[] = [
         title: 'Retrieval-augmented generation',
         level: 'intermediate',
         lessons: [
-          { id: 'ai/rag/rag-pipeline', status: 'outline' },
+          { id: 'ai/rag/rag-pipeline', status: 'written' },
           { id: 'ai/rag/vector-db-eval', status: 'outline' },
         ],
       },

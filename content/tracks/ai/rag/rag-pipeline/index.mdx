@@ -1,0 +1,194 @@
+import { chunkRunner, rag, ragCode } from './code';
+import { promptExercise, questions } from './quiz';
+
+<Section kind="intuition" title="An open-book exam for a language model">
+
+A language model answers from what it absorbed during training. It has never read your company's help center,
+yesterday's policy change or a customer's contract, and when it doesn't know, it may still produce a fluent,
+confident answer.
+
+<Term id="retrieval-augmented-generation">Retrieval-augmented generation (RAG)</Term> turns the closed-book exam
+into an open-book one. Before the model answers, your code looks up the few passages most likely to contain the
+answer and puts them into the prompt, with an instruction: answer only from these, cite them, and say so if the
+answer isn't there.
+
+The quality of the answer now depends on two things you control: whether the right passage was found, and whether
+the model used it faithfully. Most RAG failures in practice are retrieval failures, so this lesson spends most of its
+time there.
+
+The documents in this lesson are the help center of Lumen Notes, a note-taking app invented for this course: seven
+short articles on plans, refunds, payments, security, email, sync errors and the API.
+
+</Section>
+
+<Section kind="technical" title="Chunk, retrieve, rerank, assemble, generate">
+
+**Indexing (once, ahead of time).**
+
+1. **Chunk.** <Term id="chunking">Chunking</Term> splits each document into windows of `size` words; consecutive
+   windows share `overlap` words, so a window starts every `size − overlap` words. A document of 100 words with size
+   40 and overlap 10 gives chunks starting at words 0, 30 and 60.
+2. **Embed.** Each chunk gets a 384-number embedding from all-MiniLM-L6-v2, as in
+   [the previous lesson](#/learn/ai/representations/tokens-embeddings). The vectors for every chunk setting in this
+   lesson were computed ahead of time; the chunking itself runs live, and each chunk's text is looked up in the
+   bundled table.
+
+**Answering (for every question).**
+
+3. **Retrieve.** Embed the question and compute its <Term id="cosine-similarity">cosine similarity</Term> with
+   every chunk. Keep the best 8 as candidates.
+4. **Rerank.** <Term id="reranking">Reranking</Term> re-scores only those candidates with a second method. Here
+   the second method is <Term id="bm25">BM25</Term>, a keyword score that rewards rare words of the question found in
+   the chunk. The two are mixed with a weight $w$:
+
+   $$
+   \text{score} = (1 - w)\cdot\cos(q, c) + w \cdot \frac{\text{BM25}(q, c)}{\max_{c'} \text{BM25}(q, c')}
+   $$
+
+   Dividing by the largest BM25 among the candidates puts the keyword score on a 0 to 1 scale, like the cosine.
+   With $w = 0$ the cosine order is kept. The top $k$ chunks after reranking go on.
+5. **Assemble.** Build one prompt: instructions, the $k$ chunks numbered [1] to [k] with their article titles,
+   and the question. This makes the answer <Term id="grounding">grounded</Term> and checkable.
+6. **Generate.** The language model writes the answer. A good answer cites [n] for each claim; your code can check
+   that every cited number exists and that the cited chunk supports the claim.
+
+<Callout kind="simplification">
+  Three shortcuts keep this lesson runnable in a browser. Chunks are counted in words; production systems count
+  tokens, and often split on paragraphs or headings first. The reranker is a keyword mix; production rerankers are
+  usually cross-encoder models that read the question and the chunk together, which is more accurate and slower
+  (see the Sentence Transformers reference). And no language model runs here: the response is scripted, as its label
+  says. Retrieval, reranking and the prompt are computed for real.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Follow one question through the pipeline">
+
+Choose a question and change the settings. Every number in the diagram, the table, the prompt and the code below
+comes from the same settings.
+
+<Experiment def={rag} title="RAG over the Lumen help center">
+  <RagFlow />
+  <RagRetrieval />
+  <RagPrompt />
+</Experiment>
+
+Read the table from left to right: where a chunk ranked by cosine alone, its keyword score, and the combined score
+that decides the final order. Highlighted rows go into the prompt.
+
+</Section>
+
+<Section kind="code" title="The same pipeline in Python">
+
+This is the retrieval code with your current settings filled in. It uses the same model and the same scoring rule;
+the numbers on this page were computed in your browser from the bundled vectors, not by running this script.
+
+<Experiment def={rag} title="rag.py, linked to the experiment" controls={false}>
+  <Code example={ragCode} title="rag.py" />
+  <Readout title="This run" />
+</Experiment>
+
+Chunking is the step people most often get wrong, so here it is on its own. Run it: with no overlap, the sentence
+"Monthly plans are not refunded." is cut in two, and neither half answers a question about refunds.
+
+<PythonRunner example={chunkRunner} title="chunking.py" />
+
+</Section>
+
+<Section kind="experiment" title="Break retrieval, then fix it">
+
+The settings at the top of the Visual section control everything. The chunks of the article that answers the
+question are below; the one that contains the answer is outlined and labeled.
+
+<Experiment def={rag} title="Chunks of the answering article" controls={false}>
+  <RagChunks />
+</Experiment>
+
+Things to try, starting from the question "What does error E-402 mean?" with 40-word chunks and 10 words of overlap:
+
+- Set the keyword weight to 0 and k to 1. Cosine similarity alone ranks a chunk about **payment** error B-402 first,
+  and the E-402 chunk second, so the prompt holds the wrong passage and the response says the context doesn't
+  explain E-402. A real model given that prompt could also wrongly describe B-402.
+- Raise the keyword weight back to 0.5. The term "e-402" appears in only one chunk, BM25 rewards it, and the right
+  chunk moves to rank 1.
+- Switch to 80-word chunks with the keyword weight at 0. The answer chunk falls to cosine rank 3: that chunk also covers
+  offline editing, conflicted copies and error E-409, which dilutes its embedding.
+- Ask "Can Lumen turn my handwriting into text?". No chunk answers it, and the grounded response says so instead of
+  inventing a feature. Raising k doesn't help: retrieval can only find what the documents contain.
+- Try "What happens if I edit the same note on my laptop and phone while both are offline?" with 20-word chunks and
+  10 words of overlap, keyword weight 0 and k = 3: the answer chunk ranks 4th and is left out.
+
+</Section>
+
+<Section kind="mistakes" title="Splitting facts, and trusting the answer">
+
+<CommonMistake
+  title="Chunks that cut a fact in half"
+  wrong={'chunks = chunk_words(text, size=8, overlap=0)\n# chunk 2: "time from Settings, Billing. Monthly plans are not"\n# chunk 3: "refunded."'}
+  error="(no error: questions about refunds retrieve a chunk that doesn't say plans aren't refunded)"
+  cause="A fixed-size window ignores sentence boundaries. The fact sits across two chunks, so no single chunk contains it and neither embedding represents it well."
+  fix={'chunks = chunk_words(text, size=8, overlap=2)\n# "Monthly plans are not refunded." now appears whole in one chunk'}
+/>
+
+<CommonMistake
+  title="Showing the answer without checking its sources"
+  wrong={'answer = llm(prompt)\nreturn answer  # shown to the user as is'}
+  error="(no error: an answer that cites [4] when only 3 sources were sent, or cites a source that says something else, reaches the user)"
+  cause="Grounding instructions make made-up answers less likely, not impossible. A model can cite a source that doesn't support the claim, or answer from its training data."
+  fix={'cited = {int(n) for n in re.findall(r"\\[(\\d+)\\]", answer)}\nif not cited or not cited <= set(range(1, k + 1)):\n    return "I couldn\'t find a sourced answer to that."'}
+/>
+
+<Callout kind="warning">
+  Documents you retrieve are text the model will read as part of its instructions. A document that says "ignore the
+  previous instructions" is a prompt-injection risk. Treat retrieved text as data, and limit what an answer can
+  trigger.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Tuning a RAG system for real">
+
+When a RAG answer is wrong, find which stage failed before changing anything:
+
+| Symptom                                                   | Likely stage   | What to try                                                 |
+| --------------------------------------------------------- | -------------- | ----------------------------------------------------------- |
+| The answer passage exists but isn't in the prompt         | Retrieval      | Hybrid keyword search, a reranker, a larger k              |
+| The passage is in the prompt but split or diluted         | Chunking       | Smaller chunks, overlap, splitting on headings              |
+| The passage is in the prompt and the answer is still wrong | Generation     | Clearer instructions, fewer distracting chunks, check citations |
+| No document contains the answer                            | Content        | Add the content; make the model say it doesn't know         |
+
+Measure before tuning: write 20 to 50 real questions with the passage that answers each, and count how often that
+passage reaches the prompt (recall at k). [Vector databases, chunking, reranking and retrieval
+evaluation](#/learn/ai/rag/vector-db-eval) builds that evaluation.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Assemble the prompt">
+
+<MiniExercise exercise={promptExercise}>
+  Write `build_prompt(question, chunks)` where `chunks` is a list of `(title, text)` pairs. Number the chunks from 1
+  as `[n] (title) text`, separate them with blank lines, and end with the question. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- RAG retrieves passages from your documents and puts them in the prompt; the model is not retrained.
+- Chunk size trades precision for context; overlap keeps facts near a boundary in one piece.
+- Retrieval by cosine similarity finds paraphrases but blurs exact codes; a keyword score (BM25) catches them.
+  Reranking mixes a second score over the first stage's few candidates.
+- The prompt numbers its sources so answers can be cited and checked, and tells the model to say when the answer
+  isn't there.
+- Diagnose failures stage by stage: content, chunking, retrieval, then generation.
+
+Next: [Tool calling, agents and workflows](#/learn/ai/agents/tool-calling) lets the model decide when to search and
+call other tools itself.
+
+</Section>
