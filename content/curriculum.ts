@@ -18,7 +18,7 @@ export const tracks: Track[] = [
         lessons: [
           { id: 'ml/foundations/what-is-ml', status: 'written' },
           { id: 'ml/foundations/types-of-ml', status: 'written' },
-          { id: 'ml/foundations/python-basics', status: 'outline' },
+          { id: 'ml/foundations/python-basics', status: 'written' },
           { id: 'ml/foundations/python-control', status: 'outline' },
           { id: 'ml/foundations/python-collections', status: 'outline' },
           { id: 'ml/foundations/numpy-arrays', status: 'outline' },

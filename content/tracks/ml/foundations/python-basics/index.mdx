@@ -1,0 +1,154 @@
+import { basicsProgram, basicsRunner, experiment, settingsExample } from './code';
+import { questions, receiptExercise } from './quiz';
+
+<Section kind="intuition" title="Labels on boxes of values">
+
+Every ML program, however large, is built from small steps like "take this number, multiply it by that one, keep
+the result under a name". Python is the language most ML work is written in, so we start there.
+
+A <Term id="variable">variable</Term> is a name that refers to a value. Writing `price = 2.5` sticks the label
+`price` on the value 2.5. From then on, `price` means 2.5, until you assign it something else.
+
+Every value has a <Term id="data-type">type</Term> that decides what you can do with it:
+
+| Type | Example | What it is |
+|---|---|---|
+| `int` | `3`, `-7`, `1000000` | A whole number |
+| `float` | `2.5`, `3.0`, `-0.1` | A number with a decimal point |
+| `str` | `"apples"`, `'Ada'` | A <Term id="string">string</Term>: text between quotes |
+| `bool` | `True`, `False` | Yes or no |
+
+Python runs a program one line at a time, from top to bottom. The step-through further down shows exactly that:
+each line, and every variable after it.
+
+</Section>
+
+<Section kind="technical" title="Assignment, arithmetic and types">
+
+**Assignment.** `name = value` evaluates the right-hand side first, then makes the name refer to the result. It is
+not an equation: `x = x + 1` is normal Python and means "make `x` one bigger". To compare two values, use `==`.
+
+**Arithmetic.** `+ - *` work as you expect. Division comes in two forms:
+
+| Expression | Result | Type | Why |
+|---|---|---|---|
+| `7 / 2` | `3.5` | float | `/` always gives a float |
+| `6 / 2` | `3.0` | float | even when it divides exactly |
+| `7 // 2` | `3` | int | `//` rounds down to a whole number |
+| `7 % 2` | `1` | int | `%` is the remainder |
+
+When an int meets a float, the result is a float: `2.5 * 3` is `7.5`, and `2.0 * 4` is `8.0`, not `8`.
+
+**Strings.** `+` joins two strings: `"apples" + " x"` is `"apples x"`. But `+` refuses to mix a string and a
+number, because Python cannot know whether you meant adding or joining. Convert the number first with `str(3)`, or
+use an f-string, where Python converts every value inside the braces: `f"{item} x{quantity}"`.
+
+**Printing.** `print(a, b, c)` writes the values separated by spaces and ends the line. Strings print without
+their quotes. `type(x)` returns the type of `x`, which prints as `<class 'float'>`.
+
+<Callout kind="simplification">
+  Variables are labels on values, not boxes that contain them. That difference does not matter for numbers and
+  strings, but it will matter for lists in [Lists, dicts, indexing and slicing](#/learn/ml/foundations/python-collections),
+  where two names can share the same list.
+</Callout>
+
+</Section>
+
+<Section kind="code" title="A seven-line program">
+
+Hover over, focus, or select a part of the code to see what it does. The values in lines 1 to 3 come from the
+controls in the next section, and so does everything the program prints.
+
+<Experiment def={experiment} title="receipt.py, linked to the controls below" controls={false}>
+  <Code example={basicsProgram} title="receipt.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+</Section>
+
+<Section kind="experiment" title="Step through it line by line">
+
+Change the item, price or quantity, then step through the program. Each step shows the line that just ran and the
+variables after it; new and changed variables are marked. Floats always show their decimal point, so `8.0` never
+looks like the int `8`.
+
+<Experiment def={experiment} title="Values and types">
+  <StepThrough example={basicsProgram} title="receipt.py" />
+  <Readout />
+</Experiment>
+
+Things to try:
+
+- Set the price to 2 and the quantity to 4. `total` is `8.0`, and line 2 of the output still says `float`.
+- Clear the item box. An empty string `""` is still a string, and the label becomes `" x4"`.
+- Step to line 5 and look at `quantity`: `str(quantity)` made a new string and did not change `quantity`.
+
+Now write your own. This runner is real Python in your browser: edit anything and run it again.
+
+<PythonRunner example={basicsRunner} title="playground.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Mixing types, and typos in names">
+
+<CommonMistake
+  title="Joining a string and a number with +"
+  wrong={'label = "price: " + 3'}
+  error={'TypeError: can only concatenate str (not "int") to str'}
+  cause="+ joins strings and adds numbers, but it will not guess which one you mean when the two sides have different types."
+  fix={'label = "price: " + str(3)   # or f"price: {3}"'}
+/>
+
+<CommonMistake
+  title="Using a name that was never assigned"
+  wrong={'quantity = 3\nprint(quantty)'}
+  error="NameError: name 'quantty' is not defined"
+  cause="Names must match exactly, including case: Quantity, quantity and quantty are three different names. Run in a terminal, Python 3.13 adds a hint to this message: Did you mean: 'quantity'?"
+  fix={'quantity = 3\nprint(quantity)'}
+/>
+
+<Callout kind="warning">
+  `print(0.1 + 0.2)` prints `0.30000000000000004`. Floats are stored in binary, where 0.1 has no exact form, so
+  tiny errors appear. This is not a Python bug; NumPy and JavaScript print the same. Never test floats with `==`;
+  round them for display (`round(0.1 + 0.2, 2)` is `0.3`) or compare with a tolerance.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+In ML code, these basics carry the settings of an experiment:
+
+<PythonRunner example={settingsExample} title="settings.py" />
+
+It prints `Training spam-filter for 20 epochs at lr=0.01`. Types matter here too: `epochs` must be an int,
+because you cannot run 20.5 passes over the data, and training code often checks that with `type()` or
+`isinstance()`.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Build a receipt line">
+
+<MiniExercise exercise={receiptExercise}>
+  Write `receipt(item, price, quantity)` that returns a string such as `"apples x3: 7.5"`: the item, an x, the
+  quantity, a colon, and price times quantity. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A variable is a name for a value; `=` assigns, `==` compares.
+- `int`, `float` and `str` are the basic types. `/` always gives a float; an int and a float give a float.
+- `+` adds numbers and joins strings, but not a mix of the two: use `str()` or an f-string.
+- `print` shows values; `type` tells you what they are.
+
+Next: [Functions, conditions, loops](#/learn/ml/foundations/python-control) makes programs that decide and repeat.
+
+</Section>

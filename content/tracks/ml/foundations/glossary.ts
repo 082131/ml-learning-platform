@@ -27,4 +27,27 @@ export default [
     introducedIn: 'ml/foundations/types-of-ml',
     aliases: ['RL'],
   },
+  {
+    id: 'variable',
+    term: 'Variable',
+    short:
+      'A name that refers to a value, such as price = 2.5. Assigning again makes the name refer to a new value.',
+    introducedIn: 'ml/foundations/python-basics',
+  },
+  {
+    id: 'data-type',
+    term: 'Type (data type)',
+    short:
+      'The kind of a value, which decides what you can do with it: int (whole number), float (decimal number), str (text), bool (True or False).',
+    long: 'type(x) tells you the type of x. Operators depend on it: + adds two numbers but joins two strings, and mixing them raises TypeError.',
+    introducedIn: 'ml/foundations/python-basics',
+    aliases: ['type', 'int', 'float', 'str'],
+  },
+  {
+    id: 'string',
+    term: 'String (str)',
+    short: 'Text in Python, written between quotes: "apples" or \'apples\'.',
+    introducedIn: 'ml/foundations/python-basics',
+    aliases: ['str', 'text'],
+  },
 ] satisfies GlossaryTerm[];
