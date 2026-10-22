@@ -1,0 +1,97 @@
+.rows {
+  display: grid;
+  gap: var(--s-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.row {
+  display: grid;
+  grid-template-columns: 11rem minmax(0, 1fr);
+  gap: var(--s-1) var(--s-3);
+  align-items: start;
+}
+.name {
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+.meta {
+  font-weight: 400;
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}
+.bits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 6px;
+}
+.field {
+  position: relative;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  padding-bottom: 18px;
+}
+.bit {
+  display: inline-grid;
+  place-items: center;
+  width: 15px;
+  height: 22px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  border: 1px solid var(--line-strong);
+}
+.field[data-field='sign'] .bit {
+  background: var(--surface-2);
+  border-color: var(--ink);
+}
+.field[data-field='exponent'] .bit {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.field[data-field='mantissa'] .bit,
+.field[data-field='integer'] .bit {
+  background: var(--surface);
+}
+.fieldName {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.value,
+.decode {
+  grid-column: 2;
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+.value {
+  font-weight: 600;
+}
+.decode {
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}
+.invalid {
+  margin: 0;
+  padding: var(--s-3);
+  border: 1px solid var(--err);
+}
+@media (max-width: 600px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .value,
+  .decode {
+    grid-column: 1;
+  }
+  .bit {
+    width: 9px;
+    font-size: 10px;
+  }
+}

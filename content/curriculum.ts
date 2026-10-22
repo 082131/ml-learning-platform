@@ -315,7 +315,7 @@ export const tracks: Track[] = [
         id: 'precision',
         title: 'Precision',
         level: 'intermediate',
-        lessons: [{ id: 'inference/precision/precision-quantization', status: 'outline' }],
+        lessons: [{ id: 'inference/precision/precision-quantization', status: 'written' }],
       },
       {
         id: 'compression',

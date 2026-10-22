@@ -1,0 +1,29 @@
+.layout {
+  display: grid;
+}
+.levels {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+}
+.levels li {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr) 3rem;
+  align-items: center;
+  gap: var(--s-2);
+}
+.rowName {
+  color: var(--ink-2);
+}
+.bar {
+  display: block;
+  height: 12px;
+  background: var(--accent);
+}
+.count {
+  text-align: right;
+}

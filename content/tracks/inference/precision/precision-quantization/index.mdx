@@ -1,0 +1,214 @@
+import { bits, byHand, byHandTrace, quant, quantCode, structBits } from './code';
+import { questions, quantExercise } from './quiz';
+
+<Section kind="intuition" title="A ruler with fewer marks">
+
+Measure a pencil with a ruler marked every millimeter and you might write down 143 mm. With a ruler marked only
+every centimeter you would write 14 cm: shorter to write, but up to half a centimeter off. Fewer marks means less
+to write down and more rounding.
+
+Every number a model stores is written on such a ruler. The previous lesson counted the bytes per weight: 4 for
+FP32, 2 for FP16 or BF16, 1 for INT8. Fewer bytes mean less memory and less data to move, which is often what
+limits inference speed. The price is rounding. This lesson looks at what each format keeps, what it loses, and
+how to measure whether the loss matters for a real model.
+
+There are two kinds of ruler. A <Term id="floating-point">floating-point</Term> format spaces its marks closely
+near zero and further apart for large numbers, so it covers a huge range. An integer format with a scale, which
+is what <Term id="quantization">quantization</Term> produces, spaces its marks evenly over one chosen range.
+
+</Section>
+
+<Section kind="technical" title="Bits, range and rounding">
+
+**Floating point.** A floating-point number has three fields: a sign bit, an exponent and a
+<Term id="mantissa">mantissa</Term> (the fraction). For a normal number,
+
+$$
+\text{value} = (-1)^{\text{sign}} \times \left(1 + \frac{\text{mantissa}}{2^{m}}\right) \times 2^{\,\text{exponent} - \text{bias}}
+$$
+
+where $m$ is the number of mantissa bits and the bias is $2^{e-1} - 1$ for $e$ exponent bits. The exponent
+decides the range; the mantissa decides how many significant digits survive.
+
+| Format | Bits (sign + exponent + mantissa) | Largest finite value     | Gap after 1.0 ($2^{-m}$) |
+| ------ | --------------------------------- | ------------------------ | ------------------------ |
+| FP32   | 1 + 8 + 23                        | about $3.4 \times 10^{38}$ | $1.2 \times 10^{-7}$      |
+| FP16   | 1 + 5 + 10                        | 65,504                   | $0.00098$                |
+| <Term id="bfloat16">BF16</Term> | 1 + 8 + 7  | about $3.4 \times 10^{38}$ | $0.0078$                 |
+
+**Worked example: 0.1.** 0.1 has no exact binary form, so every format rounds it. In FP16 the nearest value has
+exponent field $01011_2 = 11$ and mantissa field $1001100110_2 = 614$:
+
+$$
+\left(1 + \frac{614}{1024}\right) \times 2^{11 - 15} = \frac{1638}{1024} \times \frac{1}{16} = 0.0999755859375
+$$
+
+FP32 stores $0.100000001490116\ldots$ and BF16 stores $0.10009765625$. FP16 and BF16 are equally large, but they
+spend their bits differently: FP16 is more precise, BF16 has FP32's range. A value of 70,000 becomes infinity in
+FP16 but 70,144 in BF16.
+
+**Integers with a scale.** INT8 stores whole numbers from −128 to 127. To represent real weights, pick a
+<Term id="scale-zero-point">scale</Term>, the real value of one integer step, and store $q = \text{round}(w / \text{scale})$.
+To use the weight, dequantize: $\hat w = q \times \text{scale}$. In symmetric quantization with $b$ bits,
+
+$$
+q_{\max} = 2^{b-1} - 1, \qquad \text{scale} = \frac{\max |w|}{q_{\max}}, \qquad q = \text{clip}\big(\text{round}(w / \text{scale}),\, -q_{\max},\, q_{\max}\big)
+$$
+
+so the largest weight maps exactly to $\pm q_{\max}$. Take $w = [0.31, -1.27, 0.057, 0.894, -0.402]$ at 8 bits:
+$q_{\max} = 127$ and $\text{scale} = 1.27 / 127 = 0.01$. Then $0.057 / 0.01 = 5.7$ rounds to 6, which
+dequantizes to $0.06$: an error of $0.003$. Rounding moves every weight by **at most half a step**, here 0.005.
+
+**Asymmetric quantization** adds a zero point $z$, the integer that stands for 0: $q = \text{round}(w / \text{scale}) + z$
+and $\hat w = (q - z) \times \text{scale}$. The scale is $(\max - \min) / (2^b - 1)$, so the range $[\min, \max]$
+(widened to include 0) is spread over all $2^b$ integers. It helps when values are not centered on zero.
+
+**Per tensor or per channel.** One scale for a whole matrix is set by its largest weight. If some rows hold much
+smaller weights, they land on only a few integers. <Term id="per-channel-quantization">Per-channel quantization</Term>
+gives each output row (channel) its own scale, at the cost of storing one scale per row.
+
+Step through the five-weight example, then run it:
+
+<StepThrough example={byHand} trace={byHandTrace} title="quantize_by_hand.py" />
+
+<Callout kind="simplification">
+  This lesson quantizes weights and then dequantizes them to measure the error, which is how weight-only
+  quantization behaves numerically. Fast INT8 kernels instead multiply the integers directly and apply the
+  scales to the result, and quantizing activations as well needs calibration data to choose their ranges. Low-bit
+  formats such as INT4 usually use one scale per small group of weights (for example 128) rather than per row.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="What each format stores">
+
+Type a number and see its bits in each format, the value actually stored and the rounding error. Try 0.1,
+70000, 1e-8, 3.14159 and -2.5. For INT8, change the scale: a small scale is precise but clips large values, a
+large scale covers more but rounds coarsely.
+
+<Experiment def={bits} title="Bit-layout explorer">
+  <BitLayout />
+  <Readout />
+</Experiment>
+
+You can check these bit patterns yourself with Python's standard library:
+
+<PythonRunner example={structBits} title="float_bits.py" />
+
+</Section>
+
+<Section kind="code" title="Quantizing a real model in NumPy">
+
+The weights here are real: a small network (64 pixels → 16 hidden units → 10 digits) trained with scikit-learn on
+8×8 images of handwritten digits. Its first weight matrix `W1` has shape (16, 64) and its second `W2` shape
+(10, 16), 1,184 weights in all; we hold out 360 test images it never saw. The float32 model classifies 349 of them
+correctly. The code below quantizes both matrices with the settings of the experiment in the next section and
+measures the damage. Select a part to see what it does.
+
+<Experiment def={quant} title="quantize_model.py, linked to the experiment" controls={false}>
+  <Code example={quantCode} title="quantize_model.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+<PythonRunner example={byHand} title="quantize_by_hand.py" />
+
+</Section>
+
+<Section kind="experiment" title="How few bits can the model take?">
+
+Change the bits, the scheme and the scale granularity. Everything below is computed in your browser on the real
+weights and the 360 test images: the error of every weight, how many integer levels each row of `W1` gets, and
+how many test images the quantized model still gets right.
+
+<Experiment def={quant} title="Quantization lab">
+  <QuantizationLab />
+  <Readout />
+</Experiment>
+
+Things to try:
+
+- At 8 bits, compare per tensor with per channel. The largest error barely changes, but the MSE (mean squared
+  error) halves, from 1.763e-05 to 8.439e-06: rows 1, 5 and 11 hold small weights and span only 32 to 38 of the
+  255 levels with a shared scale, against 211 to 233 with their own.
+- Lower the bits to 4 and look at the level chart: with one scale per tensor, those small rows span only 3
+  levels. Per channel, every row spans 13 to 15.
+- At 2 bits, symmetric per tensor gets 121 of 360 right, per channel 225, asymmetric per channel 329.
+- Notice that some settings score 348 or 351 against the float model's 349. On 360 images, one or two images
+  is noise, not a real gain or loss. Judge quantization on a test set large enough to see the difference you
+  care about.
+
+</Section>
+
+<Section kind="mistakes" title="Overflow, clipping and silent precision loss">
+
+<CommonMistake
+  title="Casting large values to FP16"
+  wrong={'import numpy as np\nnp.float16(70000)'}
+  error="RuntimeWarning: overflow encountered in cast"
+  cause="FP16's largest finite value is 65,504. NumPy rounds 70,000 to infinity and warns; any later arithmetic with it gives inf or nan. Activations and sums in large models can exceed 65,504."
+  fix={'np.float32(70000)   # or keep the tensor in BF16, which has FP32\'s range'}
+/>
+
+<CommonMistake
+  title="Casting floats to int8 without a scale"
+  wrong={'w = np.array([0.31, -1.27, 0.057, 0.894])\nw.astype(np.int8)'}
+  error="array([ 0, -1,  0,  0], dtype=int8)"
+  cause="astype truncates toward zero; it does not quantize. Weights smaller than 1 all become 0 or -1, and there is no error at all: the model just stops working."
+  fix={'scale = np.abs(w).max() / 127\nq = np.round(w / scale).astype(np.int8)   # keep scale to dequantize: q * scale'}
+/>
+
+<Callout kind="warning">
+  The second "error" is the output, not an exception: nothing warns you. After quantizing, always check
+  dequantized values against the originals and measure the model on real test data. Also choose the range from
+  the weights (or, for activations, from calibration data): one extreme value in a tensor stretches the scale and
+  costs every other value precision, which is another reason per-channel scales help.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Choosing a precision for serving">
+
+| Format    | Bytes per weight | Range and precision                       | Typical use in inference                               |
+| --------- | ---------------- | ----------------------------------------- | ------------------------------------------------------ |
+| FP32      | 4                | wide range, about 7 significant digits    | reference results, CPU code, debugging accuracy        |
+| BF16      | 2                | FP32's range, about 2 to 3 digits         | default for serving many recent models on modern GPUs  |
+| FP16      | 2                | up to 65,504, about 3 digits              | older GPUs without BF16 support; watch for overflow    |
+| INT8      | 1 (plus scales)  | 256 levels per scale                      | weights (and often activations) of quantized models    |
+| INT4      | 0.5 (plus scales)| 16 levels per group                       | weight-only quantization of large language models      |
+
+A workflow that holds up in practice: keep an FP32 or BF16 baseline, quantize, then compare on a held-out
+evaluation set with the same metric you care about in production, as the experiment above does. Start per
+channel at 8 bits, go lower only if memory or speed requires it, and check whether a few layers are much more
+sensitive than the rest. Libraries implement these schemes for you (and add calibration and better rounding),
+but they use the same scale and zero-point arithmetic.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Write a quantizer">
+
+<MiniExercise exercise={quantExercise}>
+  Write `quantize(w, bits)`, which returns `(q, scale)` for symmetric quantization of a list of floats, and
+  `dequantize(q, scale)`. Handle a list of all zeros without dividing by zero. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Floating point spends bits on an exponent (range) and a mantissa (precision). BF16 keeps FP32's range with less
+  precision; FP16 is more precise but overflows above 65,504.
+- Quantization stores $q = \text{round}(w / \text{scale})$ (plus a zero point if asymmetric) and uses
+  $q \times \text{scale}$. Each value moves by at most half a step, and each bit removed doubles the step.
+- Per-channel scales protect rows of small weights; asymmetric scales fit ranges that are not centered on zero.
+- Measure: max error and MSE tell you how far weights moved, accuracy on held-out data tells you whether it matters.
+
+Next: [Batching, dynamic batching, latency vs throughput](#/learn/inference/throughput/batching-throughput)
+turns from memory to time: how a server groups requests to keep the GPU busy, and what that costs in latency.
+
+</Section>
