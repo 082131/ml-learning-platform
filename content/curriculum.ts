@@ -39,7 +39,7 @@ export const tracks: Track[] = [
           { id: 'ml/math/matrices', status: 'written' },
           { id: 'ml/math/matrix-multiplication', status: 'written' },
           { id: 'ml/math/tensors', status: 'written' },
-          { id: 'ml/math/functions-derivatives', status: 'outline' },
+          { id: 'ml/math/functions-derivatives', status: 'written' },
           { id: 'ml/math/gradients-chain-rule', status: 'outline' },
           { id: 'ml/math/probability', status: 'outline' },
           { id: 'ml/math/statistics-intuition', status: 'outline' },

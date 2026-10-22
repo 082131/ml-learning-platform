@@ -1,0 +1,166 @@
+import { differenceCode, experiment, gradientCheck, stepSweep } from './code';
+import { derivativeExercise, questions } from './quiz';
+
+<Section kind="intuition" title="How steep is the road right here?">
+
+Driving up a hill, the road is steeper in some places than others. "How steep is it right here?" has an answer at
+every point, even though the road curves. You could estimate it by measuring how much you climb over the next
+10 meters, then over the next 1 meter, then over the next 10 centimeters. The answers settle down to one number:
+the slope at that point.
+
+That number is the <Term id="derivative">derivative</Term>. Training a model is mostly about derivatives: the
+model's error is a <Term id="function">function</Term> of its weights, and the derivative says which way to
+change a weight so the error goes down, and how strongly the error responds.
+
+</Section>
+
+<Section kind="technical" title="From secant to tangent">
+
+**Functions.** A function $f$ is a rule that turns an input $x$ into an output $f(x)$. For $f(x) = x^2$,
+$f(3) = 9$. Plotting every $(x, f(x))$ gives its graph.
+
+**Slope of a secant.** Between $x$ and $x + h$ the graph rises by $f(x + h) - f(x)$ over a run of $h$:
+
+$$
+\text{slope of the secant} = \frac{f(x + h) - f(x)}{h}
+$$
+
+For $f(x) = x^2$ at $x = 1$ with $h = 0.1$: $\dfrac{1.1^2 - 1^2}{0.1} = \dfrac{1.21 - 1}{0.1} = 2.1$.
+
+**The derivative** is the value this slope approaches as $h$ shrinks toward 0:
+
+$$
+f'(x) = \lim_{h \to 0} \frac{f(x + h) - f(x)}{h}
+$$
+
+For $x^2$: $\dfrac{(x + h)^2 - x^2}{h} = \dfrac{2xh + h^2}{h} = 2x + h$, which approaches $2x$. So $f'(1) = 2$,
+and the secant with $h = 0.1$ was off by exactly $h$. The line through $(x, f(x))$ with slope $f'(x)$ is the
+<Term id="tangent-line">tangent line</Term>: the straight line that best matches the graph near $x$.
+
+**Rules** that cover most of what ML needs at first:
+
+| Rule              | Function           | Derivative               |
+| ----------------- | ------------------ | ------------------------ |
+| Constant          | $c$                | $0$                      |
+| Power             | $x^n$              | $n x^{n-1}$              |
+| Constant multiple | $c \, g(x)$        | $c \, g'(x)$             |
+| Sum               | $g(x) + k(x)$      | $g'(x) + k'(x)$          |
+
+So $f(x) = x^3 - 3x$ has $f'(x) = 3x^2 - 3$: at $x = 2$ the slope is $9$, and at $x = 1$ it is $0$, a flat spot
+(here a local minimum).
+
+**Reading the sign.** $f'(x) > 0$: $f$ goes up as $x$ grows. $f'(x) < 0$: it goes down. $f'(x) = 0$: flat, as at
+a minimum or maximum. Near $x$, $f(x + h) \approx f(x) + f'(x)\,h$.
+
+**Numerical derivatives** use a small but nonzero $h$ (a <Term id="finite-difference">finite difference</Term>).
+The central difference $\dfrac{f(x + h) - f(x - h)}{2h}$ is usually far more accurate than the forward one: for
+$x^2$ it gives exactly $2x$ for any $h$.
+
+<Callout kind="simplification">
+  Not every function has a derivative everywhere. $|x|$ has a corner at 0, where the slope jumps from −1 to 1.
+  ML uses such functions anyway (ReLU, $\max(0, x)$, has the same kind of corner), and libraries simply pick a
+  value there by convention.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Shrink the step, watch the secant turn into the tangent">
+
+Move $x$ and pick a step $h$. The solid line is the tangent (slope $f'(x)$, computed from the exact rule); the
+dashed line is the secant from $x$ to $x + h$. The readout compares both numerical estimates with the exact slope.
+
+<Experiment def={experiment} title="Tangent and secant">
+  <TangentSlope />
+  <Readout />
+</Experiment>
+
+Things to try:
+
+- With $x^2$, change $h$ from 1 to 0.001: the forward difference's error is exactly $h$ each time, and the
+  central difference has none.
+- Pick $x^3 - 3x$ and move $x$ to $-1$ or $1$: the tangent is flat, $f'(x) = 0$.
+- Pick $|x|$ at $x = 0$: there is no tangent, and the central difference reports 0, the average of −1 and 1.
+- Set $h$ to 1e-12: the estimates get worse, not better (see Common mistakes).
+
+</Section>
+
+<Section kind="code" title="Finite differences in Python">
+
+<Experiment def={experiment} title="derivative.py, linked to the plot" controls={false}>
+  <Code example={differenceCode} title="derivative.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+Run this to see how the error changes as $h$ shrinks:
+
+<PythonRunner example={stepSweep} title="step_sweep.py" />
+
+The error falls with $h$ until about $h = 10^{-8}$, then rises: at $h = 10^{-15}$ the estimate is off by 0.22.
+
+</Section>
+
+<Section kind="mistakes" title="Steps that are too small, or zero">
+
+<CommonMistake
+  title="Using a step of exactly 0"
+  wrong={'def f(x):\n    return x * x\n\nx, h = 1.0, 0.0\n(f(x + h) - f(x)) / h'}
+  error="ZeroDivisionError: float division by zero"
+  cause="The derivative is a limit as h approaches 0, not the value at h = 0. With h = 0 the secant has no run, so the slope is 0 / 0."
+  fix={'h = 1e-5\n(f(x + h) - f(x - h)) / (2 * h)  # central difference with a small, nonzero h'}
+/>
+
+<Callout kind="warning">
+  Smaller is not always better. Floats keep about 16 significant digits, so $f(x + h) - f(x)$ with $h = 10^{-12}$
+  keeps only about 4 correct digits, and dividing by $h$ magnifies the rest: the sweep above shows an error of
+  $1.8 \times 10^{-4}$ there, worse than with $h = 10^{-6}$. For central differences, $h$ around $10^{-5}$ is a
+  good default.
+</Callout>
+
+<Callout kind="warning">
+  Watch the parentheses. `f(x + h) - f(x) / h` divides only $f(x)$ by $h$: for $x^2$ at $x = 1$, $h = 0.1$ it
+  gives $1.21 - 10 = -8.79$ instead of $2.1$, with no error message.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Checking a gradient">
+
+Libraries compute derivatives exactly with automatic differentiation, but engineers still use finite differences
+to test that code: a <Term id="finite-difference">gradient check</Term> compares the two.
+
+<Code example={gradientCheck} title="gradient_check.py" />
+
+The model predicts $2w$ and the target is 6, so at $w = 1$ the loss is $(2 - 6)^2 = 16$ and the slope is $-16$.
+The negative slope says that increasing $w$ lowers the loss, which is the direction
+[Loss functions and optimization](#/learn/ml/math/loss-optimization) will step in.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="A numerical derivative">
+
+<MiniExercise exercise={derivativeExercise}>
+  Write `derivative(f, x, h=1e-5)` that returns the central-difference estimate of $f'(x)$. The tests try a few
+  functions whose exact derivatives you know.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A function maps an input to an output; its derivative $f'(x)$ is the slope of the tangent at $x$.
+- $f'(x)$ is the limit of the secant slope $(f(x + h) - f(x)) / h$ as $h \to 0$.
+- Power rule: $x^n \to n x^{n-1}$; derivatives of sums and constant multiples work term by term.
+- The sign of $f'$ tells you whether $f$ rises or falls; $f'(x) = 0$ at flat points.
+- Numerical derivatives need a small, nonzero $h$; central differences are more accurate, and $h$ near
+  $10^{-5}$ avoids round-off.
+
+Next: [Partial derivatives, gradients, chain rule](#/learn/ml/math/gradients-chain-rule) handles functions of
+many inputs.
+
+</Section>
