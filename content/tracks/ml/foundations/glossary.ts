@@ -50,4 +50,21 @@ export default [
     introducedIn: 'ml/foundations/python-basics',
     aliases: ['str', 'text'],
   },
+  {
+    id: 'python-function',
+    term: 'Function (in code)',
+    short:
+      'A named, reusable block of code: def grade(score): ... runs when called as grade(72) and can return a value.',
+    long: 'Parameters are the names in the def line; arguments are the values passed in a call. Variables created inside a function exist only while it runs.',
+    introducedIn: 'ml/foundations/python-control',
+    aliases: ['def', 'return'],
+  },
+  {
+    id: 'loop',
+    term: 'Loop',
+    short:
+      'Code that runs again and again: for repeats once per item of a list or range, while repeats as long as a condition is True.',
+    introducedIn: 'ml/foundations/python-control',
+    aliases: ['for loop', 'while loop', 'iteration'],
+  },
 ] satisfies GlossaryTerm[];

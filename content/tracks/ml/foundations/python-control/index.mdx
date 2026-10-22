@@ -1,0 +1,150 @@
+import { compoundLoop, controlRunner, experiment, gradingLoop } from './code';
+import { countExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Programs that decide and repeat">
+
+The programs so far ran every line once, top to bottom. Real programs make decisions ("did this student pass?")
+and repeat work ("for every student..."). Python has three tools for that:
+
+- A <Term id="python-function">function</Term> packages a few lines under a name, so you can run them again with
+  different inputs: `grade(72, 60)`.
+- A **condition** (`if`) runs a block only when a comparison is True.
+- A <Term id="loop">loop</Term> runs a block again and again: `for` once per item, `while` as long as a condition
+  holds.
+
+Training a model is exactly this shape: a loop over the data, a function that computes the error of one example,
+and conditions that decide when to stop.
+
+</Section>
+
+<Section kind="technical" title="def, if, for and while">
+
+**Functions.** `def grade(score, pass_mark):` defines a function with two parameters. Calling `grade(72, 60)` runs
+its body with `score = 72` and `pass_mark = 60`. `return` ends the function and hands a value back; the call
+`grade(72, 60)` is then replaced by that value. A function without `return` gives back `None`.
+
+**Conditions.** Comparisons give a bool: `72 >= 60` is `True`. The operators are `==` (equal), `!=` (not equal),
+`<`, `<=`, `>`, `>=`. Combine them with `and`, `or`, `not`. `if` can be followed by any number of `elif` branches
+and one `else`; Python runs the first branch whose condition is True and skips the rest.
+
+**Blocks.** A colon at the end of a line opens a block, and the block is every following line indented further
+(four spaces by convention). Indentation is not decoration in Python: it decides which lines belong to the `if`,
+the loop or the function.
+
+**for loops.** `for s in scores:` runs its block once per item, with `s` naming the item. `range(n)` produces the
+numbers $0, 1, \dots, n-1$, so `for i in range(4)` runs 4 times. After the loop ends, the loop variable keeps its
+last value.
+
+**while loops.** `while balance < 150:` checks the condition before every pass and stops when it is False. If
+nothing in the body ever makes the condition False, the loop never ends; in this site's runner, a program that
+runs longer than 10 seconds is stopped.
+
+</Section>
+
+<Section kind="code" title="A grading loop">
+
+The program grades every score with a function and counts the passes. Hover over, focus, or select a part of the
+code to see what it does. The scores and pass mark come from the controls in the next section.
+
+<Experiment def={experiment} title="grading.py, linked to the controls below" controls={false}>
+  <Code example={gradingLoop} title="grading.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+</Section>
+
+<Section kind="experiment" title="Step through the loop">
+
+Change the scores or the pass mark, then step through. Watch the active line jump into `grade()` and back on every
+iteration, and watch the variables panel: inside the function only `score` and `pass_mark` exist.
+
+<Experiment def={experiment} title="Loop state, step by step">
+  <StepThrough example={gradingLoop} title="grading.py" />
+  <Readout />
+</Experiment>
+
+Things to try:
+
+- Set the pass mark to 0. Every call takes the `return "pass"` line, and `passed` grows on every iteration.
+- Set the pass mark to 100 with a score of 100. `>=` counts it as a pass; with `>` it would fail.
+- Clear the scores box. The loop body never runs, and the program prints `0 of 0 passed`.
+
+A `while` loop does not know in advance how many passes it needs. This one counts how many years 100 takes to grow
+past 150 at 10% a year. Its trace is not computed by this page: select **Record trace** to run the code in Python
+in your browser and record every line it executes.
+
+<StepThrough example={compoundLoop} title="compound.py" />
+
+The program prints `5 161.05`: after 4 years the balance is about 146.41, still below 150, so the loop runs a
+fifth time. Then run and change this playground:
+
+<PythonRunner example={controlRunner} title="control.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Indentation, = in a condition, and a missing return">
+
+<CommonMistake
+  title="Forgetting to indent a block"
+  wrong={'def grade(score):\nif score >= 60:\n    return "pass"'}
+  error="IndentationError: expected an indented block after function definition on line 1"
+  cause="The colon after def opens a block, so the next line must be indented further. Python reads the if as outside the function, which leaves the function empty."
+  fix={'def grade(score):\n    if score >= 60:\n        return "pass"'}
+/>
+
+<CommonMistake
+  title="Using = instead of == in a condition"
+  wrong={'score = 70\nif score = 60:\n    print("pass")'}
+  error="SyntaxError: invalid syntax. Maybe you meant '==' or ':=' instead of '='?"
+  cause="One = assigns a value; it cannot appear where Python expects a True/False condition. Python points at it and suggests ==."
+  fix={'if score == 60:\n    print("pass")'}
+/>
+
+<Callout kind="warning">
+  A function without `return` raises no error: it returns `None`. If `total(xs)` adds up its numbers into `s` but
+  never says `return s`, `print(total([1, 2, 3]))` prints `None`. When a function's result is `None`, look for a
+  missing `return`, or a `return` that is indented into a loop and runs too early.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+Every training loop in this track has this shape. In [Training loop](#/learn/ml/deep/training-loop) you will see
+code like:
+
+| Line | What it does | Tool from this lesson |
+|---|---|---|
+| `for epoch in range(epochs):` | One pass over the data per epoch | for and range |
+| `loss = compute_loss(model, batch)` | The error on a batch of examples | a function call |
+| `if loss < best_loss:` | Keep the best model so far | a condition |
+| `while not converged:` | Some optimizers repeat until changes are tiny | while |
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Count values above a limit">
+
+<MiniExercise exercise={countExercise}>
+  Write `count_above(values, limit)` that returns how many items of `values` are strictly greater than `limit`.
+  Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- `def` defines a function; `return` hands a value back, and without it the result is `None`.
+- `if` / `elif` / `else` run the first branch whose condition is True. `=` assigns, `==` compares.
+- `for x in items:` repeats once per item; `range(n)` gives $0 \dots n-1$. `while` repeats until its condition
+  is False.
+- Indentation decides what belongs to each block.
+
+Next: [Lists, dicts, indexing and slicing](#/learn/ml/foundations/python-collections) holds many values at once.
+
+</Section>
