@@ -7,10 +7,11 @@ export default {
   minutes: 45,
   kind: 'lesson',
   objectives: [
-    'Model a pipeline as a DAG of tasks',
-    'Configure retries and explain idempotency',
-    'Explain how a failure propagates to downstream tasks',
+    'Model a pipeline as a DAG of tasks with explicit dependencies',
+    'Configure retries with backoff, and explain why tasks must be idempotent to retry safely',
+    'Predict which downstream tasks run, wait or are skipped when a task fails',
+    'Backfill a pipeline for past dates without double-counting',
   ],
   prerequisites: ['data/etl/etl-vs-elt'],
-  concepts: [],
+  concepts: ['etl', 'elt'],
 } satisfies LessonMeta;

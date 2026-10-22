@@ -7,9 +7,10 @@ export default {
   minutes: 35,
   kind: 'lesson',
   objectives: [
-    'Write basic SELECT, WHERE and GROUP BY queries',
-    'Compare CSV, JSON and Parquet for a given use',
-    'Move data between Python and a SQL database',
+    'Write SELECT queries that filter with WHERE, sort with ORDER BY and summarize with GROUP BY',
+    'Compare CSV, JSON and Parquet on schema, size and read speed for a given use',
+    'Load a query result into a pandas DataFrame and write a DataFrame back to a SQL table',
+    'Explain what a table schema and column types guarantee about the data',
   ],
   prerequisites: ['ml/foundations/pandas-dataframes'],
   concepts: [],

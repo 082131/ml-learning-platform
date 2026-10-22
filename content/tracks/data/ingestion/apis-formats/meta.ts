@@ -7,9 +7,10 @@ export default {
   minutes: 45,
   kind: 'lesson',
   objectives: [
-    'Ingest data from a paginated API',
-    'Choose a file format and explain the trade-offs',
-    'Handle schema changes in incoming data',
+    'Ingest every page of a paginated REST API, with retries and rate limits',
+    'Choose between CSV, JSON and Parquet for landing data, and explain the trade-offs',
+    'Detect a schema change in incoming data and decide whether to fail, adapt or set the data aside',
+    'Make an ingestion job safe to rerun without creating duplicate rows',
   ],
   prerequisites: ['data/relational/joins-indexes'],
   concepts: [],

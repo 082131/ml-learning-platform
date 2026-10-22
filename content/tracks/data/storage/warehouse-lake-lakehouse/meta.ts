@@ -7,10 +7,11 @@ export default {
   minutes: 45,
   kind: 'lesson',
   objectives: [
-    'Compare a data warehouse, a data lake and a lakehouse',
-    'Choose a storage architecture for a use case',
-    'Explain what a table format adds on top of files',
+    'Compare a data warehouse, a data lake and a lakehouse on cost, schema enforcement and query speed',
+    'Choose a storage architecture for a given use case and justify it',
+    'Explain what a table format such as Delta Lake or Apache Iceberg adds on top of Parquet files',
+    'Explain how partitioning files by a column speeds up queries that filter on it',
   ],
   prerequisites: ['data/etl/etl-vs-elt'],
-  concepts: [],
+  concepts: ['data-warehouse', 'elt'],
 } satisfies LessonMeta;

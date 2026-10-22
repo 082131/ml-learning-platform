@@ -7,10 +7,11 @@ export default {
   minutes: 50,
   kind: 'lesson',
   objectives: [
-    'Choose cloud storage classes for different access patterns',
-    'Apply least-privilege permissions to data',
-    'Estimate storage and compute cost for a pipeline',
+    'Choose object storage classes for hot, infrequent and archive access patterns',
+    'Apply least-privilege permissions to buckets, tables and service accounts',
+    'Estimate the monthly storage, query and transfer cost of a pipeline, with the formula shown',
+    'Deploy a pipeline with its configuration and secrets kept out of the code',
   ],
   prerequisites: ['data/storage/warehouse-lake-lakehouse'],
-  concepts: [],
+  concepts: ['data-warehouse'],
 } satisfies LessonMeta;

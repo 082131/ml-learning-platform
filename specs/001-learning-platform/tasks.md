@@ -106,10 +106,10 @@ Close each content thread with: content validation green, `check`, `e2e` and `bu
 - [ ] M601 to M605 five capstone briefs with milestones, rubric, hints, local-run instructions (pinned versions, official docs) and self-assessment checklists.
 
 ## Thread 9: Data Engineering flagship (3 lessons)
-- [ ] D001 `data/relational/joins-indexes`: a join visualizer with SQL linked to the result rows, implemented in TypeScript over small tables. Index vs full-scan step-through counting rows touched (computed). Optional: real SQL via sql.js only if justified in the plan's decision log.
-- [ ] D002 `data/etl/etl-vs-elt`: FlowDiagram pipeline, inject a bad record, validation rules, a quarantine path, ETL vs ELT placement of the transform step.
-- [ ] D003 `data/processing/batch-vs-stream`: an event-time simulator (tumbling windows, watermark, late events), batch vs stream latency and completeness, computed.
-- [ ] D004 Fill objectives and prerequisites for all 9 outline lessons in this track.
+- [x] D001 `data/relational/joins-indexes`: a join visualizer with SQL linked to the result rows, implemented in TypeScript over small tables. Index vs full-scan step-through counting rows touched (computed). Optional: real SQL via sql.js only if justified in the plan's decision log.
+- [x] D002 `data/etl/etl-vs-elt`: FlowDiagram pipeline, inject a bad record, validation rules, a quarantine path, ETL vs ELT placement of the transform step.
+- [x] D003 `data/processing/batch-vs-stream`: an event-time simulator (tumbling windows, watermark, late events), batch vs stream latency and completeness, computed.
+- [x] D004 Fill objectives and prerequisites for all 9 outline lessons in this track.
 
 ## Thread 10: AI Engineer flagship (3 lessons)
 - [ ] A001 `ai/representations/tokens-embeddings`: a tokenizer playground and similarity search over a bundled precomputed embedding table. Generate it offline with a named small open model, record the model and version, keep it ≤300 KB, and commit the generation script.
