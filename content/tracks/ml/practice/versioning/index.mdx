@@ -1,0 +1,195 @@
+import { dvcWorkflow, experiment, versionCode, versionRunner } from './code';
+import { manifestExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Which file trained this model?">
+
+Most projects start with files named like `data_final.csv`, `data_final_v2.csv` and `model_best.pkl`. A month
+later nobody can say which data trained the model in production, whether the file changed since, or why a retrain
+on "the same data" scores differently. A name is a label someone typed; it says nothing reliable about the
+content.
+
+The fix is the one git uses for code: name each version by its content. Compute a fingerprint of the exact bytes,
+a <Term id="content-hash">content hash</Term>, and store it with every artifact. Then record, for every model,
+the hashes of everything that went into it. That record is the model's <Term id="data-lineage">lineage</Term>:
+from any model you can walk back to its data, config and code, and from any dataset forward to every model it
+fed.
+
+</Section>
+
+<Section kind="technical" title="Hashes, run IDs and lineage">
+
+**A content hash** is a function $h$ from bytes to a fixed-size number with two properties that matter here:
+it is deterministic (the same bytes give the same hash, on any machine), and changing even one byte gives an
+unrelated-looking hash. SHA-256 produces 256 bits, written as 64 hexadecimal digits. The lesson prints the first
+12 digits (48 bits), which is plenty to tell a project's versions apart; tools keep the full hash.
+
+**What gets a hash.** Each artifact is hashed on its exact bytes:
+
+| Artifact | Hashed content | In this lesson |
+| --- | --- | --- |
+| Data | the file's bytes | `data.csv`, 6 deliveries |
+| Config | its JSON with keys sorted | `{"drop_over_minutes": 60}` |
+| Code | the git commit (itself a hash) | pinned by git, outside the experiment |
+| Model | the saved weights | `{"w": 2.8039, "b": 10.1373}` |
+
+Sorting the keys first makes the hash depend on the config's content, not on the order someone typed it in.
+
+**The run is named by its inputs**:
+
+$$
+\text{run} = h\big(h(\text{data}) \,\|\, h(\text{config})\big)
+$$
+
+where $\|$ joins the two strings. Same inputs, same run ID; a pipeline tool can see that a run already exists and skip it. **The
+model is named by its output**, $h(\text{model})$. Keeping both is what makes lineage useful: the run ID says how
+a model was made, the model hash says what came out, and two different runs can produce the identical model.
+
+**The model here** is a straight line, $\text{minutes} = w \cdot \text{km} + b$, fitted by least squares in
+closed form after the config's cleaning step (drop deliveries slower than `drop_over_minutes`). With $n$ rows
+and the sums $S_x = \sum \text{km}$, $S_y = \sum \text{min}$, $S_{xx} = \sum \text{km}^2$ and
+$S_{xy} = \sum \text{km} \cdot \text{min}$:
+
+$$
+w = \frac{n S_{xy} - S_x S_y}{n S_{xx} - S_x^2}, \qquad b = \frac{S_y - w S_x}{n}
+$$
+
+The starting data has one suspicious row, 12 km in 95 minutes. With `drop_over_minutes = 60` it is removed and
+the remaining 5 rows give $w = 2.8039$, $b = 10.1373$. The fit is deterministic, so the model hash depends only
+on the data and the config.
+
+<Callout kind="simplification">
+  A real model's training is usually not bit-for-bit deterministic (see
+  [experiment tracking](#/learn/ml/practice/experiment-tracking)), so retraining from the same run inputs can give
+  a model with a different hash but the same behavior. That is why a registry records the run inputs and the
+  model hash separately, and why "same model" in practice is checked with evaluation metrics, not only hashes.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Follow a change through the lineage">
+
+Each box shows an artifact's hash. ✓ means it matches the registered version v1 (the starting state), ! means it
+changed. The data table and the cleaning setting are in the Experiment section below; the diagram here follows
+them.
+
+<Experiment def={experiment} title="Lineage of the delivery model" controls={false}>
+  <LineageDiagram />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="Versioning with hashlib">
+
+The program computes every version with Python's standard library. The `data_csv` and `config` lines are filled
+from the experiment.
+
+<Experiment def={experiment} title="versions.py, linked to the lineage" controls={false}>
+  <Code example={versionCode} title="versions.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+Run the complete program; it prints the same four lines as the readout for the starting data.
+
+<PythonRunner example={versionRunner} title="versions.py (complete)" />
+
+In a project you do not hash files by hand. DVC (Data Version Control) hashes data files, stores them outside git,
+and commits a small pointer file with the hash. The commands below were run with DVC 3.67.1; the comments show
+their real output for the starting `deliveries.csv`.
+
+<Code example={dvcWorkflow} title="terminal" />
+
+</Section>
+
+<Section kind="experiment" title="Change one thing at a time">
+
+The table is `rows`: column 0 is the distance in km, column 1 the time in minutes, one delivery per row.
+
+<Experiment def={experiment} title="Edit the data and the config">
+  <LineageDiagram />
+  <Readout />
+</Experiment>
+
+Things to try:
+
+- Change the last row from 95 to 44 minutes (as if a typo was fixed). The data, run and model all change: the
+  44-minute row is now kept and moves the line.
+- Put 95 back, then set the config to 90. The config and run hashes change, but the model hash does not: 90 and 60
+  drop the same row here. Same model, different recipe.
+- Set the config to None (keep all rows). The 95-minute delivery pulls the slope from 2.8039 to 6.4371.
+- Set every distance to the same value. The fit divides by zero and no model is produced; the lineage shows the
+  failed run, which is worth recording too.
+
+</Section>
+
+<Section kind="mistakes" title="Versions that silently drift">
+
+<CommonMistake
+  title="Overwriting a dataset in place"
+  wrong={'df = pd.read_csv("data/deliveries.csv")\ndf = df[df.minutes <= 60]\ndf.to_csv("data/deliveries.csv", index=False)  # same name, new content'}
+  error="No error. Every run record that says data/deliveries.csv now points at different bytes than it trained on."
+  cause="A path is not a version. Once the file is overwritten, older runs cannot be reproduced and nobody can tell from the name that anything changed."
+  fix={'df.to_csv("data/deliveries_clean.csv", index=False)\n# dvc add data/deliveries_clean.csv, then commit the .dvc file:\n# the run record stores the hash, so the cleaned data is a new, named version'}
+/>
+
+<CommonMistake
+  title="Hashing an object whose text form is not stable"
+  wrong={'config_id = short_hash(str(config))  # {"lr": 0.01, "epochs": 20} vs {"epochs": 20, "lr": 0.01}'}
+  error="No error. The same config gets two different IDs depending on key order."
+  cause="str() of a dict follows insertion order, so equal configs can produce different text and therefore different hashes."
+  fix={'config_id = short_hash(json.dumps(config, sort_keys=True))'}
+/>
+
+<Callout kind="warning">
+  Random splits are part of the data version too. If `train_test_split` runs without a fixed seed every time you
+  train, the "same" dataset gives different training rows. Save the split (or the seed) as a versioned artifact.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Versioning on a team">
+
+| Need | Typical tool | What it stores |
+| --- | --- | --- |
+| Code version | git | commit hash |
+| Data version | DVC, lakeFS, or a table format with snapshots (Delta Lake, Apache Iceberg) | content hash or snapshot ID |
+| Run record and lineage | MLflow, Weights & Biases | run ID, input versions, metrics |
+| Model versions and status | a model registry (MLflow Model Registry and others) | model version → run, plus stage such as staging or production |
+
+With these in place, three questions get one-command answers: *what data trained the model in production?* (follow
+its registry entry to the run, then to the data hash), *which models are affected by a bad batch of data?* (find
+every run whose inputs include that hash), and *can we reproduce last month's model?* (check out the commit,
+restore the data version, rerun). The next lesson,
+[error analysis and ablations](#/learn/ml/practice/ablations), relies on this: an ablation compares runs that
+differ in exactly one versioned input.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Diff two data manifests">
+
+<MiniExercise exercise={manifestExercise}>
+  A manifest maps file names to content hashes. Write `changed_files(old, new)` that returns, sorted, every file
+  that was added, removed or changed between two manifests.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Name versions by content hash, not by file name. The same bytes always give the same hash.
+- Hash configs in a canonical form (`sort_keys=True`); pin code with its git commit.
+- A run ID from its inputs says how a model was made; a model hash says what came out. Together they are the
+  lineage.
+- Different inputs can give the same model, and the same inputs can give a different model when training is not
+  deterministic, so record both.
+- DVC keeps data out of git but puts its hash in git, so a commit pins code and data together.
+
+Next: [Error analysis and ablation studies](#/learn/ml/practice/ablations) finds where a model fails and which
+parts of it matter.
+
+</Section>

@@ -93,7 +93,7 @@ export const tracks: Track[] = [
         lessons: [
           { id: 'ml/practice/experiment-tracking', status: 'written' },
           { id: 'ml/practice/hyperparameter-tuning', status: 'written' },
-          { id: 'ml/practice/versioning', status: 'outline' },
+          { id: 'ml/practice/versioning', status: 'written' },
           { id: 'ml/practice/ablations', status: 'outline' },
           { id: 'ml/practice/model-testing', status: 'outline' },
           { id: 'ml/practice/gpu-training', status: 'outline' },

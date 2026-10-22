@@ -61,4 +61,28 @@ export default [
     introducedIn: 'ml/practice/hyperparameter-tuning',
     aliases: ['patience'],
   },
+  {
+    id: 'content-hash',
+    term: 'Content hash',
+    short:
+      'A fixed-length fingerprint computed from a file’s exact bytes (for example with SHA-256). The same bytes always give the same hash.',
+    long: 'Changing one byte changes the hash completely, so a hash names a version of the content regardless of the file’s name. Git, DVC and model registries identify versions this way.',
+    introducedIn: 'ml/practice/versioning',
+    aliases: ['checksum', 'SHA-256', 'fingerprint'],
+  },
+  {
+    id: 'data-lineage',
+    term: 'Lineage',
+    short:
+      'The record of which inputs (data, code, config) produced an artifact such as a model, and which artifacts it fed.',
+    introducedIn: 'ml/practice/versioning',
+    aliases: ['data lineage', 'provenance'],
+  },
+  {
+    id: 'model-registry',
+    term: 'Model registry',
+    short:
+      'A store of trained models with their versions, lineage (the run that produced them) and status, such as staging or production.',
+    introducedIn: 'ml/practice/versioning',
+  },
 ] satisfies GlossaryTerm[];
