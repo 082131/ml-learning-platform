@@ -1,0 +1,12 @@
+.wrap {
+  min-width: 0;
+}
+.formula {
+  margin: var(--s-3) 0 0;
+  padding: var(--s-3);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-family: var(--font-mono);
+  font-size: var(--fs-15);
+  overflow-wrap: anywhere;
+}
