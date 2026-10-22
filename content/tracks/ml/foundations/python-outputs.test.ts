@@ -17,13 +17,17 @@ const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'obj
 
 const runnable = Object.values(codeModules)
   .flatMap((m) => Object.values(m))
-  .filter((v): v is CodeExample => isObject(v) && v.run === 'pyodide' && typeof v.expectedOutput === 'string');
+  .filter(
+    (v): v is CodeExample => isObject(v) && v.run === 'pyodide' && typeof v.expectedOutput === 'string',
+  );
 const exercises = Object.values(quizModules)
   .flatMap((m) => Object.values(m))
   .filter((v): v is Exercise => isObject(v) && Array.isArray(v.hints) && typeof v.tests === 'string');
 
-const usesModule = (code: string, name: string) => new RegExp(`^\\s*(import|from)\\s+${name}\\b`, 'm').test(code);
-const canRun = (code: string) => ['numpy', 'pandas', 'matplotlib'].every((m) => !usesModule(code, m) || hasModule(m));
+const usesModule = (code: string, name: string) =>
+  new RegExp(`^\\s*(import|from)\\s+${name}\\b`, 'm').test(code);
+const canRun = (code: string) =>
+  ['numpy', 'pandas', 'matplotlib'].every((m) => !usesModule(code, m) || hasModule(m));
 
 const work = mkdtempSync(path.join(tmpdir(), 'mlp-foundations-'));
 function cpython(code: string): { out: string; ok: boolean } {

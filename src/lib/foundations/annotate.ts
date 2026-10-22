@@ -5,7 +5,12 @@ import type { CodeRange } from '../types';
  * files never count columns by hand. `nth` picks a later occurrence on the same line.
  * Throws when the text is not there, so a code edit that breaks an annotation fails validation.
  */
-export function span(source: string, line: number, match: string, nth = 0): { range: CodeRange; match: string } {
+export function span(
+  source: string,
+  line: number,
+  match: string,
+  nth = 0,
+): { range: CodeRange; match: string } {
   const text = source.split('\n')[line - 1];
   if (text === undefined) throw new Error(`Line ${line} does not exist`);
   let at = -1;

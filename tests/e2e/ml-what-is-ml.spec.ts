@@ -35,7 +35,9 @@ test('the threshold and keywords change the code and the accuracy on every email
   await page.keyboard.press('ArrowLeft');
   // t = 0: "prize draw winner announced today" (score 1) becomes spam, and so does "free for lunch tomorrow".
   await expect(viz.getByText('New emails: rule 4 of 6 correct, learned 5 of 6')).toBeVisible();
-  await expect(page.locator('[data-code-example="spam-filter"]')).toContainText('def is_spam(text, threshold=0):');
+  await expect(page.locator('[data-code-example="spam-filter"]')).toContainText(
+    'def is_spam(text, threshold=0):',
+  );
 
   await page.getByRole('textbox', { name: /Hand-written rule/ }).fill('free, prize, winner');
   await expect(page.locator('[data-code-example="spam-filter"]')).toContainText(

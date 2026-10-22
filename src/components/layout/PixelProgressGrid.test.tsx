@@ -21,7 +21,9 @@ describe('PixelProgressGrid', () => {
     const cells = screen.getAllByRole('link');
     expect(cells).toHaveLength(4);
     expect(cells[0]).toHaveAccessibleName(/^001 What AI, ML and deep learning actually mean: Complete$/);
-    expect(cells[1]).toHaveAccessibleName(/: Outline only$/);
+    // The second lesson's state follows the curriculum data, which content threads change.
+    const second = lessons[1]!.ref.status === 'outline' ? 'Outline only' : 'Not started';
+    expect(cells[1]).toHaveAccessibleName(new RegExp(`: ${second}$`));
     expect(cells[2]).toHaveAccessibleName(/: In progress$/);
     expect(cells.filter((c) => c.tabIndex === 0)).toHaveLength(1);
     expect(screen.getByRole('list', { name: 'Legend' })).toHaveTextContent('Complete 1');

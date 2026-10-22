@@ -66,7 +66,9 @@ describe.skipIf(!hasPython)('spam filter against CPython', () => {
     { keywords: 'win, cheap, money', threshold: 0, email: 'cheap money now now now' },
   ];
   it.each(states)('prints what the readout says for %o', (s) => {
-    const out = runPython(fillTemplate(SPAM_SOURCE, spamSlots(s))).trim().split('\n');
+    const out = runPython(fillTemplate(SPAM_SOURCE, spamSlots(s)))
+      .trim()
+      .split('\n');
     const r = computeSpam(s);
     expect(out).toEqual([r.rule.email ? 'True' : 'False', r.learned.email ? 'True' : 'False']);
   });

@@ -1,0 +1,165 @@
+import { experiment, nearestAverage, rlEdges, rlNodes } from './code';
+import { predictExercise, questions } from './quiz';
+
+<Section kind="intuition" title="What kind of examples do you have?">
+
+The spam filter learned from emails that people had marked spam or ham. Those marks are
+<Term id="label">labels</Term>: the answer we want the model to give. Whether you have labels, and what kind of
+feedback you get, sorts almost every ML problem into one of three families.
+
+| Family | What the program gets | What it learns | Example |
+|---|---|---|---|
+| <Term id="supervised-learning">Supervised</Term> | Examples with the right answer (features and labels) | To predict the label of new examples | Penguin bill size → species |
+| <Term id="unsupervised-learning">Unsupervised</Term> | Examples without answers (features only) | Structure: groups, or simpler descriptions | Group customers who buy similar things |
+| <Term id="reinforcement-learning">Reinforcement</Term> | Rewards for actions it takes | Which actions lead to the most reward | A program learning to play a game |
+
+Supervised problems come in two kinds. When the label is a category (spam or ham, a species), it is
+**classification**. When the label is a number (a house price, a temperature), it is **regression**.
+
+</Section>
+
+<Section kind="technical" title="The same penguins, with and without labels">
+
+The visual below uses real measurements of 342 penguins from three species on islands near Palmer Station,
+Antarctica. Each penguin has two <Term id="feature">features</Term>, both in millimetres: bill length and bill
+depth.
+
+**Supervised (labels known).** Training computes each species' average bill from the labeled penguins:
+
+| Species | Penguins | Average bill length | Average bill depth |
+|---|---|---|---|
+| Adelie | 151 | 38.8 mm | 18.3 mm |
+| Chinstrap | 68 | 48.8 mm | 18.4 mm |
+| Gentoo | 123 | 47.5 mm | 15.0 mm |
+
+The <Term id="model">model</Term> is just these three averages. To classify a new penguin, find the closest average.
+For a bill of 45.0 mm by 14.5 mm, the squared distance to the Gentoo average is
+$(45.0 - 47.5)^2 + (14.5 - 15.0)^2 \approx 6.5$, far smaller than to Adelie ($\approx 53$) or Chinstrap
+($\approx 30$), so the prediction is Gentoo. This is called a nearest-centroid classifier.
+
+**Unsupervised (labels hidden).** Now the program sees only the 342 bills. k-means looks for $k$ groups:
+
+1. Pick $k$ starting centers. Here: the penguin closest to the overall average, then repeatedly the penguin
+   farthest from every center chosen so far.
+2. Put each penguin in the group of its nearest center.
+3. Move each center to the average of its group.
+4. Repeat steps 2 and 3 until no penguin changes group.
+
+The groups it finds are called clusters. Only afterwards do we look at the species to see how they compare. With
+$k = 3$, one cluster of 141 penguins holds 140 Adelies, but the other two mix Gentoo and Chinstrap penguins:
+k-means groups bills that are close together, and these two species' bill lengths overlap. A cluster is a group,
+not a name; a person has to decide what it means.
+
+**Reinforcement.** There is no fixed dataset at all. An agent acts, the environment responds with a new
+situation and a reward, and the agent learns which actions earn the most reward over time.
+
+<FlowDiagram title="The reinforcement learning loop" nodes={rlNodes} edges={rlEdges} caption="The agent acts; the environment answers with its new state and a reward. Learning means adjusting the agent so its actions earn more reward over time." />
+
+<Callout kind="simplification">
+  The families blur in practice. Large language models are first trained on raw text by predicting the next
+  word (the text supplies its own labels, which is called self-supervised learning), then tuned with human
+  feedback using reinforcement learning. The three families are still the right first question to ask.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Predict a species, or find groups">
+
+Switch between the two setups and move the new penguin with the sliders. In the supervised view, the crosses are
+the species averages and the prediction is the closest one. In the unsupervised view, the crosses are cluster
+centers, and you can change how many clusters k-means looks for.
+
+<Experiment def={experiment} title="Labels or no labels">
+  <LearningSetups />
+  <Readout />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="Supervised learning in a few lines of Python">
+
+This is the supervised setup with only six labeled penguins (real rows from the dataset). Training computes an
+average bill per species; inference returns the species whose average is closest. Run it, then try your own
+measurements in the `predict` calls.
+
+<PythonRunner example={nearestAverage} title="nearest_average.py" />
+
+With six penguins the averages differ from the ones above (Gentoo 48.05 mm by 14.75 mm instead of 47.5 by
+15.0), but both still classify a 45.0 by 14.5 mm bill as Gentoo.
+
+</Section>
+
+<Section kind="experiment" title="Things to try">
+
+In the visual above:
+
+- In the supervised view, set the bill to 44 mm by 18.5 mm: the prediction is Chinstrap. Lower the depth to 18 mm
+  and it becomes Gentoo; set the length to 43.5 mm instead and it becomes Adelie. Penguins near this point are the
+  ones a classifier gets wrong.
+- Switch to the unsupervised view with $k = 2$. k-means splits the penguins into short-billed and long-billed
+  groups: 146 of the 158 penguins in the first cluster are Adelies.
+- Set $k = 4$. One cluster is now mostly Chinstrap (38 of 49). More clusters can find finer structure, but
+  nothing tells k-means which $k$ is "right".
+
+</Section>
+
+<Section kind="mistakes" title="Calling a problem unsupervised because labels are hard to get">
+
+<Callout kind="warning">
+  If what you want the model to output is a known answer for each example (fraud or not, a price, a diagnosis),
+  the problem is supervised, even if you do not have the labels yet. Running clustering instead does not produce
+  those answers: the clusters it finds may not line up with fraud at all, as k-means' clusters did not line up
+  with the penguin species. The usual fix is to label some examples.
+</Callout>
+
+<Callout kind="warning">
+  Cluster numbers carry no meaning. "Cluster 1" is not "Adelie", and running k-means with other starting
+  centers can number the same groups differently.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Sorting real problems">
+
+| Problem | Family | Why |
+|---|---|---|
+| Will this customer cancel next month? | Supervised (classification) | Past customers show who cancelled |
+| How many units will sell next week? | Supervised (regression) | Past weeks show what sold |
+| Which support tickets are about the same issue? | Unsupervised | Nobody has grouped them |
+| Which ad to show to earn the most clicks over time | Reinforcement | Each choice gets feedback (a click or not) |
+
+Most ML in industry is supervised, and most of this track is too:
+[Linear regression](#/learn/ml/classical/linear-regression) and
+[logistic regression](#/learn/ml/classical/logistic-regression) are supervised, and
+[k-means and PCA](#/learn/ml/classical/clustering-dimred) are unsupervised.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Write the prediction step">
+
+<MiniExercise exercise={predictExercise}>
+  Write `predict(x, y, averages)`, where `averages` maps a species name to its average `(bill length, bill depth)`.
+  Return the species whose average is closest to `(x, y)`. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Supervised learning uses labeled examples to predict labels: classification for categories, regression for
+  numbers.
+- Unsupervised learning finds structure in unlabeled examples. Its groups need not match the categories you
+  care about.
+- Reinforcement learning learns from rewards for actions it takes.
+- The first question about any ML problem: what examples, and what feedback, do you have?
+
+Next: [Python: values, variables, types, printing](#/learn/ml/foundations/python-basics) starts the Python you
+need to build these yourself.
+
+</Section>

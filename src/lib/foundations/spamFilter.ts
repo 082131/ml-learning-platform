@@ -140,7 +140,8 @@ export function computeSpam(s: SpamState): SpamResult {
 export const pyBool = (b: boolean) => (b ? 'True' : 'False');
 
 /** The keywords as a Python set literal, for the code slot: {"free", "prize"}. */
-export const pySet = (items: string[]) => (items.length ? `{${items.map((w) => `"${w}"`).join(', ')}}` : 'set()');
+export const pySet = (items: string[]) =>
+  items.length ? `{${items.map((w) => `"${w}"`).join(', ')}}` : 'set()';
 
 const of = (n: number, total: number) => `${n} of ${total} (${Math.round((100 * n) / total)}%)`;
 

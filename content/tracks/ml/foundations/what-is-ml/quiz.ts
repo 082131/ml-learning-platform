@@ -73,12 +73,14 @@ export const questions: QuizQuestion[] = [
       {
         text: 'They are three names for the same thing',
         correct: false,
-        explain: 'A hand-written spam rule is AI but not ML, and the word-score filter is ML but not deep learning.',
+        explain:
+          'A hand-written spam rule is AI but not ML, and the word-score filter is ML but not deep learning.',
       },
       {
         text: 'Machine learning is part of deep learning',
         correct: false,
-        explain: 'It is the other way round: deep learning is machine learning with many-layered neural networks.',
+        explain:
+          'It is the other way round: deep learning is machine learning with many-layered neural networks.',
       },
     ],
   },
