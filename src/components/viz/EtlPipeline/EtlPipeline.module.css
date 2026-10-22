@@ -1,0 +1,49 @@
+.wrap {
+  min-width: 0;
+}
+.fate {
+  font-weight: 600;
+}
+.clean,
+.quarantined {
+  color: var(--ok);
+}
+.failed {
+  color: var(--err);
+}
+.loaded-wrong {
+  color: var(--warn);
+}
+.scroll {
+  overflow-x: auto;
+  margin-bottom: var(--s-6);
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+}
+.table caption {
+  padding-bottom: var(--s-1);
+  color: var(--ink-2);
+  text-align: left;
+  font-family: var(--font-sans);
+}
+.table th,
+.table td {
+  padding: var(--s-1) var(--s-2);
+  border: 1px solid var(--line);
+  text-align: left;
+  white-space: nowrap;
+  font-weight: 400;
+}
+.table thead th {
+  color: var(--ink-2);
+}
+.injected {
+  background: var(--accent-soft);
+}
+.injected td {
+  font-weight: 600;
+}

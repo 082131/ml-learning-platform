@@ -1,0 +1,188 @@
+import { eltSql, eltUnvalidated, etlPython, pipeline, validateRunner } from './code';
+import { questions, splitExercise } from './quiz';
+
+<Section kind="intuition" title="Checking deliveries at the door or in the storeroom">
+
+A shop's orders arrive every night as a CSV export, and a pipeline copies them into the
+<Term id="data-warehouse">data warehouse</Term> where the revenue report reads them. Most nights the file is fine.
+Some nights one row has an amount written as `12,50`, or a country written `UK` instead of `GB`, or the same
+order twice.
+
+There are two places to deal with that. You can check and clean every row in the pipeline and load only clean
+rows: that is <Term id="etl">ETL</Term>, extract, transform, load. Or you can load the file exactly as it came and
+clean it with SQL inside the warehouse: that is <Term id="elt">ELT</Term>, extract, load, transform. It is like
+checking deliveries at the door or unloading everything into the storeroom and sorting it there.
+
+Either way, the important decision is what happens to a bad row. A good pipeline neither crashes on it nor lets it
+through: it sets it aside in a <Term id="quarantine">quarantine</Term>, with the reason, and loads the rest.
+
+</Section>
+
+<Section kind="technical" title="Two orders of the same three steps">
+
+Each nightly batch has six records with five text fields: `order_id`, `email`, `amount`, `country` and
+`ordered_at`. The five good records give this revenue per country:
+
+| country | orders | revenue |
+| --- | --- | --- |
+| GB | 1001 (30.00), 1005 (20.00) | 30.00 + 20.00 = 50.00 |
+| NO | 1003 (12.00), 1006 (15.00) | 12.00 + 15.00 = 27.00 |
+| US | 1002 (45.50), 1004 (8.25) | 45.50 + 8.25 = 53.75 |
+
+**ETL.** Python reads the CSV, checks each row, converts the text to typed values, and inserts only the
+converted rows into the warehouse table `orders`. The warehouse never sees raw data.
+
+**ELT.** Python reads the CSV and inserts the rows unchanged, as text, into `raw_orders`. SQL inside the
+warehouse then checks and converts them into `orders`. The raw copy stays, so a corrected rule can be rerun
+without extracting again.
+
+| | ETL | ELT |
+| --- | --- | --- |
+| Transform runs in | pipeline code (Python here) | the warehouse (SQL here) |
+| Raw data in the warehouse | no | yes, in `raw_orders` |
+| Reprocess after a fix | extract again | rerun the SQL |
+| Bad data can reach the warehouse | only if validation misses it | always in `raw_orders`; in `orders` if validation misses it |
+
+**Validation rules.** A <Term id="validation-rule">validation rule</Term> is a check every record must pass. The
+lesson uses one of each common kind, applied in this order, and a row is quarantined with the first one it breaks:
+
+1. **Required:** no field is empty. (CSV has no NULL; a missing value arrives as an empty string.)
+2. **Format:** `amount` is digits with an optional decimal part, so `12,50` and `-20.00` fail.
+3. **Range:** `amount` is at most 1000, the shop's largest allowed order, so `4550` fails.
+4. **Allowed values:** `country` is one of GB, US, NO, DE, FR.
+5. **Format:** `email` has text on both sides of an `@`.
+6. **Parse:** `ordered_at` is a valid timestamp, so month 13 fails.
+7. **Uniqueness:** no `order_id` appears twice in the batch. Both copies are quarantined, because nothing says
+   which one is right.
+
+**Without rules,** what a bad value does depends on the tool that meets it. Python's `float("12,50")` raises
+`ValueError` and stops the batch. SQLite's `CAST('12,50' AS REAL)` returns `12.0`, its longest numeric prefix,
+with no error. A crash is loud and annoying; a silently wrong number is worse, because every report built on it is
+wrong and nobody is told.
+
+<Callout kind="simplification">
+  Real pipelines rarely fail a whole batch for one row, and real warehouses (BigQuery, Snowflake, DuckDB) have
+  stricter casts than SQLite: most raise an error on `'12,50'`, and offer a `TRY_CAST` or `SAFE_CAST` that
+  returns NULL instead. SQLite's lenient cast is used here because it is the database these results come from,
+  and because lenient conversion is a real hazard in CSV and spreadsheet data.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Inject a bad record">
+
+Pick ETL or ELT, choose what to inject into record 1006, and switch validation on or off. The diagram marks
+each step with its status in words and a symbol, and the table shows where every record ended up.
+
+<Experiment def={pipeline} title="The nightly orders pipeline">
+  <EtlPipeline />
+  <Readout title="What the warehouse contains" />
+</Experiment>
+
+Things to try:
+
+- Inject the decimal comma with validation off, in ETL and then in ELT. One crashes, one loads `12.0`.
+- Inject the amount in cents with validation off. Nothing fails, and NO's revenue becomes 4562.0.
+- Inject the duplicate with validation off. Both modes fail when inserting into `orders`, whose primary key
+  forbids it; with validation on, both copies of 1002 are quarantined and US revenue drops to 8.25.
+
+</Section>
+
+<Section kind="code" title="The rules in Python (ETL) and in SQL (ELT)">
+
+The ETL version: `validate` routes each row, and `transform` converts the rows that passed. Hover over, focus or
+select a highlighted line to see what it does.
+
+<Code example={etlPython} title="etl.py" />
+
+Run it on three rows, one valid and two not. It uses only Python's standard library.
+
+<PythonRunner example={validateRunner} title="validate_demo.py" />
+
+The ELT version applies the same rules in the same order, as SQL over `raw_orders`:
+
+<Code example={eltSql} title="elt.sql" />
+
+Without the view, the ELT transform is a single statement, and nothing stands between a bad value and `orders`:
+
+<Code example={eltUnvalidated} title="elt_unvalidated.sql" />
+
+</Section>
+
+<Section kind="mistakes" title="Silent conversions and dropped rows">
+
+<CommonMistake
+  title="Trusting a cast to reject bad text"
+  wrong={"INSERT INTO orders\nSELECT CAST(order_id AS INTEGER), email, CAST(amount AS REAL), country, ordered_at\nFROM raw_orders;  -- amount is '12,50' in one row"}
+  error="(no error: the row is stored with amount 12.0)"
+  cause="SQLite's CAST to REAL converts the longest numeric prefix of the text, '12', and ignores the rest. Many tools convert leniently like this, including spreadsheet imports."
+  fix={"-- validate first, then cast only rows that passed\nINSERT INTO orders SELECT ... FROM checked_orders WHERE reason IS NULL;"}
+/>
+
+<CommonMistake
+  title="Converting before validating"
+  wrong={"loaded = [transform(row) for row in rows]  # one row has amount '12,50'"}
+  error="ValueError: could not convert string to float: '12,50'"
+  cause="One bad row raises inside the list comprehension, so no row is loaded at all. The good rows are blocked by the bad one."
+  fix={"valid, quarantine = validate(rows)\nloaded = [transform(row) for row in valid]"}
+/>
+
+<CommonMistake
+  title="Dropping invalid rows instead of quarantining them"
+  wrong={"rows = [row for row in rows if problem(row, id_counts) is None]"}
+  error="(no error: the bad rows are gone, and so is any record of them)"
+  cause="Nobody can count, inspect or replay what was dropped. A source that starts sending 30% bad rows looks exactly like a quiet night."
+  fix={"valid, quarantine = validate(rows)  # keep quarantine, with reasons, and alert on its size"}
+/>
+
+<Callout kind="warning">
+  A NOT NULL column does not catch empty strings. `''` is a value, not NULL, so the empty-email record loads into
+  `orders` without complaint when validation is off.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Choosing between them">
+
+- **ELT** is the common default with cloud warehouses: loading raw data is cheap, SQL transforms are easy to
+  version and rerun (tools such as dbt are built around this), and the raw copy is there when a rule was wrong.
+- **ETL** fits when raw data must not reach the warehouse at all, for example personal data that has to be removed
+  or masked first, or when the transform needs code SQL cannot express.
+- **Either way,** count what each run quarantines and alert when it jumps. The rules catch bad rows; the count tells
+  you when a source has changed.
+
+For ML, the same rules protect training data: a feature with values in cents for one week, or a category spelled
+two ways, trains a model on noise. [Data quality, lineage and observability](#/learn/data/quality/observability-testing)
+turns these checks into tests that run on every pipeline run.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Route rows to a quarantine">
+
+<MiniExercise exercise={splitExercise}>
+  Write `split(rows, check)`. `check(row)` returns `None` for a valid row or a reason string for an invalid one.
+  Return `(valid, quarantine)`: valid rows unchanged, and each invalid row as a new dict with its values plus a
+  `"reason"` key. Do not change the input rows. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- ETL transforms in pipeline code before loading; ELT loads raw data and transforms it inside the warehouse.
+- Validation rules cover required fields, formats, ranges, allowed values and uniqueness. Each catches only what it
+  tests.
+- Without rules a bad value either crashes the batch (`float("12,50")`) or loads silently wrong
+  (`CAST('12,50' AS REAL)` is `12.0`).
+- Quarantine failing rows with a reason and load the rest; never drop them silently.
+
+Next: [Batch vs stream processing](#/learn/data/processing/batch-vs-stream) looks at when a pipeline runs: once a
+night, or on every event as it arrives.
+
+</Section>

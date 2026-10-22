@@ -142,7 +142,7 @@ export const tracks: Track[] = [
         id: 'etl',
         title: 'ETL and ELT',
         level: 'intermediate',
-        lessons: [{ id: 'data/etl/etl-vs-elt', status: 'outline' }],
+        lessons: [{ id: 'data/etl/etl-vs-elt', status: 'written' }],
       },
       {
         id: 'processing',

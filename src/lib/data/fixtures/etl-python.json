@@ -1,0 +1,558 @@
+{
+  "etl,none,on": {
+    "raw": 0,
+    "loaded": 6,
+    "stored": [
+      [1001, 30.0],
+      [1002, 45.5],
+      [1003, 12.0],
+      [1004, 8.25],
+      [1005, 20.0],
+      [1006, 15.0]
+    ],
+    "quarantine": [],
+    "error": null,
+    "revenue": [
+      ["GB", 50.0],
+      ["NO", 27.0],
+      ["US", 53.75]
+    ]
+  },
+  "etl,none,off": {
+    "raw": 0,
+    "loaded": 6,
+    "stored": [
+      [1001, 30.0],
+      [1002, 45.5],
+      [1003, 12.0],
+      [1004, 8.25],
+      [1005, 20.0],
+      [1006, 15.0]
+    ],
+    "quarantine": [],
+    "error": null,
+    "revenue": [
+      ["GB", 50.0],
+      ["NO", 27.0],
+      ["US", 53.75]
+    ]
+  },
+  "etl,missing-email,on": {
+    "raw": 0,
+    "loaded": 5,
+    "stored": [
+      [1001, 30.0],
+      [1002, 45.5],
+      [1003, 12.0],
+      [1004, 8.25],
+      [1005, 20.0]
+    ],
+    "quarantine": [["1006", "missing field"]],
+    "error": null,
+    "revenue": [
+      ["GB", 50.0],
+      ["NO", 12.0],
+      ["US", 53.75]
+    ]
+  },
+  "etl,missing-email,off": {
+    "raw": 0,
+    "loaded": 6,
+    "stored": [
+      [1001, 30.0],
+      [1002, 45.5],
+      [1003, 12.0],
+      [1004, 8.25],
+      [1005, 20.0],
+      [1006, 15.0]
+    ],
+    "quarantine": [],
+    "error": null,
+    "revenue": [
+      ["GB", 50.0],
+      ["NO", 27.0],
+      ["US", 53.75]
+    ]
+  },
+  "etl,negative,on": {
+    "raw": 0,
+    "loaded": 5,
+    "stored": [
+      [1001, 30.0],
+      [1002, 45.5],
+      [1003, 12.0],
+      [1004, 8.25],
+      [1005, 20.0]
+    ],
+    "quarantine": [["1006", "amount is not a decimal number"]],
+    "error": null,
+    "revenue": [
+      ["GB", 50.0],
+      ["NO", 12.0],
+      ["US", 53.75]
+    ]
+  },
+  "etl,negative,off": {
+    "raw": 0,
+    "loaded": 6,
+    "stored": [
+      [1001, 30.0],
+      [1002, 45.5],
+      [1003, 12.0],
+      [1004, 8.25],
+      [1005, 20.0],
+      [1006, -20.0]
+    ],
+    "quarantine": [],
+    "error": null,
+    "revenue": [
+      ["GB", 50.0],
+      ["NO", -8.0],
+      ["US", 53.75]
+    ]
+  },
+  "etl,comma,on": {
+    "raw": 0,
+    "loaded": 5,
+    "stored": [
+      [1001, 30.0],
+      [1002, 45.5],
+      [1003, 12.0],
+      [1004, 8.25],
+      [1005, 20.0]
+    ],
+    "quarantine": [["1006", "amount is not a decimal number"]],
+    "error": null,
+    "revenue": [
+      ["GB", 50.0],
+      ["NO", 12.0],
+      ["US", 53.75]
+    ]
+  },
+  "etl,comma,off": {
+    "raw": 0,
+    "loaded": 0,
+    "stored": [],
+    "quarantine": [],
+    "error": ["transform", "ValueError: could not convert string to float: '12,50'"],
+    "revenue": []
+  },
+  "etl,cents,on": {
+    "raw": 0,
+    "loaded": 5,
+    "stored": [
+      [1001, 30.0],
+      [1002, 45.5],
+      [1003, 12.0],
+      [1004, 8.25],
+      [1005, 20.0]
+    ],
+    "quarantine": [["1006", "amount above 1000"]],
+    "error": null,
+    "revenue": [
+      ["GB", 50.0],
+      ["NO", 12.0],
+      ["US", 53.75]
+    ]
+  },
+  "etl,cents,off": {
+    "raw": 0,
+    "loaded": 6,
+    "stored": [
+      [1001, 30.0],
+      [1002, 45.5],
+      [1003, 12.0],
+      [1004, 8.25],
+      [1005, 20.0],
+      [1006, 4550.0]
+    ],
+    "quarantine": [],
+    "error": null,
+    "revenue": [
+      ["GB", 50.0],
+      ["NO", 4562.0],
+      ["US", 53.75]
+    ]
+  },
+  "etl,country,on": {
+    "raw": 0,
+    "loaded": 5,
+    "stored": [
+      [1001, 30.0],
+      [1002, 45.5],
+      [1003, 12.0],
+      [1004, 8.25],
+      [1005, 20.0]
+    ],
+    "quarantine": [["1006", "unknown country code"]],
+    "error": null,
+    "revenue": [
+      ["GB", 50.0],
+      ["NO", 12.0],
+      ["US", 53.75]
+    ]
+  },
+  "etl,country,off": {
+    "raw": 0,
+    "loaded": 6,
+    "stored": [
+      [1001, 30.0],
+      [1002, 45.5],
+      [1003, 12.0],
+      [1004, 8.25],
+      [1005, 20.0],
+      [1006, 15.0]
+    ],
+    "quarantine": [],
+    "error": null,
+    "revenue": [
+      ["GB", 50.0],
+      ["NO", 12.0],
+      ["UK", 15.0],
+      ["US", 53.75]
+    ]
+  },
+  "etl,date,on": {
+    "raw": 0,
+    "loaded": 5,
+    "stored": [
+      [1001, 30.0],
+      [1002, 45.5],
+      [1003, 12.0],
+      [1004, 8.25],
+      [1005, 20.0]
+    ],
+    "quarantine": [["1006", "ordered_at is not a valid timestamp"]],
+    "error": null,
+    "revenue": [
+      ["GB", 50.0],
+      ["NO", 12.0],
+      ["US", 53.75]
+    ]
+  },
+  "etl,date,off": {
+    "raw": 0,
+    "loaded": 0,
+    "stored": [],
+    "quarantine": [],
+    "error": ["transform", "ValueError: month must be in 1..12"],
+    "revenue": []
+  },
+  "etl,duplicate,on": {
+    "raw": 0,
+    "loaded": 4,
+    "stored": [
+      [1001, 30.0],
+      [1003, 12.0],
+      [1004, 8.25],
+      [1005, 20.0]
+    ],
+    "quarantine": [
+      ["1002", "duplicate order_id"],
+      ["1002", "duplicate order_id"]
+    ],
+    "error": null,
+    "revenue": [
+      ["GB", 50.0],
+      ["NO", 12.0],
+      ["US", 8.25]
+    ]
+  },
+  "etl,duplicate,off": {
+    "raw": 0,
+    "loaded": 0,
+    "stored": [],
+    "quarantine": [],
+    "error": ["load", "IntegrityError: UNIQUE constraint failed: orders.order_id"],
+    "revenue": []
+  },
+  "elt,none,on": {
+    "raw": 6,
+    "loaded": 6,
+    "stored": [
+      [1001, 30.0],
+      [1002, 45.5],
+      [1003, 12.0],
+      [1004, 8.25],
+      [1005, 20.0],
+      [1006, 15.0]
+    ],
+    "quarantine": [],
+    "error": null,
+    "revenue": [
+      ["GB", 50.0],
+      ["NO", 27.0],
+      ["US", 53.75]
+    ]
+  },
+  "elt,none,off": {
+    "raw": 6,
+    "loaded": 6,
+    "stored": [
+      [1001, 30.0],
+      [1002, 45.5],
+      [1003, 12.0],
+      [1004, 8.25],
+      [1005, 20.0],
+      [1006, 15.0]
+    ],
+    "quarantine": [],
+    "error": null,
+    "revenue": [
+      ["GB", 50.0],
+      ["NO", 27.0],
+      ["US", 53.75]
+    ]
+  },
+  "elt,missing-email,on": {
+    "raw": 6,
+    "loaded": 5,
+    "stored": [
+      [1001, 30.0],
+      [1002, 45.5],
+      [1003, 12.0],
+      [1004, 8.25],
+      [1005, 20.0]
+    ],
+    "quarantine": [["1006", "missing field"]],
+    "error": null,
+    "revenue": [
+      ["GB", 50.0],
+      ["NO", 12.0],
+      ["US", 53.75]
+    ]
+  },
+  "elt,missing-email,off": {
+    "raw": 6,
+    "loaded": 6,
+    "stored": [
+      [1001, 30.0],
+      [1002, 45.5],
+      [1003, 12.0],
+      [1004, 8.25],
+      [1005, 20.0],
+      [1006, 15.0]
+    ],
+    "quarantine": [],
+    "error": null,
+    "revenue": [
+      ["GB", 50.0],
+      ["NO", 27.0],
+      ["US", 53.75]
+    ]
+  },
+  "elt,negative,on": {
+    "raw": 6,
+    "loaded": 5,
+    "stored": [
+      [1001, 30.0],
+      [1002, 45.5],
+      [1003, 12.0],
+      [1004, 8.25],
+      [1005, 20.0]
+    ],
+    "quarantine": [["1006", "amount is not a decimal number"]],
+    "error": null,
+    "revenue": [
+      ["GB", 50.0],
+      ["NO", 12.0],
+      ["US", 53.75]
+    ]
+  },
+  "elt,negative,off": {
+    "raw": 6,
+    "loaded": 6,
+    "stored": [
+      [1001, 30.0],
+      [1002, 45.5],
+      [1003, 12.0],
+      [1004, 8.25],
+      [1005, 20.0],
+      [1006, -20.0]
+    ],
+    "quarantine": [],
+    "error": null,
+    "revenue": [
+      ["GB", 50.0],
+      ["NO", -8.0],
+      ["US", 53.75]
+    ]
+  },
+  "elt,comma,on": {
+    "raw": 6,
+    "loaded": 5,
+    "stored": [
+      [1001, 30.0],
+      [1002, 45.5],
+      [1003, 12.0],
+      [1004, 8.25],
+      [1005, 20.0]
+    ],
+    "quarantine": [["1006", "amount is not a decimal number"]],
+    "error": null,
+    "revenue": [
+      ["GB", 50.0],
+      ["NO", 12.0],
+      ["US", 53.75]
+    ]
+  },
+  "elt,comma,off": {
+    "raw": 6,
+    "loaded": 6,
+    "stored": [
+      [1001, 30.0],
+      [1002, 45.5],
+      [1003, 12.0],
+      [1004, 8.25],
+      [1005, 20.0],
+      [1006, 12.0]
+    ],
+    "quarantine": [],
+    "error": null,
+    "revenue": [
+      ["GB", 50.0],
+      ["NO", 24.0],
+      ["US", 53.75]
+    ]
+  },
+  "elt,cents,on": {
+    "raw": 6,
+    "loaded": 5,
+    "stored": [
+      [1001, 30.0],
+      [1002, 45.5],
+      [1003, 12.0],
+      [1004, 8.25],
+      [1005, 20.0]
+    ],
+    "quarantine": [["1006", "amount above 1000"]],
+    "error": null,
+    "revenue": [
+      ["GB", 50.0],
+      ["NO", 12.0],
+      ["US", 53.75]
+    ]
+  },
+  "elt,cents,off": {
+    "raw": 6,
+    "loaded": 6,
+    "stored": [
+      [1001, 30.0],
+      [1002, 45.5],
+      [1003, 12.0],
+      [1004, 8.25],
+      [1005, 20.0],
+      [1006, 4550.0]
+    ],
+    "quarantine": [],
+    "error": null,
+    "revenue": [
+      ["GB", 50.0],
+      ["NO", 4562.0],
+      ["US", 53.75]
+    ]
+  },
+  "elt,country,on": {
+    "raw": 6,
+    "loaded": 5,
+    "stored": [
+      [1001, 30.0],
+      [1002, 45.5],
+      [1003, 12.0],
+      [1004, 8.25],
+      [1005, 20.0]
+    ],
+    "quarantine": [["1006", "unknown country code"]],
+    "error": null,
+    "revenue": [
+      ["GB", 50.0],
+      ["NO", 12.0],
+      ["US", 53.75]
+    ]
+  },
+  "elt,country,off": {
+    "raw": 6,
+    "loaded": 6,
+    "stored": [
+      [1001, 30.0],
+      [1002, 45.5],
+      [1003, 12.0],
+      [1004, 8.25],
+      [1005, 20.0],
+      [1006, 15.0]
+    ],
+    "quarantine": [],
+    "error": null,
+    "revenue": [
+      ["GB", 50.0],
+      ["NO", 12.0],
+      ["UK", 15.0],
+      ["US", 53.75]
+    ]
+  },
+  "elt,date,on": {
+    "raw": 6,
+    "loaded": 5,
+    "stored": [
+      [1001, 30.0],
+      [1002, 45.5],
+      [1003, 12.0],
+      [1004, 8.25],
+      [1005, 20.0]
+    ],
+    "quarantine": [["1006", "ordered_at is not a valid timestamp"]],
+    "error": null,
+    "revenue": [
+      ["GB", 50.0],
+      ["NO", 12.0],
+      ["US", 53.75]
+    ]
+  },
+  "elt,date,off": {
+    "raw": 6,
+    "loaded": 6,
+    "stored": [
+      [1001, 30.0],
+      [1002, 45.5],
+      [1003, 12.0],
+      [1004, 8.25],
+      [1005, 20.0],
+      [1006, 15.0]
+    ],
+    "quarantine": [],
+    "error": null,
+    "revenue": [
+      ["GB", 50.0],
+      ["NO", 27.0],
+      ["US", 53.75]
+    ]
+  },
+  "elt,duplicate,on": {
+    "raw": 6,
+    "loaded": 4,
+    "stored": [
+      [1001, 30.0],
+      [1003, 12.0],
+      [1004, 8.25],
+      [1005, 20.0]
+    ],
+    "quarantine": [
+      ["1002", "duplicate order_id"],
+      ["1002", "duplicate order_id"]
+    ],
+    "error": null,
+    "revenue": [
+      ["GB", 50.0],
+      ["NO", 12.0],
+      ["US", 8.25]
+    ]
+  },
+  "elt,duplicate,off": {
+    "raw": 6,
+    "loaded": 0,
+    "stored": [],
+    "quarantine": [],
+    "error": ["transform", "IntegrityError: UNIQUE constraint failed: orders.order_id"],
+    "revenue": []
+  }
+}
