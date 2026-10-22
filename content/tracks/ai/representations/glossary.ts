@@ -44,13 +44,4 @@ export default [
     introducedIn: 'ai/representations/tokens-embeddings',
     aliases: ['text embedding', 'embedding model'],
   },
-  {
-    id: 'cosine-similarity',
-    term: 'Cosine similarity',
-    short:
-      'The cosine of the angle between two vectors: their dot product divided by the product of their lengths. It ranges from −1 to 1.',
-    long: '1 means the vectors point the same way, 0 means they are perpendicular. Length doesn’t matter, so for vectors scaled to length 1 the cosine similarity equals the dot product.',
-    introducedIn: 'ai/representations/tokens-embeddings',
-    aliases: ['cosine'],
-  },
 ] satisfies GlossaryTerm[];
