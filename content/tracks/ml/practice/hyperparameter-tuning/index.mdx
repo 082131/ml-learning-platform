@@ -1,0 +1,196 @@
+import { experiment, tuningCode, tuningRunner, tuningStages } from './code';
+import { questions, randomSearchExercise } from './quiz';
+
+<Section kind="intuition" title="Tuning a radio with a limited number of tries">
+
+You are tuning an old radio with two knobs: frequency and tone. Frequency decides whether you hear the station at
+all; tone barely changes anything. You may try nine positions. If you try three frequencies, each with three tone
+settings, you have spent six of your nine tries on tone and tested only three frequencies. If instead you turn both
+knobs to a fresh random position every time, you test nine frequencies.
+
+Training a model has the same shape. A <Term id="parameter">parameter</Term> such as a weight is learned during
+training; a hyperparameter, such as the learning rate or the dropout rate, is chosen before training and stays
+fixed during it. <Term id="hyperparameter-search">Hyperparameter search</Term> tries several settings, trains a
+model for each, and keeps the one with the best validation score. Each try is a full training run, so tries are
+expensive, and how you spend them matters.
+
+</Section>
+
+<Section kind="technical" title="Grid search, random search and early stopping">
+
+**The objective.** For a setting $\theta$ (here a learning rate and a dropout rate), a trial trains a model and
+returns its validation loss $L(\theta)$. Search wants $\theta^\star = \arg\min_\theta L(\theta)$ using as few
+trials as possible. $L$ has no formula and no gradient you can use: every evaluation is a training run.
+
+In this lesson $L$ is replaced by a **known function**, so you can see the truth that a real search never shows:
+
+$$
+L(\ell, d) = 0.3 + 0.5\left(1 - e^{-(\ell + 1.9)^2 / 0.245}\right) + 0.04\left(\frac{d - 0.2}{0.25}\right)^2
+$$
+
+where $\ell = \log_{10}(\text{learning rate}) \in [-4, -1]$ and $d$ is the dropout rate in $[0, 0.5]$. The minimum
+$0.3$ is at $\ell = -1.9$ (learning rate $\approx 0.0126$) and $d = 0.2$. The learning-rate term can add up to
+$0.5$; over its whole range, dropout adds at most $0.04 \cdot 1.2^2 = 0.0576$.
+
+**Grid search** tries every combination of $k$ values per hyperparameter: $k^2$ trials for two, $k^h$ for $h$
+hyperparameters. With $k = 3$ the learning rates are $10^{-4}$, $10^{-2.5}$ and $10^{-1}$; none is near
+$10^{-1.9}$, and no number of dropout values can fix that.
+
+**Random search** draws every hyperparameter independently for each trial. Its $k^2$ trials test $k^2$ distinct
+learning rates. When a few hyperparameters matter and the rest barely do, which is common, that is the main reason
+<Term id="random-search">random search</Term> finds better settings for the same budget (Bergstra and Bengio, 2012).
+
+**Log scale.** Rates and regularization strengths are sampled uniformly in their logarithm, so each factor of 10
+gets the same share of trials. Sampling the learning rate uniformly in $[0.0001, 0.1]$ would put 90% of trials
+above $0.01$.
+
+**Early stopping** saves compute inside each trial. After every epoch, compare the validation loss with the best so
+far; stop once it has not improved for $p$ epochs (the patience) and keep the best epoch's model. Validation loss
+is noisy, so $p$ must be longer than the typical noise-driven bump. The lesson's curve is also a stated formula:
+
+$$
+L_t = 0.32 + 0.8\, e^{-t/8} + 0.004\, t + \varepsilon_t, \qquad \varepsilon_t \in [-0.015, 0.015)
+$$
+
+a fast improvement, a slow overfitting drift, and seeded noise.
+
+<Callout kind="simplification">
+  Real tuning adds two things this lesson leaves out. Trials are noisy too: the same config with another seed
+  scores differently (see [experiment tracking](#/learn/ml/practice/experiment-tracking)), so the best trial is
+  optimistic and the top few deserve a re-run over several seeds. And adaptive methods such as Bayesian
+  optimization (which models $L$ from past trials) or successive halving and Hyperband (which give many configs a
+  small budget and only the promising ones more) usually beat plain random search on large budgets.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Where each method looks">
+
+Squares are grid trials, circles are random trials, and the ringed mark is the best of each method. The strips
+under the plot show every learning rate each method actually tried. The lower chart is one training run, stopped
+early.
+
+<Experiment def={experiment} title="Nine trials each" controls={false}>
+  <SearchPlane />
+  <EarlyStoppingChart />
+</Experiment>
+
+With 9 trials, the grid's best loss is 0.6866 at $10^{-2.50}$; random search reaches 0.3023 at $10^{-1.88}$,
+close to the true minimum of 0.3.
+
+</Section>
+
+<Section kind="code" title="Both searches and early stopping in Python">
+
+The program evaluates the known function in place of training runs. The literals on the line
+`k, seed, patience = …` come from the sliders, and the readout shows what the program prints for them.
+
+<Experiment def={experiment} title="tune.py, linked to the plots" controls={false}>
+  <Code example={tuningCode} title="tune.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+Run the complete program in your browser. It needs only Python's standard library.
+
+<PythonRunner example={tuningRunner} title="tune.py (complete)" />
+
+On a real project the same ideas look like this. `train_and_validate` and `log_run` stand for your own training
+and tracking code.
+
+<ProgressiveCode example={tuningStages} title="From hand tuning to a budgeted search" />
+
+</Section>
+
+<Section kind="experiment" title="Budget, luck and patience">
+
+<Experiment def={experiment} title="Tune the tuner">
+  <SearchPlane />
+  <EarlyStoppingChart />
+  <Readout />
+</Experiment>
+
+Things to try:
+
+- Step **k** from 2 to 7. Grid search improves in jumps, whenever a grid line happens to fall near
+  $\ell = -1.9$ ($k = 4$ and $k = 7$ both include $-2.0$). Random search improves more smoothly.
+- Keep $k = 3$ and move the **seed**. Random search's result changes with it: it is better on most seeds, not
+  guaranteed on every one. Report it over several seeds, like any other run.
+- Set **patience** to 1. On seed 0 training stops after epoch 16 and keeps epoch 15, missing the best epoch, 25.
+  Raise it until the readout says the best epoch is kept, and note how many epochs are still saved.
+
+</Section>
+
+<Section kind="mistakes" title="Tuning on the number you report">
+
+<CommonMistake
+  title="Choosing hyperparameters with the test set"
+  wrong={'for config in configs:\n    model = train(config, train_set)\n    scores[config] = evaluate(model, test_set)\nbest = min(scores, key=scores.get)\nprint("test loss:", scores[best])'}
+  error="No error. The reported test loss is too optimistic, by an amount you cannot measure."
+  cause="Picking the minimum over many configs selects for configs that happen to do well on those particular test examples. The test set has become part of training."
+  fix={'for config in configs:\n    model = train(config, train_set)\n    scores[config] = evaluate(model, val_set)   # choose on validation\nbest = min(scores, key=scores.get)\nprint("test loss:", evaluate(train(best, train_set), test_set))  # once, at the end'}
+/>
+
+<CommonMistake
+  title="Sampling a learning rate on a linear scale"
+  wrong={'lr = rng.uniform(0.0001, 0.1)'}
+  error="No error. About 90% of trials use a learning rate above 0.01, and rates below 0.001 are almost never tried."
+  cause="The useful range of a learning rate spans several factors of 10, but a uniform draw spends trials in proportion to the width of each interval, and the top decade is 90% of the width."
+  fix={'lr = 10 ** rng.uniform(-4, -1)   # uniform in log10(lr)'}
+/>
+
+<Callout kind="warning">
+  If the best trial sits at the edge of a range (the smallest learning rate you allowed, say), the optimum may lie
+  outside it. Widen the range and search again before concluding.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Planning a tuning study">
+
+A tuning study on a real model is planned like a budget:
+
+| Decision | A reasonable default |
+| --- | --- |
+| What to tune | the learning rate first; then regularization (weight decay, dropout) and batch size |
+| Ranges and scales | log scale for rates and penalties; linear for fractions such as dropout |
+| Strategy | random search for up to a few dozen trials; Bayesian optimization or Hyperband beyond that |
+| Cost per trial | early stopping, or a shorter schedule to rank configs before full training |
+| Selection | validation score, re-checked over 3 to 5 seeds for the top configs |
+| Reporting | the search space, the budget, every trial's record, and one final test score |
+
+Libraries implement these strategies: scikit-learn has `GridSearchCV` and `RandomizedSearchCV` (with
+`scipy.stats.loguniform` for log-scale sampling), and dedicated tools such as Optuna or Ray Tune add adaptive
+search and trial pruning. Whatever runs the search, log every trial with the record from
+[experiment tracking](#/learn/ml/practice/experiment-tracking).
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Random search on a log scale">
+
+<MiniExercise exercise={randomSearchExercise}>
+  Write `random_search(evaluate, n, seed)`. Sample `n` configs with $\log_{10}(\text{lr})$ uniform in $[-4, -1]$
+  and dropout uniform in $[0, 0.5]$, call `evaluate(config)` once per config, and return `(best_loss,
+  best_config)`. The same seed must give the same result.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Each hyperparameter trial is a full training run; the budget is the number of runs.
+- With the same budget, random search tests more distinct values of each hyperparameter than a grid, which wins
+  when only a few hyperparameters matter.
+- Sample rates on a log scale; widen the range if the best trial sits at its edge.
+- Early stopping keeps the best epoch and saves compute; set the patience longer than the validation noise.
+- Choose on the validation set, re-check the best configs over seeds, and use the test set once.
+
+Next: [Dataset and model versioning](#/learn/ml/practice/versioning) makes the "data" field of a run record exact,
+so a tuned model can be traced back to the rows it was trained on.
+
+</Section>

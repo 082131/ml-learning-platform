@@ -35,4 +35,30 @@ export default [
     introducedIn: 'ml/practice/experiment-tracking',
     aliases: ['run log'],
   },
+  {
+    id: 'hyperparameter-search',
+    term: 'Hyperparameter search',
+    short:
+      'Trying many settings that are fixed before training (learning rate, dropout, depth…) and keeping the one with the best validation score.',
+    long: 'Each trial is a full training run, so the budget is the number of runs. Common strategies are grid search, random search and adaptive methods such as Bayesian optimization or successive halving.',
+    introducedIn: 'ml/practice/hyperparameter-tuning',
+    aliases: ['hyperparameter tuning', 'tuning'],
+  },
+  {
+    id: 'random-search',
+    term: 'Random search',
+    short:
+      'Hyperparameter search that samples each setting at random from a range, for a fixed number of trials.',
+    long: 'With the same budget it tries more distinct values of each hyperparameter than a grid, which matters when only a few hyperparameters are important (Bergstra and Bengio, 2012).',
+    introducedIn: 'ml/practice/hyperparameter-tuning',
+    aliases: ['grid search'],
+  },
+  {
+    id: 'early-stopping',
+    term: 'Early stopping',
+    short:
+      'Ending training when the validation loss has not improved for a set number of epochs (the patience), and keeping the best epoch.',
+    introducedIn: 'ml/practice/hyperparameter-tuning',
+    aliases: ['patience'],
+  },
 ] satisfies GlossaryTerm[];
