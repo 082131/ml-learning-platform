@@ -148,7 +148,7 @@ export const tracks: Track[] = [
         id: 'processing',
         title: 'Batch and stream processing',
         level: 'intermediate',
-        lessons: [{ id: 'data/processing/batch-vs-stream', status: 'outline' }],
+        lessons: [{ id: 'data/processing/batch-vs-stream', status: 'written' }],
       },
       {
         id: 'storage',

@@ -1,0 +1,65 @@
+.wrap {
+  width: 100%;
+  min-width: 0;
+}
+.wrap svg {
+  display: block;
+}
+.band {
+  fill: var(--surface);
+  opacity: 0.7;
+}
+.alt {
+  fill: var(--surface-2);
+}
+.emit {
+  stroke: var(--ok);
+  stroke-width: 3;
+}
+.watermark {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+.batch {
+  stroke: var(--warn);
+  stroke-width: 1.5;
+}
+.counted circle {
+  fill: var(--accent);
+  stroke: var(--accent);
+}
+.open circle {
+  fill: var(--surface);
+  stroke: var(--ink-2);
+  stroke-width: 1.5;
+}
+.dropped path {
+  stroke: var(--err);
+  stroke-width: 2.5;
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2) var(--s-4);
+  margin: var(--s-3) 0 0;
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}
+.key {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+}
+.swatch {
+  display: inline-block;
+  width: 18px;
+  height: 0;
+  border-top: 3px solid;
+}
+.wmSwatch {
+  border-color: var(--accent);
+}
+.emitSwatch {
+  border-color: var(--ok);
+}

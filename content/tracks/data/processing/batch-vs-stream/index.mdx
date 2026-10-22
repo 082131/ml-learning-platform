@@ -1,0 +1,181 @@
+import { batchRunner, sparkStream, stream, streamPython } from './code';
+import { lateExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Counting votes tonight or as they come in">
+
+An election can be counted two ways. You can wait until every ballot is in, including the postal votes that
+arrive days later, and count them all at once: the result is complete, but slow. Or you can report as ballots
+arrive: fast, but some ballots turn up after you have already announced a district, and you must decide whether
+to wait longer or accept that early results are incomplete.
+
+Data pipelines face the same choice. <Term id="batch-processing">Batch processing</Term> runs on a schedule over
+everything that has arrived. <Term id="stream-processing">Stream processing</Term> handles events as they arrive
+and emits results within minutes or seconds. The hard part of streaming is the late ballot: an event that
+happened at 12:02 but reaches the pipeline at 12:11, after events from 12:08.
+
+</Section>
+
+<Section kind="technical" title="Event time, windows and watermarks">
+
+**Two clocks.** Every event has an <Term id="event-time">event time</Term>, when it happened, and a
+<Term id="processing-time">processing time</Term>, when the pipeline received it. A phone that was offline, a
+retry, or a slow network partition makes the gap vary, so events arrive out of order.
+
+The lesson uses 16 page views between 12:00 and 12:30, written as minutes after 12:00 in (event time, arrival
+time) pairs. Most arrive within a minute or two; `(2, 11)` arrives 9 minutes late and `(7, 21)` 14 minutes late.
+
+**Windows.** To count views per five minutes, assign each event to a
+<Term id="tumbling-window">tumbling window</Term> by its event time:
+$\text{start} = \lfloor t / 5 \rfloor \cdot 5$. Event time 8 lands in $[5, 10)$, because
+$\lfloor 8 / 5 \rfloor \cdot 5 = 5$; starts are included and ends excluded.
+
+**Watermarks.** A stream never knows that all events for $[0, 5)$ have arrived. It uses a
+<Term id="watermark">watermark</Term>, an estimate that only moves forward:
+
+$$
+\text{watermark} = \max(\text{event times seen}) - \text{allowed lateness}
+$$
+
+When the watermark reaches a window's end, the window is treated as complete and its count is emitted. An event
+that arrives for an already-emitted window is a <Term id="late-event">late event</Term>.
+
+**Worked example** (5-minute windows, 3 minutes of allowed lateness). Event `(8, 9)` arrives at minute 9 and
+raises the largest event time seen to 8, so the watermark becomes $8 - 3 = 5$. That is the end of $[0, 5)$, so the
+stream emits its count at minute 9: 3 events (1, 3 and 4). At minute 11, `(2, 11)` arrives for $[0, 5)$, which
+is already final, so it is dropped. The true count was 4.
+
+| | Stream | Batch at minute 30 |
+| --- | --- | --- |
+| $[0, 5)$ result | 3 events, emitted at minute 9 | 4 events, ready at 30 |
+| Latency after the window ends | $9 - 5 = 4$ minutes | $30 - 5 = 25$ minutes |
+| Events counted (all windows) | 11 of the 13 in emitted windows; 2 dropped | all 16 |
+
+**The trade-off.** More allowed lateness makes the watermark trail further behind: windows wait longer, so results
+arrive later but fewer events are dropped. Less lateness gives faster, less complete results. A batch job is the
+extreme case: it waits until a fixed time and counts everything that arrived by then.
+
+<Callout kind="simplification">
+  The model drops late events and recomputes the watermark after every single event. Real engines differ: Spark
+  Structured Streaming updates the watermark between micro-batches and only guarantees not to drop data within
+  the delay threshold (later data may or may not be dropped). Engines such as Flink and Beam can also emit a
+  window early and then send corrections when late events arrive, at the cost of keeping state longer.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Watch the watermark close windows">
+
+Each dot is one event, placed by its event time (across) and its arrival time (up). An event below the dashed
+"no delay" line would have arrived before it happened, so every dot sits on or above it; the further above, the
+later it arrived. The blue step line is the watermark: a window is emitted when the watermark crosses its right
+edge, marked by a green bar at that arrival time with the count it emitted.
+
+<Experiment def={stream} title="Batch vs stream on the same events">
+  <EventTimeline />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The stream in Python">
+
+This is the code the visual runs, with your window size and lateness filled in. Hover over, focus or select a
+highlighted part to see what it does. The readout is what it prints.
+
+<Experiment def={stream} title="stream.py, linked to the timeline" controls={false}>
+  <Code example={streamPython} title="stream.py" />
+  <Readout title="Stream and batch, compared" />
+</Experiment>
+
+The batch job is simpler: it runs once and counts everything that has arrived. Run it, then try an earlier
+`BATCH_AT`, such as 20, and see which windows lose an event.
+
+<PythonRunner example={batchRunner} title="batch.py" />
+
+In Apache Spark, the same stream is a few lines, because the engine tracks the watermark and window state for you.
+This example follows the PySpark 4.2.0 documentation and does not run in the browser:
+
+<Code example={sparkStream} title="spark_stream.py" />
+
+</Section>
+
+<Section kind="experiment" title="Find the right lateness">
+
+Use the controls above the timeline and watch the readout:
+
+- Set the allowed lateness to 0. Results come within 2 or 3 minutes of each window's end, but 3 events are dropped.
+- Raise it to 6. Only `(7, 21)` is dropped, and the slowest result takes 8 minutes.
+- Raise it to 10. Nothing is dropped, but by the last event only 3 windows have been emitted: the stream waits for
+  a watermark that the data has not yet pushed far enough.
+- Switch to 10-minute windows with 3 minutes of lateness. Fewer, larger windows: `(7, 21)` is the only late event.
+- Move the batch job to minute 60. It is still complete; its results are just older.
+
+</Section>
+
+<Section kind="mistakes" title="Windows by arrival time, and windows that never close">
+
+<CommonMistake
+  title="Windowing by processing time"
+  wrong={"start = arrival // WINDOW * WINDOW  # the time the pipeline saw the event"}
+  error="(no error: (2, 11) is counted in [10, 15) instead of [0, 5))"
+  cause="Processing time depends on network delays and retries. Counts per window then change with infrastructure problems, not with what users did, and a replay of the same data gives different results."
+  fix={"start = event_time // WINDOW * WINDOW  # when it happened"}
+/>
+
+<CommonMistake
+  title="Expecting results when the input goes quiet"
+  wrong={"LATENESS = 3\n# last event (26, 27); waiting for [20, 25) and [25, 30) to be emitted"}
+  error="(no error: still open: [20, 25])"
+  cause="The watermark only moves when new events arrive. After the last event it stays at 26 − 3 = 23, which is before the end of [20, 25), so that window never closes."
+  fix={"# in production: idle-source handling or a processing-time timeout,\n# or a final batch job that closes the period"}
+/>
+
+<Callout kind="warning">
+  Dropping late events is silent in this model. In a real stream, count them (Spark reports rows dropped by the
+  watermark in its query progress metrics) and alert when the count grows: it usually means a source is falling
+  behind.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Choosing for an ML system">
+
+- **Training data** is usually batch: models need complete, reproducible data, and a nightly or hourly job that
+  waits for late events gives exactly that.
+- **Online features** (for example "clicks in the last 5 minutes" for a recommender) need a stream, because a
+  feature an hour old misses what the user is doing now.
+- **Both at once** is common: a stream for fresh results and a batch job that later recomputes the same windows
+  completely and corrects them. The two must compute features the same way, or the model sees different values in
+  training and serving. [Feature pipelines and training-serving consistency](#/learn/data/features/training-serving)
+  covers how to keep them aligned.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Which events are late?">
+
+<MiniExercise exercise={lateExercise}>
+  Write `late_events(events, window, lateness)`. `events` is a list of `(event_time, arrival_time)` pairs in
+  arrival order. Return, in arrival order, the events that arrive after their tumbling window has been emitted,
+  using the watermark rule from this lesson: emit a window once its end is at or before the largest event time
+  seen minus `lateness`. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Event time is when something happened; processing time is when the pipeline saw it. Window by event time.
+- A watermark (largest event time seen minus the allowed lateness) decides when a window is complete; events that
+  arrive after that are late.
+- More allowed lateness means more complete, later results. Less means fresher, less complete results.
+- A batch job is complete for everything that arrived before it ran, at the cost of latency.
+
+Next: [Distributed processing with Spark](#/learn/data/distributed/spark-concepts) shows how engines split this
+work across many machines.
+
+</Section>
