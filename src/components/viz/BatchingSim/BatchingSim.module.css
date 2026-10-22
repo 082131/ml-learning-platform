@@ -1,0 +1,8 @@
+.layout {
+  display: grid;
+}
+.service {
+  fill: none;
+  stroke-width: 4;
+  stroke-linecap: butt;
+}

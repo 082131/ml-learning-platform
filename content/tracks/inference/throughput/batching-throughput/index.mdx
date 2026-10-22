@@ -1,0 +1,215 @@
+import { experiment, simCode, simRunner } from './code';
+import { percentileExercise, questions } from './quiz';
+
+<Section kind="intuition" title="A shuttle bus at the airport">
+
+An airport shuttle can leave with one passenger or with twenty. The trip takes about the same time either way,
+so a full bus moves twenty times more people per hour. But the first passenger to board has to wait for the bus
+to fill. Leave too eagerly and the bus runs nearly empty; wait too long and passengers miss their flights.
+
+A model server faces the same choice. Running a model on a GPU has a large fixed cost per run: every weight must
+be read from memory, whether the run serves one request or thirty-two. Grouping requests into a
+<Term id="batch">batch</Term> shares that cost, so the server finishes more requests per second, its
+<Term id="throughput">throughput</Term>. The price is <Term id="latency-percentile">latency</Term>: each request
+may wait for others to arrive, and runs in a larger batch.
+
+This lesson simulates that trade-off. You will set how the server batches and how busy it is, and watch what
+happens to typical and worst-case latency, and to throughput.
+
+</Section>
+
+<Section kind="technical" title="Why batching helps, and the batcher's two settings">
+
+**Why the fixed cost exists: a roofline model.** A GPU has two limits: how fast it can read memory (bandwidth, in
+bytes per second) and how fast it can compute (operations per second). The
+<Term id="roofline-model">roofline model</Term> estimates the time of a step as the larger of the two:
+
+$$
+t \approx \max\left(\frac{\text{bytes moved}}{\text{bandwidth}},\; \frac{\text{operations}}{\text{peak compute}}\right)
+$$
+
+Take a hypothetical GPU with 1 TB/s of bandwidth and 100 TFLOP/s ($10^{14}$ operations per second) of compute,
+and an 8-billion-parameter model in BF16: 16 GB of weights. One forward pass for one token reads all
+16 GB, which takes $16 \times 10^9 / 10^{12} = 16$ ms, and does about $2 \times 8 \times 10^9$ operations per
+request in the batch (one multiply and one add per weight), which take $0.16$ ms each. So
+
+$$
+t(B) \approx \max(16,\; 0.16 \cdot B) \text{ ms}
+$$
+
+Up to about $B = 100$ the step is memory-bound: it takes 16 ms whether it serves 1 request or 100, and throughput
+grows almost in proportion to $B$. Beyond that it becomes compute-bound and batching stops helping.
+
+<Callout kind="simplification">
+  These are round numbers for a made-up GPU, chosen to show the shape of the curve. The model also ignores the KV
+  cache traffic, kernel launch overheads and imperfect use of the hardware. Measure your own model's step time at
+  a few batch sizes before relying on the shape, let alone the numbers.
+</Callout>
+
+**The service-time model used in this lesson.** The simulation below uses a simpler, explicit assumption: a batch
+of $B$ requests takes
+
+$$
+\text{service}(B) = t_0 + \text{per\_item} \cdot B
+$$
+
+with $t_0 = 20$ ms and per_item = 3 ms to start with. These are assumptions you can change, not measurements.
+When every batch is full, the replica (one copy of the model on one GPU) finishes at most
+
+$$
+\text{capacity}(B) = \frac{1000 \cdot B}{t_0 + \text{per\_item} \cdot B} \text{ requests per second}
+$$
+
+which is $1000 / 23 = 43.5$ with $B = 1$ and $8000 / 44 = 181.8$ with $B = 8$.
+
+**Dynamic batching.** Requests don't arrive in neat groups. Many independent users produce
+<Term id="poisson-process">Poisson arrivals</Term>: random gaps, averaging $1000 / \text{rate}$ ms, with frequent
+bursts. A <Term id="dynamic-batching">dynamic batcher</Term> holds waiting requests and sends a batch when either
+
+- it holds **max_batch** requests (waiting longer can't make it bigger), or
+- the oldest request has waited **max_wait** ms (so light traffic isn't stuck waiting),
+
+and only when the replica is free. If the replica is busy, requests keep queuing, so batches grow by themselves
+under load.
+
+**Measuring latency.** Each request's latency is its finish time minus its arrival time: waiting plus running.
+We report percentiles: p50 (the median) for a typical request, p95 and p99 for the slow tail. With $n$ sorted
+latencies, the nearest-rank p95 is the value at position $\lceil 0.95\, n \rceil$.
+
+**Little's law** connects the three quantities. In a system that is not overloaded, the average number of
+requests inside equals the arrival rate times the average latency, $L = \lambda W$: at 100 requests per second
+and 50 ms, about 5 requests are in flight (<Term id="littles-law">Little's law</Term>).
+
+</Section>
+
+<Section kind="visual" title="Watching requests wait and run">
+
+The waterfall shows the first 30 requests of the simulation: each row waits (dashed) until its batch starts, then
+runs (solid). The charts run the same arrivals for every max batch size from 1 to 32, so you can see the whole
+trade-off at once. The controls are in the Experiment section below.
+
+<Experiment def={experiment} title="Dynamic batching simulation" controls={false}>
+  <BatchingSim />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The simulator">
+
+The simulation is about 40 lines of Python. The browser runs the same algorithm, with the same random number
+generator, so the numbers below are what this code prints for the current settings. Select a part to see what it
+does.
+
+<Experiment def={experiment} title="batching_sim.py, linked to the charts" controls={false}>
+  <Code example={simCode} title="batching_sim.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+You can run and edit it in your browser. It starts with the default settings; change a number and run it again.
+
+<PythonRunner example={simRunner} title="batching_sim.py" />
+
+</Section>
+
+<Section kind="experiment" title="Find the sweet spot">
+
+Change the traffic, the batcher and the service-time model. Step through the first batches to see the policy
+decide when to send each one.
+
+<Experiment def={experiment} title="Batching experiment">
+  <StepThrough example={simCode} title="batching_sim.py" />
+  <Readout />
+</Experiment>
+
+Things to try (all at the starting settings unless stated):
+
+- Set max batch to 1. Capacity is 43.5 req/s but 100 arrive every second: the queue grows for the whole run and
+  p95 latency reaches about 25 seconds. At max batch 3 the replica just keeps up (p95 411.4 ms); at 8 it has
+  room to spare (p95 67.2 ms).
+- Raise max batch from 8 to 16. Almost nothing changes: at 100 req/s batches average about 3 requests, so the
+  limit is rarely reached.
+- Set the rate to 20 and compare max wait 0 with 50. Throughput stays at about 20 req/s either way, but p50
+  latency rises from 23.0 to 73.0 ms. Below capacity, waiting only costs latency.
+- Raise the rate towards capacity (180 req/s at max batch 8). The replica is busy 99.9% of the time and p95
+  climbs to 368.5 ms: queues grow sharply near full load.
+- Change the seed. The numbers move a little (p95 between 64.5 and 67.2 ms for seeds 7 to 9): one run of 2,000
+  requests is a sample, not the truth.
+
+</Section>
+
+<Section kind="mistakes" title="Percentiles done wrong">
+
+<CommonMistake
+  title="Computing a percentile index that runs off the end"
+  wrong={'s = sorted([30, 10, 20])\np = 100\ns[int(p / 100 * len(s))]'}
+  error="IndexError: list index out of range"
+  cause="int(1.0 * 3) is 3, but the last position of a 3-item list is 2. Rank-based formulas count from 1 and Python lists from 0, so the nearest rank needs ceil and then - 1."
+  fix={'import math\ns[max(1, math.ceil(p * len(s) / 100)) - 1]   # 30'}
+/>
+
+<Callout kind="warning">
+  Some percentile mistakes raise no error. `np.percentile(latencies, 0.95)` returns the 0.95th percentile, close
+  to the minimum, not the 95th: NumPy takes percentages from 0 to 100. And an average hides the tail: a service
+  whose p50 is 40 ms can have a p99 of several seconds. Report p50, p95 and p99, and say how many requests they
+  come from.
+</Callout>
+
+<Callout kind="warning">
+  Benchmarking with a fixed number of clients that each wait for an answer before sending the next request
+  measures a system that slows its own traffic down when it gets slow. Real users keep arriving. Generate
+  arrivals on a schedule, as this simulation does, or the latency you report will look better than production.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Configuring a real server">
+
+Serving frameworks expose the same two settings. NVIDIA Triton Inference Server's dynamic batcher, for example,
+takes a maximum batch size and a maximum queue delay in microseconds. A workable procedure:
+
+1. Measure your model's service time at several batch sizes on the target GPU (with warm-up runs first) and fit
+   $t_0$ and per_item, or use the measured table directly.
+2. Compute capacity at each batch size and compare it with the peak traffic you expect, with headroom.
+3. Set max wait from your latency budget: if p95 must stay under 100 ms and a batch takes 44 ms, the queue can
+   take only part of the rest.
+4. Load test with arrivals on a schedule and read p50, p95 and p99 at several rates, up to and past capacity.
+
+Text generation with large language models adds a twist: each request runs for many decode steps, and requests
+finish at different times. Servers such as vLLM therefore use continuous batching, adding and removing sequences
+between steps instead of waiting for a whole batch to finish. The memory for each sequence's KV cache (see
+[Memory, VRAM, parameters, activations and KV cache](#/learn/inference/memory/memory-estimation)) then limits how
+large the batch can grow.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Percentiles and capacity">
+
+<MiniExercise exercise={percentileExercise}>
+  Write `percentile(values, p)` with the nearest-rank method (it must work for p = 0 and p = 100) and
+  `capacity(t0, per_item, batch)`, the requests per second a replica finishes when every batch is full. Run the
+  tests to check them.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Small-batch inference is usually memory-bound: each pass reads all the weights, so batching shares that cost and
+  raises throughput, up to the point where compute becomes the limit.
+- A dynamic batcher sends a batch when it reaches max_batch or when the oldest request has waited max_wait.
+  Bigger batches help only when there is enough traffic; extra waiting below capacity only adds latency.
+- Capacity is $1000 B / (t_0 + \text{per\_item} \cdot B)$ requests per second for this service-time model. Above
+  it, queues and latency grow without limit.
+- Report latency as p50, p95 and p99 from enough requests, and use $L = \lambda W$ to relate rate, latency and
+  concurrency.
+
+Next: [Latency, throughput and memory profiling](#/learn/inference/perf/profiling) shows how to measure the
+service time this lesson assumed.
+
+</Section>

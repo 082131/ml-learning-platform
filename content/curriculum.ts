@@ -333,7 +333,7 @@ export const tracks: Track[] = [
         id: 'throughput',
         title: 'Throughput',
         level: 'advanced',
-        lessons: [{ id: 'inference/throughput/batching-throughput', status: 'outline' }],
+        lessons: [{ id: 'inference/throughput/batching-throughput', status: 'written' }],
       },
       {
         id: 'perf',
