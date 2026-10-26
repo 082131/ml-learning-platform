@@ -1,9 +1,12 @@
 import { expect, test } from '@playwright/test';
+import { descentExercise } from '../../content/tracks/ml/math/loss-optimization/quiz';
 import { expectAccessibleInBothThemes, openMathLesson } from './math-helpers';
+import { servePyodideLocally } from './pyodide';
 
-test.beforeEach(async ({ page }) =>
-  openMathLesson(page, 'loss-optimization', 'Loss functions and optimization'),
-);
+test.beforeEach(async ({ page, context }) => {
+  await servePyodideLocally(context);
+  await openMathLesson(page, 'loss-optimization', 'Loss functions and optimization');
+});
 
 test('the 1-D descent lands on the minimum in one step with a learning rate of 0.5', async ({ page }) => {
   const lr = page.getByRole('slider', { name: 'Learning rate η' }).first();
@@ -33,4 +36,15 @@ test('the contour map, linked code and printout follow the sliders', async ({ pa
 
 test('the lesson is accessible in both themes without horizontal scroll', async ({ page }) => {
   await expectAccessibleInBothThemes(page);
+});
+
+test.describe('Python in the lesson @network', () => {
+  test.describe.configure({ timeout: 180_000 });
+
+  test('the reference solution of descentExercise passes its tests in Pyodide', async ({ page }) => {
+    const exercise = page.locator(`[data-exercise="${descentExercise.id}"]`);
+    await exercise.getByRole('textbox', { name: 'Your solution code editor' }).fill(descentExercise.solution);
+    await exercise.getByRole('button', { name: 'Run tests' }).click();
+    await expect(exercise).toContainText('All tests passed.', { timeout: 120_000 });
+  });
 });

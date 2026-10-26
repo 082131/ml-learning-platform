@@ -84,7 +84,7 @@ Close each content thread with: content validation green, `check`, `e2e` and `bu
 - [x] M205 to M206 derivatives (tangent slider, numerical vs analytic derivative), gradients and the chain rule (computation-graph step-through with computed local gradients).
 - [x] M207 to M208 probability (sampling simulator with a seeded RNG, so results are reproducible), statistics (correlation vs causation with a confounder toggle).
 - [x] M209 `loss-optimization` using GradientDescent1D plus a 2-D contour version.
-- [ ] M210 `project-math`.
+- [x] M210 `project-math`.
 
 ## Thread 6: ML Classical (`ml/classical`, 12 entries)
 - [ ] M301 to M303 cleaning, EDA (Pyodide on the bundled dataset), features and scaling (distance changes under scaling).

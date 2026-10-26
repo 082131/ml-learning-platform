@@ -12,5 +12,12 @@ export default {
     'Test both against hand-worked examples',
   ],
   prerequisites: ['ml/math/matrix-multiplication', 'ml/math/loss-optimization'],
-  concepts: [],
+  concepts: ['matrix', 'dot-product', 'gradient-descent', 'mean-squared-error'],
+  references: [
+    {
+      title: 'numpy.polyfit',
+      url: 'https://numpy.org/doc/stable/reference/generated/numpy.polyfit.html',
+      version: 'NumPy 2.5',
+    },
+  ],
 } satisfies LessonMeta;

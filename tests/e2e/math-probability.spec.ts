@@ -1,9 +1,13 @@
 import { expect, test } from '@playwright/test';
+import { randomRunner } from '../../content/tracks/ml/math/probability/code';
+import { expectedValueExercise } from '../../content/tracks/ml/math/probability/quiz';
 import { expectAccessibleInBothThemes, openMathLesson } from './math-helpers';
+import { servePyodideLocally } from './pyodide';
 
-test.beforeEach(async ({ page }) =>
-  openMathLesson(page, 'probability', 'Probability, distributions and expected value'),
-);
+test.beforeEach(async ({ page, context }) => {
+  await servePyodideLocally(context);
+  await openMathLesson(page, 'probability', 'Probability, distributions and expected value');
+});
 
 test('the simulator, histogram and NumPy code follow the distribution, sample size and seed', async ({
   page,
@@ -32,4 +36,28 @@ test('the simulator, histogram and NumPy code follow the distribution, sample si
 
 test('the lesson is accessible in both themes without horizontal scroll', async ({ page }) => {
   await expectAccessibleInBothThemes(page);
+});
+
+test.describe('Python in the lesson @network', () => {
+  test.describe.configure({ timeout: 180_000 });
+
+  test('the dice.py runner prints the output stated in the lesson', async ({ page }) => {
+    const runner = page.locator('[data-python-runner]').filter({ hasText: 'dice.py' });
+    await runner.getByRole('button', { name: 'Run' }).click();
+    await expect(runner.getByRole('group', { name: 'Printed output' })).toHaveText(
+      randomRunner.expectedOutput!,
+      {
+        timeout: 120_000,
+      },
+    );
+  });
+
+  test('the reference solution of expectedValueExercise passes its tests in Pyodide', async ({ page }) => {
+    const exercise = page.locator(`[data-exercise="${expectedValueExercise.id}"]`);
+    await exercise
+      .getByRole('textbox', { name: 'Your solution code editor' })
+      .fill(expectedValueExercise.solution);
+    await exercise.getByRole('button', { name: 'Run tests' }).click();
+    await expect(exercise).toContainText('All tests passed.', { timeout: 120_000 });
+  });
 });

@@ -1,0 +1,114 @@
+import { brief, checkCode } from './code';
+import { fitLineExercise, matmulProjectExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Build the engine yourself">
+
+NumPy multiplies a million-entry matrix in a blink and libraries train models with one call. That speed hides two
+small ideas you have already met: an entry of a <Term id="matrix">matrix</Term> product is a
+<Term id="dot-product">dot product</Term>, and <Term id="gradient-descent">gradient descent</Term> is a loop of
+small steps downhill. In this project you write both from scratch, slowly and in plain Python, and then prove they
+are right by checking them against NumPy.
+
+Writing them once, and testing them carefully, is what lets you trust the fast versions later, and recognize what
+went wrong when a shape error or a diverging loss shows up in a real model.
+
+</Section>
+
+<Section kind="technical" title="What to build">
+
+**`matmul(A, B)`** takes matrices as lists of rows. For $A$ of shape $(n, k)$ and $B$ of shape $(k, m)$ it returns
+the $(n, m)$ matrix with
+
+$$
+C_{ij} = \sum_{t=1}^{k} A_{it} B_{tj}
+$$
+
+and raises `ValueError` when the inner sizes differ. That is $n \cdot k \cdot m$ multiplications.
+
+**`fit_line(xs, ys, lr, steps, w=0.0, b=0.0)`** fits $\hat y = w x + b$ by minimizing the mean squared error
+$L = \frac1n \sum_i (w x_i + b - y_i)^2$. Each step computes
+
+$$
+\frac{\partial L}{\partial w} = \frac2n \sum_i e_i x_i, \qquad \frac{\partial L}{\partial b} = \frac2n \sum_i e_i,
+\qquad e_i = w x_i + b - y_i
+$$
+
+and updates both parameters with the gradient at the old point. It returns `(w, b)`.
+
+**Checking.** Integer matrix products are exact, so `matmul` must equal NumPy's `A @ B` entry for entry. Gradient
+descent only approaches the answer, so `fit_line` is checked against `np.polyfit`, which solves the same
+least-squares problem directly, within a tolerance.
+
+</Section>
+
+<Section kind="practice" title="The brief">
+
+<Project brief={brief} />
+
+</Section>
+
+<Section kind="exercise" title="Milestones 1 and 2 in the browser">
+
+### Milestone 1: matrix multiplication
+
+<MiniExercise exercise={matmulProjectExercise}>
+  Write `matmul(A, B)` without NumPy. The tests use products computed by NumPy, including floats and a shape
+  mismatch.
+</MiniExercise>
+
+### Milestone 2: gradient descent on a line
+
+<MiniExercise exercise={fitLineExercise}>
+  Write `fit_line(xs, ys, lr, steps, w=0.0, b=0.0)`. The tests compare it with the loss and optimization lesson
+  and with `np.polyfit`.
+</MiniExercise>
+
+</Section>
+
+<Section kind="code" title="Checking against NumPy">
+
+Save your two functions as `my_math.py` and run this next to it. With the reference solutions it prints:
+
+<Code example={checkCode} title="check_my_math.py" />
+
+The first `True` says your loops and NumPy agree on a random $(3, 4) \times (4, 2)$ product; change the seed and
+the shapes to test more. The last two lines say that 2,000 steps of gradient descent land on the least-squares line
+$w = 1.8$, $b = 0.8$.
+
+</Section>
+
+<Section kind="mistakes" title="Errors you are likely to meet">
+
+<CommonMistake
+  title="Passing NumPy the shapes the wrong way round"
+  wrong={'A = np.ones((3, 4))\nB = np.ones((2, 4))\nA @ B'}
+  error="ValueError: matmul: Input operand 1 has a mismatch in its core dimension 0, with gufunc signature (n?,k),(k,m?)->(n?,m?) (size 2 is different from 4)"
+  cause="A has 4 columns but B has 2 rows. The inner sizes must match: (3, 4) @ (4, m)."
+  fix={'A @ B.T  # (3, 4) @ (4, 2) -> (3, 2)'}
+/>
+
+<Callout kind="warning">
+  A quiet bug in `fit_line` is updating `w` first and then computing `db` with the new `w`. It still roughly
+  converges, so it is easy to miss, but it no longer matches the lesson's numbers. Compute both partial derivatives
+  from the same point, then update both.
+</Callout>
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="summary">
+
+- A matrix product is a grid of dot products: $n \cdot k \cdot m$ multiplications for $(n, k) \times (k, m)$.
+- Gradient descent on the mean squared error reaches the least-squares line that `np.polyfit` solves directly.
+- Test exact results exactly and iterative or float results with a tolerance.
+- Random, seeded test inputs catch bugs that a single example can hide.
+
+Next: the [Classical machine learning](#/learn/ml/classical/linear-regression) chapter starts with linear regression, the
+line fit you just wrote, at scale.
+
+</Section>
