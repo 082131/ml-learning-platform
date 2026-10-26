@@ -1,0 +1,114 @@
+import { baselineCode, baselineOutput, brief, setupCode } from './code';
+import { questions, thresholdExercise } from './quiz';
+
+<Section kind="intuition" title="From a model to a system">
+
+The earlier chapters each practiced one skill: splitting data, choosing a metric, tracking runs, testing a model.
+A real classification system needs all of them at once, and the decisions connect. The metric depends on who uses
+the output, the threshold depends on the metric, the tests encode the threshold, and the report has to say how
+every number was produced.
+
+In this capstone you build that system for a small, clean medical dataset. The modeling is not the hard part, a
+logistic regression already scores 0.991 validation accuracy. The work is in making each decision on purpose,
+recording it, and proving the result can be reproduced.
+
+</Section>
+
+<Section kind="technical" title="What you will build">
+
+A repository with a training script, tracked experiments, a test suite and a model card:
+
+| Part | Contains | From lesson |
+| --- | --- | --- |
+| `baseline.py`, then `train.py` | stratified 60/20/20 split, pipelines, cross-validation, tuning | [splits and leakage](#/learn/ml/classical/splits-leakage), [tuning](#/learn/ml/practice/hyperparameter-tuning) |
+| `mlflow.db` | one run per configuration, with parameters, seed and metrics | [experiment tracking](#/learn/ml/practice/experiment-tracking) |
+| `tests/` | data checks and model tests, run by pytest | [model testing](#/learn/ml/practice/model-testing) |
+| `MODEL_CARD.md` | intended use, metric, results with intervals, limits, how to reproduce | this capstone |
+
+**The operating point.** A classifier outputs a probability $p$ of malignant; the system flags a case when
+$p \ge t$. Lowering $t$ raises recall (more malignant cases found) and lowers precision (more false alarms). Choose
+a minimum recall first, then the highest threshold $t$ that reaches it on validation data:
+
+$$
+\text{recall}(t) = \frac{\#\{\text{malignant with } p \ge t\}}{\#\{\text{malignant}\}}, \qquad
+t^\star = \max\{\, t : \text{recall}(t) \ge r_\text{min} \,\}
+$$
+
+**One look at the test set.** Every choice (features, model, hyperparameters, threshold) is made with training and
+validation data. The test set is evaluated once, at the end, and reported with a bootstrap interval, because 114
+rows give an uncertain estimate.
+
+</Section>
+
+<Section kind="code" title="Run it locally">
+
+Set up a virtual environment with the versions this brief was tested with:
+
+<Code example={setupCode} title="terminal" />
+
+`baseline.py` splits the data, trains two models and logs both runs to MLflow:
+
+<Code example={baselineCode} title="baseline.py" />
+
+Running it prints the following (with the versions above):
+
+<Code example={baselineOutput} title="terminal" />
+
+</Section>
+
+<Section kind="practice" title="The brief">
+
+Tick each milestone when it is done; your progress is saved in this browser.
+
+<Project brief={brief} />
+
+</Section>
+
+<Section kind="mistakes" title="Where projects like this go wrong">
+
+<CommonMistake
+  title="Scaling before splitting"
+  wrong={'X = StandardScaler().fit_transform(X)\nX_train, X_test, y_train, y_test = train_test_split(X, y)'}
+  error="No error. Validation and test scores are slightly optimistic."
+  cause="The scaler's mean and standard deviation were computed on every row, including the test rows."
+  fix={'model = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000))\nmodel.fit(X_train, y_train)  # the scaler sees training rows only'}
+/>
+
+<CommonMistake
+  title="Scoring the wrong class"
+  wrong={'recall_score(y_val, pred)  # pos_label=1 by default'}
+  error="No error. The number is the recall for benign tumors."
+  cause="In load_breast_cancer, 0 is malignant. The default positive class is 1."
+  fix={'recall_score(y_val, pred, pos_label=0)  # recall for malignant'}
+/>
+
+<Callout kind="warning">
+  This dataset is for learning. A model trained on 569 tumors from one source says nothing reliable about patients
+  elsewhere. Your model card should say so in plain words.
+</Callout>
+
+</Section>
+
+<Section kind="check" title="Self-assessment">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Pick the threshold">
+
+<MiniExercise exercise={thresholdExercise}>
+  Write `threshold_for_recall(scores, labels, target)` in plain Python. You will use the same logic with the
+  validation probabilities of your final model.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A system is a chain of decisions: metric, threshold, tests and report must agree with each other.
+- Accuracy hides the class you care about; choose recall at a stated precision for the malignant class.
+- Make every choice on training and validation data and use the test set once.
+- Track every run, test the data and the model, and write down limits and how to reproduce.
+
+</Section>

@@ -1,0 +1,106 @@
+import { brief, setupCode, starterCode, starterOutput } from './code';
+import { questions, softmaxExercise } from './quiz';
+
+<Section kind="intuition" title="Build it twice">
+
+A framework like PyTorch computes gradients for you, which is exactly why it is worth computing them yourself once.
+When you have written a forward pass, a loss and a backward pass by hand, and checked them, a framework stops being
+a black box: you know what `loss.backward()` must produce and you can tell when a result is wrong.
+
+This capstone has two halves. First you build and train a small network with NumPy alone. Then you build the same
+network in PyTorch and make the two agree, starting from the same weights and seeing the same batches, until their
+losses match. Every difference you can then introduce, and measure, is something you understand.
+
+</Section>
+
+<Section kind="technical" title="The network and the checks">
+
+A two-layer network for 8×8 digit images (64 inputs, 64 hidden units, 10 classes):
+
+$$
+h = \max(0,\ X W_1 + b_1), \qquad z = h W_2 + b_2, \qquad
+L = -\frac1n \sum_{i=1}^{n} \log \frac{e^{z_{i,y_i}}}{\sum_k e^{z_{ik}}}
+$$
+
+The backward pass starts from the softmax cross-entropy and works back through each layer:
+
+$$
+\frac{\partial L}{\partial z} = \frac{\operatorname{softmax}(z) - \operatorname{onehot}(y)}{n}, \quad
+\frac{\partial L}{\partial W_2} = h^\top \frac{\partial L}{\partial z}, \quad
+\frac{\partial L}{\partial h} = \frac{\partial L}{\partial z} W_2^\top \odot [X W_1 + b_1 > 0], \quad
+\frac{\partial L}{\partial W_1} = X^\top \frac{\partial L}{\partial h}
+$$
+
+with the bias gradients as column sums. **Gradient check:** for a few parameter entries $\theta$, compare the
+analytic gradient with the central difference $\big(L(\theta + \varepsilon) - L(\theta - \varepsilon)\big) / 2\varepsilon$
+using the relative error $|a - b| / (|a| + |b|)$. **Equivalence check:** with identical initial weights and batch
+order, the float64 PyTorch run must reach the same loss as yours.
+
+</Section>
+
+<Section kind="code" title="Run it locally">
+
+<Code example={setupCode} title="terminal" />
+
+The starter loads and splits the data, initializes the weights with a fixed seed and contains the gradient check.
+You write `loss_and_grads`.
+
+<Code example={starterCode} title="starter.py" />
+
+Before and after the first milestone it prints:
+
+<Code example={starterOutput} title="terminal" />
+
+</Section>
+
+<Section kind="practice" title="The brief">
+
+Tick each milestone when it is done; your progress is saved in this browser.
+
+<Project brief={brief} />
+
+</Section>
+
+<Section kind="mistakes" title="Bugs that still train">
+
+<CommonMistake
+  title="Forgetting to average the gradient over the batch"
+  wrong={'d = p.copy()\nd[np.arange(n), y] -= 1\ngW2 = h.T @ d  # loss is a mean, gradient is a sum'}
+  error="No error. Training diverges at a learning rate that should work, or works only with a tiny one."
+  cause="The loss is averaged over the batch but the gradient is summed, so it is n times too large. The gradient check catches it."
+  fix={'d = p.copy()\nd[np.arange(n), y] -= 1\nd /= n\ngW2 = h.T @ d'}
+/>
+
+<CommonMistake
+  title="Comparing runs with different batch orders"
+  wrong={'# NumPy: rng.permutation each epoch\n# PyTorch: DataLoader(..., shuffle=True)'}
+  error="No error. The losses differ in the third decimal and it is unclear whether either version has a bug."
+  cause="Different batches give different updates. Any mismatch is then explained by the order, which hides real bugs."
+  fix={'orders = [order_rng.permutation(len(X_train)) for _ in range(EPOCHS)]\n# use orders[epoch] to slice batches in both versions'}
+/>
+
+</Section>
+
+<Section kind="check" title="Self-assessment">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="The first step of the backward pass">
+
+<MiniExercise exercise={softmaxExercise}>
+  Write `softmax_ce(logits, label)` in plain Python: the loss and the gradient for one example, safe for large
+  logits.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Write the forward pass, the loss and the backward pass yourself once, with every shape written down.
+- A gradient check with central differences catches backward-pass bugs that still let training run.
+- Match a framework implementation exactly by sharing weights, batch order and dtype, then change one thing at a
+  time to explain each difference.
+
+</Section>
