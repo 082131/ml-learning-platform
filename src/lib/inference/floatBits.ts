@@ -56,7 +56,13 @@ export function encode(x: number, f: FloatFormat): Encoded {
   const sign = x < 0 || Object.is(x, -0) ? 1 : 0;
   if (Number.isNaN(x)) return { sign: 0, exponent: allOnes, mantissa: 2 ** (M - 1), value: NaN, kind: 'nan' };
   const a = Math.abs(x);
-  const inf = (): Encoded => ({ sign, exponent: allOnes, mantissa: 0, value: sign ? -Infinity : Infinity, kind: 'infinity' });
+  const inf = (): Encoded => ({
+    sign,
+    exponent: allOnes,
+    mantissa: 0,
+    value: sign ? -Infinity : Infinity,
+    kind: 'infinity',
+  });
   if (a === Infinity) return inf();
   const emin = 1 - bias(f);
   let e = a === 0 ? emin : Math.max(exponentOf(a), emin);

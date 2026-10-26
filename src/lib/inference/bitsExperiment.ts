@@ -1,6 +1,14 @@
 import type { ExperimentDef, ReadoutItem } from '../types';
 import { formatNumber } from '../trace/values';
-import { bitFields, encode, encodeInt8, FLOAT_FORMATS, toHex, type Encoded, type FloatFormat } from './floatBits';
+import {
+  bitFields,
+  encode,
+  encodeInt8,
+  FLOAT_FORMATS,
+  toHex,
+  type Encoded,
+  type FloatFormat,
+} from './floatBits';
 
 export interface BitsState {
   /** The number as typed, for example "0.1" or "1e-8". */
@@ -51,7 +59,9 @@ export const shown = (v: number) => (Number.isFinite(v) ? String(v) : v > 0 ? 'i
 
 export function bitsReadout(s: BitsState, r: BitsResult): ReadoutItem[] {
   if (r.input === undefined)
-    return [{ label: 'Input', value: `"${s.text}" is not a number. Try 0.1, -2.5 or 1e-8.`, status: 'error' }];
+    return [
+      { label: 'Input', value: `"${s.text}" is not a number. Try 0.1, -2.5 or 1e-8.`, status: 'error' },
+    ];
   const err = (v: number) => (Number.isFinite(v) ? formatNumber(Math.abs(v - r.input!)) : 'overflow');
   return [
     ...r.rows.map((row) => ({

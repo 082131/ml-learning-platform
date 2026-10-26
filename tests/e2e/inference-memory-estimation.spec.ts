@@ -8,7 +8,9 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Memory, VRAM');
 });
 
-test('changing the batch size updates the bar, the code, the printout and the trace together', async ({ page }) => {
+test('changing the batch size updates the bar, the code, the printout and the trace together', async ({
+  page,
+}) => {
   const viz = page.locator('[data-viz="Where the memory goes"]');
   await expect(viz.getByRole('status')).toContainText('Fits 16.52 GiB of 24 GiB');
 
@@ -20,7 +22,9 @@ test('changing the batch size updates the bar, the code, the printout and the tr
   // 8 sequences of 8,192 tokens: KV 8.00 GiB, activations 4.50 GiB, total 27.46 GiB > 24 GiB
   await expect(viz.getByRole('status')).toContainText('Does not fit 27.46 GiB of 24 GiB');
   await expect(viz.locator('[data-part="kvCache"]')).toContainText('8.00 GiB');
-  await expect(page.locator('[data-code-example="memory-estimate"]').first()).toContainText('batch, seq_len = 8, 8192');
+  await expect(page.locator('[data-code-example="memory-estimate"]').first()).toContainText(
+    'batch, seq_len = 8, 8192',
+  );
   const printout = page.getByRole('region', { name: 'What the code prints' });
   await expect(printout).toContainText('KV cache         8.00 GiB');
   await expect(printout).toContainText('total           27.46 GiB');
@@ -43,13 +47,19 @@ test('switching precision and model changes the weights term', async ({ page }) 
   await expect(viz.getByRole('status')).toContainText('Fits 36.48 GiB of 80 GiB');
 });
 
-test('the lesson has no serious accessibility issues and no horizontal scroll, in both themes', async ({ page }) => {
+test('the lesson has no serious accessibility issues and no horizontal scroll, in both themes', async ({
+  page,
+}) => {
   await page.locator('[data-code-example="memory-estimate"] [class*="kw"]').first().waitFor();
   for (const theme of ['light', 'dark']) {
     await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme);
     const results = await new AxeBuilder({ page }).analyze();
     const serious = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
-    expect(serious.map((v) => `${theme} ${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([]);
+    expect(
+      serious.map((v) => `${theme} ${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`),
+    ).toEqual([]);
   }
-  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth),
+  ).toBeLessThanOrEqual(0);
 });

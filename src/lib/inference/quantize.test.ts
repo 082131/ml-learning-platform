@@ -84,7 +84,12 @@ describe('quantization', () => {
   });
 
   it('summarizes errors and bins them', () => {
-    expect(errorStats([1, 2], [1.5, 2])).toEqual({ count: 2, maxAbs: 0.5, mse: 0.125, sqnrDb: 10 * Math.log10(5 / 0.25) });
+    expect(errorStats([1, 2], [1.5, 2])).toEqual({
+      count: 2,
+      maxAbs: 0.5,
+      mse: 0.125,
+      sqnrDb: 10 * Math.log10(5 / 0.25),
+    });
     expect(histogram([-1, 0, 0.2, 1], 1, 4).counts).toEqual([1, 0, 2, 1]);
   });
 
@@ -107,18 +112,24 @@ describe('the digits model', () => {
   });
 
   it('is a valid experiment', () => {
-    expect(validateExperiment(quantizationExperiment('q', digits, { scheme: 'symmetric', granularity: 'tensor', bits: 8 }))).toEqual([]);
+    expect(
+      validateExperiment(
+        quantizationExperiment('q', digits, { scheme: 'symmetric', granularity: 'tensor', bits: 8 }),
+      ),
+    ).toEqual([]);
   });
 });
 
-const hasNumpy = hasPython() && (() => {
-  try {
-    execFileSync('python3', ['-c', 'import numpy']);
-    return true;
-  } catch {
-    return false;
-  }
-})();
+const hasNumpy =
+  hasPython() &&
+  (() => {
+    try {
+      execFileSync('python3', ['-c', 'import numpy']);
+      return true;
+    } catch {
+      return false;
+    }
+  })();
 
 describe.skipIf(!hasNumpy)('the printout equals what CPython and NumPy print', () => {
   const states: QuantState[] = [];
@@ -129,7 +140,11 @@ describe.skipIf(!hasNumpy)('the printout equals what CPython and NumPy print', (
     // One Python process runs every configuration, with digits_mlp.json in its working directory.
     const programs = states.map((s) => fillSlots(QUANT_SOURCE, [], quantSlots(s)).source);
     const driver = `import json,sys,io,contextlib\nfor src in json.loads(sys.stdin.read()):\n    buf = io.StringIO()\n    with contextlib.redirect_stdout(buf): exec(src, {})\n    print(json.dumps(buf.getvalue().rstrip()))`;
-    const out = execFileSync('python3', ['-c', driver], { cwd: LESSON_DIR, input: JSON.stringify(programs), encoding: 'utf8' })
+    const out = execFileSync('python3', ['-c', driver], {
+      cwd: LESSON_DIR,
+      input: JSON.stringify(programs),
+      encoding: 'utf8',
+    })
       .trim()
       .split('\n')
       .map((l) => JSON.parse(l) as string);
@@ -143,9 +158,15 @@ describe.skipIf(!hasPython())('floating-point encodings equal Python’s struct 
     const values = [0.1, -2.5, 1 / 3, 65504, 65519, 1e-5, 6e-8, 3.14159, -7.25, 1e-30, 123456.789];
     const py = execFileSync(
       'python3',
-      ['-c', `import struct,json,sys\nfor v in json.loads(sys.argv[1]):\n    f = struct.unpack('>f', struct.pack('>f', v))[0]\n    try: h = struct.pack('>e', f).hex()\n    except OverflowError: h = 'overflow'\n    print(struct.pack('>f', v).hex(), h)`, JSON.stringify(values)],
+      [
+        '-c',
+        `import struct,json,sys\nfor v in json.loads(sys.argv[1]):\n    f = struct.unpack('>f', struct.pack('>f', v))[0]\n    try: h = struct.pack('>e', f).hex()\n    except OverflowError: h = 'overflow'\n    print(struct.pack('>f', v).hex(), h)`,
+        JSON.stringify(values),
+      ],
       { encoding: 'utf8' },
-    ).trim().split('\n');
+    )
+      .trim()
+      .split('\n');
     const ts = values.map((v) => {
       const f = encode(v, FP32);
       const h = encode(f.value, FP16);
@@ -162,7 +183,9 @@ describe('the bit-layout experiment', () => {
     expect(r.rows.map((x) => x.hex)).toEqual(['3dcccccd', '2e66', '3dcd']);
     expect(r.rows[1]!.fields).toEqual({ sign: '0', exponent: '01011', mantissa: '1001100110' });
     expect(r.int8).toMatchObject({ q: 10, bits: '00001010' });
-    expect(bitsReadout({ text: 'abc', scale: 0.01 }, encodeAll({ text: 'abc', scale: 0.01 }))[0]!.status).toBe('error');
+    expect(
+      bitsReadout({ text: 'abc', scale: 0.01 }, encodeAll({ text: 'abc', scale: 0.01 }))[0]!.status,
+    ).toBe('error');
     expect(validateExperiment(bitsExperiment('b', { text: '0.1', scale: 0.01 }))).toEqual([]);
   });
 });

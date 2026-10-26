@@ -118,10 +118,10 @@ Close each content thread with: content validation green, `check`, `e2e` and `bu
 - [ ] A004 Fill objectives and prerequisites for all 10 outline lessons, including the "train vs fine-tune vs pretrained vs API" distinction in `ai-landscape`'s objectives.
 
 ## Thread 11: Inference Engineer flagship (3 lessons)
-- [ ] I001 `inference/memory/memory-estimation`: an estimator for parameters × bytes(precision) + KV cache (layers × 2 × heads × head_dim × seq × batch × bytes) + an activation estimate. Every term is explained, model presets come with cited configs, and the results are labeled estimates.
-- [ ] I002 `inference/precision/precision-quantization`: a bit-layout explorer (FP32, FP16, BF16, INT8) and real quantize/dequantize of a weight vector with an error histogram (computed, symmetric and asymmetric, per-tensor vs per-channel).
-- [ ] I003 `inference/throughput/batching-throughput`: a discrete-event queueing simulator (seeded) for arrival rate, max batch and max wait, giving p50/p95 latency and throughput. The service-time model is stated explicitly and labeled as a model.
-- [ ] I004 Fill objectives and prerequisites for all 11 outline lessons.
+- [x] I001 `inference/memory/memory-estimation`: an estimator for parameters × bytes(precision) + KV cache (layers × 2 × heads × head_dim × seq × batch × bytes) + an activation estimate. Every term is explained, model presets come with cited configs, and the results are labeled estimates.
+- [x] I002 `inference/precision/precision-quantization`: a bit-layout explorer (FP32, FP16, BF16, INT8) and real quantize/dequantize of a weight vector with an error histogram (computed, symmetric and asymmetric, per-tensor vs per-channel).
+- [x] I003 `inference/throughput/batching-throughput`: a discrete-event queueing simulator (seeded) for arrival rate, max batch and max wait, giving p50/p95 latency and throughput. The service-time model is stated explicitly and labeled as a model.
+- [x] I004 Fill objectives and prerequisites for all 11 outline lessons.
 
 ## Thread 12: Verification and polish
 **Reads**: spec.md (Success Criteria, Edge Cases), constitution, tasks.md.

@@ -36,12 +36,14 @@ export const questions: QuizQuestion[] = [
       {
         text: 'The total, because every term scales with the context',
         correct: false,
-        explain: 'The weights, 14.96 GiB here, do not depend on the context, so the total grows by far less than 2×.',
+        explain:
+          'The weights, 14.96 GiB here, do not depend on the context, so the total grows by far less than 2×.',
       },
       {
         text: 'The weights, because longer contexts need more parameters',
         correct: false,
-        explain: 'The parameter count is fixed by the architecture. Rotary position encodings have no weights at all.',
+        explain:
+          'The parameter count is fixed by the architecture. Rotary position encodings have no weights at all.',
       },
     ],
   },
@@ -104,7 +106,8 @@ export const questions: QuizQuestion[] = [
       'Add the activation peak and leave room for the framework’s own memory',
       'Compare the total with the GPU’s memory in GiB',
     ],
-    explain: 'Shapes first, then the fixed cost (weights), then the costs that grow with traffic, then the comparison.',
+    explain:
+      'Shapes first, then the fixed cost (weights), then the costs that grow with traffic, then the comparison.',
   },
 ];
 

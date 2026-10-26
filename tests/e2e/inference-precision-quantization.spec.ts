@@ -21,7 +21,9 @@ test('typing a number updates the bit layouts and the stored values', async ({ p
   await expect(exp.getByRole('alert')).toContainText('Enter a number');
 });
 
-test('changing bits and granularity updates the code, the printout and the accuracy together', async ({ page }) => {
+test('changing bits and granularity updates the code, the printout and the accuracy together', async ({
+  page,
+}) => {
   const controls = page.locator('[data-experiment="quant"]').filter({ has: page.getByRole('slider') });
   const lab = controls.locator('[data-correct]');
   await expect(lab).toHaveAttribute('data-correct', '349');
@@ -40,13 +42,19 @@ test('changing bits and granularity updates the code, the printout and the accur
   await expect(printout).toContainText('accuracy:    62.5%');
 });
 
-test('the lesson has no serious accessibility issues and no horizontal scroll, in both themes', async ({ page }) => {
+test('the lesson has no serious accessibility issues and no horizontal scroll, in both themes', async ({
+  page,
+}) => {
   await page.locator('[data-code-example="quant-numpy"] [class*="kw"]').first().waitFor();
   for (const theme of ['light', 'dark']) {
     await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme);
     const results = await new AxeBuilder({ page }).analyze();
     const serious = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
-    expect(serious.map((v) => `${theme} ${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([]);
+    expect(
+      serious.map((v) => `${theme} ${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`),
+    ).toEqual([]);
   }
-  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth),
+  ).toBeLessThanOrEqual(0);
 });

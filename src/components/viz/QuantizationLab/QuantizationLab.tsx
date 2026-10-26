@@ -21,7 +21,9 @@ function ErrorHistogram({ r }: { r: QuantLabResult }) {
   const limit = r.stats.maxAbs || 1;
   const h = histogram(r.errors, limit, BINS);
   const m = DEFAULT_MARGIN;
-  const x = scaleLinear().domain([-limit, limit]).range([m.left, width - m.right]);
+  const x = scaleLinear()
+    .domain([-limit, limit])
+    .range([m.left, width - m.right]);
   const y = scaleLinear()
     .domain([0, Math.max(...h.counts)])
     .range([HEIGHT - m.bottom, m.top])
@@ -40,7 +42,12 @@ function ErrorHistogram({ r }: { r: QuantLabResult }) {
       }
     >
       <div ref={ref}>
-        <svg width={width} height={HEIGHT} role="img" aria-label="Histogram of dequantized minus original weight">
+        <svg
+          width={width}
+          height={HEIGHT}
+          role="img"
+          aria-label="Histogram of dequantized minus original weight"
+        >
           <Axes x={x} y={y} xLabel="dequantized − original" yLabel="weights" format={sig} />
           {bins.map((b, i) => (
             <rect
@@ -70,7 +77,11 @@ function LevelsPerRow({ r, st }: { r: QuantLabResult; st: QuantState }) {
         <VizTable
           caption="Levels used per row"
           columns={['Row', 'Levels spanned', 'Scale']}
-          rows={levels.map((l, i) => [i, l, sig((r.layers[0].params[st.granularity === 'tensor' ? 0 : i] ?? r.layers[0].params[0]!).scale)])}
+          rows={levels.map((l, i) => [
+            i,
+            l,
+            sig((r.layers[0].params[st.granularity === 'tensor' ? 0 : i] ?? r.layers[0].params[0]!).scale),
+          ])}
         />
       }
     >

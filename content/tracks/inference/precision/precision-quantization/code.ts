@@ -4,7 +4,12 @@
 // generate_weights.py in this folder (scikit-learn 1.9.1).
 import { bitsExperiment } from '@/lib/inference/bitsExperiment';
 import type { DigitsModel } from '@/lib/inference/digitsModel';
-import { QUANT_SOURCE, quantizationExperiment, quantSlots, type QuantState } from '@/lib/inference/quantExperiment';
+import {
+  QUANT_SOURCE,
+  quantizationExperiment,
+  quantSlots,
+  type QuantState,
+} from '@/lib/inference/quantExperiment';
 import { buildQuantTrace, QUANT_BY_HAND_SOURCE, QUANT_BY_HAND_W } from '@/lib/inference/quantTrace';
 import type { CodeExample } from '@/lib/types';
 import digits from './digits_mlp.json';
@@ -25,7 +30,9 @@ export const quantCode: CodeExample = {
   id: 'quant-numpy',
   language: 'python',
   source: QUANT_SOURCE,
-  slots: Object.fromEntries(['scheme', 'bits', 'axis'].map((k) => [k, (s: unknown) => quantSlots(st(s))[k]!])),
+  slots: Object.fromEntries(
+    ['scheme', 'bits', 'axis'].map((k) => [k, (s: unknown) => quantSlots(st(s))[k]!]),
+  ),
   annotations: [
     {
       id: 'qmax',

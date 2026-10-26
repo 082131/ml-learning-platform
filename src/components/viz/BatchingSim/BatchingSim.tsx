@@ -45,17 +45,41 @@ function Waterfall({ r }: { r: BatchingResult }) {
         <VizTable
           caption="First requests"
           columns={['Request', 'Arrives (ms)', 'Batch starts', 'Finishes', 'Latency (ms)', 'Batch size']}
-          rows={reqs.map((q) => [q.k, ms(q.arrival), ms(q.start), ms(q.finish), ms(q.finish - q.arrival), q.size])}
+          rows={reqs.map((q) => [
+            q.k,
+            ms(q.arrival),
+            ms(q.start),
+            ms(q.finish),
+            ms(q.finish - q.arrival),
+            q.size,
+          ])}
         />
       }
     >
       <div ref={ref}>
-        <svg width={width} height={height} role="img" aria-label="Waterfall of request waiting and service times">
+        <svg
+          width={width}
+          height={height}
+          role="img"
+          aria-label="Waterfall of request waiting and service times"
+        >
           <Axes x={x} y={y} xLabel="time (ms)" yLabel="request" ticks={6} />
           {reqs.map((q) => (
             <g key={q.k}>
-              <line className={`${svg.muted} ${svg.line} ${svg.dashed}`} x1={x(q.arrival)} x2={x(q.start)} y1={y(q.k + 0.5)} y2={y(q.k + 0.5)} />
-              <line className={`${svg.accent} ${s.service}`} x1={x(q.start)} x2={x(q.finish)} y1={y(q.k + 0.5)} y2={y(q.k + 0.5)} />
+              <line
+                className={`${svg.muted} ${svg.line} ${svg.dashed}`}
+                x1={x(q.arrival)}
+                x2={x(q.start)}
+                y1={y(q.k + 0.5)}
+                y2={y(q.k + 0.5)}
+              />
+              <line
+                className={`${svg.accent} ${s.service}`}
+                x1={x(q.start)}
+                x2={x(q.finish)}
+                y1={y(q.k + 0.5)}
+                y2={y(q.k + 0.5)}
+              />
             </g>
           ))}
         </svg>
@@ -74,7 +98,15 @@ export function BatchingSim() {
   const cap: XY[] = result.sweep.map((p) => [p.maxBatch, capacity(state, p.maxBatch)]);
   const tput: XY[] = result.sweep.map((p) => [p.maxBatch, p.throughput]);
   const marker = (v: number) => (x: (n: number) => number, y: (n: number) => number) => (
-    <circle className={svg.err} cx={x(state.maxBatch)} cy={y(v)} r={6} fill="none" strokeWidth={2} aria-hidden="true" />
+    <circle
+      className={svg.err}
+      cx={x(state.maxBatch)}
+      cy={y(v)}
+      r={6}
+      fill="none"
+      strokeWidth={2}
+      aria-hidden="true"
+    />
   );
   return (
     <div className={s.layout} data-p95={ms(result.run.p95)}>
@@ -98,7 +130,13 @@ export function BatchingSim() {
         yLabel="requests per second"
         series={[
           { id: 'throughput', label: 'Simulated throughput', points: tput, dots: true },
-          { id: 'capacity', label: 'Capacity if every batch is full (model)', points: cap, tone: 'muted', dashed: true },
+          {
+            id: 'capacity',
+            label: 'Capacity if every batch is full (model)',
+            points: cap,
+            tone: 'muted',
+            dashed: true,
+          },
         ]}
         overlay={marker(result.run.throughput)}
         caption={`Throughput can never exceed the arrival rate (${state.rate} req/s) or the capacity B / (t0 + per_item · B). Where capacity is below the arrival rate, the replica is overloaded.`}

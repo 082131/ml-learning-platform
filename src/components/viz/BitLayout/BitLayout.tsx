@@ -98,8 +98,8 @@ export function BitLayout() {
           </span>
           <span className={s.decode}>
             q = round({state.text} / {formatNumber(state.scale)}) = {int8.q}
-            {int8.clipped ? ', clipped to the range −128…127' : ''}; back: {int8.q} × {formatNumber(state.scale)} ={' '}
-            {formatNumber(int8.value)}
+            {int8.clipped ? ', clipped to the range −128…127' : ''}; back: {int8.q} ×{' '}
+            {formatNumber(state.scale)} = {formatNumber(int8.value)}
           </span>
         </li>
       </ol>

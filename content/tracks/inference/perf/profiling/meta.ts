@@ -7,9 +7,10 @@ export default {
   minutes: 50,
   kind: 'lesson',
   objectives: [
-    'Measure latency percentiles correctly',
-    'Profile where time and memory go in an inference request',
-    'Avoid common benchmarking mistakes such as missing warm-up',
+    'Measure latency percentiles with warm-up, enough samples and correct GPU synchronization',
+    'Profile where time goes in a request: preprocessing, transfer, model and postprocessing',
+    'Measure peak memory and compare it with an estimate',
+    'Avoid common benchmarking mistakes such as timing the first call or a closed-loop load',
   ],
   prerequisites: ['inference/throughput/batching-throughput'],
   concepts: [],

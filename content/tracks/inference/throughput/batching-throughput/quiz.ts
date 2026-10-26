@@ -9,7 +9,8 @@ export const questions: QuizQuestion[] = [
     answer: 181.8,
     tolerance: 0.05,
     hint: 'One full batch of 8 takes 20 + 24 = 44 ms. How many requests is that per 1,000 ms?',
-    explain: '8 requests every 44 ms: 8 / 0.044 s = 181.8 requests per second. With batches of 1 it is only 1 / 0.023 s = 43.5.',
+    explain:
+      '8 requests every 44 ms: 8 / 0.044 s = 181.8 requests per second. With batches of 1 it is only 1 / 0.023 s = 43.5.',
   },
   {
     id: 'why-batching',
@@ -25,41 +26,48 @@ export const questions: QuizQuestion[] = [
       {
         text: 'Batched requests need fewer arithmetic operations per request',
         correct: false,
-        explain: 'The arithmetic per request is the same. What is shared is the weight traffic and fixed overheads.',
+        explain:
+          'The arithmetic per request is the same. What is shared is the weight traffic and fixed overheads.',
       },
       {
         text: 'Batching makes each individual request faster',
         correct: false,
-        explain: 'Each request waits for others and runs in a longer batch, so its own latency usually goes up.',
+        explain:
+          'Each request waits for others and runs in a longer batch, so its own latency usually goes up.',
       },
     ],
   },
   {
     id: 'max-wait-light',
     type: 'choice',
-    prompt: 'Traffic is light: 20 requests per second, far below capacity. What does raising max_wait from 0 to 50 ms mostly do?',
+    prompt:
+      'Traffic is light: 20 requests per second, far below capacity. What does raising max_wait from 0 to 50 ms mostly do?',
     options: [
       {
         text: 'Raises latency, because requests sit waiting for partners that rarely come, while throughput stays at 20 req/s',
         correct: true,
-        explain: 'Throughput cannot exceed the arrival rate. Below capacity, waiting longer only adds latency.',
+        explain:
+          'Throughput cannot exceed the arrival rate. Below capacity, waiting longer only adds latency.',
       },
       {
         text: 'Raises throughput, because batches get bigger',
         correct: false,
-        explain: 'Bigger batches only raise throughput when the replica is the bottleneck. Here it is idle most of the time.',
+        explain:
+          'Bigger batches only raise throughput when the replica is the bottleneck. Here it is idle most of the time.',
       },
       {
         text: 'Nothing, because max_wait only matters when batches are full',
         correct: false,
-        explain: 'It matters exactly when batches are not full: it decides how long the first request waits for others.',
+        explain:
+          'It matters exactly when batches are not full: it decides how long the first request waits for others.',
       },
     ],
   },
   {
     id: 'overload',
     type: 'choice',
-    prompt: 'Requests arrive at 100 per second but the replica can finish only 43.5 per second. What happens to p95 latency?',
+    prompt:
+      'Requests arrive at 100 per second but the replica can finish only 43.5 per second. What happens to p95 latency?',
     options: [
       {
         text: 'It keeps growing for as long as the overload lasts, because the queue grows by about 56 requests every second',
@@ -87,7 +95,8 @@ export const questions: QuizQuestion[] = [
     answer: 5,
     tolerance: 0,
     hint: 'Little’s law: L = λW. Use seconds for W.',
-    explain: 'L = 100 req/s × 0.05 s = 5 requests. That is the concurrency a load test must sustain to reproduce this load.',
+    explain:
+      'L = 100 req/s × 0.05 s = 5 requests. That is the concurrency a load test must sustain to reproduce this load.',
   },
 ];
 

@@ -26,10 +26,9 @@ export const estimateCode: CodeExample = {
   language: 'python',
   source: MEMORY_SOURCE,
   slots: Object.fromEntries(
-    ['label', 'shape', 'params', 'batch', 'seq_len', 'w_bytes', 'kv_bytes', 'act_bytes', 'scores'].map((k) => [
-      k,
-      (s: unknown) => memorySlots(st(s))[k]!,
-    ]),
+    ['label', 'shape', 'params', 'batch', 'seq_len', 'w_bytes', 'kv_bytes', 'act_bytes', 'scores'].map(
+      (k) => [k, (s: unknown) => memorySlots(st(s))[k]!],
+    ),
   ),
   annotations: [
     {

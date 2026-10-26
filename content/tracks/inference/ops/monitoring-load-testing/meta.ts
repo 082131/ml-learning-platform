@@ -7,9 +7,10 @@ export default {
   minutes: 50,
   kind: 'lesson',
   objectives: [
-    'Load test a model server and find its saturation point',
-    'Monitor latency, errors and resource use',
-    'Debug a production slowdown from metrics',
+    'Load test a model server with open-loop arrivals and find its saturation point',
+    'Monitor latency percentiles, error rate, throughput and GPU memory over time',
+    'Set alerts from service-level objectives rather than averages',
+    'Debug a production slowdown from metrics and traces',
   ],
   prerequisites: ['inference/serving/apis-containers', 'inference/perf/profiling'],
   concepts: [],

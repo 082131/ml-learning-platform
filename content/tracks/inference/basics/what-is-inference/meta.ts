@@ -7,10 +7,11 @@ export default {
   minutes: 35,
   kind: 'lesson',
   objectives: [
-    'Explain the difference between training and inference',
-    'List what changes in compute and memory at inference time',
-    'Name the latency and throughput goals of a serving system',
+    'Explain what changes between training and inference: no gradients, no optimizer state, fixed weights',
+    'Trace one request through a served model from input to response',
+    'Distinguish online, batch and streaming (token-by-token) inference and give an example of each',
+    'Name the goals a serving system is judged on: latency, throughput, cost and accuracy',
   ],
-  prerequisites: ['ml/foundations/what-is-ml'],
+  prerequisites: ['ml/foundations/what-is-ml', 'ml/deep/forward-propagation'],
   concepts: ['inference', 'training'],
 } satisfies LessonMeta;

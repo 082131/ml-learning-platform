@@ -31,12 +31,14 @@ export default {
       version: 'NumPy 2.5',
     },
     {
-      title: 'PyTorch: CUDA semantics, memory management (caching allocator, memory_allocated vs memory_reserved)',
+      title:
+        'PyTorch: CUDA semantics, memory management (caching allocator, memory_allocated vs memory_reserved)',
       url: 'https://pytorch.org/docs/stable/notes/cuda.html#memory-management',
       version: 'PyTorch stable docs, read 2026-10-19',
     },
     {
-      title: 'Ainslie et al., GQA: Training Generalized Multi-Query Transformer Models from Multi-Head Checkpoints (2023)',
+      title:
+        'Ainslie et al., GQA: Training Generalized Multi-Query Transformer Models from Multi-Head Checkpoints (2023)',
       url: 'https://arxiv.org/abs/2305.13245',
     },
     {
@@ -44,7 +46,8 @@ export default {
       url: 'https://arxiv.org/abs/2205.14135',
     },
     {
-      title: 'Kwon et al., Efficient Memory Management for Large Language Model Serving with PagedAttention (2023)',
+      title:
+        'Kwon et al., Efficient Memory Management for Large Language Model Serving with PagedAttention (2023)',
       url: 'https://arxiv.org/abs/2309.06180',
     },
   ],

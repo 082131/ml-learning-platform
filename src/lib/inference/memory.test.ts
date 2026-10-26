@@ -128,8 +128,11 @@ describe.skipIf(!hasPython())('the printout equals what CPython prints', () => {
     { ...base, weights: 'int8', kv: 'fp16', batch: 3, seqLen: 128 },
   ];
   for (const s of Object.values(MODELS)) cases.push({ ...base, model: s.id, seqLen: 512, batch: 5 });
-  it.each(cases.map((c) => [`${c.model} ${c.weights} b${c.batch} s${c.seqLen}`, c] as const))('%s', (_, s) => {
-    const code = fillSlots(MEMORY_SOURCE, [], memorySlots(s)).source;
-    expect(runPython(code)).toBe(memoryPrintout(estimateMemory(s)).join('\n'));
-  });
+  it.each(cases.map((c) => [`${c.model} ${c.weights} b${c.batch} s${c.seqLen}`, c] as const))(
+    '%s',
+    (_, s) => {
+      const code = fillSlots(MEMORY_SOURCE, [], memorySlots(s)).source;
+      expect(runPython(code)).toBe(memoryPrintout(estimateMemory(s)).join('\n'));
+    },
+  );
 });

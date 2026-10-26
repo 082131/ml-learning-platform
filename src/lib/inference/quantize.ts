@@ -57,7 +57,9 @@ export function quantizeMatrix(
   granularity: Granularity,
 ): QuantizedMatrix {
   const params =
-    granularity === 'tensor' ? [quantParams(W.flat(), bits, scheme)] : W.map((row) => quantParams(row, bits, scheme));
+    granularity === 'tensor'
+      ? [quantParams(W.flat(), bits, scheme)]
+      : W.map((row) => quantParams(row, bits, scheme));
   const paramsOf = (i: number) => params[granularity === 'tensor' ? 0 : i]!;
   const q = W.map((row, i) => row.map((w) => quantizeValue(w, paramsOf(i), bits, scheme)));
   return { params, q, dequantized: q.map((row, i) => row.map((v) => dequantizeValue(v, paramsOf(i)))) };

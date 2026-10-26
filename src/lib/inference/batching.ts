@@ -100,7 +100,8 @@ export function simulate(c: BatchingConfig, arrivals = arrivalTimes(c.rate, c.n,
 }
 
 /** Requests per second the replica can finish when every batch is full: B / (t0 + per_item · B). */
-export const capacity = (c: BatchingConfig, batch = c.maxBatch) => (1000 * batch) / (c.t0 + c.perItem * batch);
+export const capacity = (c: BatchingConfig, batch = c.maxBatch) =>
+  (1000 * batch) / (c.t0 + c.perItem * batch);
 
 export const BATCHING_SOURCE = `import math
 

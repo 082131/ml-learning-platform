@@ -123,7 +123,8 @@ export function memorySlots(s: MemoryState): Record<string, string> {
 
 /** Exactly what the four print lines output (checked against CPython in memory.test.ts). */
 export function memoryPrintout(e: MemoryEstimate): string[] {
-  const line = (name: string, bytes: number) => `${name.padEnd(12)}${padLeft(pyFixed(bytes / GIB, 2), 9)} GiB`;
+  const line = (name: string, bytes: number) =>
+    `${name.padEnd(12)}${padLeft(pyFixed(bytes / GIB, 2), 9)} GiB`;
   return [
     line('weights', e.weights),
     line('KV cache', e.kvCache),
@@ -162,9 +163,13 @@ export function buildMemoryTrace(s: MemoryState): Trace {
     `Bytes per stored number: ${e.bytes.weights} for weights (${s.weights.toUpperCase()}), ${e.bytes.kv} for the KV cache (${s.kv.toUpperCase()}), ${e.bytes.act} for activations.`,
     { w_bytes: e.bytes.weights, kv_bytes: e.bytes.kv, act_bytes: e.bytes.act },
   );
-  step(8, `weights = ${n(e.params)} · ${e.bytes.weights} = ${n(e.weights)} bytes (${formatBytes(e.weights)}).`, {
-    weights: e.weights,
-  });
+  step(
+    8,
+    `weights = ${n(e.params)} · ${e.bytes.weights} = ${n(e.weights)} bytes (${formatBytes(e.weights)}).`,
+    {
+      weights: e.weights,
+    },
+  );
   step(
     9,
     `kv_cache = 2 · ${c.layers} · ${c.kvHeads} · ${e.headDim} · ${n(s.seqLen)} · ${s.batch} · ${e.bytes.kv} = ${n(e.kvCache)} bytes (${formatBytes(e.kvCache)}). That is ${n(e.kvPerToken)} bytes per token.`,
@@ -290,9 +295,7 @@ export function memoryReadout(s: MemoryState, e: MemoryEstimate): ReadoutItem[] 
     { label: 'Python: what the code prints', value: out.join('\n') },
     {
       label: `Fits in ${s.gpu} GiB? (estimate)`,
-      value: e.fits
-        ? `Yes, with ${formatBytes(free)} to spare`
-        : `No, ${formatBytes(-free)} over`,
+      value: e.fits ? `Yes, with ${formatBytes(free)} to spare` : `No, ${formatBytes(-free)} over`,
     },
     {
       label: `Largest batch at ${n(s.seqLen)} tokens (estimate)`,

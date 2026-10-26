@@ -44,7 +44,7 @@ describe('the batcher', () => {
   });
 
   it('draws arrivals from the seeded generator with mean gap 1000 / rate ms', () => {
-    const first = -Math.log(1 - seededRandom(7)()) / 100 * 1000;
+    const first = (-Math.log(1 - seededRandom(7)()) / 100) * 1000;
     const a = arrivalTimes(100, 20000, 7);
     expect(a[0]).toBe(first);
     expect(a.at(-1)! / a.length).toBeCloseTo(10, 0);

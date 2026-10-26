@@ -13,7 +13,14 @@ export default {
     'Choose between per-tensor and per-channel scales, and symmetric and asymmetric schemes',
   ],
   prerequisites: ['inference/memory/memory-estimation', 'ml/math/matrix-multiplication'],
-  concepts: ['floating-point', 'mantissa', 'bfloat16', 'quantization', 'scale-zero-point', 'per-channel-quantization'],
+  concepts: [
+    'floating-point',
+    'mantissa',
+    'bfloat16',
+    'quantization',
+    'scale-zero-point',
+    'per-channel-quantization',
+  ],
   references: [
     {
       title: 'IEEE 754-2019, Standard for Floating-Point Arithmetic',
@@ -31,11 +38,13 @@ export default {
       version: 'NumPy 2.5',
     },
     {
-      title: 'Jacob et al., Quantization and Training of Neural Networks for Efficient Integer-Arithmetic-Only Inference (2018)',
+      title:
+        'Jacob et al., Quantization and Training of Neural Networks for Efficient Integer-Arithmetic-Only Inference (2018)',
       url: 'https://arxiv.org/abs/1712.05877',
     },
     {
-      title: 'Krishnamoorthi, Quantizing deep convolutional networks for efficient inference: A whitepaper (2018)',
+      title:
+        'Krishnamoorthi, Quantizing deep convolutional networks for efficient inference: A whitepaper (2018)',
       url: 'https://arxiv.org/abs/1806.08342',
     },
     {

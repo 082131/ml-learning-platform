@@ -15,7 +15,8 @@ export const questions: QuizQuestion[] = [
       {
         text: 'It has more mantissa bits, so it is more precise',
         correct: false,
-        explain: 'The opposite: BF16 has 7 mantissa bits to FP16’s 10, so each value is rounded more coarsely.',
+        explain:
+          'The opposite: BF16 has 7 mantissa bits to FP16’s 10, so each value is rounded more coarsely.',
       },
       {
         text: 'It stores integers, which GPUs multiply faster',
@@ -27,7 +28,8 @@ export const questions: QuizQuestion[] = [
   {
     id: 'scale',
     type: 'numeric',
-    prompt: 'You quantize a weight matrix to 8 bits, symmetric, per tensor. Its largest |w| is 0.635. What is the scale?',
+    prompt:
+      'You quantize a weight matrix to 8 bits, symmetric, per tensor. Its largest |w| is 0.635. What is the scale?',
     answer: 0.005,
     tolerance: 0,
     hint: 'scale = max|w| / qmax, and qmax = 2⁷ − 1 for 8 bits.',
@@ -40,7 +42,8 @@ export const questions: QuizQuestion[] = [
     answer: 40,
     tolerance: 0,
     hint: 'Divide by the scale and round to the nearest integer.',
-    explain: '0.2013 / 0.005 = 40.26, which rounds to 40. Dequantized, it is 40 × 0.005 = 0.2, an error of 0.0013.',
+    explain:
+      '0.2013 / 0.005 = 40.26, which rounds to 40. Dequantized, it is 40 × 0.005 = 0.2, an error of 0.0013.',
   },
   {
     id: 'max-error',
@@ -66,7 +69,8 @@ export const questions: QuizQuestion[] = [
       {
         text: 'It gets clipped to ±127',
         correct: false,
-        explain: 'Clipping affects values beyond the largest |w|. Small values are never clipped; they are rounded coarsely.',
+        explain:
+          'Clipping affects values beyond the largest |w|. Small values are never clipped; they are rounded coarsely.',
       },
       {
         text: 'Nothing: every weight gets the same absolute error bound, so all rows are equally accurate',
@@ -90,12 +94,14 @@ export const questions: QuizQuestion[] = [
       {
         text: 'When the values are symmetric around zero, like most weight matrices',
         correct: false,
-        explain: 'Then the zero point ends up near 0 and the result is close to symmetric quantization, with an extra number to store.',
+        explain:
+          'Then the zero point ends up near 0 and the result is close to symmetric quantization, with an extra number to store.',
       },
       {
         text: 'Never: it always gives a larger error than symmetric quantization',
         correct: false,
-        explain: 'It uses all 2ᵇ levels instead of 2ᵇ − 1 and fits the actual range, so its steps are never larger.',
+        explain:
+          'It uses all 2ᵇ levels instead of 2ᵇ − 1 and fits the actual range, so its steps are never larger.',
       },
     ],
   },

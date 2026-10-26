@@ -37,5 +37,8 @@ export function predict(W1: number[][], b1: number[], W2: number[][], b2: number
 
 /** How many test images the model with these weight matrices classifies correctly. */
 export function countCorrect(m: DigitsModel, W1: number[][], W2: number[][]): number {
-  return m.test.X.reduce((n, image, i) => n + (predict(W1, m.b1, W2, m.b2, image) === m.test.y[i] ? 1 : 0), 0);
+  return m.test.X.reduce(
+    (n, image, i) => n + (predict(W1, m.b1, W2, m.b2, image) === m.test.y[i] ? 1 : 0),
+    0,
+  );
 }

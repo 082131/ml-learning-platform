@@ -11,7 +11,15 @@ const SIM_ID = 'batching-sim';
  * 100 requests per second on average, batches of up to 8, a 10 ms wait limit, and an assumed
  * service time of 20 + 3 · batch ms. These are illustrative numbers, not measurements of a GPU.
  */
-export const initial: BatchingConfig = { rate: 100, n: 2000, seed: 7, maxBatch: 8, maxWait: 10, t0: 20, perItem: 3 };
+export const initial: BatchingConfig = {
+  rate: 100,
+  n: 2000,
+  seed: 7,
+  maxBatch: 8,
+  maxWait: 10,
+  t0: 20,
+  perItem: 3,
+};
 
 export const experiment = batchingExperiment('batching', initial, SIM_ID);
 
@@ -22,7 +30,10 @@ export const simCode: CodeExample = {
   language: 'python',
   source: BATCHING_SOURCE,
   slots: Object.fromEntries(
-    ['rate', 'n', 'seed', 'max_batch', 'max_wait', 't0', 'per_item'].map((k) => [k, (s: unknown) => batchingSlots(st(s))[k]!]),
+    ['rate', 'n', 'seed', 'max_batch', 'max_wait', 't0', 'per_item'].map((k) => [
+      k,
+      (s: unknown) => batchingSlots(st(s))[k]!,
+    ]),
   ),
   annotations: [
     {
