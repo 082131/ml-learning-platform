@@ -4,11 +4,13 @@ export const questions: QuizQuestion[] = [
   {
     id: 'std-value',
     type: 'numeric',
-    prompt: 'The values are 2, 4, 4, 4, 5, 5, 7, 9. Their mean is 5. What is the standard deviation, dividing by n (ddof = 0)?',
+    prompt:
+      'The values are 2, 4, 4, 4, 5, 5, 7, 9. Their mean is 5. What is the standard deviation, dividing by n (ddof = 0)?',
     answer: 2,
     tolerance: 0,
     hint: 'Square each distance from 5, average the squares, then take the square root.',
-    explain: 'Squared distances: 9, 1, 1, 1, 0, 0, 4, 16. Their mean is 32 / 8 = 4, the variance, and √4 = 2.',
+    explain:
+      'Squared distances: 9, 1, 1, 1, 0, 0, 4, 16. Their mean is 32 / 8 = 4, the variance, and √4 = 2.',
   },
   {
     id: 'units',
@@ -18,31 +20,40 @@ export const questions: QuizQuestion[] = [
       {
         text: 'Square centimetres',
         correct: true,
-        explain: 'The variance averages squared distances. The standard deviation, its square root, is back in centimetres.',
+        explain:
+          'The variance averages squared distances. The standard deviation, its square root, is back in centimetres.',
       },
-      { text: 'Centimetres', correct: false, explain: 'That is the standard deviation, the square root of the variance.' },
+      {
+        text: 'Centimetres',
+        correct: false,
+        explain: 'That is the standard deviation, the square root of the variance.',
+      },
       { text: 'It has no units', correct: false, explain: 'Correlation has no units; the variance does.' },
     ],
   },
   {
     id: 'causation',
     type: 'choice',
-    prompt: 'Across many towns, the number of firefighters at a fire correlates strongly with the damage it causes. What is the best explanation?',
+    prompt:
+      'Across many towns, the number of firefighters at a fire correlates strongly with the damage it causes. What is the best explanation?',
     options: [
       {
         text: 'Bigger fires cause both more damage and more firefighters to be sent',
         correct: true,
-        explain: 'The size of the fire is a confounder: it drives both quantities. Sending fewer firefighters would not reduce damage.',
+        explain:
+          'The size of the fire is a confounder: it drives both quantities. Sending fewer firefighters would not reduce damage.',
       },
       {
         text: 'Firefighters cause damage',
         correct: false,
-        explain: 'Correlation alone cannot tell you the direction or the cause. Here a third variable explains it.',
+        explain:
+          'Correlation alone cannot tell you the direction or the cause. Here a third variable explains it.',
       },
       {
         text: 'The correlation must be a coincidence',
         correct: false,
-        explain: 'With many towns a strong correlation is unlikely to be chance. It is real, just not causal.',
+        explain:
+          'With many towns a strong correlation is unlikely to be chance. It is real, just not causal.',
       },
     ],
   },
@@ -54,17 +65,27 @@ export const questions: QuizQuestion[] = [
       {
         text: 'There is no straight-line relationship, even though y is completely determined by x',
         correct: true,
-        explain: 'Pearson r measures only linear association. A U-shape has r = 0. Always look at the scatter plot.',
+        explain:
+          'Pearson r measures only linear association. A U-shape has r = 0. Always look at the scatter plot.',
       },
-      { text: 'x and y are unrelated', correct: false, explain: 'y = x² exactly; r just cannot see a curve.' },
-      { text: 'The data are wrong', correct: false, explain: 'The data are fine; the summary misses the pattern.' },
+      {
+        text: 'x and y are unrelated',
+        correct: false,
+        explain: 'y = x² exactly; r just cannot see a curve.',
+      },
+      {
+        text: 'The data are wrong',
+        correct: false,
+        explain: 'The data are fine; the summary misses the pattern.',
+      },
     ],
   },
 ];
 
 export const stdExercise: Exercise = {
   id: 'std',
-  prompt: 'Write `std(xs, ddof=0)` that returns the standard deviation of a list, dividing by `len(xs) - ddof`, without NumPy.',
+  prompt:
+    'Write `std(xs, ddof=0)` that returns the standard deviation of a list, dividing by `len(xs) - ddof`, without NumPy.',
   starter: `def std(xs, ddof=0):
     # 1. the mean
     # 2. the sum of squared distances from the mean

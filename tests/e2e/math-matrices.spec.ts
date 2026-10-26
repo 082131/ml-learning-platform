@@ -17,7 +17,10 @@ test('editing A changes Aᵀ, the sum, the code literal and the printout togethe
 });
 
 test('selecting an entry of Aᵀ moves the index in the code and the readout', async ({ page }) => {
-  await page.locator('[data-viz="A and its transpose"]').getByRole('button', { name: 'Aᵀ[2][1] = 6' }).click();
+  await page
+    .locator('[data-viz="A and its transpose"]')
+    .getByRole('button', { name: 'Aᵀ[2][1] = 6' })
+    .click();
   await expect(page.locator('[data-code-example="matrices-numpy"]')).toContainText('print(A[1, 2])');
   const printed = page.getByRole('region', { name: 'What the code prints' });
   await expect(printed).toContainText('print(A[1, 2])');

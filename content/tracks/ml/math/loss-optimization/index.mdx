@@ -1,0 +1,166 @@
+import { descent1dCode, descent2dCode, experiment1d, experiment2d } from './code';
+import { descentExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Downhill in the fog">
+
+Training a model means choosing its <Term id="parameter">parameters</Term> so that its predictions are good. To
+make "good" precise you pick a <Term id="loss-function">loss function</Term>: one number that is large when the
+predictions are far from the targets and small when they are close. Training is then a search for the parameters
+with the smallest loss.
+
+You cannot see the whole loss landscape, any more than a hiker in thick fog can see the valley floor. But you can
+feel the slope under your feet: that is the <Term id="gradient">gradient</Term>.
+<Term id="gradient-descent">Gradient descent</Term> takes a small step downhill, feels the slope again, and
+repeats. How big each step is, the <Term id="learning-rate">learning rate</Term>, decides whether you walk down
+steadily, crawl, or leap clean over the valley.
+
+</Section>
+
+<Section kind="technical" title="Loss functions and the update rule">
+
+**Mean squared error.** For predictions $\hat y_i$ and targets $y_i$, $i = 1 \dots n$:
+
+$$
+L = \frac1n \sum_{i=1}^n (\hat y_i - y_i)^2
+$$
+
+Squaring makes every error count as positive and punishes large errors more than small ones. It is the standard
+<Term id="mean-squared-error">loss for regression</Term>; classification uses cross-entropy instead, which you meet
+with logistic regression.
+
+**Gradient descent** updates every parameter $\theta$ against its partial derivative, with learning rate $\eta$:
+
+$$
+\theta \leftarrow \theta - \eta \, \frac{\partial L}{\partial \theta}
+$$
+
+For $f(x) = (x - 2)^2 + 1$, $f'(x) = 2(x - 2)$, so from $x_0 = 6$ with $\eta = 0.25$:
+$x_1 = 6 - 0.25 \cdot 8 = 4$, $x_2 = 4 - 0.25 \cdot 4 = 3$. Each step halves the distance to the minimum at 2.
+
+**The learning rate.** On this function each step multiplies the distance to the minimum by $1 - 2\eta$. So
+$\eta = 0.5$ lands on the minimum in one step, $0.5 < \eta < 1$ overshoots but still converges, $\eta = 1$ bounces
+between 6 and −2 forever, and $\eta > 1$ diverges. For a general loss the safe range depends on how sharply it
+curves: $\eta < 2 / \text{curvature}$, along the most sharply curved direction.
+
+**Convex or not.** A <Term id="convex-function">convex</Term> loss has a single valley, so any point with zero
+gradient is the global minimum. Mean squared error for a linear model is convex. Neural network losses are not:
+gradient descent can settle in a <Term id="local-minimum">local minimum</Term>, and where it ends depends on where
+it starts.
+
+</Section>
+
+<Section kind="visual" title="One parameter">
+
+<Experiment def={experiment1d} title="Gradient descent on one variable">
+  <GradientDescent1D />
+  <Readout />
+</Experiment>
+
+Things to try:
+
+- Set $\eta = 0.5$: the first step lands exactly on $x = 2$.
+- Set $\eta = 0.9$: x zig-zags across the minimum but closes in.
+- Set $\eta$ just above 1, say 1.01: each overshoot is a little larger than the last, and the loss per step climbs.
+- Switch to the non-convex function. Start at $x_0 = 1$ and gradient descent stops in the local minimum near
+  $x = 1.13$; start at $x_0 = -0.5$ and it finds the deeper one near $x = -1.30$.
+
+</Section>
+
+<Section kind="visual" title="Two parameters: the loss surface from above">
+
+A real model has many parameters. With two you can still draw the loss: fit a line $\hat y = w x + b$ to the four
+points $(0, 1), (1, 2), (2, 5), (3, 6)$, and draw the mean squared error over every $(w, b)$ as a contour map, like
+the height lines of a hiking map. The minimum is the least-squares line $w = 1.8$, $b = 0.8$, with loss 0.2.
+
+<Experiment def={experiment2d} title="Gradient descent on a line fit">
+  <DescentContour />
+  <Readout />
+</Experiment>
+
+The small arrows show $-\nabla L$ at a grid of points: always downhill, at right angles to the contour lines. The
+valley is long and narrow because the loss curves about 14 times more sharply across it than along it (the
+curvatures are 8.41 and 0.59).
+
+Things to try:
+
+- Raise $\eta$ to 0.2: the path zig-zags across the narrow valley, because a step sized for the gentle direction
+  is too big for the steep one.
+- Raise $\eta$ to 0.24, just past $2 / 8.41 \approx 0.238$: the zig-zag grows instead of shrinking, and with
+  enough steps the loss goes up.
+- Lower $\eta$ to 0.02: the path is smooth but crawls along the valley floor and is far from the minimum after
+  100 steps.
+- Move the inspected step to see each update as an arrow; it always leaves its point along $-\nabla L$.
+
+</Section>
+
+<Section kind="code" title="Gradient descent in Python">
+
+The one-variable version, with the settings the first experiment starts with:
+
+<Code example={descent1dCode} title="descent_1d.py" />
+
+The line fit, linked to the second experiment. Change a slider and the code, and what it prints, follow:
+
+<Experiment def={experiment2d} title="descent_2d.py, linked to the contour map" controls={false}>
+  <Code example={descent2dCode} title="descent_2d.py" />
+  <Readout title="Where the descent ended" />
+</Experiment>
+
+</Section>
+
+<Section kind="mistakes" title="When the learning rate is too large">
+
+<CommonMistake
+  title="Diverging until the numbers overflow"
+  wrong={'x = 6.0\nlr = 1.5\nfor step in range(1000):\n    x = x - lr * df(x)\n    loss = f(x)'}
+  error="OverflowError: (34, 'Numerical result out of range')"
+  cause="With η = 1.5 each step multiplies the distance to the minimum by −2, so x doubles in size every step. After about 500 steps (x − 2) ** 2 is too large for a float and Python raises."
+  fix={'lr = 0.1  # below 1 for this function: each step shrinks the distance to the minimum'}
+/>
+
+<Callout kind="warning">
+  Libraries such as NumPy and PyTorch do not raise on overflow: the loss becomes `inf` and then `nan`, and training
+  carries on silently. If the loss goes up, or turns into `nan`, lower the learning rate first.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Choosing a learning rate in practice">
+
+There is no formula for the best learning rate of a real model. A common recipe:
+
+1. Try a few values spaced by factors of 10 (0.1, 0.01, 0.001) and plot the loss per step for each.
+2. Keep the largest one whose loss goes down steadily, without spikes.
+3. If the loss falls fast and then stalls, lower the rate later in training (a learning-rate schedule).
+
+The contour map shows why a single rate is a compromise: the steepest direction limits how large it can be, and
+the gentlest direction then takes many steps. Optimizers such as momentum and Adam, covered in the deep learning
+track, adapt the step per direction to ease exactly this.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Write gradient descent">
+
+<MiniExercise exercise={descentExercise}>
+  Write `descend(df, x0, lr, steps)` that applies the update $x \leftarrow x - \eta f'(x)$ `steps` times and returns
+  the final $x$.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A loss function turns "how wrong" into one number; mean squared error is the regression default.
+- Gradient descent repeats $\theta \leftarrow \theta - \eta \, \partial L / \partial \theta$.
+- Too small a learning rate crawls; too large overshoots and diverges.
+- Convex losses have one minimum; non-convex ones can trap descent in a local minimum.
+
+Next: [Project: matrix multiply and gradient descent from scratch](#/learn/ml/math/project-math).
+
+</Section>

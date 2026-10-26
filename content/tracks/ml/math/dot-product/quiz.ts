@@ -27,7 +27,8 @@ export const questions: QuizQuestion[] = [
       {
         text: 'The angle between them is more than 90°',
         correct: true,
-        explain: 'u · v = ‖u‖‖v‖ cos θ, and the lengths are positive, so the sign is the sign of cos θ: negative beyond 90°.',
+        explain:
+          'u · v = ‖u‖‖v‖ cos θ, and the lengths are positive, so the sign is the sign of cos θ: negative beyond 90°.',
       },
       {
         text: 'One of the vectors has a negative length',
@@ -54,7 +55,8 @@ export const questions: QuizQuestion[] = [
       {
         text: '2',
         correct: false,
-        explain: 'Cosine similarity is a cosine, so it is never above 1. The dot product would double, but the lengths cancel it.',
+        explain:
+          'Cosine similarity is a cosine, so it is never above 1. The dot product would double, but the lengths cancel it.',
       },
       {
         text: '0.5',

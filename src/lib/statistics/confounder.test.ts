@@ -32,7 +32,13 @@ describe('confounder simulation', () => {
   it('reports r values that match pearson on the generated days', () => {
     const days = simulateDays(0.5, 7);
     const res = analyzeDays(days);
-    expect(res.rAll).toBeCloseTo(pearson(days.map((d) => d.iceCream), days.map((d) => d.sunburn)), 12);
+    expect(res.rAll).toBeCloseTo(
+      pearson(
+        days.map((d) => d.iceCream),
+        days.map((d) => d.sunburn),
+      ),
+      12,
+    );
   });
 
   it('is a valid experiment and shows within-season r only when split', () => {

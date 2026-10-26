@@ -43,7 +43,7 @@ export const tracks: Track[] = [
           { id: 'ml/math/gradients-chain-rule', status: 'written' },
           { id: 'ml/math/probability', status: 'written' },
           { id: 'ml/math/statistics-intuition', status: 'written' },
-          { id: 'ml/math/loss-optimization', status: 'outline' },
+          { id: 'ml/math/loss-optimization', status: 'written' },
           { id: 'ml/math/project-math', status: 'outline' },
         ],
       },

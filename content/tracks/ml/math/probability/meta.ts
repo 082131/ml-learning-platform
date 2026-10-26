@@ -13,7 +13,13 @@ export default {
     'Use a seed to make random experiments reproducible',
   ],
   prerequisites: ['ml/foundations/python-basics'],
-  concepts: ['random-variable', 'probability-distribution', 'expected-value', 'law-of-large-numbers', 'random-seed'],
+  concepts: [
+    'random-variable',
+    'probability-distribution',
+    'expected-value',
+    'law-of-large-numbers',
+    'random-seed',
+  ],
   references: [
     {
       title: 'NumPy random Generator',

@@ -109,7 +109,8 @@ export default [
   {
     id: 'reshape',
     term: 'Reshape',
-    short: 'Giving the same entries a new shape with the same total size, keeping their flat (row-major) order.',
+    short:
+      'Giving the same entries a new shape with the same total size, keeping their flat (row-major) order.',
     long: 'np.arange(12).reshape(3, 4) lays 0 to 11 out in 3 rows of 4. One size may be -1, meaning "whatever makes the total match". Unlike transpose, reshape never reorders entries.',
     introducedIn: 'ml/math/tensors',
   },
@@ -146,7 +147,8 @@ export default [
   {
     id: 'finite-difference',
     term: 'Finite difference',
-    short: 'A numerical estimate of a derivative from f at nearby points, such as (f(x + h) − f(x − h)) / (2h).',
+    short:
+      'A numerical estimate of a derivative from f at nearby points, such as (f(x + h) − f(x − h)) / (2h).',
     long: 'The forward difference has error roughly proportional to h, the central difference roughly h² for smooth functions. Too small an h loses accuracy to floating-point round-off. Comparing a finite difference with code’s exact gradient is called a gradient check.',
     introducedIn: 'ml/math/functions-derivatives',
     aliases: ['numerical derivative', 'gradient check', 'central difference', 'forward difference'],
@@ -162,7 +164,8 @@ export default [
   {
     id: 'gradient',
     term: 'Gradient',
-    short: 'The vector of all partial derivatives, ∇f = (∂f/∂w₁, ∂f/∂w₂, …); it points in the direction of steepest increase.',
+    short:
+      'The vector of all partial derivatives, ∇f = (∂f/∂w₁, ∂f/∂w₂, …); it points in the direction of steepest increase.',
     long: 'Its negative is the direction of steepest descent, which gradient descent follows. A gradient of zero marks a flat point: a minimum, a maximum or a saddle.',
     introducedIn: 'ml/math/gradients-chain-rule',
     aliases: ['∇', 'grad'],
@@ -170,14 +173,16 @@ export default [
   {
     id: 'chain-rule',
     term: 'Chain rule',
-    short: 'The derivative through a chain of steps is the product of each step’s derivative: ∂L/∂w = ∂L/∂e · ∂e/∂w.',
+    short:
+      'The derivative through a chain of steps is the product of each step’s derivative: ∂L/∂w = ∂L/∂e · ∂e/∂w.',
     long: 'Backpropagation applies it from the loss backward through a computation graph, multiplying one local derivative per edge.',
     introducedIn: 'ml/math/gradients-chain-rule',
   },
   {
     id: 'computation-graph',
     term: 'Computation graph',
-    short: 'A computation written as nodes (values) connected by simple operations, such as p = w·x, ŷ = p + b.',
+    short:
+      'A computation written as nodes (values) connected by simple operations, such as p = w·x, ŷ = p + b.',
     long: 'The forward pass computes node values from inputs to loss. The backward pass computes each node’s gradient from the loss back, using the local derivative of each operation. Autograd libraries record this graph automatically.',
     introducedIn: 'ml/math/gradients-chain-rule',
     aliases: ['autograd graph'],
@@ -192,7 +197,8 @@ export default [
   {
     id: 'probability-distribution',
     term: 'Probability distribution',
-    short: 'The values a random variable can take and how likely each is; for a discrete variable the probabilities sum to 1.',
+    short:
+      'The values a random variable can take and how likely each is; for a discrete variable the probabilities sum to 1.',
     long: 'A fair die gives probability 1/6 to each of 1 to 6. The binomial distribution counts successes in n independent trials.',
     introducedIn: 'ml/math/probability',
     aliases: ['distribution'],
@@ -200,7 +206,8 @@ export default [
   {
     id: 'expected-value',
     term: 'Expected value',
-    short: 'The probability-weighted average of a random variable’s values, E[X] = Σ x · P(X = x): its long-run mean.',
+    short:
+      'The probability-weighted average of a random variable’s values, E[X] = Σ x · P(X = x): its long-run mean.',
     long: 'For a fair die it is 3.5, which is not itself a possible roll.',
     introducedIn: 'ml/math/probability',
     aliases: ['expectation', 'E[X]'],
@@ -230,7 +237,8 @@ export default [
   {
     id: 'standard-deviation',
     term: 'Standard deviation',
-    short: 'The square root of the variance: how far values typically are from the mean, in the data’s own units.',
+    short:
+      'The square root of the variance: how far values typically are from the mean, in the data’s own units.',
     introducedIn: 'ml/math/statistics-intuition',
     aliases: ['SD', 'std'],
   },
@@ -245,9 +253,60 @@ export default [
   {
     id: 'confounder',
     term: 'Confounder',
-    short: 'A third variable that affects two others, making them correlate even when neither causes the other.',
+    short:
+      'A third variable that affects two others, making them correlate even when neither causes the other.',
     long: 'Summer raises both ice-cream sales and sunburns. Comparing within one level of the confounder, or running a controlled experiment, separates its effect.',
     introducedIn: 'ml/math/statistics-intuition',
     aliases: ['confounding variable'],
+  },
+  {
+    id: 'loss-function',
+    term: 'Loss function',
+    short:
+      'A function that turns a model’s predictions and the targets into one number that is smaller when the predictions are better.',
+    long: 'Training searches for the parameters that minimize it. Mean squared error is common for regression, cross-entropy for classification.',
+    introducedIn: 'ml/math/loss-optimization',
+    aliases: ['loss', 'cost function', 'objective'],
+  },
+  {
+    id: 'mean-squared-error',
+    term: 'Mean squared error',
+    short: 'The average of the squared differences between predictions and targets: (1/n) Σ (ŷᵢ − yᵢ)².',
+    long: 'Squaring makes all errors positive and weighs large errors more. For a linear model it is convex in the parameters.',
+    introducedIn: 'ml/math/loss-optimization',
+    aliases: ['MSE'],
+  },
+  {
+    id: 'gradient-descent',
+    term: 'Gradient descent',
+    short: 'Repeatedly move the parameters a small step against the gradient of the loss: θ ← θ − η · ∂L/∂θ.',
+    long: 'Each step goes downhill along the steepest direction at the current point. Stochastic gradient descent estimates the gradient from a small batch of examples.',
+    introducedIn: 'ml/math/loss-optimization',
+    aliases: ['GD'],
+  },
+  {
+    id: 'learning-rate',
+    term: 'Learning rate',
+    short: 'The step size η in gradient descent: how far each update moves, as a multiple of the gradient.',
+    long: 'Too small and training is slow; too large and updates overshoot the minimum and can diverge. It is a hyperparameter, chosen rather than learned.',
+    introducedIn: 'ml/math/loss-optimization',
+    aliases: ['η', 'step size', 'lr'],
+  },
+  {
+    id: 'convex-function',
+    term: 'Convex function',
+    short:
+      'A function shaped like a single bowl: the straight line between any two points on its graph lies on or above the graph.',
+    long: 'Any point where the gradient of a convex function is zero is a global minimum, so gradient descent with a small enough step finds it.',
+    introducedIn: 'ml/math/loss-optimization',
+    aliases: ['convex'],
+  },
+  {
+    id: 'local-minimum',
+    term: 'Local minimum',
+    short:
+      'A point lower than everything near it, but not necessarily the lowest point overall (the global minimum).',
+    long: 'Gradient descent stops wherever the gradient is zero, so on a non-convex loss its result depends on the starting point.',
+    introducedIn: 'ml/math/loss-optimization',
   },
 ] satisfies GlossaryTerm[];

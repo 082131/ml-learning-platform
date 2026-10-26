@@ -1,9 +1,13 @@
 import { expect, test } from '@playwright/test';
 import { expectAccessibleInBothThemes, openMathLesson } from './math-helpers';
 
-test.beforeEach(async ({ page }) => openMathLesson(page, 'probability', 'Probability, distributions and expected value'));
+test.beforeEach(async ({ page }) =>
+  openMathLesson(page, 'probability', 'Probability, distributions and expected value'),
+);
 
-test('the simulator, histogram and NumPy code follow the distribution, sample size and seed', async ({ page }) => {
+test('the simulator, histogram and NumPy code follow the distribution, sample size and seed', async ({
+  page,
+}) => {
   const viz = page.locator('[data-viz="Sample vs distribution"]');
   const code = page.locator('[data-code-example="sampling-numpy"]');
   await expect(viz).toContainText('100 draws with seed 1');

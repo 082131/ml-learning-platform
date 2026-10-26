@@ -15,9 +15,17 @@ export const questions: QuizQuestion[] = [
     type: 'choice',
     prompt: 'At some point, f′(x) = −4. What happens to f if you increase x a little?',
     options: [
-      { text: 'f decreases, about 4 times as fast as x increases', correct: true, explain: 'A negative slope means the graph goes down to the right: f(x + h) ≈ f(x) − 4h.' },
+      {
+        text: 'f decreases, about 4 times as fast as x increases',
+        correct: true,
+        explain: 'A negative slope means the graph goes down to the right: f(x + h) ≈ f(x) − 4h.',
+      },
       { text: 'f increases', correct: false, explain: 'That would need a positive derivative.' },
-      { text: 'f(x) equals −4', correct: false, explain: 'The derivative is the slope at x, not the value of f there.' },
+      {
+        text: 'f(x) equals −4',
+        correct: false,
+        explain: 'The derivative is the slope at x, not the value of f there.',
+      },
     ],
   },
   {
@@ -27,7 +35,8 @@ export const questions: QuizQuestion[] = [
     answer: 6.1,
     tolerance: 0.0001,
     hint: 'f(3.1) = 9.61 and f(3) = 9.',
-    explain: '(9.61 − 9) / 0.1 = 0.61 / 0.1 = 6.1. The exact derivative is 2 · 3 = 6, so the error is h = 0.1.',
+    explain:
+      '(9.61 − 9) / 0.1 = 0.61 / 0.1 = 6.1. The exact derivative is 2 · 3 = 6, so the error is h = 0.1.',
   },
   {
     id: 'tiny-h',
@@ -37,7 +46,8 @@ export const questions: QuizQuestion[] = [
       {
         text: 'f(x + h) − f(x) loses almost all its digits to floating-point rounding',
         correct: true,
-        explain: 'Floats keep about 16 significant digits. Subtracting two nearly equal numbers leaves only a few correct ones, and dividing by a tiny h magnifies the rest.',
+        explain:
+          'Floats keep about 16 significant digits. Subtracting two nearly equal numbers leaves only a few correct ones, and dividing by a tiny h magnifies the rest.',
       },
       {
         text: 'The derivative changes when h is small',

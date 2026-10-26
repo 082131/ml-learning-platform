@@ -6,9 +6,21 @@ export const questions: QuizQuestion[] = [
     type: 'choice',
     prompt: 'A dataset has 500 examples and 12 features, one example per row. What is its shape?',
     options: [
-      { text: '(500, 12)', correct: true, explain: 'Rows come first: 500 rows (examples), 12 columns (features).' },
-      { text: '(12, 500)', correct: false, explain: 'That is the shape of its transpose, with one row per feature.' },
-      { text: '(6000,)', correct: false, explain: '6000 is the number of entries, but a matrix keeps its two dimensions.' },
+      {
+        text: '(500, 12)',
+        correct: true,
+        explain: 'Rows come first: 500 rows (examples), 12 columns (features).',
+      },
+      {
+        text: '(12, 500)',
+        correct: false,
+        explain: 'That is the shape of its transpose, with one row per feature.',
+      },
+      {
+        text: '(6000,)',
+        correct: false,
+        explain: '6000 is the number of entries, but a matrix keeps its two dimensions.',
+      },
     ],
   },
   {
@@ -33,12 +45,14 @@ export const questions: QuizQuestion[] = [
       {
         text: 'M + M.T',
         correct: false,
-        explain: 'M.T has shape (5, 3). Element-wise addition needs equal shapes, so NumPy raises a broadcasting ValueError.',
+        explain:
+          'M.T has shape (5, 3). Element-wise addition needs equal shapes, so NumPy raises a broadcasting ValueError.',
       },
       {
         text: 'M[3, 0]',
         correct: false,
-        explain: 'Rows are numbered 0, 1, 2. Index 3 raises IndexError: index 3 is out of bounds for axis 0 with size 3.',
+        explain:
+          'Rows are numbered 0, 1, 2. Index 3 raises IndexError: index 3 is out of bounds for axis 0 with size 3.',
       },
     ],
   },
@@ -49,7 +63,11 @@ export const questions: QuizQuestion[] = [
     options: [
       { text: 'T[2, 0]', correct: true, explain: 'Transposing swaps the two indices.' },
       { text: 'T[0, 2]', correct: false, explain: 'Only entries on the diagonal (i = j) stay in place.' },
-      { text: 'T[2, 2]', correct: false, explain: 'The row index becomes the column index and vice versa; neither is replaced.' },
+      {
+        text: 'T[2, 2]',
+        correct: false,
+        explain: 'The row index becomes the column index and vice versa; neither is replaced.',
+      },
     ],
   },
 ];

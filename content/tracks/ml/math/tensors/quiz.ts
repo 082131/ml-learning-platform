@@ -4,11 +4,20 @@ export const questions: QuizQuestion[] = [
   {
     id: 'ndim',
     type: 'choice',
-    prompt: 'A batch of 16 sentences, each 20 tokens long, each token a vector of 128 numbers. What is its shape?',
+    prompt:
+      'A batch of 16 sentences, each 20 tokens long, each token a vector of 128 numbers. What is its shape?',
     options: [
       { text: '(16, 20, 128)', correct: true, explain: 'Batch first, then sequence, then features: 3 axes.' },
-      { text: '(16, 2560)', correct: false, explain: 'That is the same data flattened per sentence; the token axis is gone.' },
-      { text: '(128, 20, 16)', correct: false, explain: 'Same sizes, but the batch axis comes first by convention.' },
+      {
+        text: '(16, 2560)',
+        correct: false,
+        explain: 'That is the same data flattened per sentence; the token axis is gone.',
+      },
+      {
+        text: '(128, 20, 16)',
+        correct: false,
+        explain: 'Same sizes, but the batch axis comes first by convention.',
+      },
     ],
   },
   {
@@ -28,7 +37,8 @@ export const questions: QuizQuestion[] = [
       {
         text: 'x.reshape(2, 4, 3) and x.transpose(0, 2, 1) have the same shape but different contents',
         correct: true,
-        explain: 'reshape keeps the flat order of the numbers; transpose moves them so that x[i, j, k] becomes y[i, k, j].',
+        explain:
+          'reshape keeps the flat order of the numbers; transpose moves them so that x[i, j, k] becomes y[i, k, j].',
       },
       {
         text: 'x.reshape(2, 4, 3) is the same array as x.transpose(0, 2, 1)',
@@ -38,7 +48,8 @@ export const questions: QuizQuestion[] = [
       {
         text: 'x.reshape(5, 5) works because 2 · 3 · 4 is close to 25',
         correct: false,
-        explain: 'The size must match exactly: NumPy raises ValueError: cannot reshape array of size 24 into shape (5,5).',
+        explain:
+          'The size must match exactly: NumPy raises ValueError: cannot reshape array of size 24 into shape (5,5).',
       },
     ],
   },
@@ -47,9 +58,17 @@ export const questions: QuizQuestion[] = [
     type: 'choice',
     prompt: 'X has shape (8, 10, 64) and W has shape (64, 32). What is the shape of X @ W?',
     options: [
-      { text: '(8, 10, 32)', correct: true, explain: 'Each of the 8 (10, 64) matrices is multiplied by W: (10, 64) @ (64, 32) → (10, 32).' },
+      {
+        text: '(8, 10, 32)',
+        correct: true,
+        explain: 'Each of the 8 (10, 64) matrices is multiplied by W: (10, 64) @ (64, 32) → (10, 32).',
+      },
       { text: '(8, 64, 32)', correct: false, explain: 'The inner size 64 is summed over, so it disappears.' },
-      { text: 'An error', correct: false, explain: 'The last axis of X (64) matches the first axis of W (64), so it works.' },
+      {
+        text: 'An error',
+        correct: false,
+        explain: 'The last axis of X (64) matches the first axis of W (64), so it works.',
+      },
     ],
   },
 ];

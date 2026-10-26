@@ -4,7 +4,8 @@ export const questions: QuizQuestion[] = [
   {
     id: 'event',
     type: 'numeric',
-    prompt: 'A fair die is rolled once. What is the probability of rolling a number greater than 4? (Give a decimal.)',
+    prompt:
+      'A fair die is rolled once. What is the probability of rolling a number greater than 4? (Give a decimal.)',
     answer: 1 / 3,
     tolerance: 0.005,
     hint: 'Count the outcomes that qualify and divide by the number of equally likely outcomes.',
@@ -13,7 +14,8 @@ export const questions: QuizQuestion[] = [
   {
     id: 'expected',
     type: 'numeric',
-    prompt: 'A loaded die shows 6 with probability 0.5 and each of 1 to 5 with probability 0.1. What is E[X]?',
+    prompt:
+      'A loaded die shows 6 with probability 0.5 and each of 1 to 5 with probability 0.1. What is E[X]?',
     answer: 4.5,
     tolerance: 0,
     hint: 'E[X] = Σ x · P(X = x). The faces 1 to 5 contribute 0.1 · (1 + 2 + 3 + 4 + 5).',
@@ -22,17 +24,20 @@ export const questions: QuizQuestion[] = [
   {
     id: 'lln',
     type: 'choice',
-    prompt: 'You roll a fair die 10 times and get a mean of 4.2. What happens to the sample mean as you keep rolling to 10,000?',
+    prompt:
+      'You roll a fair die 10 times and get a mean of 4.2. What happens to the sample mean as you keep rolling to 10,000?',
     options: [
       {
         text: 'It tends to get closer to 3.5, although any particular sample can still be off a little',
         correct: true,
-        explain: 'The law of large numbers: the sample mean settles near E[X] as n grows. Its typical error shrinks like 1/√n.',
+        explain:
+          'The law of large numbers: the sample mean settles near E[X] as n grows. Its typical error shrinks like 1/√n.',
       },
       {
         text: 'It drops below 3.5 to make up for the high start',
         correct: false,
-        explain: 'Rolls are independent; the die does not compensate. The early excess is simply diluted by many more rolls (the gambler’s fallacy).',
+        explain:
+          'Rolls are independent; the die does not compensate. The early excess is simply diluted by many more rolls (the gambler’s fallacy).',
       },
       {
         text: 'It stays near 4.2, because the first rolls set the trend',
@@ -49,17 +54,20 @@ export const questions: QuizQuestion[] = [
       {
         text: 'So a run that uses randomness (shuffling, initial weights, sampling) can be repeated exactly',
         correct: true,
-        explain: 'A seeded generator produces the same sequence each time, so results can be reproduced and compared.',
+        explain:
+          'A seeded generator produces the same sequence each time, so results can be reproduced and compared.',
       },
       {
         text: 'To make the random numbers more random',
         correct: false,
-        explain: 'A seed only chooses the starting point of a deterministic sequence; it does not change its quality.',
+        explain:
+          'A seed only chooses the starting point of a deterministic sequence; it does not change its quality.',
       },
       {
         text: 'To guarantee the model reaches the best possible accuracy',
         correct: false,
-        explain: 'A seed fixes which result you get, not how good it is. Reporting several seeds shows how much results vary.',
+        explain:
+          'A seed fixes which result you get, not how good it is. Reporting several seeds shows how much results vary.',
       },
     ],
   },
@@ -67,7 +75,8 @@ export const questions: QuizQuestion[] = [
 
 export const expectedValueExercise: Exercise = {
   id: 'expected-value',
-  prompt: 'Write `expected_value(values, probs)` that returns Σ x · P(X = x), and raises ValueError if the probabilities do not sum to 1.',
+  prompt:
+    'Write `expected_value(values, probs)` that returns Σ x · P(X = x), and raises ValueError if the probabilities do not sum to 1.',
   starter: `def expected_value(values, probs):
     # check that probs sums to 1 (allow a tiny rounding error)
     # then return the probability-weighted sum of the values

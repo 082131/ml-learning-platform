@@ -12,5 +12,19 @@ export default {
     'Recognize when a learning rate is too small or makes training diverge',
   ],
   prerequisites: ['ml/math/gradients-chain-rule'],
-  concepts: ['parameter'],
+  concepts: [
+    'parameter',
+    'loss-function',
+    'mean-squared-error',
+    'gradient-descent',
+    'learning-rate',
+    'convex-function',
+    'local-minimum',
+  ],
+  references: [
+    {
+      title: 'Deep Learning, chapter 4.3: Gradient-Based Optimization (Goodfellow, Bengio and Courville)',
+      url: 'https://www.deeplearningbook.org/contents/numerical.html',
+    },
+  ],
 } satisfies LessonMeta;

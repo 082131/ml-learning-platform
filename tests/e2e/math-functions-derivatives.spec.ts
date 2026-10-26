@@ -1,7 +1,9 @@
 import { expect, test } from '@playwright/test';
 import { expectAccessibleInBothThemes, openMathLesson } from './math-helpers';
 
-test.beforeEach(async ({ page }) => openMathLesson(page, 'functions-derivatives', 'Functions and derivatives'));
+test.beforeEach(async ({ page }) =>
+  openMathLesson(page, 'functions-derivatives', 'Functions and derivatives'),
+);
 
 test('changing h and x moves the secant, the code literals and the estimates together', async ({ page }) => {
   const viz = page.locator('[data-viz="Slope at a point"]');

@@ -13,7 +13,8 @@ export const questions: QuizQuestion[] = [
   {
     id: 'direction',
     type: 'choice',
-    prompt: 'The gradient of a loss at the current weights is (∂L/∂w₁, ∂L/∂w₂) = (4, −2). Which change lowers the loss fastest?',
+    prompt:
+      'The gradient of a loss at the current weights is (∂L/∂w₁, ∂L/∂w₂) = (4, −2). Which change lowers the loss fastest?',
     options: [
       {
         text: 'Move the weights in the direction (−4, 2)',
@@ -49,7 +50,8 @@ export const questions: QuizQuestion[] = [
       {
         text: 'Each node’s gradient is the next node’s gradient times one local derivative, so going backward reuses work',
         correct: true,
-        explain: 'Starting from ∂L/∂L = 1, every gradient is one multiplication away from one already computed. This is backpropagation.',
+        explain:
+          'Starting from ∂L/∂L = 1, every gradient is one multiplication away from one already computed. This is backpropagation.',
       },
       {
         text: 'Because the forward values are not needed',
@@ -59,7 +61,8 @@ export const questions: QuizQuestion[] = [
       {
         text: 'It is a convention; going forward gives the same cost',
         correct: false,
-        explain: 'With one loss and many weights, the backward order computes all the gradients in one pass; going forward would need a pass per weight.',
+        explain:
+          'With one loss and many weights, the backward order computes all the gradients in one pass; going forward would need a pass per weight.',
       },
     ],
   },
