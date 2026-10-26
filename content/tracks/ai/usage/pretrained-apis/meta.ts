@@ -7,10 +7,10 @@ export default {
   minutes: 45,
   kind: 'lesson',
   objectives: [
-    'Call a hosted model API and handle its errors',
-    'Run a pretrained model locally with a library',
-    'Compare hosted and local use on cost, latency and privacy',
+    'Call a hosted model API, read its response and usage, and handle rate-limit and server errors with retries',
+    'Run a small pretrained model locally with a library',
+    'Compare hosted and local models on cost, latency, quality and data privacy',
   ],
-  prerequisites: ['ai/llm/transformers-llms'],
+  prerequisites: ['ai/llm/transformers-llms', 'ai/fundamentals/ai-landscape'],
   concepts: [],
 } satisfies LessonMeta;

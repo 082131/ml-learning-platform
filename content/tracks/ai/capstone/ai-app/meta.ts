@@ -7,10 +7,11 @@ export default {
   minutes: 600,
   kind: 'capstone',
   objectives: [
-    'Build an AI application with retrieval or tools',
-    'Evaluate it with an automated eval set',
-    'Monitor and document its behavior in use',
+    'Build an AI application that uses retrieval or tools to answer from your own data',
+    'Evaluate it with an automated evaluation set and report the results honestly',
+    'Ship it with cost limits, guardrails and monitoring',
+    'Document its intended use, known failure cases and the model behind it',
   ],
-  prerequisites: ['ai/ops/deploy-monitor', 'ai/agents/tool-calling'],
+  prerequisites: ['ai/ops/deploy-monitor', 'ai/agents/tool-calling', 'ai/rag/vector-db-eval'],
   concepts: [],
 } satisfies LessonMeta;

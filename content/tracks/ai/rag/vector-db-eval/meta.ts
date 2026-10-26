@@ -7,10 +7,11 @@ export default {
   minutes: 50,
   kind: 'lesson',
   objectives: [
-    'Explain how approximate nearest-neighbor indexes trade accuracy for speed',
-    'Measure retrieval quality with recall@k',
-    'Decide when reranking is worth its cost',
+    'Explain how an approximate nearest-neighbor index (such as HNSW) trades recall for speed',
+    'Store embeddings with their text, metadata and model version, and filter by metadata at query time',
+    'Measure retrieval quality with recall@k on a set of questions with known answer passages',
+    'Decide from measurements whether a reranker or hybrid search is worth its latency',
   ],
-  prerequisites: ['ai/rag/rag-pipeline'],
+  prerequisites: ['ai/rag/rag-pipeline', 'ml/classical/metrics-error-analysis'],
   concepts: [],
 } satisfies LessonMeta;

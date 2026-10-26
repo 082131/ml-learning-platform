@@ -7,9 +7,10 @@ export default {
   minutes: 45,
   kind: 'lesson',
   objectives: [
-    'Write prompts with clear instructions, context and examples',
-    'Request structured output and validate it against a schema',
-    'Compare prompt variants with a small evaluation',
+    'Write a prompt with clear instructions, context and examples, and explain what each part does',
+    'Request JSON output that follows a schema, and validate it in code before using it',
+    'Handle output that fails validation by retrying with the error or falling back',
+    'Compare two prompt variants on a small labeled set instead of a single example',
   ],
   prerequisites: ['ai/usage/pretrained-apis'],
   concepts: [],

@@ -7,9 +7,10 @@ export default {
   minutes: 50,
   kind: 'lesson',
   objectives: [
-    'Deploy an AI feature behind a version flag',
-    'Monitor quality, latency and cost in production',
-    'Roll back a bad prompt or model change',
+    'Release a prompt or model change behind a flag to a share of traffic',
+    'Monitor quality, latency, cost and error rates in production, and alert on changes',
+    'Compare a new version with the current one on the evaluation set before and after release',
+    'Roll back a bad prompt or model change quickly',
   ],
   prerequisites: ['ai/ops/latency-cost-security', 'ai/reliability/evals-guardrails'],
   concepts: [],
