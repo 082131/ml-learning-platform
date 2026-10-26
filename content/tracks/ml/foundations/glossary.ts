@@ -106,4 +106,30 @@ export default [
     introducedIn: 'ml/foundations/numpy-arrays',
     aliases: ['data type of an array'],
   },
+  {
+    id: 'vectorization',
+    term: 'Vectorization',
+    short:
+      'Writing a computation as operations on whole arrays instead of a Python loop over their elements.',
+    long: 'prices * qty multiplies every pair at once. The loop still happens, but inside NumPy’s compiled code, which is much faster than the Python interpreter running it one item at a time.',
+    introducedIn: 'ml/foundations/vectorization',
+    aliases: ['vectorized', 'vectorize'],
+  },
+  {
+    id: 'broadcasting',
+    term: 'Broadcasting',
+    short:
+      'NumPy’s rule for combining arrays of different shapes: line the shapes up from the right; each axis must match or be 1.',
+    long: 'Axes of size 1, and axes one array lacks, are stretched to match the other array without copying data. Two different sizes where neither is 1 raise "operands could not be broadcast together".',
+    introducedIn: 'ml/foundations/vectorization',
+    aliases: ['broadcast'],
+  },
+  {
+    id: 'boolean-mask',
+    term: 'Boolean mask',
+    short:
+      'An array of True and False, such as P > 10, used to pick the elements where it is True: P[P > 10].',
+    introducedIn: 'ml/foundations/vectorization',
+    aliases: ['mask', 'boolean indexing'],
+  },
 ] satisfies GlossaryTerm[];

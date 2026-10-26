@@ -12,5 +12,17 @@ export default {
     'Measure loop vs vectorized time in your own browser and read the result',
   ],
   prerequisites: ['ml/foundations/numpy-arrays'],
-  concepts: [],
+  concepts: ['vectorization', 'broadcasting', 'boolean-mask', 'element-wise', 'axis'],
+  references: [
+    {
+      title: 'NumPy: broadcasting',
+      url: 'https://numpy.org/doc/stable/user/basics.broadcasting.html',
+      version: 'NumPy 2.x',
+    },
+    {
+      title: 'NumPy: universal functions (ufunc) basics',
+      url: 'https://numpy.org/doc/stable/user/basics.ufuncs.html',
+      version: 'NumPy 2.x',
+    },
+  ],
 } satisfies LessonMeta;

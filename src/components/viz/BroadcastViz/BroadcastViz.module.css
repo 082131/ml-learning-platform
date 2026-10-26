@@ -1,0 +1,86 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  font-family: var(--font-mono);
+}
+.align {
+  border-collapse: collapse;
+  font-size: var(--fs-13);
+}
+.align th,
+.align td {
+  padding: var(--s-1) var(--s-3);
+  border: none;
+  background: none;
+  text-align: center;
+}
+.align th {
+  font-weight: 400;
+  color: var(--ink-2);
+}
+.align tbody td {
+  font-size: var(--fs-15);
+}
+.align tbody tr:last-child td {
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}
+.align td.bad {
+  color: var(--err);
+  font-weight: 600;
+}
+.sum {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-3);
+}
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+}
+.name {
+  margin: 0;
+  font-size: var(--fs-13);
+  font-weight: 600;
+}
+.muted {
+  font-weight: 400;
+  color: var(--ink-2);
+}
+.grid {
+  border-collapse: separate;
+  border-spacing: 2px;
+}
+.grid .cell {
+  min-width: 36px;
+  padding: var(--s-2) var(--s-1);
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  text-align: center;
+  font-size: var(--fs-15);
+}
+.grid .copy {
+  border-style: dashed;
+  background: none;
+  color: var(--ink-2);
+  font-style: italic;
+}
+.op {
+  font-size: var(--fs-20);
+  color: var(--ink-2);
+}
+.result {
+  margin: 0;
+  padding: var(--s-3);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: var(--fs-15);
+  overflow-wrap: anywhere;
+}
+.error {
+  color: var(--err);
+  font-weight: 600;
+}

@@ -74,7 +74,7 @@ Close each content thread with: content validation green, `check`, `e2e` and `bu
 - [x] M101 `what-is-ml` (replaces the shell's sample): rule-based vs learned spam toy (computed word counts and threshold).
 - [x] M102 `types-of-ml`: scenario-sorting exercise (`order` and `choice` checks).
 - [x] M103 to M105 Python basics, control flow, collections: Pyodide runners, step-throughs of state changes (trace via Pyodide where possible, otherwise computed), and a slice visualizer.
-- [ ] M106 to M107 NumPy arrays and vectorization: shape explorer, broadcasting visualizer, loop vs vectorized timing measured live in Pyodide and labeled "measured in your browser".
+- [x] M106 to M107 NumPy arrays and vectorization: shape explorer, broadcasting visualizer, loop vs vectorized timing measured live in Pyodide and labeled "measured in your browser".
 - [ ] M108 to M109 Pandas and Matplotlib: a bundled small CSV (≤50 KB, source and license noted), table explorer, plots rendered by Pyodide.
 - [ ] M110 `project-foundations` brief, rubric and checklist.
 

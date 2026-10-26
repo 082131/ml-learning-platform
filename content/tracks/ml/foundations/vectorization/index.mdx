@@ -1,0 +1,153 @@
+import { broadcastCode, experiment, timingRunner, vectorRunner } from './code';
+import { questions, standardizeExercise } from './quiz';
+
+<Section kind="intuition" title="Say what, not how">
+
+To get the total cost of a shopping list, a loop goes item by item: multiply price by quantity, append, repeat.
+With NumPy you write the whole thing at once, `prices * quantities`, and NumPy does the item-by-item work inside
+fast compiled code. Writing computations this way is called <Term id="vectorization">vectorization</Term>.
+
+Sometimes the two arrays do not have the same shape. Subtracting the average of each column from a whole table
+combines a table with a single row. NumPy's <Term id="broadcasting">broadcasting</Term> rule says when that works:
+it stretches the row down the table as if it were repeated, without actually copying it.
+
+</Section>
+
+<Section kind="technical" title="Element-wise operations and the broadcasting rule">
+
+**Element-wise operations.** For arrays of the same shape, `+`, `-`, `*`, `/`, `**` and comparisons such as `>`
+work <Term id="element-wise">element by element</Term> and return an array of that shape. Functions such as
+`np.sqrt` and `np.exp` work the same way on every element.
+
+**Reductions.** `X.sum()`, `X.mean()`, `X.max()` and `X.std()` reduce an array to a number. With `axis=0` they
+reduce down the rows, so `X.mean(axis=0)` of a table of shape $(n, d)$ has shape $(d,)$: one mean per column.
+
+**Masks.** A comparison such as `P > 10` gives an array of `True` and `False`, a
+<Term id="boolean-mask">boolean mask</Term>. `P[P > 10]` keeps the elements where the mask is True, and
+`(P > 10).sum()` counts them.
+
+**Broadcasting.** To combine arrays of different shapes, NumPy:
+
+1. Lines the two shapes up **from the right**, and treats missing axes on the left as size 1.
+2. Checks every axis: the sizes must be **equal**, or one of them must be **1**. Otherwise it raises
+   `ValueError: operands could not be broadcast together with shapes ...`.
+3. Stretches every axis of size 1 to the other size. The result has the larger size on every axis.
+
+**Worked example.** `X` of shape $(3, 2)$ minus `X.mean(axis=0)` of shape $(2,)$: lined up from the right, $2$
+matches $2$, and the mean has no first axis, so it counts as $1$ and is stretched to $3$. The result has shape
+$(3, 2)$, and every row has the column means subtracted. With a shape of $(3,)$ instead, the last axes would be
+$2$ and $3$: an error.
+
+**Why it is faster.** A Python loop runs every step through the interpreter, which looks up types and creates a
+new Python object for every number. A NumPy operation runs one compiled loop over numbers stored side by side.
+Looping over a NumPy array element by element is slower still, because every element read creates a NumPy number
+object. The runner at the end of the experiments measures the difference in your browser.
+
+</Section>
+
+<Section kind="visual" title="Broadcast two shapes">
+
+Pick shapes for A and B. The table lines them up from the right and names the rule for each axis. When they
+broadcast, values that NumPy reuses by stretching are drawn dashed and in italics.
+
+<Experiment def={experiment} title="Broadcasting visualizer">
+  <BroadcastViz />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The same sum in Python">
+
+This code uses the shapes you chose above. The readout shows what it prints, or NumPy's exact error.
+
+<Experiment def={experiment} title="broadcast.py, linked to the visualizer" controls={false}>
+  <Code example={broadcastCode} title="broadcast.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+</Section>
+
+<Section kind="experiment" title="Things to try">
+
+In the visualizer above:
+
+- Set A to `(2, 3)` and B to `(3, 2)`. Same number of elements, but the shapes do not broadcast.
+- Set A to `(2, 1)` and B to `(1, 3)`. Both are stretched, and C is a full $2 \times 3$ table: every row value
+  meets every column value.
+- Set A to `(2, 3)` and B to `(2,)`. Lined up from the right, 3 meets 2. Now try B as `(2, 1)`: one number per
+  row works.
+
+Then compare a loop with vectorized code, masks and per-column statistics:
+
+<PythonRunner example={vectorRunner} title="vectorize.py" />
+
+Finally, time a Python loop against NumPy on a million numbers. Both compute $\sum x^2$, each is run 3 times, and
+the best time counts. The lesson shows no numbers in advance: they are measured in your browser when you press
+Run, and they change with your device and from run to run.
+
+<PythonRunner example={timingRunner} title="timing.py (loop vs NumPy)" runLabel="Run and measure" />
+
+</Section>
+
+<Section kind="mistakes" title="Shapes that line up the wrong way">
+
+<CommonMistake
+  title="One number per row, but shaped as a row"
+  wrong={'X = np.zeros((100, 3))\nm = X.mean(axis=1)      # shape (100,)\nX - m'}
+  error="ValueError: operands could not be broadcast together with shapes (100,3) (100,) "
+  cause="Shapes are compared from the right, so the 100 means are lined up with the 3 columns. NumPy never guesses that you meant rows."
+  fix={'X - m.reshape(-1, 1)    # shape (100, 1): one value per row\n# or: X - X.mean(axis=1, keepdims=True)'}
+/>
+
+<CommonMistake
+  title="Same number of elements is not enough"
+  wrong={'A = np.ones((2, 3))\nB = np.ones((3, 2))\nA + B'}
+  error="ValueError: operands could not be broadcast together with shapes (2,3) (3,2) "
+  cause="Both hold 6 numbers, but axis by axis 3 meets 2 and 2 meets 3. Broadcasting only stretches axes of size 1."
+  fix={'A + B.T    # transpose B to shape (2, 3) if that is what you mean'}
+/>
+
+<Callout kind="warning">
+  Broadcasting can also succeed when you did not mean it to. A column of shape `(3, 1)` plus a row of shape `(3,)`
+  gives a `(3, 3)` table, not 3 sums. Print `.shape` after every step whose result shape you are not sure of.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+| In ML code | What it does |
+|---|---|
+| `(X - X.mean(axis=0)) / X.std(axis=0)` | Standardize every feature (the exercise below) |
+| `X @ w + b` | A linear model on a whole batch: `b` is broadcast to every example |
+| `accuracy = (pred == y).mean()` | Compare all predictions at once; True counts as 1 |
+| `X[y == 1]` | Keep the rows of one class with a mask |
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Standardize a feature table">
+
+<MiniExercise exercise={standardizeExercise}>
+  Write `standardize(X)` without a loop. For every column, subtract the column's mean and divide by the column's
+  standard deviation. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Vectorized code applies one operation to whole arrays; the loop runs in compiled code.
+- Reductions take `axis=`: `axis=0` gives one result per column.
+- Broadcasting lines shapes up from the right; each axis must be equal or 1, and size-1 axes are stretched.
+- When shapes surprise you, print them. `reshape(-1, 1)` turns one value per row into a column.
+
+Next: [pandas DataFrames](#/learn/ml/foundations/pandas-dataframes) add column names and mixed types on top of
+NumPy arrays.
+
+</Section>

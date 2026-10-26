@@ -22,7 +22,7 @@ export const tracks: Track[] = [
           { id: 'ml/foundations/python-control', status: 'written' },
           { id: 'ml/foundations/python-collections', status: 'written' },
           { id: 'ml/foundations/numpy-arrays', status: 'written' },
-          { id: 'ml/foundations/vectorization', status: 'outline' },
+          { id: 'ml/foundations/vectorization', status: 'written' },
           { id: 'ml/foundations/pandas-dataframes', status: 'outline' },
           { id: 'ml/foundations/matplotlib-plotting', status: 'outline' },
           { id: 'ml/foundations/project-foundations', status: 'outline' },
