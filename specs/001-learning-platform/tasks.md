@@ -112,10 +112,10 @@ Close each content thread with: content validation green, `check`, `e2e` and `bu
 - [x] D004 Fill objectives and prerequisites for all 9 outline lessons in this track.
 
 ## Thread 10: AI Engineer flagship (3 lessons)
-- [ ] A001 `ai/representations/tokens-embeddings`: a tokenizer playground and similarity search over a bundled precomputed embedding table. Generate it offline with a named small open model, record the model and version, keep it ≤300 KB, and commit the generation script.
-- [ ] A002 `ai/rag/rag-pipeline`: chunking controls (size and overlap), real cosine retrieval over the bundled embeddings, a reranking step, prompt assembly shown verbatim, and generation shown as a labeled simulated response.
-- [ ] A003 `ai/agents/tool-calling`: an agent loop step-through. Model turns are a scripted, labeled trace, while tool execution (calculator, doc search) really runs in the browser. Includes a failure and retry case.
-- [ ] A004 Fill objectives and prerequisites for all 10 outline lessons, including the "train vs fine-tune vs pretrained vs API" distinction in `ai-landscape`'s objectives.
+- [x] A001 `ai/representations/tokens-embeddings`: a tokenizer playground and similarity search over a bundled precomputed embedding table. Generate it offline with a named small open model, record the model and version, keep it ≤300 KB, and commit the generation script.
+- [x] A002 `ai/rag/rag-pipeline`: chunking controls (size and overlap), real cosine retrieval over the bundled embeddings, a reranking step, prompt assembly shown verbatim, and generation shown as a labeled simulated response.
+- [x] A003 `ai/agents/tool-calling`: an agent loop step-through. Model turns are a scripted, labeled trace, while tool execution (calculator, doc search) really runs in the browser. Includes a failure and retry case.
+- [x] A004 Fill objectives and prerequisites for all 10 outline lessons, including the "train vs fine-tune vs pretrained vs API" distinction in `ai-landscape`'s objectives.
 
 ## Thread 11: Inference Engineer flagship (3 lessons)
 - [x] I001 `inference/memory/memory-estimation`: an estimator for parameters × bytes(precision) + KV cache (layers × 2 × heads × head_dim × seq × batch × bytes) + an activation estimate. Every term is explained, model presets come with cited configs, and the results are labeled estimates.
