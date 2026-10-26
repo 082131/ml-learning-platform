@@ -140,4 +140,13 @@ export default [
     introducedIn: 'ml/foundations/pandas-dataframes',
     aliases: ['data frame', 'pandas DataFrame'],
   },
+  {
+    id: 'histogram',
+    term: 'Histogram',
+    short:
+      'A bar chart of one numeric column: the range is split into equal bins, and each bar counts the values in its bin.',
+    long: 'It shows the shape of the data: where values bunch up, how spread out they are, and whether there is more than one peak. The number of bins changes how it looks.',
+    introducedIn: 'ml/foundations/matplotlib-plotting',
+    aliases: ['histograms', 'bins'],
+  },
 ] satisfies GlossaryTerm[];

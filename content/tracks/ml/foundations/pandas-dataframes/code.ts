@@ -2,8 +2,8 @@
 // with Pyodide 314.0.7 (Python 3.14, pandas 3.0); both print the same. In tests, open_url reads the bundled
 // file instead of downloading it (testSetup.ts). The explorer's numbers are checked against pandas for every
 // combination of controls in src/lib/foundations/penguinTable.test.ts.
-import penguinsCsv from '@/lib/classical/data/penguins.csv?url';
 import { lineOf, span } from '@/lib/foundations/annotate';
+import { PENGUINS_URL } from '@/lib/foundations/penguinsUrl';
 import { filterText, summaryText, tableExperiment, type TableState } from '@/lib/foundations/penguinTable';
 import type { CodeExample } from '@/lib/types';
 
@@ -15,12 +15,6 @@ export const experiment = tableExperiment('penguin-table', {
   column: 'body_mass_g',
   stat: 'mean',
 });
-
-/** The address of the bundled CSV on this site, which Python downloads in the browser. */
-export const PENGUINS_URL =
-  typeof document === 'undefined'
-    ? `https://example.invalid/${penguinsCsv}`
-    : new URL(penguinsCsv, document.baseURI).href;
 
 const st = (s: unknown) => s as TableState;
 const TABLE_SOURCE = `import pandas as pd

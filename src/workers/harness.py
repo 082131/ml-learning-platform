@@ -8,6 +8,7 @@ import math
 import sys
 import traceback
 import types
+import warnings
 
 LESSON_FILE = "<lesson>"
 TESTS_FILE = "<tests>"
@@ -128,7 +129,11 @@ def _figures():
     images = []
     for num in plt.get_fignums():
         buf = io.BytesIO()
-        plt.figure(num).savefig(buf, format="png", dpi=100, bbox_inches="tight")
+        with warnings.catch_warnings():
+            # Pyodide's Matplotlib 3.10 Agg renderer warns about its own float text positions on every
+            # label it draws. The warning is not about the learner's code, so it is not shown.
+            warnings.filterwarnings("ignore", message="The [xy] parameter as float was deprecated")
+            plt.figure(num).savefig(buf, format="png", dpi=100, bbox_inches="tight")
         images.append(base64.b64encode(buf.getvalue()).decode("ascii"))
     plt.close("all")
     return images

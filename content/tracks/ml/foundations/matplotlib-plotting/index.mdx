@@ -1,0 +1,147 @@
+import { experiment, histCode, plotsRunner, scatterSteps, trendsRunner } from './code';
+import { histExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Look before you model">
+
+A table of 344 rows hides its patterns. A picture shows them at once: that heavier penguins have longer
+flippers, that Gentoos are much heavier than the other two species, that one island has only one species. Plotting is the first thing
+to do with a new dataset, and the first thing to do when a model behaves oddly.
+
+Matplotlib is Python's standard plotting library. You make a figure, draw on it with one call per kind of mark,
+and add the words that make it readable: axis labels with units, a title and a legend.
+
+</Section>
+
+<Section kind="technical" title="Figures, axes, and which plot to use">
+
+**Figure and Axes.** `fig, ax = plt.subplots()` makes a Figure, the whole image, and one Axes, a plot area
+with an x and a y axis. Everything is drawn by calling methods on `ax`. `plt.subplots(1, 2)` makes two Axes side
+by side.
+
+**Four plots cover most questions:**
+
+| Question | Plot | Call |
+|---|---|---|
+| How do two numeric columns vary together? | Scatter plot | `ax.scatter(x, y)` |
+| What is the shape of one column? | <Term id="histogram">Histogram</Term> | `ax.hist(values, bins=20)` |
+| How does a value change over an ordered x, such as time or epochs? | Line plot | `ax.plot(x, y)` |
+| How do categories compare? | Bar chart | `ax.bar(names, values)` |
+
+**Histograms.** `ax.hist(values, bins=n)` splits the range from the smallest to the largest value into $n$
+equal-width bins and draws one bar per bin, as tall as the number of values in it. Each bin includes its left
+edge; the last also includes its right edge. The counts come from `np.histogram`, so you can print them.
+The number of bins changes the picture: too few hide structure, too many show noise.
+
+**Making a plot readable.** `ax.set_xlabel` and `ax.set_ylabel` name what each axis measures, with units.
+`ax.set_title` says what the plot shows. `label=` on each drawing call plus `ax.legend()` names the groups.
+Different markers as well as colors keep groups apart for readers who do not see the colors.
+
+</Section>
+
+<Section kind="visual" title="Choose the bins">
+
+The bars below are the ones `ax.hist` draws for the chosen penguin column. Move the bins slider and watch the
+shape change. This chart is drawn by the page from the same counts that `np.histogram` returns.
+
+<Experiment def={experiment} title="Histogram explorer">
+  <HistogramViz />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The same histogram in Matplotlib">
+
+This code draws the histogram you chose above. The readout shows the counts it prints and the widest bar.
+
+<Experiment def={experiment} title="hist.py, linked to the histogram explorer" controls={false}>
+  <Code example={histCode} title="hist.py" />
+  <Readout title="What the code computes" />
+</Experiment>
+
+A scatter plot built up step by step, from bare points to a plot that can be read on its own:
+
+<ProgressiveCode example={scatterSteps} title="scatter.py" />
+
+</Section>
+
+<Section kind="experiment" title="Things to try">
+
+In the histogram explorer above:
+
+- Set `body_mass_g` to 3 bins, then to 40. With 3 you only learn "light, medium, heavy"; with 40 many bars hold
+  only a few penguins and the outline gets ragged.
+- Switch to `flipper_length_mm`, which was measured in whole millimetres, and set 40 bins. Each bin is about
+  1.5 mm wide, so some bins cover two whole-millimetre values and others only one, and the bars alternate
+  between tall and short. That pattern comes from the measuring, not from the penguins.
+
+Then let Matplotlib draw the plots in your browser. The figures appear under the printed output after the run:
+
+<PythonRunner example={plotsRunner} title="plots.py" />
+
+A line plot over time and a bar chart of categories:
+
+<PythonRunner example={trendsRunner} title="trends.py" />
+
+<Callout kind="note">
+  Data: the Palmer penguins dataset (Gorman, Williams and Fraser, 2014; palmerpenguins package by Horst, Hill and
+  Gorman, 2020), CC0 1.0 public domain. The mean-per-year line plot uses only three years, so it shows how the
+  sample changed from year to year, not a long-term trend.
+</Callout>
+
+</Section>
+
+<Section kind="mistakes" title="Plots that mislead or fail">
+
+<CommonMistake
+  title="Plotting a column with missing values in a histogram"
+  wrong={'import numpy as np\nnp.histogram(penguins["body_mass_g"], bins=20)'}
+  error="ValueError: autodetected range of [nan, nan] is not finite"
+  cause="Two penguins have no body mass. The smallest and largest values are then NaN, so NumPy cannot place the bins."
+  fix={'np.histogram(penguins["body_mass_g"].dropna(), bins=20)'}
+/>
+
+<Callout kind="warning">
+  Matplotlib accepts plots that answer nothing. A line plot over rows connects penguins that have nothing to do
+  with each other, and a plot without axis labels leaves readers guessing what was measured. Before drawing, say
+  the question the plot should answer, and pick the plot type from the table above.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+| In ML work | Plot |
+|---|---|
+| Training and validation loss per epoch | Line plot: watch for the gap that signals overfitting |
+| A feature's distribution before scaling | Histogram |
+| Two features colored by class | Scatter plot: are the classes separable? |
+| Accuracy per class or per model | Bar chart |
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Draw a labeled histogram">
+
+<MiniExercise exercise={histExercise}>
+  Write `plot_masses(ax, masses)`. It draws a histogram of the list `masses` with 10 bins on the Axes `ax`, and
+  labels the x axis `Body mass (g)` and the y axis `Penguins`. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- `fig, ax = plt.subplots()`, then draw on `ax`.
+- Scatter for two numeric columns, histogram for one, line for an ordered x, bars for categories.
+- `bins` changes how a histogram looks; the counts come from `np.histogram`.
+- Label axes with units, add a title and a legend, and use markers as well as colors.
+
+Next: the [Foundations project](#/learn/ml/foundations/project-foundations) puts loading, summarizing and
+plotting together.
+
+</Section>
