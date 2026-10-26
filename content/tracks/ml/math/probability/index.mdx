@@ -1,0 +1,144 @@
+import { experiment, numpyDie, numpySampling, randomRunner } from './code';
+import { expectedValueExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Uncertain, but not lawless">
+
+You cannot say what the next roll of a die will be, but you can say a lot about the next ten thousand: each face
+will come up about a sixth of the time, and the average will be close to 3.5. Probability is the language for that
+kind of statement. Machine learning uses it everywhere: data are samples from some unknown process, a classifier
+outputs probabilities, and training itself shuffles and samples at random.
+
+A <Term id="random-variable">random variable</Term> is a quantity whose value depends on chance, such as the face of
+a die. Its <Term id="probability-distribution">distribution</Term> lists what values it can take and how likely
+each one is. Its <Term id="expected-value">expected value</Term> is the long-run average, and the
+<Term id="law-of-large-numbers">law of large numbers</Term> says a sample's average really does settle there.
+
+</Section>
+
+<Section kind="technical" title="Distributions and expected value">
+
+**Probabilities** are numbers between 0 and 1. For a discrete random variable $X$, the probabilities of all its
+possible values sum to 1. The probability of an event (a set of outcomes) is the sum over its outcomes: for a fair
+die, $P(X > 4) = P(5) + P(6) = \tfrac{2}{6}$.
+
+**A discrete distribution** is that table of values and probabilities. Three examples used below:
+
+| Distribution | Values | Probabilities |
+| --- | --- | --- |
+| Fair die | 1 to 6 | $\tfrac16$ each |
+| Loaded die | 1 to 6 | 0.1 each for 1 to 5, 0.5 for 6 |
+| Heads in 10 fair flips | 0 to 10 | $\binom{10}{k} / 2^{10}$ (binomial) |
+
+**The expected value** weights each value by its probability:
+
+$$
+E[X] = \sum_x x \cdot P(X = x)
+$$
+
+Fair die: $\tfrac16 (1 + 2 + \dots + 6) = 3.5$. Loaded die: $0.1 \cdot 15 + 0.5 \cdot 6 = 4.5$. Ten flips:
+$10 \cdot 0.5 = 5$. The expected value need not be a possible outcome; no die shows 3.5.
+
+**The law of large numbers.** If $x_1, \dots, x_n$ are independent draws of $X$, the sample mean
+$\bar x = \tfrac1n \sum_i x_i$ gets closer to $E[X]$ as $n$ grows, and each outcome's observed frequency gets
+closer to its probability. The typical error shrinks in proportion to $1/\sqrt{n}$: a hundred times more data
+gives about ten times less error.
+
+**Seeds.** Computers produce pseudo-random numbers: a deterministic sequence that looks random. A
+<Term id="random-seed">seed</Term> picks where the sequence starts, so the same seed reproduces the same draws.
+
+</Section>
+
+<Section kind="visual" title="Sample versus distribution">
+
+The bars show how often each value came up in the sample; the dashed marks show the true probabilities. Change the
+sample size and the seed, and switch distributions.
+
+<Experiment def={experiment} title="Sampling simulator">
+  <SamplingHistogram />
+  <Readout />
+</Experiment>
+
+Things to try:
+
+- With $n = 10$, change the seed a few times: the bars jump around and the mean can miss 3.5 by a whole point.
+- Move $n$ to 10,000: the bars sit on the dashed marks and the mean is within a few hundredths of $E[X]$.
+- Pick the loaded die and watch the expected value move to 4.5, pulled toward the heavy 6.
+- The same seed and $n$ always give the same sample. That is what reproducible means.
+
+</Section>
+
+<Section kind="code" title="Sampling in Python">
+
+The same experiment in NumPy, following the simulator's settings:
+
+<Experiment def={experiment} title="sampling.py, linked to the simulator" controls={false}>
+  <Code example={numpySampling} title="sampling.py" />
+</Experiment>
+
+<Callout kind="note">
+  NumPy's generator (PCG64) and the simulator's generator are different algorithms, so with the same seed they
+  draw different numbers. The behaviour is the same: frequencies near the probabilities and a mean near $E[X]$ that
+  improves with $n$. This page does not show NumPy output for the simulator's settings because it would not match
+  the bars above.
+</Callout>
+
+Python's built-in `random` module needs no NumPy. This one runs in your browser:
+
+<PythonRunner example={randomRunner} title="dice.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Probabilities that do not add up">
+
+<CommonMistake
+  title="Probabilities that do not sum to 1"
+  wrong={'rng = np.random.default_rng(0)\nrng.choice([1, 2, 3], size=5, p=[0.5, 0.3, 0.3])'}
+  error="ValueError: Probabilities do not sum to 1. See Notes section of docstring for more information."
+  cause="A distribution's probabilities must add up to 1; these add up to 1.1."
+  fix={'rng.choice([1, 2, 3], size=5, p=[0.5, 0.3, 0.2])'}
+/>
+
+<Callout kind="warning">
+  The gambler's fallacy: after a run of sixes, a fair die is not "due" a low number. Draws are independent. The
+  law of large numbers works by dilution, not compensation: a lucky start matters less and less as $n$ grows.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="A reproducible die in NumPy">
+
+With seed 0, this prints the same numbers every time, on any machine with the same NumPy version:
+
+<Code example={numpyDie} title="die.py" />
+
+The first ten rolls look nothing like a sixth each; ten thousand rolls give frequencies within 0.003 of
+$\tfrac16 \approx 0.1667$ and a mean of 3.5045.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Expected value from a table">
+
+<MiniExercise exercise={expectedValueExercise}>
+  Write `expected_value(values, probs)` that returns $\sum_x x \cdot P(X = x)$, and raises `ValueError` if the
+  probabilities do not sum to 1.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A distribution lists a random variable's values and their probabilities, which sum to 1.
+- $E[X] = \sum_x x \cdot P(X = x)$ is the long-run average.
+- Sample frequencies and means approach the distribution's as $n$ grows; the error shrinks like $1/\sqrt n$.
+- A seed makes random experiments reproducible.
+
+Next: [Statistics intuition](#/learn/ml/math/statistics-intuition) summarizes data and asks what a correlation does
+and does not tell you.
+
+</Section>

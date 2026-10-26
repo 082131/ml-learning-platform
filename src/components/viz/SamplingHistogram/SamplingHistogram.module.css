@@ -1,0 +1,45 @@
+.chart {
+  min-width: 0;
+}
+.bar {
+  fill: var(--accent);
+  opacity: 0.85;
+}
+.truth {
+  stroke: var(--ink);
+  stroke-width: 2.5;
+  stroke-dasharray: 5 3;
+}
+.gridLine {
+  stroke: var(--line);
+}
+.tick {
+  fill: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-4);
+  margin: var(--s-2) 0 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+.swatchBar {
+  width: 14px;
+  height: 10px;
+  background: var(--accent);
+}
+.swatchTruth {
+  width: 18px;
+  border-top: 2.5px dashed var(--ink);
+}
