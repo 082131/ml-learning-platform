@@ -90,4 +90,20 @@ export default [
     introducedIn: 'ml/foundations/python-collections',
     aliases: ['slicing'],
   },
+  {
+    id: 'numpy-array',
+    term: 'NumPy array',
+    short: 'A grid of numbers of one type, with a shape, that NumPy can compute on in one step.',
+    long: 'Unlike a Python list, every element has the same dtype and the elements sit side by side in memory, so NumPy processes them in compiled code. Pandas and most ML libraries are built on arrays like it.',
+    introducedIn: 'ml/foundations/numpy-arrays',
+    aliases: ['array', 'np.array'],
+  },
+  {
+    id: 'dtype',
+    term: 'dtype',
+    short: 'The type every element of a NumPy array has, such as int64, int32 or float64.',
+    long: 'The dtype fixes how many bytes each number takes and what it can hold. NumPy picks one when you create an array: whole numbers give an integer dtype, any decimal gives float64.',
+    introducedIn: 'ml/foundations/numpy-arrays',
+    aliases: ['data type of an array'],
+  },
 ] satisfies GlossaryTerm[];

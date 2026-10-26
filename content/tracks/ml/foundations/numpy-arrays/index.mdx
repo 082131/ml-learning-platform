@@ -1,0 +1,167 @@
+import { arraysRunner, experiment, indexCode } from './code';
+import { questions, splitExercise } from './quiz';
+
+<Section kind="intuition" title="A list built for numbers">
+
+Machine learning is mostly arithmetic on big grids of numbers: a table of 344 penguins by 4 measurements, a batch
+of images, the weights of a model. Python lists can hold numbers, but they are slow for this and know nothing about
+rows and columns.
+
+A <Term id="numpy-array">NumPy array</Term> is a grid of numbers that all have the same type. It has a
+<Term id="shape">shape</Term>, such as `(3, 4)` for 3 rows and 4 columns, and you can do arithmetic on the whole
+grid at once: `heights * 100` converts every height from metres to centimetres without a loop.
+
+Each direction of the grid is an <Term id="axis">axis</Term>. In a table of examples, axis 0 usually runs down the
+rows (one per example) and axis 1 across the columns (one per feature).
+
+</Section>
+
+<Section kind="technical" title="Shape, dtype and indexing">
+
+**Creating arrays.** `np.array([1.62, 1.75, 1.80])` turns a list into an array. `np.arange(12)` makes the
+integers 0 to 11. `np.zeros((2, 3))` makes a 2 by 3 array of zeros.
+
+**Shape and size.** `a.shape` is a tuple with one entry per axis; `a.ndim` is how many axes there are, and
+`a.size` is the number of elements, the product of the shape. A 1-D array of 12 numbers has shape `(12,)`; the
+comma marks a tuple with one entry.
+
+**dtype.** Every element has the same <Term id="dtype">dtype</Term>. Whole numbers give an integer dtype and any
+decimal makes the array `float64`. The default integer dtype follows the computer: `int64` on a 64-bit laptop
+or server, but `int32` in your browser, because Pyodide runs NumPy as 32-bit WebAssembly. The runner on this page
+prints `int32` for that reason.
+
+**Reshape.** <Term id="reshape">`a.reshape(3, 4)`</Term> arranges the same numbers in a new shape, filling row by
+row. The sizes must match: 12 numbers fit `(3, 4)`, `(2, 6)` or `(12,)`, never `(5, 2)`. One entry may be `-1`,
+meaning "whatever makes the size fit": `reshape(2, -1)` gives `(2, 6)`.
+
+**Indexing.** An array takes one index per axis, separated by commas. For `m` of shape $(r, c)$:
+
+| Expression | Picks | Result shape |
+|---|---|---|
+| `m[i, j]` | the element in row $i$, column $j$ | `()`, a single number |
+| `m[i]` | row $i$ | $(c,)$ |
+| `m[:, j]` | column $j$ (`:` means every row) | $(r,)$ |
+| `m[i:, j:]` | rows from $i$, columns from $j$ | $(r - i, c - j)$ for $0 \le i \le r$, $0 \le j \le c$ |
+
+A plain number removes its axis from the result; a slice keeps it. Negative numbers count from the end, as with
+lists. A plain index outside the axis raises `IndexError`, while slices are clipped, again as with lists.
+
+**Why arrays are fast.** Because every element has the same dtype and the elements sit next to each other in
+memory, NumPy can run one loop in compiled code over all of them. A Python loop instead handles each item as a
+separate Python object. How large the difference is depends on the computer; the
+[next lesson](#/learn/ml/foundations/vectorization) measures it in your browser.
+
+</Section>
+
+<Section kind="visual" title="Reshape and index an array">
+
+`a` is `np.arange(12)` in the shape you choose. Each number is also its position in memory, so you can see that
+reshape only changes how the same numbers are laid out. Pick an index and move i and j: the picked numbers are
+outlined and dotted, and indexes that do not exist show NumPy's error.
+
+<Experiment def={experiment} title="Shape explorer">
+  <ShapeExplorer />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The same index in Python">
+
+This code uses the shape and index you chose above. The readout shows what it prints, or the error NumPy raises.
+
+<Experiment def={experiment} title="index.py, linked to the shape explorer" controls={false}>
+  <Code example={indexCode} title="index.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+</Section>
+
+<Section kind="experiment" title="Things to try">
+
+In the shape explorer above:
+
+- Keep one element, `a[1, 2]`, and switch the shape from `(3, 4)` to `(4, 3)`. The value changes from 6 to 5:
+  the same position means a different place in memory.
+- Choose `a[:, j]` with shape `(12,)`. A 1-D array has only one axis, so two indexes are too many.
+- Choose `a[i:, j:]` and set i to 3 with shape `(3, 4)`. The slice is clipped, the result has shape `(0, 2)`, and
+  NumPy prints `[]`. Now set the index to `a[i]`: the same 3 is an error.
+
+Then create, reshape and index arrays for real. Notice the difference between `nums * 2` on a list and on an
+array:
+
+<PythonRunner example={arraysRunner} title="arrays.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Shapes that do not fit">
+
+<CommonMistake
+  title="Reshaping to a size that does not match"
+  wrong={'a = np.arange(12)\nm = a.reshape(5, 2)'}
+  error="ValueError: cannot reshape array of size 12 into shape (5,2)"
+  cause="(5, 2) holds 10 numbers and a has 12. Reshape never drops or invents numbers."
+  fix={'m = a.reshape(6, 2)    # or a.reshape(-1, 2) to let NumPy work out 6'}
+/>
+
+<CommonMistake
+  title="An index past the end of an axis"
+  wrong={'m = np.arange(12).reshape(3, 4)\nprint(m[3])'}
+  error="IndexError: index 3 is out of bounds for axis 0 with size 3"
+  cause="Axis 0 has size 3, so its positions are 0, 1 and 2. NumPy names the axis and its size, which tells you which index is wrong."
+  fix={'print(m[2])    # the last row, also m[-1]'}
+/>
+
+<CommonMistake
+  title="Two indexes on a 1-D array"
+  wrong={'a = np.arange(12)\nprint(a[1, 2])'}
+  error="IndexError: too many indices for array: array is 1-dimensional, but 2 were indexed"
+  cause="a has shape (12,): one axis, so it takes one index. Check a.shape whenever an index fails."
+  fix={'m = a.reshape(3, 4)\nprint(m[1, 2])'}
+/>
+
+<Callout kind="warning">
+  `*` and `+` mean different things for lists and arrays. `[1, 2, 3] * 2` repeats the list, giving
+  `[1, 2, 3, 1, 2, 3]`; `np.array([1, 2, 3]) * 2` doubles each number, giving `[2 4 6]`. Convert data to an array
+  before doing arithmetic on it.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+| In ML code | What it is |
+|---|---|
+| `X.shape == (n_examples, n_features)` | The standard layout of a feature table |
+| `X, y = data[:, :-1], data[:, -1]` | Split the columns into features and labels (the exercise below) |
+| `images.reshape(len(images), -1)` | Flatten each image into one row of pixels |
+| `X[:800], X[800:]` | Split examples into a training and a test set |
+
+[Vectorization](#/learn/ml/foundations/vectorization) shows how to compute with whole arrays instead of loops.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Split features and labels">
+
+<MiniExercise exercise={splitExercise}>
+  `data` has one row per example, and its last column is the label. Write `split_xy(data)` that returns `X`, every
+  column except the last, and `y`, the last column. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- An array holds numbers of one dtype in a shape such as `(3, 4)`; `.size` is the product of the shape.
+- `reshape` re-arranges the same numbers row by row; the sizes must match, and `-1` fills in one axis.
+- One index per axis: a plain number removes the axis, a slice keeps it.
+- Integer dtype is `int64` on most computers and `int32` in this browser runtime.
+
+Next: [vectorization and broadcasting](#/learn/ml/foundations/vectorization) replace loops with whole-array math.
+
+</Section>

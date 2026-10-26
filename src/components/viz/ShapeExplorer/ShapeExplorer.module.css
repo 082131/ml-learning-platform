@@ -1,0 +1,92 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  font-family: var(--font-mono);
+}
+.label {
+  margin: 0 0 var(--s-2);
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+  text-align: left;
+  caption-side: top;
+}
+.grid {
+  border-collapse: separate;
+  border-spacing: 2px;
+}
+.index,
+.axis {
+  font-size: var(--fs-13);
+  font-weight: 400;
+  color: var(--ink-2);
+  padding: 0 var(--s-1);
+  text-align: center;
+}
+.axis {
+  white-space: nowrap;
+}
+.axisDown {
+  margin: calc(-1 * var(--s-2)) 0 0;
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}
+.cell,
+.slot {
+  min-width: 36px;
+  padding: var(--s-2) var(--s-1);
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  text-align: center;
+  font-size: var(--fs-15);
+}
+.position {
+  display: block;
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}
+.picked {
+  border: 2px solid var(--accent);
+  background: var(--accent-soft);
+  font-weight: 600;
+}
+.picked::after {
+  content: ' •';
+  color: var(--accent);
+}
+.result {
+  margin: 0;
+  padding: var(--s-3);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: var(--fs-15);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.muted {
+  color: var(--ink-2);
+}
+.error {
+  color: var(--err);
+  font-weight: 600;
+}
+.memory {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.slot {
+  min-width: 30px;
+  font-size: var(--fs-13);
+}
+.grid .index,
+.grid .axis {
+  border: none;
+  background: none;
+}
+.grid .picked {
+  border: 2px solid var(--accent);
+}
