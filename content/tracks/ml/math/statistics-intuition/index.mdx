@@ -1,0 +1,144 @@
+import { describeCode, experiment, splitCode, statsRunner } from './code';
+import { questions, stdExercise } from './quiz';
+
+<Section kind="intuition" title="A few numbers for a pile of data">
+
+Before training anything, you look at the data. A handful of numbers do most of the work: where the values sit
+(the <Term id="mean">mean</Term>), how spread out they are (the <Term id="variance">variance</Term> and
+<Term id="standard-deviation">standard deviation</Term>), and whether two columns move together (the
+<Term id="correlation">correlation</Term>).
+
+Correlation is also where the most famous trap in statistics lives. On days when more ice cream is sold, more
+people get sunburnt. Ice cream does not cause sunburn: sunny summer days cause both. A hidden variable that drives
+two others is a <Term id="confounder">confounder</Term>, and a model trained on data like this will happily use
+one as a stand-in for the other.
+
+</Section>
+
+<Section kind="technical" title="Mean, spread and correlation">
+
+For values $x_1, \dots, x_n$:
+
+$$
+\bar x = \frac1n \sum_i x_i \qquad
+\operatorname{Var}(x) = \frac1n \sum_i (x_i - \bar x)^2 \qquad
+\operatorname{SD}(x) = \sqrt{\operatorname{Var}(x)}
+$$
+
+The variance is in squared units; the standard deviation is back in the units of the data, so it is the one to
+quote. Dividing by $n - 1$ instead of $n$ gives the *sample* variance, which corrects a small sample's tendency to
+underestimate the spread. NumPy divides by $n$ unless you pass `ddof=1`; pandas divides by $n - 1$ by default.
+
+**Pearson correlation** measures how well a straight line describes the relationship between two variables:
+
+$$
+r = \frac{\sum_i (x_i - \bar x)(y_i - \bar y)}{\sqrt{\sum_i (x_i - \bar x)^2}\,\sqrt{\sum_i (y_i - \bar y)^2}}
+$$
+
+It runs from $-1$ (a perfect falling line) through 0 (no linear trend) to $+1$ (a perfect rising line), and has
+no units. Two cautions: $r$ sees only straight lines ($y = x^2$ on $-2 \dots 2$ has $r = 0$), and $r$ says nothing
+about cause.
+
+**Confounding.** If $Z$ affects both $X$ and $Y$, then $X$ and $Y$ correlate even when neither affects the other.
+One check is to compare like with like: hold $Z$ fixed (look within one season) and see whether the correlation
+survives. Only a controlled experiment, where you set $X$ yourself, shows causation directly.
+
+</Section>
+
+<Section kind="visual" title="Ice cream, sunburn and the season">
+
+Eighty simulated days, forty in summer and forty in winter. Within a season, ice-cream sales and sunburn cases
+are generated independently; the only link between them is that summer raises both.
+
+<Experiment def={experiment} title="Correlation with a confounder">
+  <ConfounderScatter />
+  <Readout />
+</Experiment>
+
+Things to try:
+
+- Switch to **Split by season**: the strong overall correlation falls apart into two clouds, each with $r$ near 0.
+- Lower **How much summer raises both** to 0%: the clouds merge and the overall correlation disappears too. The
+  season was the whole story.
+- Change the seed: the within-season $r$ wobbles around 0 (forty days is a small sample), but the overall $r$
+  stays well above them while summer has a strong effect.
+- Watch the standard deviation of sales: mixing two seasons with different means makes the spread much larger
+  than within either season.
+
+</Section>
+
+<Section kind="code" title="Describing data in NumPy">
+
+A small, fixed version of the same data, four winter days then four summer days:
+
+<Code example={describeCode} title="describe.py" />
+
+Splitting by season, the correlation is close to 0 within each group:
+
+<Code example={splitCode} title="split.py" />
+
+Python's `statistics` module does the same without NumPy, and runs in your browser. Note that its `variance` and
+`stdev` divide by $n - 1$, and `pvariance` divides by $n$:
+
+<PythonRunner example={statsRunner} title="describe_stdlib.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Mismatched columns and the wrong ddof">
+
+<CommonMistake
+  title="Correlating columns of different lengths"
+  wrong={'sales = np.array([52, 61, 58, 70, 95, 104, 88, 99])\nburns = np.array([5, 4, 7, 6, 14, 15, 16])  # one day missing\nnp.corrcoef(sales, burns)'}
+  error="ValueError: all the input array dimensions except for the concatenation axis must match exactly, but along dimension 1, the array at index 0 has size 8 and the array at index 1 has size 7"
+  cause="Correlation pairs the i-th value of one column with the i-th value of the other, so both need one value per day. The message comes from np.corrcoef stacking the two arrays into rows."
+  fix={'# drop the day from both columns, or fill the missing value, before correlating\nburns = np.array([5, 4, 7, 6, 14, 15, 16, 17])\nnp.corrcoef(sales, burns)[0, 1]'}
+/>
+
+<Callout kind="warning">
+  NumPy's `np.std` divides by $n$ and pandas' `.std()` divides by $n - 1$, so the same column gives different
+  answers: 19.15 and 20.47 for the sales above. Neither is wrong, but compare like with like and say which one you
+  report.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Reading a correlation">
+
+When you meet a correlation in data, ask three questions before you act on it:
+
+1. **Is it linear?** Plot it. A curve or two clusters can give a misleading $r$.
+2. **Is there a third variable?** Season, size, age and time are the usual suspects. Split by it and see if the
+   correlation survives.
+3. **Could the arrow point the other way?** Cities with more police may have more crime because crime brings
+   police.
+
+In machine learning, a confounded feature is a trap for later: a model that learns "lots of ice cream means lots of
+sunburn" works until the data come from somewhere where the confounder behaves differently.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Standard deviation by hand">
+
+<MiniExercise exercise={stdExercise}>
+  Write `std(xs, ddof=0)` without NumPy. With `ddof=1` it should divide by $n - 1$.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- The mean is where values sit; the standard deviation is how far they typically are from it, in the data's units.
+- `ddof=0` divides by $n$ (NumPy's default); `ddof=1` divides by $n - 1$ (pandas' default).
+- Pearson $r$ measures linear association from $-1$ to $1$, and says nothing about cause.
+- A confounder drives two variables at once; splitting by it can make the correlation vanish.
+
+Next: [Loss functions and optimization](#/learn/ml/math/loss-optimization) turns "how wrong is the model" into a
+number and minimizes it.
+
+</Section>

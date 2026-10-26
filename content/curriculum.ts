@@ -42,7 +42,7 @@ export const tracks: Track[] = [
           { id: 'ml/math/functions-derivatives', status: 'written' },
           { id: 'ml/math/gradients-chain-rule', status: 'written' },
           { id: 'ml/math/probability', status: 'written' },
-          { id: 'ml/math/statistics-intuition', status: 'outline' },
+          { id: 'ml/math/statistics-intuition', status: 'written' },
           { id: 'ml/math/loss-optimization', status: 'outline' },
           { id: 'ml/math/project-math', status: 'outline' },
         ],

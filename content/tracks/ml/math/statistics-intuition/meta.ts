@@ -12,5 +12,22 @@ export default {
     'Explain why correlation does not show causation, with a confounder example',
   ],
   prerequisites: ['ml/math/probability'],
-  concepts: [],
+  concepts: ['mean', 'variance', 'standard-deviation', 'correlation', 'confounder'],
+  references: [
+    {
+      title: 'numpy.std',
+      url: 'https://numpy.org/doc/stable/reference/generated/numpy.std.html',
+      version: 'NumPy 2.5',
+    },
+    {
+      title: 'numpy.corrcoef',
+      url: 'https://numpy.org/doc/stable/reference/generated/numpy.corrcoef.html',
+      version: 'NumPy 2.5',
+    },
+    {
+      title: 'statistics: mathematical statistics functions',
+      url: 'https://docs.python.org/3/library/statistics.html',
+      version: 'Python 3.13',
+    },
+  ],
 } satisfies LessonMeta;
