@@ -1,0 +1,171 @@
+import { agent, agentCode, loopRunner, playground } from './code';
+import { questions, toolResultExercise } from './quiz';
+
+<Section kind="intuition" title="A model that can ask for help">
+
+A language model only produces text. It can't look up today's price list, do exact arithmetic reliably or send an
+email. <Term id="tool-calling">Tool calling</Term> gives it a way to ask: instead of answering, the model replies
+with a structured request such as `calculator({"expression": "2480 * 0.175"})`. Your program runs the calculator,
+sends back `434`, and the model continues with that result in front of it.
+
+Think of a new colleague with a phone list. They can't fix the payroll system themselves, but they know who to call
+and what to ask. They still decide when to call, and you still decide who picks up.
+
+Put that in a loop and you have an <Term id="agent">agent</Term>: the model asks for a tool, reads the result, asks
+for another or answers. The questions in this lesson are about Lumen Notes, the invented app from
+[the RAG lesson](#/learn/ai/rag/rag-pipeline), and one of the tools searches its help center.
+
+</Section>
+
+<Section kind="technical" title="Definitions, calls, results and limits">
+
+**A tool is a definition, not code.** With every request you send each tool's name, a description in plain
+language, and a <Term id="tool-schema">tool schema</Term>: a JSON Schema for its arguments. The model never sees
+your function. It chooses a tool, and writes the arguments, from the definition alone.
+
+**The model proposes; your code executes.** When the model wants a tool, its reply contains a `tool_use` block with
+an id, the tool's name and the arguments, and the reply's `stop_reason` is `"tool_use"`. Your code checks the
+arguments against the schema, runs the tool and sends back a `tool_result` with the same id. If anything fails, the
+result carries the error message and `is_error: true`, and the model can try again.
+
+**The loop.** The <Term id="agent-loop">agent loop</Term> repeats: send the conversation, append the model's reply,
+run the requested tools, append their results. It ends when the model answers without asking for a tool. The
+conversation list is the loop's only memory: each request carries everything so far.
+
+**Limits.** Nothing guarantees the model will finish. Every model turn is a paid call, and a model can repeat a
+failing call. So a loop needs a maximum number of model turns, and usually a maximum number of failed tool calls.
+Tools with side effects (paying, deleting, emailing) also need a person's approval before they run.
+
+**Agents and workflows.** If you know the steps in advance (search, then summarize), write them in code and call
+the model at fixed points: that is a <Term id="llm-workflow">workflow</Term>. Use an agent when the steps depend on
+what the tools return. Workflows are cheaper, faster and easier to test, so start with one.
+
+<Callout kind="simplification">
+  No language model runs in this lesson. The model's turns are a script written for it, and every one is labeled.
+  Everything else is real: the loop, the argument checks, and both tools, which run in your browser on the arguments
+  shown. When you change a limit, the loop really stops where the limit says.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Step through the loop">
+
+Choose a task and step through it. Model turns have dashed borders and a "Scripted model turn" label; tool results
+are computed when you get to them. Start with "A failed call, then a retry": the model writes `×` for
+multiplication, the calculator rejects it, and the model reads the error and tries again.
+
+<Experiment def={agent} title="Agent loop over the Lumen help center">
+  <AgentLoop />
+</Experiment>
+
+Now lower "Failed tool calls allowed" to 0, or "Max model turns" to 3, and step through again: the same script stops
+early, with no answer.
+
+</Section>
+
+<Section kind="code" title="The same loop with the Anthropic API">
+
+This is the loop in Python with the Anthropic SDK. The tool definitions are the ones the experiment validates
+against, and the limits and the question come from the experiment's settings. This code was checked against a fake
+API server; the step-through above did not call any model.
+
+<Experiment def={agent} title="agent.py, linked to the experiment" controls={false}>
+  <Code example={agentCode} title="agent.py" />
+  <Readout title="This run in the step-through" />
+</Experiment>
+
+The loop itself doesn't need an API. Here it is with the model replaced by a list of turns, and a calculator that
+only evaluates arithmetic (never `eval` text from a model). Run it: the first call fails with Python's own error
+message, and with `max_tool_errors=0` the second run stops there.
+
+<PythonRunner example={loopRunner} title="agent_loop.py" />
+
+</Section>
+
+<Section kind="experiment" title="Call the tools yourself">
+
+You are the model now. Pick a tool and write its arguments as JSON. The arguments are checked against the tool's
+schema first, exactly as the loop checks the model's calls, then the tool runs.
+
+<Experiment def={playground} title="Tool playground">
+  <Readout title="Tool result" />
+</Experiment>
+
+Things to try:
+
+- `{"expression": "12 * 10"}`, then `{"expression": "12 × 10"}` and `{"expression": "1 / 0"}`. Errors are results
+  too.
+- `{"expr": "12 * 10"}`: a misspelled argument name is caught by the schema before the tool runs.
+- Switch to `search_docs` with `{"query": "refund monthly plan"}`, then `{"query": "handwriting"}`. A search that
+  finds nothing returns "No matching passages.", which is a result, not an error.
+
+</Section>
+
+<Section kind="mistakes" title="Trusting the call, and loops without limits">
+
+<CommonMistake
+  title="Running what the model wrote"
+  wrong={'def calculator(expression):\n    return eval(expression)  # the model wrote expression'}
+  error={'(no error: an expression such as __import__("os").remove("notes.db") runs with your program\'s permissions)'}
+  cause="Tool arguments come from the model, and the model's input can come from users or retrieved documents. Treat arguments as untrusted input, like a web form."
+  fix={'def calculator(expression):\n    return evaluate_arithmetic(expression)  # parses numbers and + - * / only; anything else raises'}
+/>
+
+<CommonMistake
+  title="A loop that only stops when the model does"
+  wrong={'while True:\n    response = client.messages.create(...)\n    if response.stop_reason != "tool_use":\n        break'}
+  error="(no error: a model that keeps retrying a failing call runs until you notice the bill)"
+  cause="The model decides when to stop. If a tool keeps failing, or the task is impossible, it may keep asking."
+  fix={'for _ in range(max_steps):\n    ...\n    if errors > max_tool_errors:\n        break'}
+/>
+
+<Callout kind="warning">
+  A tool that changes something (sends, pays, deletes) should show the call to a person and wait for approval. Tool
+  results can also carry instructions planted in a web page or a document, so treat them as data, as in the RAG
+  lesson.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Designing tools for an agent">
+
+| Decision           | Good default                                                                 |
+| ------------------ | ---------------------------------------------------------------------------- |
+| Workflow or agent  | A workflow, until the steps really depend on what the tools return            |
+| Tool descriptions  | Say what the tool does, what it accepts, and when not to use it               |
+| Arguments          | Few, typed and required where possible; validate before running               |
+| Errors             | Return them as results with a message the model can act on                   |
+| Limits             | Maximum model turns and failed calls; log every call and result              |
+| Side effects       | Ask a person before anything that can't be undone                             |
+
+[Evaluations and guardrails](#/learn/ai/reliability/evals-guardrails) shows how to test an agent on a set of tasks
+instead of one demo.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Turn every outcome into a result">
+
+<MiniExercise exercise={toolResultExercise}>
+  Write `call_tool(tools, name, args)` that never raises: a successful call returns its result as text, and an
+  unknown tool or an exception becomes a result with `is_error` set to `True`. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- With tool calling, the model replies with a request to run a named tool with arguments; your code runs it and
+  sends the result back.
+- The model sees only each tool's name, description and input schema, so those decide whether it calls the right
+  tool well.
+- The agent loop repeats model turn, tool calls and results until the model answers. The conversation is its memory.
+- Validate arguments, return failures as error results, and limit model turns and failed calls.
+- Prefer a fixed workflow when the steps are known; use an agent when they depend on what the tools return.
+
+</Section>

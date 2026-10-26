@@ -1,0 +1,78 @@
+.events {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.event {
+  min-width: 0;
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.event[data-event='user'] {
+  box-shadow: inset 3px 0 0 var(--ink-2);
+}
+.event[data-event='model'] {
+  border-style: dashed;
+}
+.event[data-status='ok'] {
+  box-shadow: inset 3px 0 0 var(--ok);
+}
+.event[data-status='error'],
+.event[data-status='tool-errors'],
+.event[data-status='step-limit'],
+.event[data-status='script-ended'] {
+  box-shadow: inset 3px 0 0 var(--err);
+}
+.event[data-status='answer'] {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  margin: 0 0 var(--s-1);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
+}
+.text {
+  margin: 0 0 var(--s-1);
+  font-size: var(--fs-15);
+}
+.call {
+  display: block;
+  font-size: var(--fs-13);
+  overflow-wrap: anywhere;
+}
+.result {
+  margin: 0;
+  padding: var(--s-2);
+  background: var(--surface-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.event[data-status='error'] .result {
+  color: var(--err);
+}
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  margin-top: var(--s-3);
+}
+.count {
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}

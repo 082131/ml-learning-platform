@@ -245,7 +245,7 @@ export const tracks: Track[] = [
         id: 'agents',
         title: 'Agents',
         level: 'advanced',
-        lessons: [{ id: 'ai/agents/tool-calling', status: 'outline' }],
+        lessons: [{ id: 'ai/agents/tool-calling', status: 'written' }],
       },
       {
         id: 'apps',
