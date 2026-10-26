@@ -3,13 +3,13 @@
 // every starter must fail them. CPython runs always (when installed). With PYODIDE_DIR set to an
 // extracted Pyodide 314.0.7 distribution, the same code also runs in Pyodide, the browser's runtime.
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { hasModule, hasPython } from '@/lib/foundations/pythonOracle';
 import type { CodeExample, Exercise } from '@/lib/types';
-import { CPYTHON_DIFFERENCES, pythonSetup } from './testSetup';
+import { CPYTHON_DIFFERENCES, DATA_FILES, pythonSetup } from './testSetup';
 
 const codeModules = import.meta.glob<Record<string, unknown>>('./*/code.ts', { eager: true });
 const quizModules = import.meta.glob<Record<string, unknown>>('./*/quiz.ts', { eager: true });
@@ -30,6 +30,8 @@ const canRun = (code: string) =>
   ['numpy', 'pandas', 'matplotlib'].every((m) => !usesModule(code, m) || hasModule(m));
 
 const work = mkdtempSync(path.join(tmpdir(), 'mlp-foundations-'));
+for (const [name, source] of Object.entries(DATA_FILES))
+  copyFileSync(path.resolve(source), path.join(work, name));
 function cpython(code: string): { out: string; ok: boolean } {
   const file = path.join(work, 'run.py');
   writeFileSync(file, `${pythonSetup(work)}\n${code}`);
@@ -73,6 +75,10 @@ function pyodideOutputs(programs: string[]): string[] {
 import { readFileSync } from 'node:fs';
 const programs = JSON.parse(readFileSync(process.argv[2], 'utf8'));
 const py = await loadPyodide({ indexURL: ${JSON.stringify(`${PYODIDE_DIR}/`)} });
+for (const name of ${JSON.stringify(Object.keys(DATA_FILES))}) {
+  py.FS.mkdirTree(${JSON.stringify(work)});
+  py.FS.writeFile(${JSON.stringify(work)} + '/' + name, readFileSync(${JSON.stringify(work)} + '/' + name));
+}
 py.runPython('import os\\nos.environ["MPLBACKEND"] = "AGG"');
 let out = '';
 py.setStdout({ batched: (t) => (out += t + '\\n') });

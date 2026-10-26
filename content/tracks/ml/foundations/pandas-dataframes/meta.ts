@@ -12,5 +12,21 @@ export default {
     'Group rows and compute a summary per group',
   ],
   prerequisites: ['ml/foundations/numpy-arrays'],
-  concepts: ['dataset', 'feature'],
+  concepts: ['dataframe', 'dataset', 'feature', 'boolean-mask'],
+  references: [
+    {
+      title: '10 minutes to pandas',
+      url: 'https://pandas.pydata.org/docs/user_guide/10min.html',
+      version: 'pandas 3.0',
+    },
+    {
+      title: 'pandas: Group by (split-apply-combine)',
+      url: 'https://pandas.pydata.org/docs/user_guide/groupby.html',
+      version: 'pandas 3.0',
+    },
+    {
+      title: 'palmerpenguins: Palmer Archipelago (Antarctica) penguin data (CC0)',
+      url: 'https://allisonhorst.github.io/palmerpenguins/',
+    },
+  ],
 } satisfies LessonMeta;

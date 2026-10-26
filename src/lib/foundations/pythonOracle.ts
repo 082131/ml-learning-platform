@@ -13,7 +13,7 @@ export const hasPython = (() => {
 
 /** Runs `code` with python3 and returns what it printed. */
 export function runPython(code: string): string {
-  return execFileSync('python3', ['-c', code], { encoding: 'utf8' });
+  return execFileSync('python3', ['-'], { input: code, encoding: 'utf8', maxBuffer: 1 << 26 });
 }
 
 /** Can python3 import this module (numpy, pandas)? */

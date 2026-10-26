@@ -1,0 +1,146 @@
+import { experiment, pandasRunner, tableCode } from './code';
+import { heaviestExercise, questions } from './quiz';
+
+<Section kind="intuition" title="A spreadsheet you program">
+
+Real <Term id="dataset">datasets</Term> are tables: one row per example, one column per measurement, and the
+columns hold different kinds of values. The penguins table in this lesson has a species name, an island, four
+measurements and the year for each of 344 penguins.
+
+A <Term id="dataframe">DataFrame</Term> from the pandas library is that table in Python. Each column has a name
+and its own type, and underneath each column is an array, so whole-column arithmetic is as fast as NumPy. On top,
+pandas adds what spreadsheets do: read a CSV file, filter rows, sort, and summarize groups, each in one line.
+
+</Section>
+
+<Section kind="technical" title="Load, select, filter, group">
+
+**Load and look.** `pd.read_csv("penguins.csv")` reads the file. `df.shape` is `(rows, columns)`, `df.head()`
+shows the first 5 rows, `df.dtypes` the type of each column, and `df.isna().sum()` counts the missing values per
+column. In this file, missing values are written `NA`, and pandas reads them as `NaN`.
+
+**Select columns.** `df["body_mass_g"]` is one column, a `Series`. `df[["species", "island"]]` (a list inside
+the brackets) is a smaller DataFrame.
+
+**Filter rows.** `df["body_mass_g"] > 5500` is a mask with one True or False per row, as in NumPy, and
+`df[mask]` keeps the True rows. Combine conditions with `&` (and), `|` (or) and `~` (not), with parentheses
+around each condition. Rows keep their labels, the index printed on the left, so you can always find them in
+the original file.
+
+**Sort.** `df.sort_values("flipper_length_mm", ascending=False)` orders rows by a column. Add `kind="stable"` to
+keep equal values in file order; otherwise their order is not guaranteed.
+
+**Group and summarize.** `df.groupby("species")["body_mass_g"].mean()` splits the rows by species, takes the
+body mass column of each group and averages it: one number per species, in sorted order. Summaries such as
+`mean`, `count`, `min` and `max` skip missing values, and `groupby` leaves out rows whose group key is missing.
+That is why `len(df)` and `df["body_mass_g"].count()` can differ.
+
+</Section>
+
+<Section kind="visual" title="Filter and group the penguins">
+
+Choose which penguins to keep, then how to group and summarize them. The table shows the first rows of `df` with
+their pandas row labels, and the bars show the summary. Every number here was checked against pandas for every
+combination of these controls.
+
+<Experiment def={experiment} title="Table explorer">
+  <TableExplorer />
+</Experiment>
+
+<Callout kind="note">
+  Data: the Palmer penguins dataset (344 penguins, Palmer Station, Antarctica), collected by Dr. Kristen Gorman and
+  the Palmer Station LTER, and published by Horst, Hill and Gorman (2020) in the palmerpenguins package under a
+  CC0 1.0 public domain dedication. The file is bundled with this site unmodified.
+</Callout>
+
+</Section>
+
+<Section kind="code" title="The same steps in pandas">
+
+This code filters and summarizes the way you chose above. The readout lists the values it computes.
+
+<Experiment def={experiment} title="table.py, linked to the table explorer" controls={false}>
+  <Code example={tableCode} title="table.py" />
+  <Readout title="Values the code computes" />
+</Experiment>
+
+</Section>
+
+<Section kind="experiment" title="Things to try">
+
+In the explorer above:
+
+- Group by `sex` with the statistic `count`. Together the groups hold 333 rows, not 344: 11 penguins have no
+  recorded sex, and groupby leaves them out.
+- Keep species `Chinstrap` and island `Biscoe`. No rows are left, because Chinstrap penguins in this data live
+  only on Dream.
+- Keep island `Torgersen` and group by species. Only Adelie penguins are recorded there.
+
+Then load the real file in Python. In the browser, Python downloads the CSV from this site; on your own computer
+the same code works with a file name instead of the address.
+
+<PythonRunner example={pandasRunner} title="penguins.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Brackets and conditions">
+
+<CommonMistake
+  title="Combining conditions with and"
+  wrong={'penguins[(penguins["species"] == "Gentoo") and (penguins["island"] == "Biscoe")]'}
+  error="ValueError: The truth value of a Series is ambiguous. Use a.empty, a.bool(), a.item(), a.any() or a.all()."
+  cause="Python's and needs a single True or False, but each condition is a whole column of them."
+  fix={'penguins[(penguins["species"] == "Gentoo") & (penguins["island"] == "Biscoe")]'}
+/>
+
+<CommonMistake
+  title="A column name that does not exist"
+  wrong={'penguins["mass"]'}
+  error="KeyError: 'mass'"
+  cause="Column names must match exactly, including units and underscores. print(penguins.columns) lists them."
+  fix={'penguins["body_mass_g"]'}
+/>
+
+<Callout kind="warning">
+  Missing values do not raise errors: `mean()` quietly skips them and `groupby` quietly drops rows with a missing
+  key. Check `df.isna().sum()` before you trust a summary.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+| In ML code | What it does |
+|---|---|
+| `df = pd.read_csv("train.csv")` | Load a training table |
+| `df = df.dropna(subset=["body_mass_g"])` | Drop rows with a missing value in a column you need |
+| `X = df[["bill_length_mm", "flipper_length_mm"]].to_numpy()` | Turn feature columns into a NumPy array for a model |
+| `df.groupby("label").size()` | Check how balanced the classes are |
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Find the heaviest species">
+
+<MiniExercise exercise={heaviestExercise}>
+  Write `heaviest_species(df)`. It gets a DataFrame with `species` and `body_mass_g` columns and returns the name
+  of the species with the highest average body mass. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A DataFrame is a table of named columns, each with its own type; `shape`, `head()`, `dtypes` and
+  `isna().sum()` are the first things to look at.
+- `df["col"]` selects a column, `df[mask]` filters rows; combine masks with `&` and `|` and parentheses.
+- `groupby(key)[col].mean()` gives one summary per group; summaries skip missing values.
+
+Next: [plotting with Matplotlib](#/learn/ml/foundations/matplotlib-plotting) turns these columns into pictures.
+
+</Section>

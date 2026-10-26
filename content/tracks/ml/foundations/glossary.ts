@@ -132,4 +132,12 @@ export default [
     introducedIn: 'ml/foundations/vectorization',
     aliases: ['mask', 'boolean indexing'],
   },
+  {
+    id: 'dataframe',
+    term: 'DataFrame',
+    short: 'A pandas table: rows with labels and named columns, where each column has its own type.',
+    long: 'Each column is a pandas Series backed by an array. DataFrames are how most tabular datasets are loaded, cleaned and summarized in Python before training a model.',
+    introducedIn: 'ml/foundations/pandas-dataframes',
+    aliases: ['data frame', 'pandas DataFrame'],
+  },
 ] satisfies GlossaryTerm[];
