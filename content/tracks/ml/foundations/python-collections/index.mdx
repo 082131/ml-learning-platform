@@ -1,0 +1,155 @@
+import { collectionsRunner, experiment, sliceCode } from './code';
+import { countsExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Many values under one name">
+
+A dataset is many values: 344 penguins, ten thousand emails. Python has two everyday containers for them.
+
+A <Term id="python-list">list</Term> keeps values in order, like a numbered row of boxes:
+`scores = [72, 45, 90]`. You get an item by its position, counting from 0: `scores[0]` is 72.
+
+A <Term id="python-dict">dict</Term> (dictionary) keeps pairs of a key and a value, like a phone book:
+`ages = {"Ada": 36, "Alan": 41}`. You get a value by its key: `ages["Alan"]` is 41.
+
+A <Term id="slice">slice</Term> takes a run of items out of a list: `letters[1:6:2]` means "from position 1, up
+to but not including 6, every 2nd item". The same notation slices NumPy arrays and pandas tables later in this
+chapter, so it is worth getting exactly right.
+
+</Section>
+
+<Section kind="technical" title="Indexes, slices and keys">
+
+**Indexing.** In a list of length $n$, positions run from $0$ to $n-1$. Negative positions count from the end:
+`-1` is the last item, `-2` the one before, down to $-n$, the first. So for 8 letters, position $-3$ is the same
+as $8 - 3 = 5$. Reading a position outside the list raises `IndexError`.
+
+**Slicing.** `xs[start:stop:step]` makes a new list. Python resolves it in three steps:
+
+1. **Fill in blanks.** With a positive step, a blank start means the beginning and a blank stop the end. With a
+   negative step, it is the other way round: start at the last item, run past the first. A blank step is 1.
+2. **Turn negative bounds into positions** by adding the length, and clip anything outside the list to the edge.
+   Slices never raise an error for out-of-range bounds.
+3. **Walk** from start towards stop in steps of step, and stop *before* reaching stop.
+
+**Worked example.** `letters[1:6:2]` on `["a", ..., "h"]`: start 1, stop 6, step 2 visits positions 1, 3, 5,
+giving `['b', 'd', 'f']`. `letters[-3:]` has start $-3 + 8 = 5$ and a blank stop meaning 8, so it is positions 5,
+6, 7: `['f', 'g', 'h']`. Python itself reports the resolved bounds with `slice(-3, None).indices(8)`, which is
+`(5, 8, 1)`.
+
+**Changing lists.** Lists can change in place: `scores[1] = 50` replaces an item, `scores.append(61)` adds one
+at the end. Slicing never changes the original list.
+
+**Dicts.** `ages["Grace"] = 85` adds or replaces a key. `"Linus" in ages` checks whether a key exists, and
+`ages.get("Linus", 0)` returns a default instead of raising `KeyError`. `for name, age in ages.items():` loops
+over the pairs, in the order they were added.
+
+</Section>
+
+<Section kind="visual" title="Pick start, stop and step">
+
+Choose the three parts of the slice. Positions are shown above each item and negative positions below; the picked
+items are marked with the order the slice visits them in. Blank means "use the default".
+
+<Experiment def={experiment} title="Slice explorer">
+  <SliceViz />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The slice in Python">
+
+The slice in this code is the one you chose above, and the readout shows what it prints.
+
+<Experiment def={experiment} title="slice.py, linked to the slice explorer" controls={false}>
+  <Code example={sliceCode} title="slice.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+</Section>
+
+<Section kind="experiment" title="Things to try">
+
+In the slice explorer above:
+
+- Leave start and stop blank and set step to -1. That reverses the list: `letters[::-1]`.
+- Set start to 6 and stop to 2 with a blank step. The slice is empty, because step 1 walks right and never
+  reaches 2. Now set step to -1: positions 6, 5, 4, 3.
+- Set start to -10 and stop to 10. Both are clipped to the edges, and you get the whole list without an error.
+
+Then run lists, dicts and a shared list for real:
+
+<PythonRunner example={collectionsRunner} title="collections.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Off the end, missing keys, and shared lists">
+
+<CommonMistake
+  title="Reading past the end of a list"
+  wrong={'letters = ["a", "b", "c"]\nprint(letters[3])'}
+  error="IndexError: list index out of range"
+  cause="A list of 3 items has positions 0, 1 and 2. Position 3 does not exist. (A slice such as letters[3:] would just give [].)"
+  fix={'print(letters[2])   # or letters[-1] for the last item'}
+/>
+
+<CommonMistake
+  title="Looking up a key that is not in a dict"
+  wrong={'ages = {"Ada": 36}\nprint(ages["Linus"])'}
+  error="KeyError: 'Linus'"
+  cause="Square brackets require the key to exist. Python names the missing key in the error."
+  fix={'print(ages.get("Linus", 0))   # 0 when the key is missing\nprint("Linus" in ages)       # False'}
+/>
+
+<CommonMistake
+  title="A slice step of zero"
+  wrong={'xs = [1, 2, 3]\nprint(xs[::0])'}
+  error="ValueError: slice step cannot be zero"
+  cause="A step of 0 would never move, so Python refuses it. That is why the explorer offers no 0."
+  fix={'print(xs[::1])'}
+/>
+
+<Callout kind="warning">
+  `b = a` does not copy a list: both names refer to the same list, so `b.append(4)` also changes what `a` shows.
+  The runner above prints `[1, 2, 3, 4]` for `a`. Use `b = a.copy()` (or `a[:]`) when you need a separate list.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+| In ML code | What it is |
+|---|---|
+| `train, test = rows[:800], rows[800:]` | Split examples into a training and a test set with slices |
+| `batch = rows[i:i + 32]` | Take the next batch of 32 examples |
+| `config = {"lr": 0.01, "epochs": 20}` | Settings of an experiment as a dict |
+| `vocab = {"free": 0, "money": 1}` | A dict from words to numbers, as text models use |
+
+[NumPy arrays](#/learn/ml/foundations/numpy-arrays) extend indexing and slicing to grids of numbers.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Count words with a dict">
+
+<MiniExercise exercise={countsExercise}>
+  Write `word_counts(words)` that returns a dict from each word in the list `words` to how many times it appears.
+  Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Lists are ordered: positions $0 \dots n-1$, and negative positions count from the end.
+- `xs[start:stop:step]` excludes stop; blanks get defaults and out-of-range bounds are clipped.
+- Dicts map keys to values; use `in` or `.get()` to avoid `KeyError`.
+- Assigning a list to a second name shares it; `.copy()` makes a new one.
+
+Next: [NumPy arrays](#/learn/ml/foundations/numpy-arrays) are lists built for numbers, with shapes and fast math.
+
+</Section>

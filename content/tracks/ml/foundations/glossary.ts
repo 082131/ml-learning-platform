@@ -67,4 +67,27 @@ export default [
     introducedIn: 'ml/foundations/python-control',
     aliases: ['for loop', 'while loop', 'iteration'],
   },
+  {
+    id: 'python-list',
+    term: 'List',
+    short: 'An ordered, changeable collection in Python, written [72, 45, 90]. Items are numbered from 0.',
+    introducedIn: 'ml/foundations/python-collections',
+    aliases: ['list'],
+  },
+  {
+    id: 'python-dict',
+    term: 'Dictionary (dict)',
+    short:
+      'A collection of key-value pairs, written {"Ada": 36}, where you look values up by key instead of by position.',
+    introducedIn: 'ml/foundations/python-collections',
+    aliases: ['dict', 'mapping'],
+  },
+  {
+    id: 'slice',
+    term: 'Slice',
+    short: 'A part of a sequence picked by start:stop:step, such as letters[1:6:2]. Stop is not included.',
+    long: 'Blank parts take defaults (start of the list, end of the list, step 1), and out-of-range bounds are clipped rather than raising an error. NumPy arrays and pandas use the same notation.',
+    introducedIn: 'ml/foundations/python-collections',
+    aliases: ['slicing'],
+  },
 ] satisfies GlossaryTerm[];
