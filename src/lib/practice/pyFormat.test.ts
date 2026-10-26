@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pyFloat, pyJson, pyRound } from './pyFormat';
+import { pyFixed, pyFloat, pyJson, pyRound } from './pyFormat';
 
 // Expected strings were printed by CPython 3.13.
 describe('pyRound', () => {
@@ -23,5 +23,21 @@ describe('pyFloat and pyJson', () => {
     );
     expect(pyFloat(NaN)).toBe('nan');
     expect(() => pyFloat(1e16)).toThrow();
+  });
+});
+
+describe('pyFixed', () => {
+  it('matches CPython 3.13 f-string formatting', () => {
+    // print([f"{x:+.2f}" for x in (0.125, 0.375, -0.0, -0.001, 2.675, 0.0)], f"{1.005:.2f}", f"{-7.5:.0f}")
+    expect([0.125, 0.375, -0, -0.001, 2.675, 0].map((x) => pyFixed(x, 2, true))).toEqual([
+      '+0.12',
+      '+0.38',
+      '-0.00',
+      '-0.00',
+      '+2.67',
+      '+0.00',
+    ]);
+    expect(pyFixed(1.005, 2)).toBe('1.00');
+    expect(pyFixed(-7.5, 0)).toBe('-8');
   });
 });

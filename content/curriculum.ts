@@ -95,7 +95,7 @@ export const tracks: Track[] = [
           { id: 'ml/practice/hyperparameter-tuning', status: 'written' },
           { id: 'ml/practice/versioning', status: 'written' },
           { id: 'ml/practice/ablations', status: 'written' },
-          { id: 'ml/practice/model-testing', status: 'outline' },
+          { id: 'ml/practice/model-testing', status: 'written' },
           { id: 'ml/practice/gpu-training', status: 'outline' },
         ],
       },

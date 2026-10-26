@@ -88,7 +88,8 @@ export default [
   {
     id: 'ablation',
     term: 'Ablation study',
-    short: 'Measuring how much each part of a model or pipeline contributes by removing one part at a time and re-evaluating.',
+    short:
+      'Measuring how much each part of a model or pipeline contributes by removing one part at a time and re-evaluating.',
     long: 'Each ablation changes exactly one component and keeps data, seeds and everything else fixed, so the change in the metric can be attributed to that component. Differences smaller than the seed-to-seed spread are not findings.',
     introducedIn: 'ml/practice/ablations',
     aliases: ['ablation', 'leave-one-out'],
@@ -96,9 +97,35 @@ export default [
   {
     id: 'error-slice',
     term: 'Error slice',
-    short: 'A subset of examples defined by a column value (a region, a language, a device) on which a model’s error is measured separately.',
+    short:
+      'A subset of examples defined by a column value (a region, a language, a device) on which a model’s error is measured separately.',
     long: 'Error analysis compares slices to find where a model fails; an average metric can look fine while one slice is much worse.',
     introducedIn: 'ml/practice/ablations',
     aliases: ['slice', 'error analysis'],
+  },
+  {
+    id: 'behavioral-test',
+    term: 'Behavioral test',
+    short:
+      'A test of how a model’s prediction responds to a controlled change in its input, such as "one more stop should not make the delivery faster".',
+    long: 'Directional tests check the sign or size of a change, invariance tests check that an irrelevant change leaves the prediction alone. They encode domain knowledge that an average metric does not check.',
+    introducedIn: 'ml/practice/model-testing',
+    aliases: ['directional test', 'invariance test'],
+  },
+  {
+    id: 'training-serving-skew',
+    term: 'Training-serving skew',
+    short:
+      'A difference between how features are computed during training and in production, which makes production predictions worse than offline metrics suggest.',
+    introducedIn: 'ml/practice/model-testing',
+    aliases: ['train-serve skew'],
+  },
+  {
+    id: 'release-gate',
+    term: 'Release gate',
+    short:
+      'A pass or fail threshold, agreed in advance, that a new model must meet before it replaces the current one, for example a maximum validation error per slice.',
+    introducedIn: 'ml/practice/model-testing',
+    aliases: ['quality gate', 'metric gate'],
   },
 ] satisfies GlossaryTerm[];

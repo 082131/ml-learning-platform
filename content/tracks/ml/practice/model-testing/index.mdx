@@ -1,0 +1,197 @@
+import { experiment, pipelineCode, pipelineRunner, pytestCode, pytestRun } from './code';
+import { invarianceExercise, questions } from './quiz';
+
+<Section kind="intuition" title="A model is code that can be wrong in new ways">
+
+Ordinary software tests check that a function returns the right answer. A model has no single right answer, but it
+can still be broken in ways a test can catch: the data it trained on was corrupted, a column quietly contained the
+answer, production feeds it features in a different form than training did, or it is accurate on average and bad
+for one group of customers.
+
+An evaluation pipeline runs a fixed list of checks every time a model changes, in order from cheap to expensive,
+and blocks the release when any of them fails. Each check exists because of a real failure mode, and the only way
+to trust a check is to watch it fail on the fault it is meant to catch. This lesson does exactly that.
+
+</Section>
+
+<Section kind="technical" title="Four kinds of check">
+
+The lesson tests the delivery-time model from [the ablation lesson](#/learn/ml/practice/ablations): linear
+regression on distance, stops, rain and region, trained on 150 of the 200 synthetic deliveries and validated on the
+other 50.
+
+| Stage | Check | Fails when | Catches |
+| --- | --- | --- | --- |
+| data | schema | a distance is missing or outside (0, 50] km, a category is unknown | broken exports, unit changes |
+| data | label leak | any feature has $\lvert r \rvert \ge 0.95$ with the label | a column recorded after the outcome |
+| data | split overlap | an order is in both training and validation | evaluating on memorized rows |
+| train | smoke | a prediction is not a finite number | crashes, NaN weights |
+| behavior | directional | +1 km does not add 1 to 5 min; +1 stop, rain or rural does not add time | wrong signs, missing features at serving |
+| gate | metric | validation MAE above the threshold | a worse model |
+| gate | slices | any region's MAE above its threshold | a model that fails one group |
+
+**Data checks stop the pipeline.** If one fails, training does not run: broken data produces numbers nobody should
+read, and it wastes compute. The later checks all run and every failure is reported, so one run shows everything
+that needs fixing.
+
+**The leak check** uses the Pearson correlation between each feature $x$ and the label $y$:
+
+$$
+r = \frac{\sum_i (x_i - \bar x)(y_i - \bar y)}{\sqrt{\sum_i (x_i - \bar x)^2 \, \sum_i (y_i - \bar y)^2}}
+$$
+
+The strongest honest feature, distance, has $\lvert r \rvert = 0.869$. A column that is the label in disguise has
+$\lvert r \rvert$ near 1.
+
+**<Term id="behavioral-test">Behavioral tests</Term>** check how the prediction responds to one controlled change of
+a reference request (5 km, 1 stop, no rain, city). They go through the serving code, the function production
+calls, because that is where <Term id="training-serving-skew">training-serving skew</Term> lives: training builds
+features one way, production another, and the offline metric never sees the difference.
+
+**<Term id="release-gate">Release gates</Term>** compare metrics with thresholds agreed in advance: here an overall
+validation MAE of at most 2.5 minutes and at most 3.0 in every region. Because 50 validation rows give an uncertain
+MAE, the pipeline also prints a 95% bootstrap interval: resample the 50 absolute errors with replacement $B = 1000$
+times, compute the mean of each resample, sort the means and report the 25th and 975th values (the 2.5th and 97.5th
+percentiles). For the healthy model:
+
+$$
+\text{MAE} = 2.11 \text{ minutes}, \qquad 95\%\ \text{interval } [1.77,\ 2.46]
+$$
+
+The gate at 2.5 sits just above that interval, so the model passes, but not by much.
+
+<Callout kind="simplification">
+  A percentile bootstrap on one split measures the uncertainty from which rows happen to be in validation, not
+  from retraining. Comparing a new model with the current one is more sensitive when both are scored on the same
+  rows and the paired differences are bootstrapped. The thresholds here are illustrative; in a project they come
+  from what the product needs and from the current model's performance.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="The pipeline">
+
+Each box is a stage: ✓ passed, ✗ failed, and boxes with no mark never ran. Below the diagram is every check with the
+line the program prints for it. The faults and thresholds are set in the Experiment section below.
+
+<Experiment def={experiment} title="Evaluation pipeline for the delivery model" controls={false}>
+  <EvalPipeline />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The pipeline in plain Python">
+
+The program implements every check with the standard library. The four settings near the end are filled from the
+experiment.
+
+<Experiment def={experiment} title="pipeline.py, linked to the diagram" controls={false}>
+  <Code example={pipelineCode} title="pipeline.py" />
+  <Readout title="Summary of what the code prints" />
+</Experiment>
+
+Run the complete program; with no faults it prints the twelve PASS lines and `RELEASE: ship`.
+
+<PythonRunner example={pipelineRunner} title="pipeline.py (complete)" />
+
+In a project the same checks are usually written as tests for a test runner such as pytest, so they run in
+continuous integration on every change. This file imports the functions above from `delivery_model.py`:
+
+<Code example={pytestCode} title="test_delivery_model.py" />
+
+The commands below were run with pytest 9.1.1; the comments show their real output, first for the healthy model
+and then with the serving fault that ignores the region.
+
+<Code example={pytestRun} title="terminal" />
+
+</Section>
+
+<Section kind="experiment" title="Break it on purpose">
+
+<Experiment def={experiment} title="Inject faults and set the gates">
+  <EvalPipeline />
+  <Readout />
+</Experiment>
+
+Things to try:
+
+- Each data fault in turn. Every one is stopped by a different data check, and nothing after it runs. A batch in
+  meters fails 50 rows; a leaked column has $\lvert r \rvert = 1.000$.
+- Validation rows in training. Had the pipeline not stopped it, the MAE would have been 1.98 instead of 2.11:
+  better-looking, and wrong. A leaked label would have given 0.24.
+- Serving fault "stops not sent". The +1 stop test fails with +0.00 minutes, and the MAE more than doubles to
+  4.49.
+- Serving fault "region not sent". The overall MAE rises to 4.36, but city and suburb still pass their slice gates;
+  only rural (7.87) fails. Then raise the gates to 5.0 and 8.0: every gate passes, and the behavioral test still
+  blocks the release.
+- No faults, metric gate at 2.0. The MAE of 2.11 fails, although the interval (1.77 to 2.46) contains 2.0: with
+  50 rows, a different validation split could have passed it. Near the threshold, the gate's verdict is partly luck.
+
+</Section>
+
+<Section kind="mistakes" title="Tests that cannot fail">
+
+<CommonMistake
+  title="Testing the training features instead of the serving path"
+  wrong={'def test_rural_slower():\n    x_city = features({"km": 5, "stops": 1, "rain": 0, "region": "city"}, columns)\n    x_rural = features({"km": 5, "stops": 1, "rain": 0, "region": "rural"}, columns)\n    assert dot(w, x_rural) > dot(w, x_city)'}
+  error="No error. The test passes while production ignores the region."
+  cause="The test rebuilds features with the training code, so it never exercises the code production calls. Skew between the two stays invisible."
+  fix={'def test_rural_slower(model):  # model calls serve(), the production path\n    assert model({**BASE, "region": "rural"}) > model(BASE)'}
+/>
+
+<CommonMistake
+  title="Moving the threshold after seeing the result"
+  wrong={'# new model: val MAE 2.61, gate was 2.5\nMAX_MAE = 2.7  # "close enough"'}
+  error="No error. The gate passes, and it now passes every model up to 2.7."
+  cause="A threshold chosen after the result only records what the model scored. It no longer blocks anything."
+  fix={'# keep MAX_MAE = 2.5; investigate with the slices and the ablation table,\n# or change the threshold in a reviewed commit, with a reason, before the next run'}
+/>
+
+<Callout kind="warning">
+  A test suite that has never failed proves little. When you add a check, inject the fault it is for, once, and see
+  it fail, as the experiment above does.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Testing models on a team">
+
+- **Run the pipeline in CI.** Data and behavior tests on every pull request (they are fast); full training and the
+  gates on every candidate model. Record the results with the run (see
+  [experiment tracking](#/learn/ml/practice/experiment-tracking)).
+- **Compare against production.** Besides absolute thresholds, require that the candidate is not worse than the
+  current model on the same validation rows, overall and per slice.
+- **Test the serving path.** Call the same function production calls, with requests shaped like production
+  requests. Log production features and compare their distributions with the training data.
+- **Use a rubric.** The ML Test Score (Breck et al., 2017) lists tests for data, model development, infrastructure
+  and monitoring, and is a useful checklist for what a pipeline is missing.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Write an invariance test">
+
+<MiniExercise exercise={invarianceExercise}>
+  Write `invariance_failures(predict, request, field, values, tol)` that returns every value of `field` for which
+  the prediction moves by more than `tol`.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- An evaluation pipeline runs data checks, a smoke test, behavioral tests and release gates on every model change.
+- Data checks stop the pipeline early; a failed check never reaches training.
+- Behavioral tests must call the serving code, or training-serving skew goes unnoticed.
+- Gates are agreed before seeing the model, overall and per slice, with an interval showing how uncertain the
+  metric is.
+- Inject each fault once to prove that its check can fail.
+
+Next: [GPU training](#/learn/ml/practice/gpu-training) estimates what a training run costs in time and memory.
+
+</Section>

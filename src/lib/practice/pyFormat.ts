@@ -23,7 +23,7 @@ export function pyRound(x: number, digits = ROUND_DIGITS): number {
   const tie = next === '5' && !/[1-9]/.test(rest);
   const up = next > '5' || (next === '5' && !tie) || (tie && kept % 2n === 1n);
   const scaled = (kept + (up ? 1n : 0n)).toString().padStart(digits + 1, '0');
-  const text = `${scaled.slice(0, -digits || undefined)}.${scaled.slice(-digits)}`;
+  const text = digits === 0 ? scaled : `${scaled.slice(0, -digits)}.${scaled.slice(-digits)}`;
   return Math.sign(x) * Number(text);
 }
 
@@ -55,4 +55,11 @@ export function pyJson(v: PyValue): string {
   return `{${Object.entries(v)
     .map(([k, x]) => `${JSON.stringify(k)}: ${pyJson(x)}`)
     .join(', ')}}`;
+}
+
+/** Python's `f"{x:.{digits}f}"` (with `plus`, `f"{x:+.{digits}f}"`): exact ties go to even, and -0 keeps its sign. */
+export function pyFixed(x: number, digits: number, plus = false): string {
+  const negative = x < 0 || Object.is(x, -0);
+  const text = Math.abs(pyRound(x, digits)).toFixed(digits);
+  return `${negative ? '-' : plus ? '+' : ''}${text}`;
 }
