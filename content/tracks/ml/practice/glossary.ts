@@ -128,4 +128,29 @@ export default [
     introducedIn: 'ml/practice/model-testing',
     aliases: ['quality gate', 'metric gate'],
   },
+  {
+    id: 'mixed-precision',
+    term: 'Mixed-precision training',
+    short:
+      'Training with most matrix arithmetic in a 16-bit format (bfloat16 or float16) while keeping weights and precision-sensitive operations in float32.',
+    long: 'It speeds up computation on tensor cores and halves activation memory. With float16, the loss is scaled so small gradients do not round to zero; bfloat16 has float32’s exponent range and needs no scaling.',
+    introducedIn: 'ml/practice/gpu-training',
+    aliases: ['automatic mixed precision', 'AMP', 'autocast'],
+  },
+  {
+    id: 'activation-checkpointing',
+    term: 'Activation checkpointing',
+    short:
+      'Keeping only some activations (such as each layer’s input) during the forward pass and recomputing the rest during the backward pass, trading compute for memory.',
+    introducedIn: 'ml/practice/gpu-training',
+    aliases: ['gradient checkpointing', 'activation recomputation'],
+  },
+  {
+    id: 'model-flops-utilization',
+    term: 'Model FLOPs utilization',
+    short:
+      'The share of a GPU’s peak throughput that a training run achieves: model FLOPs per second divided by the datasheet peak.',
+    introducedIn: 'ml/practice/gpu-training',
+    aliases: ['MFU', 'utilization'],
+  },
 ] satisfies GlossaryTerm[];

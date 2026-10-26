@@ -96,7 +96,7 @@ export const tracks: Track[] = [
           { id: 'ml/practice/versioning', status: 'written' },
           { id: 'ml/practice/ablations', status: 'written' },
           { id: 'ml/practice/model-testing', status: 'written' },
-          { id: 'ml/practice/gpu-training', status: 'outline' },
+          { id: 'ml/practice/gpu-training', status: 'written' },
         ],
       },
       {

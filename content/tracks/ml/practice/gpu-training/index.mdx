@@ -1,0 +1,221 @@
+import { ampLoop, ampOutput, estimatorCode, estimatorRunner, experiment } from './code';
+import { maxBatchExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Two budgets: memory and time">
+
+Training a neural network is mostly matrix multiplication, and a GPU is a machine for doing thousands of
+multiply-adds at once (the [CPU vs GPU lesson](#/learn/inference/hardware/cpu-vs-gpu) explains why). Before a run,
+two questions decide whether it is practical. **Does it fit?** Everything the training step needs must be in GPU
+memory at the same time. **How long will it take?** That depends on how many operations the model needs per token,
+how fast the GPU really runs them, and whether the data arrives fast enough to keep it busy.
+
+Both can be estimated on paper from the model size, the batch and the GPU's datasheet, to within a factor that is
+good enough for planning. This lesson builds that estimate for the four GPT-2 sizes, labels every part of it as an
+estimate, and then shows the PyTorch settings that move each number.
+
+</Section>
+
+<Section kind="technical" title="Where the memory and the time go">
+
+**Model size.** A GPT-2-style transformer with $L$ layers, hidden size $h$, vocabulary $V = 50{,}257$ and context
+$s = 1024$ has
+
+$$
+P = 12 L h^2 + 13 L h + (V + s) h + 2h
+$$
+
+parameters: GPT-2 small ($L = 12$, $h = 768$) has 124,439,808, matching the published count.
+
+**Memory, part 1: states.** Training with AdamW keeps, for every parameter, a float32 weight (4 bytes), a float32
+gradient (4) and two float32 moment estimates (8): **16 bytes per parameter**, about 2 GB for GPT-2 small and 25 GB
+for GPT-2 XL. <Term id="mixed-precision">Mixed precision</Term> with `torch.autocast` does not change this: the
+weights stay float32 and only the computation is cast.
+
+**Memory, part 2: activations.** The backward pass needs values saved during the forward pass. Korthikanti et al.
+(2022) count, for one layer with batch $b$ and $a$ attention heads, with 16-bit activations:
+
+$$
+\text{activations per layer} = s\,b\,h\left(34 + \frac{5\,a\,s}{h}\right) \text{ bytes}
+$$
+
+The $5as/h$ term is the attention scores. Fused attention kernels, such as the one behind PyTorch's
+`scaled_dot_product_attention`, recompute the scores instead of storing them, which removes that term. In float32
+the activations take about twice as much. With <Term id="activation-checkpointing">activation checkpointing</Term>
+only each layer's input ($2sbh$ bytes) is kept, plus one layer's full activations while it is recomputed.
+
+**Memory, part 3: logits.** The output layer produces $b \cdot s \cdot V$ scores; the estimate counts them once in
+float32 ($4bsV$ bytes), 3.3 GB at batch 16. Real implementations may hold more copies (for example the gradient
+of the logits), so this part is a lower bound.
+
+**Time.** A training step on $b \cdot s$ tokens costs about
+
+$$
+\text{FLOPs} \approx 6 \cdot P \cdot b \cdot s
+$$
+
+(2 per parameter per token forward, about 4 backward; Kaplan et al., 2020), or $8 P b s$ with checkpointing, which
+repeats the forward pass. The GPU does not run at its datasheet peak; the share it achieves is the
+<Term id="model-flops-utilization">model FLOPs utilization</Term> $u$, often 30 to 50% for well-tuned
+transformer training and lower for small models. So
+
+$$
+t_\text{compute} = \frac{\text{FLOPs}}{u \cdot \text{peak}}, \qquad
+t_\text{load} = \frac{b}{\text{loader samples per second}}, \qquad
+t_\text{step} = \begin{cases} \max(t_\text{compute}, t_\text{load}) & \text{overlapped} \\ t_\text{compute} + t_\text{load} & \text{otherwise} \end{cases}
+$$
+
+For GPT-2 small on an A100 (312 TFLOPS dense bfloat16) at 40% utilization, batch 16: 0.098 s of compute per step,
+167,149 tokens per second, 16.6 hours for 10 billion tokens.
+
+| GPU | Memory | float32 | 16-bit tensor cores (dense) |
+| --- | --- | --- | --- |
+| T4 | 16 GB | 8.1 TFLOPS | 65 TFLOPS float16 (no bfloat16) |
+| L4 | 24 GB | 30.3 TFLOPS | 121 TFLOPS bfloat16 |
+| A100 80GB | 80 GB | 19.5 TFLOPS | 312 TFLOPS bfloat16 |
+| H100 SXM | 80 GB | 67 TFLOPS | 989.5 TFLOPS bfloat16 |
+
+The numbers come from NVIDIA's datasheets (linked in the references). For L4 and H100 the datasheets print the
+16-bit figure "with sparsity"; dense training gets half of it, which is what the table shows. The float32 column
+is for plain float32 math; A100 and H100 can also run float32 matrix multiplications as TF32 on tensor cores, which
+PyTorch leaves off by default.
+
+<Callout kind="simplification">
+  This is an estimate, not a measurement. It leaves out the attention-score FLOPs (a few percent here), the CUDA
+  context and allocator fragmentation (often a gigabyte or more), temporary buffers, and the fact that utilization
+  itself drops at small batch sizes, which the fixed utilization slider does not model. Use it to rule options in
+  or out, then measure the real run with `torch.cuda.max_memory_allocated()` and a synchronized timer.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="The memory budget and one step">
+
+The left chart stacks the estimated memory against the GPU's capacity (dashed line). The right chart shows one
+training step as two lanes: the GPU computing and the loader preparing the next batch. All settings are in the
+Experiment section below.
+
+<Experiment def={experiment} title="Training budget, GPT-2 small on an A100" controls={false}>
+  <TrainingBudget />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The estimate in plain Python">
+
+The estimator is plain Python arithmetic. The arguments of the last call are filled from the experiment.
+
+<Experiment def={experiment} title="estimate.py, linked to the charts" controls={false}>
+  <Code example={estimatorCode} title="estimate.py" />
+  <Readout title="Summary of what the code prints (an estimate)" />
+</Experiment>
+
+Run the complete program; it prints the estimate for the default settings.
+
+<PythonRunner example={estimatorRunner} title="estimate.py (complete)" />
+
+A training loop with mixed precision, overlapped loading and correct timing looks like this in PyTorch 2.14. The
+same file runs on a GPU (bfloat16, or float16 with loss scaling on a T4) and on a CPU.
+
+<Code example={ampLoop} title="train_amp.py" />
+
+We ran it with torch 2.14.1 on a CPU, because no GPU was available while writing this lesson; the comments show
+that run's real output. The losses are deterministic for the seed; the times depend on the machine.
+
+<Code example={ampOutput} title="terminal" />
+
+</Section>
+
+<Section kind="experiment" title="Plan a training run">
+
+<Experiment def={experiment} title="GPU, model, precision and pipeline">
+  <TrainingBudget />
+  <Readout />
+</Experiment>
+
+Things to try:
+
+- Switch the precision to float32. Activations double to 10.27 GB, and the step takes 16 times as long (1.568 s)
+  because the A100's float32 rate is 19.5 TFLOPS instead of 312.
+- Switch the attention kernel to naive. The stored scores more than triple the activations, from 5.13 to 17.21 GB.
+- Choose GPT-2 XL. At batch 16 it needs 71.00 GB, just under 80. The states alone are 24.92 GB.
+- Choose the T4 with GPT-2 small. Batch 16 needs 10.42 GB with mixed precision and 15.55 GB in float32, just
+  under 16; at batch 20 float32 no longer fits (18.94 GB). In float32 the T4 needs 640 hours for 10 billion tokens.
+- Drop the loader to 50 samples per second. Loading takes 0.320 s, the GPU is busy 31% of the step and 10 billion
+  tokens take 54.3 hours instead of 16.6. Then switch to the H100: even at 400 samples per second the loader
+  becomes the bottleneck (GPU busy 77%).
+- Turn on checkpointing. Activations drop from 5.13 to 0.73 GB and the time rises from 16.6 to 22.2 hours.
+
+</Section>
+
+<Section kind="mistakes" title="Measuring and fitting">
+
+<CommonMistake
+  title="Timing GPU code without synchronizing"
+  wrong={'start = time.perf_counter()\nfor _ in range(100):\n    loss = train_step(batch)\nprint(time.perf_counter() - start)  # suspiciously fast'}
+  error="No error. The printed time is mostly how long Python took to queue the work."
+  cause="CUDA calls are asynchronous: they return as soon as the kernel is queued. The GPU may still be working when the clock is read."
+  fix={'for _ in range(10):\n    train_step(batch)          # warm-up: kernel selection, allocator\ntorch.cuda.synchronize()\nstart = time.perf_counter()\nfor _ in range(100):\n    loss = train_step(batch)\ntorch.cuda.synchronize()\nprint((time.perf_counter() - start) / 100, "s per step")'}
+/>
+
+<CommonMistake
+  title="Using float16 without loss scaling"
+  wrong={'with torch.autocast(device_type="cuda", dtype=torch.float16):\n    loss = loss_fn(model(x), y)\nloss.backward()\noptimizer.step()'}
+  error="Often no error, but small gradients round to zero in float16 and training stalls or diverges."
+  cause="float16 has a narrow exponent range: values below about 6e-8 become zero."
+  fix={'scaler = torch.amp.GradScaler("cuda")\n...\nscaler.scale(loss).backward()\nscaler.step(optimizer)\nscaler.update()\n# or use dtype=torch.bfloat16 where the GPU supports it'}
+/>
+
+<Callout kind="warning">
+  When a run runs out of memory, reduce the batch and use gradient accumulation (several small batches, one
+  optimizer step) to keep the effective batch size. Changing the effective batch changes the training dynamics,
+  so the learning rate may need to change with it.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Making a real run fast">
+
+- **Profile before optimizing.** Watch GPU utilization (`nvidia-smi`) during training; if it dips between steps,
+  the input pipeline is the bottleneck. The PyTorch profiler shows where each step's time goes.
+- **Feed the GPU.** `DataLoader(num_workers=..., pin_memory=True)` and `.to(device, non_blocking=True)` overlap
+  loading and copying with compute. Decode and tokenize once, ahead of time, rather than every epoch.
+- **Use the tensor cores.** Mixed precision (bfloat16 on A100, H100 and L4) is usually the single largest speedup.
+  Matrix dimensions that are multiples of 8 or 64 help the kernels.
+- **Fit more.** Fused attention, activation checkpointing and gradient accumulation, in roughly that order. Past
+  one GPU, data parallelism and sharded optimizer states (ZeRO, PyTorch FSDP) split the 16 bytes per parameter
+  across devices.
+- **Record the hardware with the run.** The GPU type, precision and batch size belong in the run record (see
+  [experiment tracking](#/learn/ml/practice/experiment-tracking)): they change speed, memory and sometimes results.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Find the largest batch that fits">
+
+<MiniExercise exercise={maxBatchExercise}>
+  Write `max_batch(params, act_bytes_per_seq, gpu_gb)` that returns the largest batch size whose estimated memory
+  fits, or 0 if not even the model states fit.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Training memory is states (16 bytes per parameter with AdamW), activations (grow with batch and sequence) and
+  smaller buffers. Activations usually decide the batch size.
+- Training compute is about 6 · parameters · tokens FLOPs; time is that divided by the achieved throughput, a
+  fraction of the datasheet peak.
+- Mixed precision speeds up compute and halves activations; float16 needs loss scaling, bfloat16 does not.
+- Activation checkpointing trades about a third more compute for much less activation memory.
+- If loading is slower than compute, the GPU waits. Overlap loading and make the pipeline faster before buying a
+  faster GPU.
+- Every number here is an estimate. Measure the real run, with synchronization, before relying on it.
+
+Next: the [capstone projects](#/learn/ml/projects/capstone-classification) put the whole track together.
+
+</Section>

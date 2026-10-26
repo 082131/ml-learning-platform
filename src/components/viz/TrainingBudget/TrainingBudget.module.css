@@ -1,0 +1,44 @@
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0 var(--s-4);
+}
+@media (min-width: 900px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+.chart {
+  width: 100%;
+  min-width: 0;
+}
+.chart svg {
+  display: block;
+  overflow: visible;
+}
+.inBar {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  fill: var(--bg);
+  stroke: none;
+}
+.marker {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-1) var(--s-3);
+  margin: var(--s-2) 0 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink);
+}
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
