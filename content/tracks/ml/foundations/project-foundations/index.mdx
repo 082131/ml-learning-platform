@@ -1,0 +1,100 @@
+import { brief, starterRunner } from './code';
+import { cleanExercise, questions, sexGapExercise } from './quiz';
+
+<Section kind="intuition" title="From a file to findings">
+
+Every machine learning project starts the same way: someone hands you a file, and before any model you need to
+know what is in it. How many rows? What is missing? What patterns would a model be able to learn?
+
+This project uses everything in the chapter on one real <Term id="dataset">dataset</Term>: Python to organize the
+work, pandas to load, clean and summarize, and Matplotlib to show what you found. The result is a short write-up
+that a colleague could check line by line, because every number in it comes from code next to it.
+
+</Section>
+
+<Section kind="technical" title="The analysis, step by step">
+
+**1. Inspect.** `df.shape`, `df.dtypes` and `df.isna().sum()` tell you the size, the type of each column and what
+is missing. Write these down first; they decide everything after.
+
+**2. Clean per question.** Each question needs some columns. Drop the rows missing those columns with
+`dropna(subset=[...])`, and record how many rows remain. Dropping every row with any missing value throws away
+evidence you could have used.
+
+**3. Answer with a number and a picture.** A <Term id="dataframe">DataFrame</Term> summary such as
+`groupby("species")["body_mass_g"].mean()` gives the number; a plot from the
+[Matplotlib lesson](#/learn/ml/foundations/matplotlib-plotting) shows the spread behind it. Report group sizes next
+to averages.
+
+**4. Write it up.** For each question: the answer in one sentence, the numbers, the plot, and the code. Describe
+correlations as associations: two columns that rise together do not show that one causes the other.
+
+</Section>
+
+<Section kind="code" title="Starter: milestones 1 and 2">
+
+The starter loads the data, inspects it and drops the rows without measurements. It runs in your browser; on
+your own computer, replace the download with `pd.read_csv("penguins.csv")`.
+
+<PythonRunner example={starterRunner} title="analysis.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Errors you are likely to meet">
+
+<CommonMistake
+  title="Averaging a whole table that has text columns"
+  wrong={'penguins.groupby("species").mean()'}
+  error="TypeError: dtype 'str' does not support operation 'mean'"
+  cause="island and sex are text, and pandas will not average text. (Older pandas versions silently dropped those columns.)"
+  fix={'penguins.groupby("species")["body_mass_g"].mean()\n# or: penguins.groupby("species").mean(numeric_only=True)'}
+/>
+
+<Callout kind="warning">
+  A summary over different rows is a quiet error. If one number uses all 344 penguins and the next uses the 333 with
+  a recorded sex, comparing them mixes two groups. Say how many rows each number is based on.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="The brief">
+
+<Project brief={brief} />
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Two milestones in the browser">
+
+### Cleaning only what a question needs
+
+<MiniExercise exercise={cleanExercise}>
+  Write `clean_penguins(df)`. Keep the rows where all four measurement columns have a value, including rows that
+  are only missing `sex`. The tests use a small table with missing values in different places.
+</MiniExercise>
+
+### Question 3: the gap between males and females
+
+<MiniExercise exercise={sexGapExercise}>
+  Write `sex_gap(df)` that returns the mean body mass of males minus that of females, for each species. The
+  tests check it on a small made-up table.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Inspect first: shape, types and missing values.
+- Clean per question with `dropna(subset=...)`, and say how many rows each answer uses.
+- Back each answer with a number from code and a labeled plot; report group sizes next to averages.
+- Correlation describes an association, not a cause.
+
+Next: the [Classical machine learning](#/learn/ml/classical/data-cleaning) chapter goes deeper into cleaning and
+exploring tables like this one, then trains the first models on them.
+
+</Section>

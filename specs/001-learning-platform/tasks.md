@@ -76,7 +76,7 @@ Close each content thread with: content validation green, `check`, `e2e` and `bu
 - [x] M103 to M105 Python basics, control flow, collections: Pyodide runners, step-throughs of state changes (trace via Pyodide where possible, otherwise computed), and a slice visualizer.
 - [x] M106 to M107 NumPy arrays and vectorization: shape explorer, broadcasting visualizer, loop vs vectorized timing measured live in Pyodide and labeled "measured in your browser".
 - [x] M108 to M109 Pandas and Matplotlib: a bundled small CSV (≤50 KB, source and license noted), table explorer, plots rendered by Pyodide.
-- [ ] M110 `project-foundations` brief, rubric and checklist.
+- [x] M110 `project-foundations` brief, rubric and checklist.
 
 ## Thread 5: ML Mathematical Foundations (`ml/math`, 11 entries; `matrix-multiplication` already done)
 - [x] M201 to M203 scalars-vectors, dot-product, matrices (VectorPlane, transpose visualizer).

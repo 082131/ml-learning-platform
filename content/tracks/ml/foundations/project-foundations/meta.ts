@@ -12,5 +12,16 @@ export default {
     'Write up findings with the code that produced them',
   ],
   prerequisites: ['ml/foundations/matplotlib-plotting'],
-  concepts: [],
+  concepts: ['dataset', 'dataframe', 'histogram'],
+  references: [
+    {
+      title: 'palmerpenguins: Palmer Archipelago (Antarctica) penguin data (CC0)',
+      url: 'https://allisonhorst.github.io/palmerpenguins/',
+    },
+    {
+      title:
+        'Gorman, Williams and Fraser (2014): Ecological sexual dimorphism and environmental variability within a community of Antarctic penguins',
+      url: 'https://doi.org/10.1371/journal.pone.0090081',
+    },
+  ],
 } satisfies LessonMeta;
