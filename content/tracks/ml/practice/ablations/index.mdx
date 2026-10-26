@@ -1,0 +1,200 @@
+import { ablateExercise, questions } from './quiz';
+import { ablationCode, ablationRunner, experiment } from './code';
+
+<Section kind="intuition" title="Where does it fail, and what is doing the work?">
+
+A single validation score answers one question: how good is the model on average? Two more questions decide what
+to do next. **Where does it fail?** Split the validation errors by something you know about each example, such as
+the region of a delivery, and compare the groups. Each group is an <Term id="error-slice">error slice</Term>; a
+slice with a much larger error points at something the model is missing there. **What is doing the work?** Remove
+one part of the model, retrain, and measure again. That is an <Term id="ablation">ablation</Term>; the size of the
+drop is how much that part was contributing.
+
+Both are controlled comparisons, and both have the same trap: the score moves a little every time you change the
+<Term id="random-seed">seed</Term> of the split. A difference smaller than that movement is not a finding. So the
+first thing an ablation measures is its own noise.
+
+</Section>
+
+<Section kind="technical" title="Leave-one-out ablation with a noise floor">
+
+**The setup.** The lesson uses 200 synthetic deliveries whose true rule is known:
+
+$$
+\text{minutes} = 6 + 2.5\,\text{km} + 3\,\text{stops} + 7\,\text{rain} + r(\text{region}) + \varepsilon,
+\qquad r = \{\text{city}: 0,\ \text{suburb}: 2,\ \text{rural}: 8\},\quad \varepsilon \sim U(-4, 4)
+$$
+
+The model is linear regression on up to five components: distance, stops, rain, region (one-hot: two columns,
+city is the reference) and order_id, a running number that has nothing to do with delivery time. Knowing the
+truth lets you check what the ablation concludes; with real data you would not have this line.
+
+**Scoring one model.** For a seed $s$, shuffle the rows with that seed, hold out a quarter (50 rows) for
+validation, fit by least squares on the other 150, and compute the validation mean absolute error,
+$\text{MAE}_s = \frac{1}{50}\sum |\hat{y}_i - y_i|$. Repeat for seeds $0, \dots, S-1$ and report the mean and the
+sample standard deviation:
+
+$$
+\overline{\text{MAE}} = \frac{1}{S}\sum_{s} \text{MAE}_s, \qquad
+\text{sd} = \sqrt{\frac{1}{S-1}\sum_s \big(\text{MAE}_s - \overline{\text{MAE}}\big)^2}
+$$
+
+**Leave-one-out.** With baseline components $C$, score $C$ and then $C \setminus \{c\}$ for each $c$, all on the
+same seeds. The effect of $c$ is $\Delta_c = \overline{\text{MAE}}(C \setminus \{c\}) - \overline{\text{MAE}}(C)$.
+A positive $\Delta_c$ means the error rose without $c$, so $c$ helps. The lesson calls an effect *within noise*
+when $|\Delta_c| \le \max(\text{sd}_C, \text{sd}_{C \setminus c})$. That rule is a deliberately simple screen,
+not a significance test; the callout below says what a careful study adds.
+
+With all five components and 5 seeds the program prints:
+
+| model | val MAE (minutes) | change | reading |
+| --- | --- | --- | --- |
+| baseline | 2.094 ± 0.182 | | |
+| − distance | 9.679 ± 0.977 | +7.585 | helps a lot |
+| − stops | 3.602 ± 0.396 | +1.508 | helps |
+| − region | 3.617 ± 0.358 | +1.523 | helps |
+| − rain | 3.259 ± 0.391 | +1.165 | helps |
+| − order_id | 2.086 ± 0.165 | −0.008 | within noise |
+
+The ranking follows the true rule: distance varies by up to 36 minutes across the data, while stops, region and
+rain each add at most 7 to 9. order_id does nothing, and the ablation says so.
+
+**Error slices.** For seed 0, the baseline's validation errors grouped by region give MAE 2.303 (city, 14
+deliveries), 2.062 (suburb, 17) and 1.982 (rural, 19): no slice stands out. Leave region out of the baseline and
+the rural slice jumps to 4.896 while city is 3.462 and suburb 2.288 (seed 0). The model without region cannot know that
+rural deliveries take about 8 minutes longer, so it underestimates them, overestimates city deliveries to
+compensate, and the slices show exactly where.
+
+<Callout kind="simplification">
+  Each split here has only 50 validation rows, and the 5 seeds reuse the same 200 rows, so the per-seed scores are
+  correlated and the spread understates the true uncertainty somewhat. A careful study uses more seeds or
+  repeated cross-validation, compares models seed by seed (a paired difference), and reports an interval for each
+  difference. The decision rule stays the same: no conclusion from a difference the noise could explain.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="The ablation table and the slices">
+
+The top chart shows each model's mean validation MAE with a bar for ± one standard deviation; the dashed line is
+the baseline. The bottom chart splits the baseline's seed-0 errors by region. The switches are in the Experiment
+section below.
+
+<Experiment def={experiment} title="Ablation of the delivery-time model" controls={false}>
+  <AblationTable />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The study in plain Python">
+
+The program fits every model with least squares written out in full (no NumPy), so the numbers depend only on the
+data and the split. The `baseline` and `seeds` lines are filled from the experiment.
+
+<Experiment def={experiment} title="ablate.py, linked to the charts" controls={false}>
+  <Code example={ablationCode} title="ablate.py" />
+  <Readout title="Summary of what the code prints" />
+</Experiment>
+
+Run the complete program; it prints the table above for the full baseline.
+
+<PythonRunner example={ablationRunner} title="ablate.py (complete)" />
+
+</Section>
+
+<Section kind="experiment" title="Switch components off">
+
+Each select decides whether a component is in the baseline. The ablation rows are always the baseline minus one
+component, so leaving a component out also removes its row.
+
+<Experiment def={experiment} title="Baseline components and seeds">
+  <AblationTable />
+  <Readout />
+</Experiment>
+
+Things to try:
+
+- Leave region out. The baseline MAE rises to 3.617 and the rural slice stands out at 4.896. This is the error
+  analysis an engineer would see before anyone thought of adding region.
+- Put region back and leave order_id out. Nothing changes beyond noise: the simpler model is as good.
+- Set the seeds to 1. Every spread becomes 0, so even order_id's tiny difference is labeled as an effect. One
+  split cannot tell you how big the noise is.
+- Set the seeds to 10 and compare the spreads with 5 seeds. The means move a little, which is a reminder that the
+  third decimal is not meaningful.
+- Leave distance out. The baseline MAE is 9.679 and every other row is now within noise: the missing feature's
+  error swamps the smaller effects. Every slice is bad too: when a dominant feature is missing, fix that before reading smaller effects.
+
+</Section>
+
+<Section kind="mistakes" title="Ablations that mislead">
+
+<CommonMistake
+  title="One run per model"
+  wrong={'base = mae(val_errors(rows, all_components, seed=0))\nfor c in all_components:\n    used = [x for x in all_components if x != c]\n    print(c, mae(val_errors(rows, used, seed=0)) - base)'}
+  error="No error. Every difference looks like an effect, including order_id's, because there is no noise estimate to compare it with."
+  cause="A single split mixes the effect of the component with the luck of that split."
+  fix={'scores = [mae(val_errors(rows, used, s)) for s in range(5)]\n# report statistics.mean(scores) ± statistics.stdev(scores)\n# and compare each difference with the spread'}
+/>
+
+<CommonMistake
+  title="Changing two things in one ablation row"
+  wrong={'# "remove rain" run, also with a new learning rate and an extra week of data\nused = [c for c in baseline if c != "rain"]\nmodel = train(used, lr=0.003, data="deliveries_oct.csv")'}
+  error="No error. The row's score changes, but there is no way to tell whether rain, the learning rate or the data caused it."
+  cause="An ablation attributes a difference to the one thing that changed. With two changes the attribution is gone."
+  fix={'# keep data version, config and seeds identical to the baseline run;\n# record them (see experiment tracking) so the comparison can be checked'}
+/>
+
+<Callout kind="warning">
+  Slices and ablations are chosen on validation data, which makes them part of model development. Read them as
+  often as you like on validation, but confirm the final model once on a test set you did not look at.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Ablations and error analysis on real projects">
+
+- **Ablate groups, not only single columns.** For a neural network the components are usually larger: a block of
+  layers, a data augmentation, a loss term, a pretraining step. The rule is unchanged: one component per row.
+- **Interactions exist.** Two correlated features can each look useless when removed alone because the other
+  covers for it. If a leave-one-out row is within noise but the domain says the feature matters, remove the pair
+  together.
+- **Slices come from metadata.** Region, device, language, customer tier and input length are typical. Tools such
+  as Slice Finder search many slices automatically; the risk is that with enough slices some look bad by chance,
+  so check the slice size and confirm on fresh data.
+- **Record every run.** An ablation table is a set of runs that differ in one input. With
+  [experiment tracking](#/learn/ml/practice/experiment-tracking) and
+  [versioning](#/learn/ml/practice/versioning) in place, each row can be traced and rerun.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Write a leave-one-out ablation">
+
+<MiniExercise exercise={ablateExercise}>
+  Write `ablate(components, score)` that returns, for each component, how much the score changes when that
+  component alone is removed.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Error analysis groups validation errors into slices; a slice with a much larger error points at missing
+  information there.
+- An ablation removes one component, retrains and re-scores with everything else fixed, including the seeds.
+- Score every model on several seeds and report the spread; a difference smaller than the spread is not a
+  finding.
+- Here the ablation recovers the true rule: distance matters most, stops, region and rain help, order_id does
+  nothing.
+- Leaving region out makes the rural slice stand out (4.896 against 2.288 to 3.462), which is how a missing feature
+  shows up in practice.
+
+Next: [Model testing](#/learn/ml/practice/model-testing) turns checks like these into tests that run before a
+model ships.
+
+</Section>

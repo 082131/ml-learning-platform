@@ -85,4 +85,20 @@ export default [
       'A store of trained models with their versions, lineage (the run that produced them) and status, such as staging or production.',
     introducedIn: 'ml/practice/versioning',
   },
+  {
+    id: 'ablation',
+    term: 'Ablation study',
+    short: 'Measuring how much each part of a model or pipeline contributes by removing one part at a time and re-evaluating.',
+    long: 'Each ablation changes exactly one component and keeps data, seeds and everything else fixed, so the change in the metric can be attributed to that component. Differences smaller than the seed-to-seed spread are not findings.',
+    introducedIn: 'ml/practice/ablations',
+    aliases: ['ablation', 'leave-one-out'],
+  },
+  {
+    id: 'error-slice',
+    term: 'Error slice',
+    short: 'A subset of examples defined by a column value (a region, a language, a device) on which a model’s error is measured separately.',
+    long: 'Error analysis compares slices to find where a model fails; an average metric can look fine while one slice is much worse.',
+    introducedIn: 'ml/practice/ablations',
+    aliases: ['slice', 'error analysis'],
+  },
 ] satisfies GlossaryTerm[];
