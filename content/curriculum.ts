@@ -82,7 +82,7 @@ export const tracks: Track[] = [
           { id: 'ml/deep/tokenization', status: 'written' },
           { id: 'ml/deep/embeddings', status: 'written' },
           { id: 'ml/deep/attention', status: 'written' },
-          { id: 'ml/deep/transformers', status: 'outline' },
+          { id: 'ml/deep/transformers', status: 'written' },
           { id: 'ml/deep/project-neural-net', status: 'written' },
         ],
       },

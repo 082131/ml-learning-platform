@@ -1,0 +1,203 @@
+import { experiment, gpt2Runner, paramsCode } from './code';
+import { blockParamsExercise, questions } from './quiz';
+
+<Section kind="intuition" title="One block, stacked many times">
+
+A <Term id="transformer">transformer</Term> is a stack of identical blocks. Each block does two things to the
+sequence of token vectors:
+
+1. **Attention** lets every token gather information from other tokens (the previous lesson).
+2. **A feed-forward network** then processes every token on its own, with the same small two-layer network.
+
+Two pieces of plumbing make deep stacks trainable. A <Term id="residual-connection">residual connection</Term> adds
+each part's input to its output, so information can flow straight through the stack. <Term id="layer-normalization">Layer
+normalization</Term> keeps each token's vector at a steady scale. Because a block's output has the same shape as
+its input, you can stack 12, 48 or 96 of them.
+
+The shape of the data is the thread through all of it: a batch of $B$ sequences of $T$ tokens, each a vector of
+$d_\text{model}$ numbers, a <Term id="tensor">tensor</Term> of shape $(B, T, d_\text{model})$.
+
+</Section>
+
+<Section kind="technical" title="Shapes and parameters, stage by stage">
+
+**Before the blocks.** Token IDs $(B, T)$ are looked up in the embedding table $(V, d_\text{model})$, giving
+$(B, T, d_\text{model})$. Attention by itself treats the sequence as a set: it would give the same result for
+shuffled tokens. So a <Term id="positional-encoding">positional encoding</Term> is added: GPT-2 learns one vector
+per position, a table of shape $(T_\text{max}, d_\text{model})$; the original paper used fixed sine and cosine
+waves instead.
+
+**Multi-head attention.** <Term id="multi-head-attention">Multi-head attention</Term> runs $h$ attention
+computations side by side, each on a slice of $d_\text{model}/h$ numbers. With $B = 2$, $T = 8$,
+$d_\text{model} = 64$ and $h = 4$:
+
+| Step                       | Operation                                         | Shape            |
+| -------------------------- | ------------------------------------------------- | ---------------- |
+| Project                    | $Q = xW_q + b_q$ (and $K$, $V$)                   | $(2, 8, 64)$     |
+| Split                      | reshape to $(2, 8, 4, 16)$, swap axes 1 and 2     | $(2, 4, 8, 16)$  |
+| Scores and softmax per head | $\text{softmax}(QK^\top / \sqrt{16})$            | $(2, 4, 8, 8)$   |
+| Mix values                 | weights $\times V$                                | $(2, 4, 8, 16)$  |
+| Merge                      | swap axes back, reshape to $(2, 8, 64)$           | $(2, 8, 64)$     |
+| Output projection          | $yW_o + b_o$                                      | $(2, 8, 64)$     |
+
+Splitting and merging only rearrange numbers; the heads use slices of the same full-width matrices. Each head can
+learn a different kind of match (one may follow the previous word, another the subject of the sentence).
+
+**The block (pre-LN, as in GPT-2).**
+
+$$
+x \leftarrow x + \text{MHA}(\text{LN}_1(x)), \qquad x \leftarrow x + \text{FFN}(\text{LN}_2(x)), \qquad
+\text{FFN}(z) = \text{GELU}(zW_1 + b_1)\,W_2 + b_2
+$$
+
+$W_1$ widens each token to $d_\text{ff}$ (usually $4 \cdot d_\text{model}$) and $W_2$ brings it back, so the
+residual addition has matching shapes. LayerNorm rescales each token's vector to mean 0 and variance 1 across its
+$d_\text{model}$ features, then applies a learned scale and shift.
+
+**Parameters per block.** Count every learned matrix and vector:
+
+| Part                          | Parameters                                          | $d = 64$, $d_\text{ff} = 256$ |
+| ----------------------------- | --------------------------------------------------- | ----------------------------- |
+| $W_q, W_k, W_v, W_o$ + biases | $4(d^2 + d)$                                        | $4 \cdot 4{,}160 = 16{,}640$   |
+| FFN: $W_1, b_1, W_2, b_2$     | $d \cdot d_\text{ff} + d_\text{ff} + d_\text{ff} \cdot d + d$ | $33{,}088$          |
+| Two LayerNorms                | $2 \cdot 2d$                                        | $256$                         |
+| **Block**                     | $4d^2 + 2d\,d_\text{ff} + 9d + d_\text{ff}$         | $49{,}984$                    |
+
+Check with GPT-2 small ($d = 768$, $d_\text{ff} = 3072$): $4 \cdot 768^2 + 2 \cdot 768 \cdot 3072 + 9 \cdot 768 +
+3072 = 2{,}359{,}296 + 4{,}718{,}592 + 6{,}912 + 3{,}072 = 7{,}087{,}872$ per block. Twelve blocks, a
+$50{,}257 \times 768$ token table, a $1{,}024 \times 768$ position table and a final LayerNorm ($2 \cdot 768$) give
+$124{,}439{,}808$, the size usually quoted as "124M". The number of heads does not appear: it changes the slicing,
+not the matrices.
+
+**Decoder vs encoder.** A decoder (GPT) uses the <Term id="causal-mask">causal mask</Term> in every block, so
+position $t$ only sees tokens $0..t$, and its output at $t$ is a guess of token $t + 1$: it generates text. An
+encoder (BERT) uses no mask, so every position sees the whole input: it suits classification and search. The
+original paper used both: an encoder reads the source sentence and a decoder, which also attends to the
+encoder's output (cross-attention), writes the translation.
+
+<Callout kind="simplification">
+  The diagram follows GPT-2: LayerNorm before each sub-layer (pre-LN), learned positions, GELU, and an output layer
+  that reuses the token table. The original 2017 transformer normalized after each addition (post-LN) and used
+  sine-cosine positions and ReLU. Newer models change more: RMSNorm instead of LayerNorm, rotary position
+  embeddings, gated feed-forward layers (SwiGLU), no biases, and grouped-query attention, which shares keys and
+  values between heads. Each of these changes the parameter formula; the shapes of the residual stream stay
+  $(B, T, d_\text{model})$.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="The block diagram with live shapes">
+
+Change the sizes below. Every shape in the diagram, the parameter counts and the code follow. Select a stage to
+see what it computes and how many parameters it holds. Try 12 heads with $d_\text{model} = 64$: the split is not
+possible, and the diagram says so.
+
+<Experiment def={experiment} title="Transformer shapes">
+  <TransformerDiagram />
+  <Readout title="Shapes and parameters" />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="Count the parameters in Python">
+
+The sizes in the code come from the controls above. Select a highlighted part to see what it counts.
+
+<Experiment def={experiment} title="params.py, linked to the diagram" controls={false}>
+  <Code example={paramsCode} title="params.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+The same counter with GPT-2 small's sizes, to run in your browser:
+
+<PythonRunner example={gpt2Runner} title="gpt2_params.py" />
+
+PyTorch's `nn.TransformerEncoderLayer(d_model, nhead, dim_feedforward)` is built from the same parts (a
+multi-head attention with input and output projections, two linear layers and two LayerNorms, all with biases by
+default), so it has the same count per layer; see its documentation in the references. We did not run PyTorch
+for this lesson.
+
+</Section>
+
+<Section kind="experiment" title="Step through the count">
+
+<Experiment def={experiment} title="The parameter count, step by step" controls={false}>
+  <StepThrough example={paramsCode} title="params.py" />
+</Experiment>
+
+Things to try:
+
+- Double both $d_\text{model}$ and $d_\text{ff}$ (64 → 128 and 256 → 512): the block grows about 4 times,
+  because its count is dominated by the $d^2$ and $d \cdot d_\text{ff}$ terms.
+- Change the number of heads: the count does not move.
+- Raise $T$ in the diagram: only the scores stage grows as $T^2$, which is why long contexts are expensive.
+
+</Section>
+
+<Section kind="mistakes" title="Shape errors in blocks">
+
+<CommonMistake
+  title="Splitting into a number of heads that does not divide d_model"
+  wrong={'x = np.zeros((2, 8, 64))  # (B, T, d_model)\nheads = x.reshape(2, 8, 12, -1)'}
+  error="ValueError: cannot reshape array of size 1024 into shape (2,8,12,newaxis)"
+  cause="Each token's 64 numbers must split into 12 equal slices, and 64 / 12 is not a whole number. Model configurations always choose d_model as a multiple of the head count (768 = 12 · 64 in GPT-2 small)."
+  fix={'heads = x.reshape(2, 8, 4, 16).transpose(0, 2, 1, 3)  # (B, heads, T, 16)'}
+/>
+
+<CommonMistake
+  title="Adding the residual before projecting back to d_model"
+  wrong={'x = np.zeros((2, 8, 64))   # residual stream\nh = np.zeros((2, 8, 256))  # after W_1: d_ff wide\nx = x + h'}
+  error="ValueError: operands could not be broadcast together with shapes (2,8,64) (2,8,256) "
+  cause="The feed-forward network widens each token to d_ff. Its second layer, W_2, must bring it back to d_model before the residual addition."
+  fix={'x = x + h @ W_2 + b_2  # W_2 has shape (256, 64)'}
+/>
+
+<Callout kind="warning">
+  Forgetting the causal mask in a decoder raises no error. Training loss then drops suspiciously fast, because
+  each position can read the token it is supposed to predict, and generation fails. Check the mask on a tiny input:
+  row 0 of the attention weights must be $[1, 0, 0, \dots]$.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+| Model family            | Blocks                 | Mask   | Typical use                          |
+| ----------------------- | ---------------------- | ------ | ------------------------------------ |
+| GPT, Llama (decoder)    | decoder only           | causal | text generation, chat                |
+| BERT (encoder)          | encoder only           | none   | classification, search embeddings    |
+| T5, the 2017 original   | encoder and decoder    | both   | translation, summarization           |
+
+When you read a model card, the configuration lists exactly the sizes in this lesson: `n_embd` or `hidden_size`
+($d_\text{model}$), `n_head`, `n_layer`, `n_inner` or `intermediate_size` ($d_\text{ff}$), `vocab_size` and
+`n_positions`. During generation, a decoder keeps every block's keys and values in a
+<Term id="kv-cache">KV cache</Term>; the inference track's lessons on it build on these shapes.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Count a block’s parameters">
+
+<MiniExercise exercise={blockParamsExercise}>
+  Write `block_params(d_model, d_ff)` that returns the number of parameters in one transformer block: the four
+  attention matrices and their biases, the two feed-forward layers and their biases, and two LayerNorms. Run the
+  tests to check it against GPT-2 small.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A block keeps the shape $(B, T, d_\text{model})$: $x + \text{MHA}(\text{LN}(x))$, then $x + \text{FFN}(\text{LN}(x))$.
+- Heads split $d_\text{model}$ into $h$ slices: $(B, h, T, d_\text{model}/h)$, with scores $(B, h, T, T)$.
+- One block has $4d^2 + 2d\,d_\text{ff} + 9d + d_\text{ff}$ parameters: 7,087,872 for GPT-2 small.
+- Decoders use a causal mask and generate; encoders see everything and classify or embed.
+
+Next: the chapter project, [Train and evaluate a neural network](#/learn/ml/deep/project-neural-net).
+
+</Section>
