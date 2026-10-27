@@ -1,0 +1,277 @@
+import {
+  closedForm,
+  fitExp,
+  gdExp,
+  leastSquaresRunner,
+  mseLoop,
+  numpyGD,
+  sklearnFit,
+} from './code';
+import { lineExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Guessing a penguin's weight from its flipper">
+
+Penguins with longer flippers tend to be heavier. If you plot body mass against flipper length for a few
+penguins, the points drift upward from left to right, roughly along a straight line. Draw that line, and you can
+read off a guess for the mass of a penguin you have only measured with a ruler.
+
+<Term id="linear-regression">Linear regression</Term> is that idea made precise. The
+<Term id="model">model</Term> is a line, $\hat{y} = w \cdot x + b$: the <Term id="feature">feature</Term> $x$ is
+the flipper length, the prediction $\hat{y}$ ("y hat") is a mass, and the two
+<Term id="parameter">parameters</Term> are the slope $w$ (kilograms per extra centimetre) and the intercept $b$
+(where the line crosses $x = 0$). Training means choosing $w$ and $b$.
+
+But which line is "best"? Every line misses most points by a little. The vertical gap between a penguin's real
+mass and the line is its <Term id="residual">residual</Term>. A good line keeps the residuals small overall, and
+the usual way to measure "small overall" is to square every residual and average them.
+
+The whole lesson uses the same 12 real penguins from the Palmer penguins dataset (rows 0, 30, 59, …, 321 of
+`penguins.csv`: every 29th penguin with both measurements). Flipper lengths are in **centimetres** and masses in
+**kilograms**, so the slope and intercept are small numbers you can check by hand.
+
+</Section>
+
+<Section kind="technical" title="Residuals, MSE, and two ways to minimize it">
+
+**Data.** $n = 12$ pairs $(x_i, y_i)$: $x$ has shape $(12,)$ and $y$ has shape $(12,)$. The first penguin (CSV
+row 0, an Adelie) has $x_0 = 18.1$ cm and $y_0 = 3.75$ kg.
+
+**Prediction and residual.** For a line with slope $w$ and intercept $b$,
+
+$$
+\hat{y}_i = w \cdot x_i + b, \qquad r_i = y_i - \hat{y}_i
+$$
+
+With $w = 0.3$ and $b = -1.8$: $\hat{y}_0 = 0.3 \cdot 18.1 - 1.8 = 3.63$ kg, so $r_0 = 3.75 - 3.63 = 0.12$ kg. The
+penguin is 0.12 kg above the line.
+
+**Mean squared error.** The <Term id="mean-squared-error">mean squared error</Term> (MSE) is the average squared
+residual:
+
+$$
+\text{MSE}(w, b) = \frac{1}{n} \sum_{i=0}^{n-1} \left(y_i - (w x_i + b)\right)^2
+$$
+
+For $w = 0.3$, $b = -1.8$ the twelve squared residuals add up to $1.8176$, so
+$\text{MSE} = 1.8176 / 12 = 0.1515$ kg². Squaring keeps residuals above and below the line from cancelling, and
+makes one big miss cost more than several small ones. MSE is the loss for this model: the number training tries
+to make as small as possible (see [Loss functions and optimization](#/learn/ml/math/loss-optimization)).
+
+**The closed form.** MSE is a smooth bowl in $(w, b)$ with a single lowest point. At that point both partial
+derivatives are zero. Writing that out gives two linear equations in $w$ and $b$, the *normal equations*, whose
+solution is a <Term id="closed-form-solution">closed-form solution</Term>, also called the least-squares line:
+
+$$
+w^* = \frac{\sum_i (x_i - \bar{x})(y_i - \bar{y})}{\sum_i (x_i - \bar{x})^2}, \qquad b^* = \bar{y} - w^* \bar{x}
+$$
+
+where $\bar{x}$ and $\bar{y}$ are the means. For our penguins $\bar{x} = 19.925$ cm, $\bar{y} = 4.1979$ kg, the
+numerator is $9.1556$ and the denominator $21.2825$, so
+
+$$
+w^* = 9.1556 / 21.2825 = 0.4302 \text{ kg/cm}, \qquad b^* = 4.1979 - 0.4302 \cdot 19.925 = -4.3737 \text{ kg}
+$$
+
+and the lowest possible MSE is $0.1210$ kg². No other line through these 12 points has a smaller MSE. The second
+formula says the least-squares line always passes through the point of averages $(\bar{x}, \bar{y})$.
+
+**Gradient descent.** The other route is <Term id="gradient-descent">gradient descent</Term>: start somewhere,
+compute which way the MSE goes up, and step the other way. The partial derivatives are
+
+$$
+\frac{\partial\,\text{MSE}}{\partial w} = \frac{2}{n} \sum_i (\hat{y}_i - y_i)\, x_i, \qquad
+\frac{\partial\,\text{MSE}}{\partial b} = \frac{2}{n} \sum_i (\hat{y}_i - y_i)
+$$
+
+and one update with <Term id="learning-rate">learning rate</Term> $\eta$ is
+$w \leftarrow w - \eta \, \partial\text{MSE}/\partial w$ and $b \leftarrow b - \eta \, \partial\text{MSE}/\partial b$.
+Using all 12 penguins in every update is *batch* gradient descent.
+
+**Why centering $x$ matters.** How large $\eta$ may be depends on how sharply the bowl curves. Its curvature is
+described by the matrix of second derivatives,
+$2 \begin{bmatrix} \overline{x^2} & \bar{x} \\ \bar{x} & 1 \end{bmatrix}$, where $\overline{x^2} = 398.78$ is the
+mean of $x^2$. Its two eigenvalues (the curvatures along the bowl's two main directions) are about $799.5$ and
+$0.0089$: the bowl is a valley about 90,000 times steeper across than along. Gradient descent diverges when
+$\eta$ is larger than 2 divided by the steepest curvature, $2 / 799.5 = 0.0025$, and with such a small $\eta$ it
+crawls along the flat direction. Replacing $x$ by $x - \bar{x}$ (centering) removes the off-diagonal terms: the
+curvatures become $2 \cdot \text{Var}(x) = 3.547$ and $2$, so $\eta$ up to $2 / 3.547 = 0.564$ works and both
+directions shrink quickly. The best line is the same; only its intercept is written differently
+($\hat{y} = w (x - \bar{x}) + c$, so $b = c - w \bar{x}$). Scaling $x$ to unit variance as well (standardizing,
+see [Feature engineering and scaling](#/learn/ml/classical/features-scaling)) makes the two curvatures equal.
+
+<Callout kind="simplification">
+  Here all 12 penguins are used to fit the line, so the MSE is measured on the same data the line was fitted to.
+  In a real project you fit on the training set only and report the MSE on held-out data, as in
+  [Train, validation and test sets](#/learn/ml/classical/splits-leakage); the training MSE is usually too
+  optimistic. Twelve points are also far too few for a trustworthy model: they keep every number checkable.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Fit a line by hand">
+
+Move the slope and the intercept and watch the residuals (dashed vertical segments) and the MSE. Select a penguin
+with the slider or by clicking its point to see its share of the sum. Try to get the MSE below 0.13, then show the
+least-squares line to compare.
+
+<Experiment def={fitExp} title="Your line and its residuals">
+  <RegressionFit />
+  <Readout title="Your line" />
+</Experiment>
+
+Two things to notice. Changing the slope swings the line around $x = 0$, far to the left of the data, so after
+changing $w$ you have to fix $b$ by a lot: the two parameters are tangled, just as the curvature numbers above
+predicted. And the least-squares line has residuals on both sides; their plain sum is 0 for that line.
+
+</Section>
+
+<Section kind="code" title="MSE, the closed form and scikit-learn in Python">
+
+The MSE loop below is filled with your slope and intercept from the plot above. The readout shows what its last
+line prints; the same Python, run with CPython 3.13, printed `0.1515` for the starting line.
+
+<Experiment def={fitExp} title="mse.py, linked to your line" controls={false}>
+  <Code example={mseLoop} title="mse.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+Step through the loop to see every prediction, residual and running total for the current line:
+
+<Experiment def={fitExp} title="Step through the MSE sum" controls={false}>
+  <StepThrough example={mseLoop} title="mse.py" />
+</Experiment>
+
+The closed form takes two lines in NumPy, and `np.polyfit` with degree 1 gives the same line. This output is from a
+local run with NumPy 2.4.6 (the version Pyodide ships):
+
+<Code example={closedForm} title="closed_form.py" />
+
+The same formula in plain Python runs in your browser without any package. Change a number in `y` and run it
+again:
+
+<PythonRunner example={leastSquaresRunner} title="least_squares.py" />
+
+In practice you use scikit-learn's `LinearRegression`, which solves the same least-squares problem with a linear
+algebra routine and also handles many features at once. Output from a local run with scikit-learn 1.8.0:
+
+<Code example={sklearnFit} title="sklearn_fit.py" />
+
+<Callout kind="simplification">
+  `LinearRegression` does not use the one-feature formula above; its documentation describes it as ordinary
+  least squares computed with `scipy.linalg.lstsq`, which works for any number of features. The answer is the
+  same up to floating-point rounding: the intercept printed here, −4.373718626414498, differs from the formula's
+  −4.373718626414505 only in the 15th digit.
+</Callout>
+
+</Section>
+
+<Section kind="experiment" title="Gradient descent, raw versus centered">
+
+Gradient descent starts from the flat line $w = 0$, $b = 0$ (MSE 18.0717, off the top of the loss chart). It
+begins on raw flipper lengths with $\eta = 0.002$, just under the 0.0025 limit computed above. Watch it stall,
+then switch to centered $x$.
+
+<Experiment def={gdExp} title="Gradient descent on the 12 penguins">
+  <RegressionGD />
+  <Readout />
+</Experiment>
+
+The loop that produces those numbers, filled from the controls. Run locally with NumPy 2.4.6, the starting
+settings printed `slope=0.2115 intercept=0.0028 mse=0.2062`, and centered $x$ with $\eta = 0.1$ for 50 steps printed
+`slope=0.4302 intercept=-4.3738 mse=0.1210`; the readout above computes the same numbers in your browser.
+
+<Experiment def={gdExp} title="gd.py, linked to the controls" controls={false}>
+  <Code example={numpyGD} title="gd.py" />
+</Experiment>
+
+Things to try:
+
+- Raw $x$, $\eta = 0.002$: the slope jumps to about 0.21 in a few steps and then barely moves. After 200 steps
+  the MSE is still about 0.206, far from 0.121. The intercept has hardly left 0.
+- Raw $x$, $\eta = 0.003$: just over the limit of 0.0025, so it diverges.
+- Centered $x$, $\eta = 0.1$: the path heads straight for the cross and the MSE meets the dashed line in about
+  30 steps.
+- Centered $x$, $\eta = 0.5$ and $0.6$: 0.5 zigzags but converges; 0.6 is over the limit of 0.564 and diverges.
+
+</Section>
+
+<Section kind="mistakes" title="Shapes, coefficient order and step sizes">
+
+<CommonMistake
+  title="Passing a 1-D array as X to scikit-learn"
+  wrong={'x = np.array([18.1, 17.8, 19.4])\nLinearRegression().fit(x, np.array([1., 2., 3.]))'}
+  error={"ValueError: Expected 2D array, got 1D array instead:\narray=[18.1 17.8 19.4].\nReshape your data either using array.reshape(-1, 1) if your data has a single feature or array.reshape(1, -1) if it contains a single sample."}
+  cause="scikit-learn always expects X with shape (n_samples, n_features). A 1-D array of shape (3,) could mean 3 samples of 1 feature or 1 sample of 3 features, so it refuses to guess."
+  fix={'X = x.reshape(-1, 1)  # shape (3, 1): 3 penguins, 1 feature\nLinearRegression().fit(X, np.array([1., 2., 3.]))'}
+/>
+
+<CommonMistake
+  title="Reading np.polyfit's result in the wrong order"
+  wrong={'intercept, slope = np.polyfit(x, y, 1)  # swapped'}
+  cause="np.polyfit returns coefficients from the highest power down, so for a line it returns [slope, intercept]. No error is raised; you silently get intercept = 0.4302 and slope = −4.3737, a line that slopes steeply downward."
+  fix={'slope, intercept = np.polyfit(x, y, 1)'}
+/>
+
+<CommonMistake
+  title="A learning rate that is too large for the scale of x"
+  wrong={'shift = 0.0   # raw x\nlr = 0.003    # above 2 / 799.5 = 0.0025'}
+  error="slope=-29259357425845537083909734400.0000 intercept=-1461959979888466495686049792.0000 mse=343105592477345271630839296721714473595370400613417504210944.0000"
+  cause="That is what gd.py printed after 200 steps (no Python error, just exploding numbers). Each step overshoots the bottom of the steep direction by more than the last. The same rate is tiny for centered x, which shows the limit depends on the data's scale."
+  fix={'shift = x.mean()  # center x first\nlr = 0.1'}
+/>
+
+<Callout kind="warning">
+  A model that "trains" without errors can still be far from the answer. Compare the final MSE of gradient
+  descent with the closed form (or with `LinearRegression`) when you can; a stalled run looks like convergence on
+  a loss chart whose axis starts too high.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+- **As a baseline.** Before trying a complex model for a numeric target, fit a linear regression. If the fancy
+  model cannot beat its test MSE, something is wrong.
+- **With many features.** The model becomes $\hat{y} = w_1 x_1 + \dots + w_d x_d + b$ and $X$ has shape
+  $(n, d)$; `LinearRegression().fit(X, y)` returns `coef_` of shape $(d,)$. The normal equations become a $d$ by
+  $d$ linear system.
+- **Inside other models.** Logistic regression (next lesson) passes the same weighted sum through a squashing
+  function, and every dense layer of a neural network computes $w \cdot x + b$ for many outputs at once.
+- **With regularization.** Ridge and lasso add a penalty on the size of $w$ to the MSE; see
+  [Overfitting, underfitting, regularization](#/learn/ml/classical/fit-regularization).
+
+When a dataset is too large for the closed form (or the model has no closed form at all, like a neural network),
+gradient descent is what remains, which is why its behaviour on this small, solvable problem is worth knowing.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Write MSE and the least-squares line">
+
+<MiniExercise exercise={lineExercise}>
+  Write `mse(x, y, w, b)` and `fit_line(x, y)` in plain Python, without NumPy. `fit_line` returns
+  `(slope, intercept)` of the least-squares line. The tests use the lesson's 12 penguins.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Linear regression predicts $\hat{y} = w x + b$. A residual is $y - \hat{y}$.
+- MSE is the average squared residual. For the 12 penguins the best line is $\hat{y} = 0.4302 x - 4.3737$
+  (kg, cm) with MSE 0.1210 kg².
+- The closed form: $w^* = \sum (x - \bar{x})(y - \bar{y}) / \sum (x - \bar{x})^2$ and $b^* = \bar{y} - w^* \bar{x}$.
+  `np.polyfit(x, y, 1)` and `LinearRegression` give the same line.
+- Gradient descent reaches the same line by repeated small steps. The largest usable learning rate depends on the
+  scale of $x$; centering (or standardizing) $x$ turns a long valley into a round bowl and speeds it up enormously.
+- scikit-learn wants $X$ with shape (samples, features): reshape a single feature with `reshape(-1, 1)`.
+
+Next: [Logistic regression](#/learn/ml/classical/logistic-regression) uses the same weighted sum to predict a
+class instead of a number.
+
+</Section>
