@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useId, useRef } from 'react';
 import { scaleLinear } from 'd3-scale';
 import { DOMAIN, type TrainResult, type TrainState } from '@/lib/deep/trainingExperiment';
 import { fmt } from '@/lib/deep/optimizers';
@@ -28,6 +28,7 @@ export function TrainingBoundary() {
   const y = scaleLinear()
     .domain(d.y)
     .range([height - m.bottom, m.top]);
+  const clipId = useId().replace(/:/g, '');
   const { grid, boundary, data, run } = result;
   const last = run.epochs.at(-1)!;
   const cw = x(grid.xs[1]!) - x(grid.xs[0]!);
@@ -64,7 +65,17 @@ export function TrainingBoundary() {
           role="img"
           aria-label="Training data and the network's decision boundary"
         >
-          <g aria-hidden="true">
+          <defs>
+            <clipPath id={clipId}>
+              <rect
+                x={m.left}
+                y={m.top}
+                width={width - m.left - m.right}
+                height={height - m.top - m.bottom}
+              />
+            </clipPath>
+          </defs>
+          <g aria-hidden="true" clipPath={`url(#${clipId})`}>
             {grid.values.flatMap((row, j) =>
               row.map((p, i) =>
                 p >= 0.5 ? (
