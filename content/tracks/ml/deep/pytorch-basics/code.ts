@@ -14,7 +14,7 @@ import type { CodeExample } from '@/lib/types';
 /** The values recorded from the PyTorch run, as a step-through (labeled Simulated trace). */
 export const torchTrace = buildTorchTrace();
 export const recordedNote =
-  'Simulated trace: the values were recorded from a run of PyTorch 2.14.1 on CPU; nothing runs in your browser.';
+  'Values recorded from a run of PyTorch 2.14.1 on CPU; nothing runs in your browser.';
 
 export const experiment = tinyNetExperiment('tiny-net');
 

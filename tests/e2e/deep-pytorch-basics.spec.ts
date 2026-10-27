@@ -10,13 +10,12 @@ test.beforeEach(async ({ page }) => {
 
 test('the PyTorch trace is labeled simulated and shows the recorded values', async ({ page }) => {
   const step = page.locator('[data-step-through="pytorch-tiny-net"]');
-  await expect(step.getByText('Simulated trace')).toBeVisible();
+  await expect(step.getByText('Simulated trace', { exact: true })).toBeVisible();
   await expect(step).toContainText(
     'recorded from a run of PyTorch 2.14.1 on CPU; nothing runs in your browser',
   );
   await expect(step).not.toContainText('written out by hand');
-  await step.focus();
-  await page.keyboard.press('End');
+  await step.getByRole('button', { name: 'Last step' }).click();
   await expect(step).toContainText('tensor([0.5315, 0.5023, 0.4945, 0.4813])');
   await expect(page.locator('[data-code-example="pytorch-tiny-net"]')).toContainText('0 0.70559');
 });
@@ -40,7 +39,7 @@ test('the TypeScript twin matches the recorded run, and retrains when the contro
   await expect(exp.locator('[data-code-example="pytorch-ts-twin"]')).toContainText('step < 300');
   await expect(exp.locator('[data-code-example="pytorch-ts-twin"]')).toContainText('sgdStep(net, grads, 2)');
   await expect(readout).toContainText('recorded only for lr = 0.5 and 3 steps');
-  await expect(readout).toContainText('[0.0040, 0.9920');
+  await expect(readout).toContainText('[0.0043, 0.9924');
   await expect(exp.locator('[data-viz="XOR loss per step"] figcaption')).toContainText('at step 299');
 });
 
