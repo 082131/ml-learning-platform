@@ -1,0 +1,120 @@
+import { brief, setupCode, starterCode } from './code';
+import { questions, standardizeExercise } from './quiz';
+
+<Section kind="intuition" title="From a toy to a real dataset">
+
+The chapter's networks learned two moons and XOR, where you could see every point. This project trains the same
+kind of network on real measurements: 30 numbers describing the cell nuclei in a breast tumour sample, with the
+diagnosis as the label. You cannot plot 30 dimensions, so you rely on the instruments from this chapter instead:
+loss curves, a validation set, and a careful look at the mistakes.
+
+You build it twice. In NumPy you write every line, including the backward pass, and check it. In
+<Term id="pytorch">PyTorch</Term> you write the same model the way practitioners do, and compare.
+
+</Section>
+
+<Section kind="technical" title="What to build">
+
+**Data.** 569 rows, 30 features, labels 0 (malignant, 212 rows) and 1 (benign, 357 rows). The starter splits them
+60 / 20 / 20 into training (341 rows), validation (114) and test (114), stratified so each split keeps the class
+ratio, and standardizes every feature with the training mean and standard deviation.
+
+**Model.** A 30-16-1 network:
+
+$$
+H = \tanh(X W_1 + b_1), \qquad \hat y = \sigma(H W_2 + b_2)
+$$
+
+with $X$ of shape $(B, 30)$, $W_1$ $(30, 16)$, $b_1$ $(16,)$, $H$ $(B, 16)$, $W_2$ $(16, 1)$, $b_2$ $(1,)$ and
+$\hat y$ $(B, 1)$: $30 \cdot 16 + 16 + 16 + 1 = 513$ parameters. The loss is the mean binary cross-entropy.
+
+**Training.** Mini-batch SGD, shuffling every epoch: with 341 rows and a batch of 16 that is
+$\lceil 341 / 16 \rceil = 22$ iterations per epoch, the last with 5 rows. Track training and validation loss per
+epoch and keep the weights from the epoch with the lowest validation loss
+(<Term id="early-stopping">early stopping</Term>).
+
+**The three splits have three jobs.** Training rows set the weights. Validation rows choose the learning rate,
+batch size and epoch. Test rows are used once, at the end, to estimate how the chosen model does on new
+tumours. Choosing anything with the test set makes its score optimistic.
+
+<Callout kind="simplification">
+  This is a learning exercise, not a medical tool. 569 rows from one source say little about other hospitals,
+  scanners or populations, and a real screening system is judged on sensitivity at a chosen threshold, calibration
+  and clinical validation, not on test accuracy.
+</Callout>
+
+</Section>
+
+<Section kind="code" title="Run it locally">
+
+You need Python 3.13. Create an environment with pinned versions
+and run the starter:
+
+<Code example={setupCode} title="terminal" />
+
+The starter loads, splits and standardizes the data and leaves `loss_and_grads` for you. Hover over or select the
+underlined parts.
+
+<Code example={starterCode} title="starter.py" />
+
+The expected output above was recorded from a run with Python 3.13.16, NumPy 2.5.4, scikit-learn 1.9.1 and
+PyTorch 2.14.1 on CPU. If your split sizes or class counts differ, check the versions before anything else.
+
+</Section>
+
+<Section kind="practice" title="The brief">
+
+Tick each milestone when it is done; your progress is saved in this browser.
+
+<Project brief={brief} />
+
+</Section>
+
+<Section kind="mistakes" title="Mistakes that inflate the score">
+
+<CommonMistake
+  title="Fitting the scaler on all rows"
+  wrong={'mean, std = X.mean(axis=0), X.std(axis=0)   # before splitting\nX = (X - mean) / std'}
+  error="No error: the test score looks fine, and slightly better than it should."
+  cause="The validation and test rows took part in computing the statistics the model is trained with."
+  fix={'mean, std = X_train.mean(axis=0), X_train.std(axis=0)\nX_train, X_val, X_test = [(A - mean) / std for A in (X_train, X_val, X_test)]'}
+/>
+
+<CommonMistake
+  title="Applying a sigmoid before BCEWithLogitsLoss"
+  wrong={'model = nn.Sequential(nn.Linear(30, 16), nn.Tanh(), nn.Linear(16, 1), nn.Sigmoid())\nloss_fn = nn.BCEWithLogitsLoss()'}
+  error="No error: training is slow and the loss never gets near 0."
+  cause="BCEWithLogitsLoss applies its own sigmoid, so outputs are squashed twice and predictions can never reach 0 or 1."
+  fix={'model = nn.Sequential(nn.Linear(30, 16), nn.Tanh(), nn.Linear(16, 1))   # logits\nloss_fn = nn.BCEWithLogitsLoss()'}
+/>
+
+</Section>
+
+<Section kind="check" title="Self-assessment">
+
+Check your understanding before you write the report.
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Scale with training statistics">
+
+<MiniExercise exercise={standardizeExercise}>
+  Write `standardize(train, other)` in plain Python: compute each column's mean and (population) standard
+  deviation from `train` only, and use them to scale the rows of `other`.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Split into training, validation and test; compute every statistic, including scaling, on training rows only.
+- Choose settings with validation loss and keep the best epoch; touch the test set once.
+- Write and gradient-check the NumPy version, then build the PyTorch version and explain the differences.
+- Report a confusion matrix and look at the misclassified rows, not just accuracy.
+
+Next: the [neural-network capstone](#/learn/ml/projects/capstone-neural-net) makes a NumPy and a PyTorch network
+agree to many decimal places on a 10-class problem.
+
+</Section>
