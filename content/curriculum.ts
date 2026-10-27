@@ -58,7 +58,7 @@ export const tracks: Track[] = [
           { id: 'ml/classical/features-scaling', status: 'outline' },
           { id: 'ml/classical/splits-leakage', status: 'written' },
           { id: 'ml/classical/linear-regression', status: 'written' },
-          { id: 'ml/classical/logistic-regression', status: 'outline' },
+          { id: 'ml/classical/logistic-regression', status: 'written' },
           { id: 'ml/classical/trees-ensembles', status: 'written' },
           { id: 'ml/classical/clustering-dimred', status: 'outline' },
           { id: 'ml/classical/fit-regularization', status: 'written' },

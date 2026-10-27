@@ -1,0 +1,228 @@
+import { logExp, numpyLogGD, predictCode, sigmoidRunner, sklearnLog } from './code';
+import { logisticExercise, questions } from './quiz';
+
+<Section kind="intuition" title="From a score to a probability">
+
+Adelie and Chinstrap penguins look alike, but Chinstraps tend to have longer bills. Measure a penguin's bill and
+you can make a good guess at its species, and you would like the guess to come with a confidence: "almost
+certainly a Chinstrap" for a very long bill, "could be either" for one in between.
+
+<Term id="logistic-regression">Logistic regression</Term> does exactly this. It starts like linear regression:
+a weighted sum of the <Term id="feature">features</Term>, $z = w_1 x_1 + w_2 x_2 + b$, called the score. A score
+can be any number, so it is passed through the <Term id="sigmoid">sigmoid</Term>, an S-shaped function that maps
+every number into the range 0 to 1. The result $p$ is read as the probability that the penguin is a Chinstrap.
+Predicting "Chinstrap" whenever $p \ge 0.5$ splits the plane of bill measurements into two halves; the line
+between them is the <Term id="decision-boundary">decision boundary</Term>.
+
+Training chooses $w_1$, $w_2$ and $b$ so that the probabilities fit the <Term id="label">labels</Term> well, using
+<Term id="gradient-descent">gradient descent</Term> as in the previous lesson, but on a loss made for
+probabilities.
+
+</Section>
+
+<Section kind="technical" title="Sigmoid, log loss and its gradient">
+
+**Data.** The 219 Adelie and Chinstrap penguins in `penguins.csv` with both bill measurements (one Adelie row has
+none). Every 4th of them in file order (positions 3, 7, 11, …) is held out as the <Term id="test-set">test set</Term>
+(54 penguins); the other 165 form the <Term id="training-set">training set</Term> (114 Adelie, 51 Chinstrap). The
+label is $y = 1$ for Chinstrap and $y = 0$ for Adelie.
+
+**Standardizing.** Bill length (around 42 mm) and depth (around 18.5 mm) have different scales, so each is
+replaced by its distance from the training mean in training standard deviations:
+$x_1 = (\text{length} - 42.3582) / 5.4750$ and $x_2 = (\text{depth} - 18.5376) / 1.2126$. The training matrix $Z$
+has shape $(165, 2)$. Test penguins are scaled with the same training numbers.
+
+**Model.** For one penguin,
+
+$$
+z = w_1 x_1 + w_2 x_2 + b, \qquad p = \sigma(z) = \frac{1}{1 + e^{-z}}
+$$
+
+$\sigma(0) = 0.5$, $\sigma(2) = 1 / (1 + 0.1353) = 0.8808$, and $\sigma(-z) = 1 - \sigma(z)$. Because $\sigma$ only
+increases, $p \ge 0.5$ exactly when $z \ge 0$, so the decision boundary is the line $w_1 x_1 + w_2 x_2 + b = 0$.
+
+**Loss.** MSE is a poor fit for probabilities (and makes the loss surface non-convex with a sigmoid). The
+<Term id="log-loss">log loss</Term> charges each penguin $-\log$ of the probability the model gave its true species:
+
+$$
+L = -\frac{1}{n} \sum_{i} \ell_i
+$$
+
+$$
+\ell_i = y_i \log p_i + (1 - y_i) \log (1 - p_i)
+$$
+
+A Chinstrap with $p = 0.9$ costs $-\log 0.9 = 0.1054$; with $p = 0.1$ it costs $-\log 0.1 = 2.3026$. At the start,
+with every weight 0, every $p$ is 0.5 and $L = \log 2 = 0.6931$.
+
+**Gradient.** With the sigmoid and log loss together, the derivative simplifies to
+
+$$
+\frac{\partial L}{\partial w} = \frac{1}{n} Z^\top (p - y)
+$$
+
+$$
+\frac{\partial L}{\partial b} = \frac{1}{n} \sum_i (p_i - y_i)
+$$
+
+where $p - y$ has shape $(165,)$ and $Z^\top (p - y)$ has shape $(2,)$. Batch gradient descent repeats
+$w \leftarrow w - \eta \, \partial L / \partial w$ and $b \leftarrow b - \eta \, \partial L / \partial b$ with
+<Term id="learning-rate">learning rate</Term> $\eta$. The log loss is convex in $(w, b)$, so there are no bad local
+minima. Unlike linear regression there is no closed-form answer, so an iterative method is always needed.
+
+<Callout kind="simplification">
+  When the classes are almost separable, as here, the unpenalized log loss keeps decreasing as the weights grow,
+  so plain gradient descent keeps making the weights larger and the probabilities more extreme. Libraries add a
+  penalty on the weights to stop this (see the scikit-learn example in the Code section).
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="The boundary, the shading and the sigmoid">
+
+Each penguin is a point; Chinstraps are triangles, Adelies circles, and test penguins are hollow. The blue shading
+is the model's $p$ at every spot, and the dark line is where $p = 0.5$. Click a penguin to see its numbers; the
+learning rate and step controls are in the Experiment section below and change this plot too.
+
+<Experiment def={logExp} title="Adelie or Chinstrap?" controls={false}>
+  <LogisticBoundary />
+  <LogisticCurves />
+</Experiment>
+
+The boundary is tilted. Bill length does most of the work (after 50 steps $w_1 = 2.75$, more than four times
+$|w_2| = 0.65$), and the negative weight on depth means that a penguin with a deeper bill needs a longer bill to be
+called a Chinstrap. The penguins on the wrong side are the overlap between the species that no straight line can
+fix.
+
+</Section>
+
+<Section kind="code" title="Scoring one penguin, training, and scikit-learn">
+
+The prediction for the selected penguin in plain Python, with the current weights filled in at full precision.
+The readout shows what it prints; for the starting settings and penguin 1, CPython 3.13 printed
+`-2.991 0.0478 Adelie`.
+
+<Experiment def={logExp} title="predict.py, linked to the plot" controls={false}>
+  <Code example={predictCode} title="predict.py" />
+  <StepThrough example={predictCode} title="predict.py" />
+</Experiment>
+
+The sigmoid alone, in plain Python, runs in your browser:
+
+<PythonRunner example={sigmoidRunner} title="sigmoid.py" />
+
+In practice you use scikit-learn. This needs `penguins.csv` next to the script, so run it locally; the output is
+from scikit-learn 1.8.0:
+
+<Code example={sklearnLog} title="sklearn_logistic.py" />
+
+`LogisticRegression()` uses an L2 penalty by default with $C = 1.0$: it minimizes
+$C \sum_i \text{loss}_i + \tfrac{1}{2} \lVert w \rVert^2$ (the intercept is not penalized). Dividing by $C n$, that
+is the mean log loss plus $\lVert w \rVert^2 / (2 C n)$, a pull toward small weights. That is why its weights
+(3.8127, −1.1936) are much smaller than those of long, unpenalized gradient descent, while `C=np.inf` (no penalty)
+gives 10.8703 and −4.5112, which the experiment approaches with $\eta = 30$ and 500 steps (10.8691, −4.5138). Both
+put the boundary in a similar place; the penalized model gives less extreme probabilities.
+
+<Callout kind="note">
+  With `C=np.inf`, scikit-learn 1.8.0 also printed this warning before the second line (its own internal
+  handling of the new parameters, not an error in the code):
+  `UserWarning: Setting penalty=None will ignore the C and l1_ratio parameters`. In 1.8, `C=np.inf` is the
+  documented way to switch the penalty off; the old `penalty=None` is deprecated.
+</Callout>
+
+</Section>
+
+<Section kind="experiment" title="Train it yourself">
+
+<Experiment def={logExp} title="Batch gradient descent on log loss">
+  <LogisticCurves />
+  <Readout />
+</Experiment>
+
+The NumPy loop behind those numbers, filled from the controls (run locally next to `penguins.csv`; for the
+starting settings it printed `w1=2.7513 w2=-0.6453 b=-1.2673` and `log loss=0.1303 accuracy=0.9758`, the same as
+the readout):
+
+<Experiment def={logExp} title="train.py, linked to the controls" controls={false}>
+  <Code example={numpyLogGD} title="train.py" />
+</Experiment>
+
+Things to try:
+
+- Set the steps to 0: every weight is 0, the shading is uniform, and the log loss is $\log 2 = 0.6931$.
+- $\eta = 0.01$: after 50 steps the log loss has only dropped from 0.6931 to 0.6085. The learning rate is far too
+  small.
+- $\eta = 30$, 500 steps: the weights grow towards the unpenalized answer and the shading turns into a sharp edge.
+  The training accuracy hardly changes, but the probabilities become extreme.
+- Compare the training and test log loss as you train longer. Here both keep falling (0.1303 and 0.1412 after 50
+  steps at $\eta = 0.5$, 0.0565 and 0.0698 after 500), because a straight line cannot overfit these two features
+  much. On noisier data the test loss can start rising while the training loss still falls.
+
+</Section>
+
+<Section kind="mistakes" title="Scaling with the wrong statistics, and reading p as certainty">
+
+<CommonMistake
+  title="Fitting the scaler on all the data, or on the test set"
+  wrong={'scaler = StandardScaler().fit(pair[features])  # includes the test penguins\nZ_test = scaler.transform(test[features])'}
+  cause="No error is raised, but the test penguins have influenced the scaling, so the test score is no longer a fair estimate for unseen penguins. Fitting a separate scaler on the test set is worse: the same bill gets a different standardized value in training and testing."
+  fix={'scaler = StandardScaler().fit(train[features])\nZ_train = scaler.transform(train[features])\nZ_test = scaler.transform(test[features])'}
+/>
+
+<CommonMistake
+  title="Passing species names straight into the loss"
+  wrong={'y = train["species"].to_numpy()\nloss = -np.mean(y * np.log(p) + (1 - y) * np.log(1 - p))'}
+  error="TypeError: can't multiply sequence by non-int of type 'float'"
+  cause="The labels are strings such as 'Adelie'. The log loss needs numbers: 1 for the positive class and 0 for the other. (scikit-learn accepts string labels, but your own NumPy code does not.)"
+  fix={'y = (train["species"] == "Chinstrap").to_numpy().astype(float)'}
+/>
+
+<Callout kind="warning">
+  A probability of 0.99 from a model is not a guarantee. With nearly separable training data and no penalty, the
+  probabilities become extreme even for penguins near the boundary. Check the test log loss, not just the
+  accuracy, and prefer a regularized model when probabilities matter.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+- **As the classification baseline.** Logistic regression is fast, its weights are readable (a positive weight
+  pushes towards the positive class), and it gives probabilities. Try it before anything more complex.
+- **With a threshold other than 0.5.** A medical screen may flag anything above $p = 0.1$. The next lesson,
+  [Evaluation metrics and error analysis](#/learn/ml/classical/metrics-error-analysis), moves the threshold and
+  measures what changes.
+- **In neural networks.** The last layer of a binary classifier is a logistic regression on learned features, and
+  binary cross-entropy is this log loss. With more than two classes, the sigmoid becomes the softmax.
+- **When the boundary must bend.** Add features such as $x_1^2$ or $x_1 x_2$, or use trees or neural networks.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Write the sigmoid and the log loss">
+
+<MiniExercise exercise={logisticExercise}>
+  Write `sigmoid(z)` and `log_loss(y, p)` in plain Python, using only `math`. `log_loss` takes a list of labels (0
+  or 1) and a list of probabilities and returns the mean log loss.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Logistic regression computes a score $z = w \cdot x + b$ and a probability $p = \sigma(z) = 1 / (1 + e^{-z})$.
+- With threshold 0.5, the decision boundary is the line $w \cdot x + b = 0$.
+- It is trained by minimizing log loss; the gradient is $Z^\top (p - y) / n$ for $w$ and $\text{mean}(p - y)$ for $b$.
+- Standardize with training statistics only, and score test data with the same numbers.
+- scikit-learn's `LogisticRegression` adds an L2 penalty by default ($C = 1.0$), so its weights are smaller than
+  plain gradient descent's; `C=np.inf` removes the penalty.
+
+Next: [Evaluation metrics and error analysis](#/learn/ml/classical/metrics-error-analysis) asks how good these
+predictions really are, beyond accuracy.
+
+</Section>
