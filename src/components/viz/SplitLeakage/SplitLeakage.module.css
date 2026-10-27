@@ -1,0 +1,132 @@
+.bar {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+@media (min-width: 700px) {
+  .bar {
+    grid-template-columns: repeat(20, minmax(0, 1fr));
+  }
+}
+.cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  border: 1px solid var(--line-strong);
+  border-bottom-width: 4px;
+  border-bottom-color: transparent;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.train {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.validation {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--ink);
+}
+.test {
+  background: var(--surface);
+  border-color: var(--ink-2);
+  border-style: dashed;
+  color: var(--ink);
+}
+.cell.seen {
+  border-bottom: 4px solid var(--ink);
+}
+.counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2) var(--s-4);
+  margin: var(--s-3) 0 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}
+.counts li {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+.swatch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 18px;
+  border: 1px solid var(--line-strong);
+  font-size: 11px;
+}
+.swatch.seen {
+  background: transparent;
+  border: none;
+  border-bottom: 4px solid var(--ink);
+  height: 10px;
+}
+.scores {
+  display: grid;
+  gap: var(--s-4);
+}
+.bars {
+  display: grid;
+  gap: var(--s-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.barRow {
+  display: grid;
+  gap: var(--s-1);
+}
+.barLabel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  align-items: center;
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}
+.active .barLabel {
+  color: var(--ink);
+}
+.tag {
+  padding: 0 var(--s-1);
+  border: 1px solid var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+.track {
+  position: relative;
+  display: block;
+  height: 18px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+.fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+.fillLeak {
+  background: var(--err);
+}
+.chance {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  border-left: 2px dashed var(--ink);
+}
+.barValue {
+  font-family: var(--font-mono);
+  font-size: var(--fs-15);
+}

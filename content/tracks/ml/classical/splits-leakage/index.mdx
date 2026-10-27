@@ -1,0 +1,242 @@
+import { experiment, leakSklearn, scalerLeak, splitCode, ttsExample } from './code';
+import { questions, splitExercise } from './quiz';
+
+<Section kind="intuition" title="Don't study with the exam paper">
+
+A teacher wants to know whether you understand the material, not whether you remember particular questions. So the
+practice problems you study with are different from the questions on the final exam. If you got hold of the exam
+paper a week early, you could score 100% without understanding anything, and the score would tell the teacher
+nothing.
+
+A <Term id="model">model</Term> is in the same position. We fit it on some rows of a <Term id="dataset">dataset</Term>
+and want to know how it will do on rows it has never seen: its <Term id="generalization">generalization</Term>. So
+before doing anything else we split the rows into three groups:
+
+| Split                                         | Exam analogy                          | Used for                                                       |
+| --------------------------------------------- | ------------------------------------- | -------------------------------------------------------------- |
+| <Term id="training-set">Training set</Term>   | Practice problems                     | Fitting the model: every learned number comes from these rows  |
+| <Term id="validation-set">Validation set</Term> | Mock exams, to decide how to study  | Comparing models and choosing settings                         |
+| <Term id="test-set">Test set</Term>           | The real exam, taken once             | One final, honest estimate of performance on new data          |
+
+<Term id="data-leakage">Data leakage</Term> is the model getting a peek at the exam paper: information from the
+validation or test rows (or from the answer itself) slips into training. The score goes up; the model does not get
+any better. This lesson shows a leak inflating a score from 50% to about 80% on data where no real pattern exists.
+
+</Section>
+
+<Section kind="technical" title="Splits, and the rule that keeps them honest">
+
+**Splitting.** Take $n$ rows and choose a validation share and a test share. Each held-out count is the share times
+$n$, rounded to a whole row; training gets the rest. With $n = 60$, 15% validation and 30% test:
+
+$$
+n_\text{val} = 60 \cdot 0.15 = 9, \qquad n_\text{test} = 60 \cdot 0.30 = 18, \qquad n_\text{train} = 60 - 9 - 18 = 33
+$$
+
+The rows are **shuffled first** with a seeded random generator, then cut in order: the first 33 shuffled rows train,
+the next 9 validate, the last 18 test. Shuffling matters because files are often sorted (`penguins.csv` lists every
+Adelie penguin before any Gentoo), and a <Term id="random-seed">seed</Term> makes the split the same every time you run the code.
+
+**What each split is for.** The model learns its <Term id="parameter">parameters</Term> from the training rows.
+Settings you choose yourself, such as how many features to keep, are <Term id="hyperparameter">hyperparameters</Term>:
+you try several and keep the one with the best validation score. Because you picked the winner by looking at
+validation scores, the winner's validation score is a little optimistic. The test set has played no part in any
+choice, so its score is the honest estimate. Use it once, at the end.
+
+**The rule.** _Everything that is fitted is fitted on training rows only._ That includes the model, but also every
+preprocessing step that learns numbers from data: a scaler's mean and standard deviation, the values used to fill in
+missing entries, and which features to keep. The validation and test rows are only ever _transformed_ with numbers
+learned from the training rows.
+
+**The leakage experiment.** To see what breaking the rule costs, we use data where the right answer is known:
+
+- $X$ has shape $(60, 300)$: 60 rows, 300 <Term id="feature">features</Term>, every value an independent draw from a
+  standard normal distribution (mean 0, standard deviation 1). The dataset is generated once from a fixed seed.
+- $y$ has shape $(60,)$: a <Term id="label">label</Term> of 0 or 1 per row, 30 of each, assigned at random.
+
+The features say nothing about the labels, so on new rows _any_ model is right 50% of the time, on average.
+The pipeline has two steps:
+
+1. <Term id="feature-selection">Feature selection</Term>: score each feature $j$ by the size of its Pearson
+   <Term id="correlation">correlation</Term> with the label, $|r_j|$, and keep the $k$ features with the largest scores.
+
+   $$
+   r_j = \frac{\sum_i (x_{ij} - \bar{x}_j)(y_i - \bar{y})}{\sqrt{\sum_i (x_{ij} - \bar{x}_j)^2 \, \sum_i (y_i - \bar{y})^2}}
+   $$
+
+   The sums run over the rows the selection is allowed to see.
+
+2. A **nearest-centroid** classifier on the $k$ kept features: for each class $c$, average the training rows of
+   that class to get a centroid $\mu_c$ (a vector of $k$ means). A test row $x$ gets the class whose centroid is
+   closer: class 1 if $\lVert x - \mu_1 \rVert^2 < \lVert x - \mu_0 \rVert^2$, otherwise class 0.
+
+**Accuracy** is the share of test rows classified correctly, for example $9 / 18 = 50\%$. The two versions of the
+pipeline differ in one thing only: whether step 1 sums over the 33 training rows (honest) or over all 60 rows,
+test rows included (leak). The centroids always use training rows only.
+
+**Why the leak works on pure noise.** Even unrelated numbers correlate a little in a finite sample. For independent
+data, $r$ computed on $n$ rows has a spread of roughly $1 / \sqrt{n - 1}$, which is $1 / \sqrt{59} \approx 0.13$
+for 60 rows (an approximation for large $n$). With 300 features, a few will reach $|r|$ around $0.3$ to $0.4$ by
+chance alone. When the selection sees the test rows, it prefers features whose chance pattern _includes_ the test
+rows, so those same features then appear to predict the test labels. On new data the pattern is gone.
+
+<Callout kind="simplification">
+  The experiment uses one split and an 18-row test set, so a single score moves in steps of $1/18 \approx 5.6$
+  percentage points and varies a lot between seeds. That is why it also shows the mean over 50 splits. Real
+  projects have more rows, but the same leak with many features and few rows is a documented cause of results that
+  fail to replicate.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Where each row goes">
+
+Each cell is one row of the 60-row dataset, in file order. Its label says where the seeded shuffle put it: **Tr**
+train, **Va** validation, **Te** test. Rows the feature selection may look at are underlined. The sliders for the
+shares, the seed and the leak are in the Experiment section below; this view follows them.
+
+<Experiment def={experiment} title="The split" controls={false}>
+  <SplitBar />
+</Experiment>
+
+Change the seed and the same counts land on different rows. Change a share and the counts change. Turn the leak on
+and every row becomes underlined: the selection now sees the test rows.
+
+</Section>
+
+<Section kind="code" title="The same split in scikit-learn">
+
+`train_test_split` cuts arrays into two parts, so three splits take two calls: first set the test rows aside, then
+split what is left into train and validation. The numbers in the code come from the experiment's sliders.
+
+<Experiment def={experiment} title="split.py, linked to the sliders" controls={false}>
+  <Code example={splitCode} title="split.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+The counts printed by scikit-learn equal the counts in the experiment (checked in this project's tests for several
+settings). Which rows land in which split differs, because scikit-learn shuffles with NumPy's random generator and
+the experiment uses its own.
+
+With real data you pass the features and the labels together, and they are shuffled with the same permutation.
+`stratify=y` keeps the share of each label about the same in both parts:
+
+<Code example={ttsExample} title="stratified_split.py" />
+
+</Section>
+
+<Section kind="experiment" title="Turn the leak on">
+
+The model and the data are the same in both bars. Only the rows that feature selection looks at differ. Try the
+leak toggle, then change the seed a few times.
+
+<Experiment def={experiment} title="Leakage on pure noise">
+  <SplitBar />
+  <LeakageScores />
+  <Readout />
+</Experiment>
+
+In the starting state (seed 1, $k = 10$) the honest pipeline gets $9 / 18 = 50.0\%$ and the leaky one
+$16 / 18 = 88.9\%$. Things to try:
+
+- Step through seeds. The honest score jumps around 50% (single splits are noisy), but the leaky score stays well
+  above it. The line chart averages 50 splits, and its two lines never meet.
+- Set $k = 1$. Even one leaked feature lifts the average to about 70%.
+- Make the test share larger. The leaked line drops only a little: with more test rows, chance patterns are harder
+  to fit, but a selection that sees them still finds some.
+
+The same experiment in scikit-learn, on 50 freshly generated noise datasets. The leak is one line,
+`SelectKBest(...).fit(X, y)` on all rows; the fix puts selection inside a pipeline that is fitted on the training
+rows only:
+
+<Code example={leakSklearn} title="leak_sklearn.py" />
+
+The honest average, 0.469, is near 0.5 but not exactly 0.5: 50 runs with 18 test rows each still leave a few points
+of noise in the average.
+
+</Section>
+
+<Section kind="mistakes" title="Leaks that raise no error, and errors that do">
+
+Leaks are dangerous because nothing fails. The score just looks good. The common ones:
+
+| Leak                                    | What happens                                                                                                  | Fix                                                                                     |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Preprocessing fitted on all rows        | A scaler, imputer or feature selector learns numbers from the test rows                                       | Split first; fit preprocessing on training rows (a scikit-learn <Term id="ml-pipeline">pipeline</Term> does this) |
+| Duplicates across splits                | The same penguin, patient or photo appears in train and test, so the test row is a memorized one              | Remove exact duplicates before splitting; keep all rows of one entity in one split      |
+| Target leakage                          | A feature is computed from the answer or only known after it, such as "refund issued" when predicting fraud   | For each feature ask: would I know this value at prediction time?                      |
+| Time order ignored                      | Shuffling time-stamped rows trains on the future and tests on the past                                        | Split by time: train on earlier rows, validate and test on later ones                   |
+| Tuning on the test set                  | Trying many settings and keeping the best test score                                                          | Choose with validation (or cross-validation); use the test set once                     |
+
+Here is the first one with real numbers: the flipper lengths (mm) of six Adelie penguins (rows 0, 1, 2, 4, 5 and 6
+of `penguins.csv`) as training rows, and two Gentoo penguins (rows 152 and 153) as test rows.
+
+<Code example={scalerLeak} title="scaler_leak.py" />
+
+Fitted on training rows only, the mean is $1126 / 6 = 187.67$ and the test penguins come out 4.27 and 7.74 standard
+deviations above it: clearly unlike anything in training. Fitted on all eight rows, the mean moves to
+$1567 / 8 = 195.875$ and they look ordinary (0.96 and 2.17). The leaky version has hidden exactly the thing a test
+set is meant to reveal.
+
+Two errors you will meet when splitting:
+
+<CommonMistake
+  title="Stratifying when a class has only one row"
+  wrong={'y = np.array([0] * 9 + [1])          # one row of class 1\ntrain_test_split(X, y, test_size=0.3, stratify=y)'}
+  error="ValueError: The least populated classes in y have only 1 member, which is too few. The minimum number of groups for any class cannot be less than 2. Classes with too few members are: [1]"
+  cause="Stratifying puts some of every class in both parts, which needs at least two rows of each class."
+  fix={'# Collect more rows of the rare class, or merge it with another class, or split without stratify:\ntrain_test_split(X, y, test_size=0.3, random_state=0)'}
+/>
+
+<CommonMistake
+  title="Passing features and labels with different row counts"
+  wrong={'train_test_split(np.arange(60), np.arange(59))'}
+  error="ValueError: Found input variables with inconsistent numbers of samples: [60, 59]"
+  cause="Every array passed to train_test_split is shuffled with the same permutation, so they must all have the same number of rows. Usually a row was dropped from X but not from y."
+  fix={'# Drop rows from X and y together, for example with one DataFrame:\nclean = df.dropna()\nX, y = clean[features], clean["label"]'}
+/>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+- **Every model you train.** The next lessons fit linear and logistic regression on penguins; each starts with a
+  split, and each fitted step goes in a pipeline.
+- **Choosing hyperparameters.** [Overfitting and regularization](#/learn/ml/classical/fit-regularization) picks a
+  polynomial degree and a penalty with a validation set, and
+  [Cross-validation](#/learn/ml/classical/cross-validation) replaces the single validation split with several.
+- **Medical and scientific data.** Several patients' scans, or one patient's many scans? Group splits (all rows of
+  one patient in one split) prevent the duplicates leak.
+- **Forecasting.** Sales, prices and sensor readings are split by time, never shuffled.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Write a seeded split">
+
+<MiniExercise exercise={splitExercise}>
+  Write `split_rows(n, n_val, n_test, seed)` that shuffles the row numbers `0..n-1` with `random.Random(seed)` and
+  returns three lists: the training, validation and test rows. Raise `ValueError` when no rows would be left for
+  training. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Split before anything else: train to fit, validation to choose, test once to report.
+- Shuffle with a seed so the split is random and reproducible. Shares become row counts: $60 \cdot 0.3 = 18$.
+- Fit everything that learns from data (model, scaler, imputer, feature selection) on training rows only.
+- On pure noise, choosing 10 of 300 features with the test rows in view lifts test accuracy from about 50% to
+  about 80%. Leaks raise no error; they make the score lie.
+- Watch for duplicates across splits, features that encode the answer, and time order.
+
+Next: [Linear regression](#/learn/ml/classical/linear-regression) fits its first model on a training split and
+reports its error on held-out rows.
+
+</Section>

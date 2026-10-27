@@ -56,7 +56,7 @@ export const tracks: Track[] = [
           { id: 'ml/classical/data-cleaning', status: 'outline' },
           { id: 'ml/classical/eda', status: 'outline' },
           { id: 'ml/classical/features-scaling', status: 'outline' },
-          { id: 'ml/classical/splits-leakage', status: 'outline' },
+          { id: 'ml/classical/splits-leakage', status: 'written' },
           { id: 'ml/classical/linear-regression', status: 'outline' },
           { id: 'ml/classical/logistic-regression', status: 'outline' },
           { id: 'ml/classical/trees-ensembles', status: 'outline' },
