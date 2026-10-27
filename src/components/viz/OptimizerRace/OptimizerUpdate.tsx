@@ -16,7 +16,12 @@ export function OptimizerUpdate() {
         const step = inspectedStep(run, state.inspect);
         const lines = describeUpdate(id, step, run.steps[step.t - 2], h);
         return (
-          <section key={id} className={s.card} aria-label={`${OPTIMIZER_LABEL[id]}, step ${step.t}`} data-update={id}>
+          <section
+            key={id}
+            className={s.card}
+            aria-label={`${OPTIMIZER_LABEL[id]}, step ${step.t}`}
+            data-update={id}
+          >
             <h4>
               {OPTIMIZER_LABEL[id]} · step {step.t}
               {step.t < state.inspect && ' (its last step)'}

@@ -1,0 +1,225 @@
+import { adamCode, experiment, torchAdam } from './code';
+import { momentumExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Walking downhill in a narrow valley">
+
+Training a network means changing its <Term id="parameter">parameters</Term> to make the loss smaller. The
+gradient (the vector of slopes of the loss, one per parameter) points uphill, so the basic move is a step
+against it. An <Term id="optimizer">optimizer</Term> is the rule that decides how big that step is and in which
+direction, using the gradient and possibly what it saw before.
+
+Picture a long, narrow valley. Its walls are steep and its floor slopes gently towards the lowest point. A walker
+who always steps straight downhill bounces from wall to wall, because downhill points mostly across the valley,
+and makes slow progress along it. Two fixes:
+
+- Remember which way you have been going and keep some of that speed: this is
+  <Term id="momentum">momentum</Term>. The bounces across the valley cancel out; the steady slope along it adds up.
+- Measure how steep each direction usually is and take steps of similar length in all of them: this is what
+  <Term id="adam">Adam</Term> does, on top of a momentum-like average.
+
+This lesson races the three on two small surfaces where you can see every step.
+
+</Section>
+
+<Section kind="technical" title="Three update rules">
+
+Write the parameters as a vector $\theta$ (theta). Here $\theta = (x, y)$ has shape $(2,)$; in a network it holds
+every weight and bias. Let $g = \nabla f(\theta)$ be the gradient at the current point and $\eta$ (eta) the
+learning rate, the step-size multiplier.
+
+**Gradient descent.** $\theta \leftarrow \theta - \eta\, g$. When $g$ is computed on a random
+mini-batch of training data instead of the whole dataset, this is <Term id="sgd">stochastic gradient descent
+(SGD)</Term>. Our surfaces are fixed formulas, so here the gradient is exact and SGD is plain gradient descent;
+the noise from batches is the subject of the next lesson.
+
+**Momentum** keeps a velocity $u$ that starts at $0$ (PyTorch calls it the momentum buffer):
+
+$$
+u \leftarrow \beta\, u + g, \qquad \theta \leftarrow \theta - \eta\, u
+$$
+
+With $\beta = 0.9$, a gradient that stays the same builds the velocity up to
+$g\,(1 + 0.9 + 0.81 + \dots) = g / (1 - 0.9) = 10\,g$.
+
+**Adam** keeps two running averages per parameter, $m$ (of $g$) and $v$ (of $g^2$, squared element by element),
+both starting at $0$. At step $t = 1, 2, \dots$:
+
+$$
+\begin{aligned}
+m &\leftarrow \beta_1 m + (1 - \beta_1)\, g, &
+v &\leftarrow \beta_2 v + (1 - \beta_2)\, g^2 \\
+\hat m &= \frac{m}{1 - \beta_1^t}, &
+\hat v &= \frac{v}{1 - \beta_2^t} \\
+\theta &\leftarrow \theta - \eta\, \frac{\hat m}{\sqrt{\hat v} + \epsilon}
+\end{aligned}
+$$
+
+The division by $1 - \beta^t$ is the <Term id="bias-correction">bias correction</Term>: after one step from zero,
+$m = 0.1\,g$ is only a tenth of the gradient, and dividing by $1 - 0.9^1 = 0.1$ restores it.
+
+**Worked example** on the bowl $f(x, y) = \tfrac12(x^2 + 10y^2)$, whose gradient is $(x, 10y)$, from
+$\theta = (-4, 1.5)$, so $g = (-4, 15)$:
+
+| Optimizer                    | Step 1                                                                                                                       | Result          |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| SGD, $\eta = 0.05$           | $(-4, 1.5) - 0.05 \cdot (-4, 15)$                                                                                            | $(-3.8, 0.75)$  |
+| Momentum, $\eta = 0.05$      | $u = 0.9 \cdot (0, 0) + (-4, 15)$, then the same step                                                                        | $(-3.8, 0.75)$  |
+| Adam, $\eta = 0.2$           | $m = 0.1 \cdot (-4, 15) = (-0.4, 1.5)$, $v = 0.001 \cdot (16, 225) = (0.016, 0.225)$, $\hat m = (-4, 15)$, $\hat v = (16, 225)$ | $(-3.8, 1.3)$   |
+
+Adam's first step is $0.2 \cdot (-4/4, \; 15/15) = 0.2 \cdot (-1, 1)$: exactly $\eta$ in each coordinate,
+whatever the gradient's size. Momentum differs from SGD from step 2:
+$u = 0.9 \cdot (-4, 15) + (-3.8, 7.5) = (-7.4, 21)$, so
+$\theta = (-3.8, 0.75) - 0.05 \cdot (-7.4, 21) = (-3.43, -0.3)$. It overshoots $y = 0$, while SGD lands on
+$(-3.61, 0.375)$.
+
+**When gradient descent diverges.** Along $y$ the gradient is $10y$, so one step maps
+$y \mapsto y - 10\eta y = (1 - 10\eta)\, y$. The error shrinks only while $|1 - 10\eta| < 1$, that is for
+$\eta < 0.2$. In general a quadratic with curvature $\lambda$ (its second derivative) needs $\eta < 2 / \lambda$,
+and the steepest direction sets the limit for all of them. That is the trap of a narrow valley: the steep walls cap
+$\eta$, and the gentle floor then takes many small steps.
+
+<Callout kind="simplification">
+  These surfaces have two parameters and one valley. A network's loss has millions of parameters, the gradient
+  comes from random mini-batches, and frameworks add options we leave out: weight decay, Nesterov momentum,
+  AMSGrad, learning-rate schedules. The update rules above are the ones `torch.optim.SGD` (with
+  `dampening=0`, `nesterov=False`) and `torch.optim.Adam` (with `weight_decay=0`, `amsgrad=False`) apply.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="The race">
+
+All three optimizers start at the same point. Contour lines join points with the same loss, like the height lines
+of a map; the cross marks the minimum. Change the learning rates and β values and watch the paths and the loss
+curves. The ring on each path marks the position before the inspected step $t$, whose arithmetic is shown in the
+Code and Experiment sections.
+
+<Experiment def={experiment} title="Optimizer race">
+  <OptimizerRace />
+  <OptimizerLoss />
+  <Readout title="Where the race ends" />
+</Experiment>
+
+Things to try:
+
+- On the bowl, raise the SGD learning rate to 0.25. SGD diverges at step 15 and is labeled; momentum at the same
+  η still converges.
+- Set momentum β to 0: the momentum path becomes the SGD path.
+- Switch to the Rosenbrock valley. Its floor is a curved, nearly flat banana: SGD crawls, momentum follows the
+  curve, and Adam moves about η per step until its averages settle.
+
+</Section>
+
+<Section kind="code" title="Adam in NumPy">
+
+The code runs Adam up to the inspected step $t$ on the selected surface. Its literals come from the controls above:
+the gradient formula, Adam's η, β₁, β₂ and $t$. The cards below it show the inspected step of all three optimizers
+with the numbers filled in.
+
+<Experiment def={experiment} title="adam.py, linked to the race" controls={false}>
+  <Code example={adamCode} title="adam.py" />
+  <OptimizerUpdate />
+</Experiment>
+
+We ran this code with NumPy 2.5.3 for the starting settings, and for $t = 5$ on the bowl and $t = 40$ on
+Rosenbrock; it printed the same θ as the race to every digit shown. In practice you call the framework's
+optimizer. The same three Adam steps in <Term id="pytorch">PyTorch</Term>:
+
+<Code example={torchAdam} title="adam_torch.py" />
+
+The printed output was recorded from a run of PyTorch 2.14.1 on CPU (it does not run in your browser). PyTorch
+uses 32-bit floats by default, so $-3.8$ prints as $-3.799999952316284$. Run with 64-bit tensors, PyTorch's
+`SGD`, `SGD(momentum=0.9)` and `Adam` gave the race's positions after 60 steps to at least 15 significant
+digits.
+
+</Section>
+
+<Section kind="experiment" title="Step through one Adam update">
+
+Choose a step with **Inspect step t** in the race controls, then step through the code. The first iterations are
+summarized in one step; iteration $t$ is shown line by line with the values of $g$, $m$, $v$, $\hat m$, $\hat v$
+and $\theta$.
+
+<Experiment def={experiment} title="Adam, step t" controls={false}>
+  <StepThrough example={adamCode} title="adam.py" />
+  <Readout title="Where the race ends" />
+</Experiment>
+
+Things to try:
+
+- Inspect step 1 and check the bias corrections: $1 - \beta_1^1 = 0.1$ and $1 - \beta_2^1 = 0.001$, so
+  $\hat m = g$ and $\hat v = g^2$.
+- Inspect step 30 on the bowl. $1 - 0.999^{30} \approx 0.0296$, so $\hat v$ is still being scaled up about 34 times:
+  $\beta_2$ makes $v$ remember slowly.
+- Lower β₁ to 0 and Adam keeps no momentum: $\hat m = g$, so each step divides the current gradient by the
+  running size of past gradients. Watch the path zigzag more than with β₁ = 0.9.
+
+</Section>
+
+<Section kind="mistakes" title="Learning rates that do not transfer">
+
+<CommonMistake
+  title="Reusing an SGD learning rate for Adam, or the other way round"
+  wrong={'opt = torch.optim.Adam(model.parameters(), lr=0.5)  # 0.5 worked for SGD'}
+  error="No error: the loss jumps around or stops improving."
+  cause="SGD steps are η times the gradient, so a good η depends on the gradient's scale. Adam's steps are about η per parameter regardless of scale, so η = 0.5 moves every weight by up to 0.5 each step, far too much for most networks."
+  fix={'opt = torch.optim.Adam(model.parameters(), lr=1e-3)  # PyTorch\'s default; tune from there'}
+/>
+
+<CommonMistake
+  title="Forgetting the bias correction in a hand-written Adam"
+  wrong={'theta = theta - lr * m / (np.sqrt(v) + eps)  # m and v without the hats'}
+  error="No error: the first steps have the wrong size."
+  cause="At t = 1, m = 0.1·g but √v = √0.001·|g| ≈ 0.032·|g|, so the step is about 3.2·η instead of η, and the error fades only as βᵗ goes to 0."
+  fix={'m_hat = m / (1 - beta1 ** t)\nv_hat = v / (1 - beta2 ** t)\ntheta = theta - lr * m_hat / (np.sqrt(v_hat) + eps)'}
+/>
+
+<Callout kind="warning">
+  Divergence is not always an exploding number. At η = 0.2 on the bowl, SGD's y flips between 1.5 and −1.5
+  forever without growing: the loss stays flat. A loss curve that refuses to go down can mean the learning rate
+  is too high, not too low.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Choosing an optimizer">
+
+| Situation                                    | Common choice                                         | Why                                                         |
+| -------------------------------------------- | ----------------------------------------------------- | ----------------------------------------------------------- |
+| A new network, little tuning time            | Adam (or AdamW), `lr=1e-3`                            | Works with little tuning because steps are scale-free        |
+| Image models trained for a long time         | SGD with momentum 0.9 and a learning-rate schedule    | Often generalizes a little better once tuned                 |
+| Transformers                                 | AdamW with warm-up and decay                          | AdamW is Adam with weight decay applied separately           |
+
+Whatever you pick, try a few learning rates spaced by about 3× (1e-4, 3e-4, 1e-3, 3e-3) and compare loss
+curves: the next lesson shows how to read them. These are starting points, not rules.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Write a momentum step">
+
+<MiniExercise exercise={momentumExercise}>
+  Write `momentum_step(theta, u, g, lr, beta)` for plain Python lists. Update the velocity first,
+  u ← β·u + g, then move θ ← θ − η·u, and return both new lists. The tests replay the first two momentum
+  steps of the race on the bowl.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- SGD: θ ← θ − η·g. On a quadratic with curvature λ it needs η &lt; 2 / λ, and the steepest direction sets that limit.
+- Momentum: u ← β·u + g, θ ← θ − η·u. Consistent directions speed up; zigzags cancel.
+- Adam: running averages m and v, bias-corrected by 1 − βᵗ, and a step of η·m̂ / (√v̂ + ε): about η per parameter.
+- Learning rates are optimizer-specific: Adam's default is 1e-3.
+- In PyTorch: `opt.zero_grad()`, `loss.backward()`, `opt.step()`.
+
+Next: [The training loop](#/learn/ml/deep/training-loop) puts an optimizer inside a loop over mini-batches and
+epochs, where the gradient becomes noisy.
+
+</Section>

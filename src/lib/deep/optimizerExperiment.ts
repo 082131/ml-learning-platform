@@ -1,5 +1,6 @@
 import type { ExperimentDef, ReadoutItem } from '../types';
 import { buildAdamTrace } from './adamTrace';
+import { isolines, sampleGrid, type Segment } from './contour';
 import {
   ADAM_EPS,
   fmt,
@@ -12,6 +13,7 @@ import {
   type Hyper,
   type OptimizerId,
   type OptRun,
+  type Surface,
 } from './optimizers';
 
 export interface RaceState {
@@ -54,7 +56,9 @@ export const hyperOf = (s: RaceState): Hyper => ({
 export function runRace(s: RaceState): RaceResult {
   const surface = surfaceOf(s.surface);
   const h = hyperOf(s);
-  return Object.fromEntries(OPTIMIZER_IDS.map((id) => [id, runOptimizer(surface, id, h, s.steps)])) as RaceResult;
+  return Object.fromEntries(
+    OPTIMIZER_IDS.map((id) => [id, runOptimizer(surface, id, h, s.steps)]),
+  ) as RaceResult;
 }
 
 /** The inspected step of a run, clamped to the steps it took (a diverged run stops early). */
@@ -74,11 +78,23 @@ const lrSlider = (id: 'lr' | 'adamLr', label: string) =>
   }) as const;
 
 /** The optimizer race: three optimizers from one start point on one surface, sharing one state. */
-export function optimizerRaceExperiment(id: string, traceExample: string): ExperimentDef<RaceState, RaceResult> {
+export function optimizerRaceExperiment(
+  id: string,
+  traceExample: string,
+): ExperimentDef<RaceState, RaceResult> {
   const d = SURFACES.bowl.defaults;
   return {
     id,
-    initial: { surface: 'bowl', lr: d.lr, beta: 0.9, adamLr: d.adamLr, beta1: 0.9, beta2: 0.999, steps: d.steps, inspect: 1 },
+    initial: {
+      surface: 'bowl',
+      lr: d.lr,
+      beta: 0.9,
+      adamLr: d.adamLr,
+      beta1: 0.9,
+      beta2: 0.999,
+      steps: d.steps,
+      inspect: 1,
+    },
     controls: [
       {
         kind: 'select',
@@ -88,7 +104,14 @@ export function optimizerRaceExperiment(id: string, traceExample: string): Exper
         get: (s) => s.surface,
         set: (s, v) => {
           const def = surfaceOf(v).defaults;
-          return { ...s, surface: v, lr: def.lr, adamLr: def.adamLr, steps: def.steps, inspect: Math.min(s.inspect, def.steps) };
+          return {
+            ...s,
+            surface: v,
+            lr: def.lr,
+            adamLr: def.adamLr,
+            steps: def.steps,
+            inspect: Math.min(s.inspect, def.steps),
+          };
         },
       },
       lrSlider('lr', 'Learning rate η (SGD and momentum)'),
@@ -161,4 +184,18 @@ export function optimizerRaceExperiment(id: string, traceExample: string): Exper
       });
     },
   };
+}
+
+const CONTOUR_GRID = { x: 61, y: 49 };
+const contourCache = new Map<string, { level: number; segments: Segment[] }[]>();
+
+/** The surface's contour lines at its levels, computed once per surface. */
+export function surfaceContours(surface: Surface) {
+  let found = contourCache.get(surface.id);
+  if (!found) {
+    const grid = sampleGrid(surface.f, surface.x, surface.y, CONTOUR_GRID.x, CONTOUR_GRID.y);
+    found = surface.levels.map((level) => ({ level, segments: isolines(grid, level) }));
+    contourCache.set(surface.id, found);
+  }
+  return found;
 }

@@ -12,7 +12,8 @@ export default [
   {
     id: 'sgd',
     term: 'Stochastic gradient descent (SGD)',
-    short: 'Gradient descent where each step uses the gradient of a small random batch of examples instead of the whole dataset.',
+    short:
+      'Gradient descent where each step uses the gradient of a small random batch of examples instead of the whole dataset.',
     long: 'The batch gradient is a noisy estimate of the full gradient, so steps are cheap but jittery. In PyTorch, torch.optim.SGD implements the update θ ← θ − η·g (optionally with momentum) for whatever gradient you give it.',
     introducedIn: 'ml/deep/optimizers',
     aliases: ['stochastic gradient descent', 'mini-batch gradient descent'],
@@ -20,21 +21,24 @@ export default [
   {
     id: 'momentum',
     term: 'Momentum',
-    short: 'An optimizer that steps along a running sum of past gradients (a velocity) instead of the current gradient alone.',
+    short:
+      'An optimizer that steps along a running sum of past gradients (a velocity) instead of the current gradient alone.',
     long: 'With coefficient β (often 0.9), u ← β·u + g and θ ← θ − η·u. Directions where gradients agree build up speed; directions where they flip sign partly cancel.',
     introducedIn: 'ml/deep/optimizers',
   },
   {
     id: 'adam',
     term: 'Adam',
-    short: 'An optimizer that scales each parameter’s step by running averages of its gradient (m) and squared gradient (v).',
+    short:
+      'An optimizer that scales each parameter’s step by running averages of its gradient (m) and squared gradient (v).',
     long: 'Adam (adaptive moment estimation, Kingma and Ba, 2015) divides the bias-corrected mean gradient by the root of the bias-corrected mean squared gradient, so every coordinate moves roughly η per step whatever its steepness. PyTorch defaults: η = 0.001, β₁ = 0.9, β₂ = 0.999, ε = 1e-8.',
     introducedIn: 'ml/deep/optimizers',
   },
   {
     id: 'bias-correction',
     term: 'Bias correction (Adam)',
-    short: 'Dividing Adam’s running averages by 1 − βᵗ, which undoes their pull towards the zero they started at.',
+    short:
+      'Dividing Adam’s running averages by 1 − βᵗ, which undoes their pull towards the zero they started at.',
     introducedIn: 'ml/deep/optimizers',
   },
   {
@@ -69,14 +73,16 @@ export default [
   {
     id: 'pytorch',
     term: 'PyTorch',
-    short: 'An open-source Python library for tensors on CPUs and GPUs, automatic differentiation and neural networks.',
+    short:
+      'An open-source Python library for tensors on CPUs and GPUs, automatic differentiation and neural networks.',
     introducedIn: 'ml/deep/pytorch-basics',
     aliases: ['torch'],
   },
   {
     id: 'autograd',
     term: 'Autograd',
-    short: 'PyTorch’s automatic differentiation: it records operations on tensors and computes gradients by backpropagation when you call backward().',
+    short:
+      'PyTorch’s automatic differentiation: it records operations on tensors and computes gradients by backpropagation when you call backward().',
     introducedIn: 'ml/deep/pytorch-basics',
   },
   {

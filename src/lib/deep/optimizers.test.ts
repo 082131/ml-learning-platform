@@ -77,7 +77,10 @@ describe('optimizers on Rosenbrock from (−1.2, 1)', () => {
     expect(runOptimizer(ROSENBROCK, 'sgd', h, 1).path[1]![0]).toBeCloseTo(-0.9844, 12);
     const close = (p: number[], q: number[]) => p.forEach((v, i) => expect(v).toBeCloseTo(q[i]!, 8));
     close(runOptimizer(ROSENBROCK, 'sgd', h, 400).path.at(-1)!, [-0.6445472395110311, 0.42340687940662597]);
-    close(runOptimizer(ROSENBROCK, 'momentum', h, 400).path.at(-1)!, [0.9327297793632173, 0.8697043716202181]);
+    close(
+      runOptimizer(ROSENBROCK, 'momentum', h, 400).path.at(-1)!,
+      [0.9327297793632173, 0.8697043716202181],
+    );
     close(runOptimizer(ROSENBROCK, 'adam', h, 400).path.at(-1)!, [0.7710462709899862, 0.5937205294156158]);
     const a2 = runOptimizer(ROSENBROCK, 'adam', h, 2).steps[1]!;
     expect(a2.vHat![0]).toBeCloseTo(24614.12538320234, 7);
@@ -97,7 +100,9 @@ describe('equations, formatting and the experiment', () => {
       '(−4, 1.5) − 0.2·(−1, 1) = (−3.8, 1.3)',
     ]);
     const sgd = runOptimizer(BOWL, 'sgd', H, 1).steps[0]!;
-    expect(describeUpdate('sgd', sgd, undefined, H).at(-1)!.numbers).toBe('(−4, 1.5) − 0.05·(−4, 15) = (−3.8, 0.75)');
+    expect(describeUpdate('sgd', sgd, undefined, H).at(-1)!.numbers).toBe(
+      '(−4, 1.5) − 0.05·(−4, 15) = (−3.8, 0.75)',
+    );
     expect(fmt(0.00001234)).toBe('1.23e−5');
     expect(fmt(-2.5)).toBe('−2.5');
   });
@@ -110,10 +115,18 @@ describe('equations, formatting and the experiment', () => {
   it('is a valid experiment whose Adam trace fits the filled code', () => {
     const def = optimizerRaceExperiment('race', 'adam-code');
     expect(validateExperiment(def)).toEqual([]);
-    for (const [surface, inspect] of [['bowl', 1], ['bowl', 5], ['rosenbrock', 40]] as const) {
+    for (const [surface, inspect] of [
+      ['bowl', 1],
+      ['bowl', 5],
+      ['rosenbrock', 40],
+    ] as const) {
       const s: RaceState = { ...def.initial, surface, inspect };
       const trace = def.trace!(s);
-      const src = fillSlots(ADAM_SOURCE, [], adamSlots(surface === 'bowl' ? BOWL : ROSENBROCK, { ...H, ...s }, inspect)).source;
+      const src = fillSlots(
+        ADAM_SOURCE,
+        [],
+        adamSlots(surface === 'bowl' ? BOWL : ROSENBROCK, { ...H, ...s }, inspect),
+      ).source;
       expect(validateTrace(trace, src)).toEqual([]);
     }
     const t5 = buildAdamTrace(BOWL, H, runOptimizer(BOWL, 'adam', H, 5), 5);
@@ -134,19 +147,42 @@ describe('equations, formatting and the experiment', () => {
 describe('isolines (marching squares)', () => {
   it('finds the crossing of one cell by linear interpolation', () => {
     // Values 0 on the left, 2 on the right: the level-1 line is the vertical x = 0.5.
-    const grid = { xs: [0, 1], ys: [0, 1], values: [[0, 2], [0, 2]] };
-    expect(isolines(grid, 1)).toEqual([[[0.5, 0], [0.5, 1]]]);
+    const grid = {
+      xs: [0, 1],
+      ys: [0, 1],
+      values: [
+        [0, 2],
+        [0, 2],
+      ],
+    };
+    expect(isolines(grid, 1)).toEqual([
+      [
+        [0.5, 0],
+        [0.5, 1],
+      ],
+    ]);
   });
 
   it('traces the unit circle for x² + y² = 1', () => {
-    const segs = isolines(sampleGrid((x, y) => x * x + y * y, [-2, 2], [-2, 2], 41, 41), 1);
+    const segs = isolines(
+      sampleGrid((x, y) => x * x + y * y, [-2, 2], [-2, 2], 41, 41),
+      1,
+    );
     expect(segs.length).toBeGreaterThan(20);
-    for (const seg of segs) for (const p of seg) expect(Math.abs(Math.hypot(p[0], p[1]) - 1)).toBeLessThan(0.02);
+    for (const seg of segs)
+      for (const p of seg) expect(Math.abs(Math.hypot(p[0], p[1]) - 1)).toBeLessThan(0.02);
   });
 
   it('resolves a saddle cell with its center value', () => {
     // Corners 00 and 11 above 1, center 1.5 above: the curve cuts off the two low corners.
-    const grid = { xs: [0, 1], ys: [0, 1], values: [[2, 1], [1, 2]].map((r) => r.map((v) => v - 0.5)) };
+    const grid = {
+      xs: [0, 1],
+      ys: [0, 1],
+      values: [
+        [2, 1],
+        [1, 2],
+      ].map((r) => r.map((v) => v - 0.5)),
+    };
     expect(isolines(grid, 1)).toHaveLength(2);
   });
 });

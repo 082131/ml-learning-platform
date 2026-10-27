@@ -25,7 +25,21 @@ for t in range(1, {{t}} + 1):
     theta = theta - lr * m_hat / (np.sqrt(v_hat) + eps)
 print(theta)`;
 
-const LINE = { grad: 3, hyper: 7, theta0: 8, m0: 9, v0: 10, loop: 11, g: 12, m: 13, v: 14, mHat: 15, vHat: 16, step: 17, print: 18 };
+const LINE = {
+  grad: 3,
+  hyper: 7,
+  theta0: 8,
+  m0: 9,
+  v0: 10,
+  loop: 11,
+  g: 12,
+  m: 13,
+  v: 14,
+  mHat: 15,
+  vHat: 16,
+  step: 17,
+  print: 18,
+};
 
 /** A Python float literal: always with a decimal point, so NumPy builds a float array. */
 const pyFloat = (n: number) => (Number.isInteger(n) ? n.toFixed(1) : String(n));
@@ -106,7 +120,11 @@ export function buildAdamTrace(surface: Surface, h: Hyper, run: OptRun, t: numbe
     vars[name as keyof typeof vars] = value;
     steps.push({ range: { line }, vars: { ...vars }, note });
   };
-  steps.push({ range: { line: LINE.loop }, vars: { ...vars }, note: `t = ${last}: the update this step-through explains.` });
+  steps.push({
+    range: { line: LINE.loop },
+    vars: { ...vars },
+    note: `t = ${last}: the update this step-through explains.`,
+  });
   push(LINE.g, 'g', vec(s.g), `The gradient at θ = ${fmtVec(s.theta)} is g = ${fmtVec(s.g)}.`);
   push(
     LINE.m,

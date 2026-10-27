@@ -173,7 +173,12 @@ export interface EquationLine {
  * The update equations of step `s` with its numbers. `prev` is the optimizer state before the step
  * (the previous step's m and v, or zeros at t = 1).
  */
-export function describeUpdate(id: OptimizerId, s: OptStep, prev: OptStep | undefined, h: Hyper): EquationLine[] {
+export function describeUpdate(
+  id: OptimizerId,
+  s: OptStep,
+  prev: OptStep | undefined,
+  h: Hyper,
+): EquationLine[] {
   const g = { symbol: 'g = ∇f(θ)', numbers: `∇f${fmtVec(s.theta)} = ${fmtVec(s.g)}` };
   const theta = (rate: number, what: string, d: Vec2) => ({
     symbol: `θ ← θ − ${what}`,
