@@ -59,7 +59,13 @@ export function NeuronPlayground() {
         height={220}
         series={[
           { id: 'f', label: act.label, points: curve, inTable: false },
-          { id: 'now', label: 'Current (z, a)', points: inRange ? [[result.z, result.a]] : [], tone: 'err', dots: true },
+          {
+            id: 'now',
+            label: 'Current (z, a)',
+            points: inRange ? [[result.z, result.a]] : [],
+            tone: 'err',
+            dots: true,
+          },
         ]}
         overlay={(x, y) =>
           inRange ? (

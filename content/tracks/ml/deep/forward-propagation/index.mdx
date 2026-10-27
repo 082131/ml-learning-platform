@@ -1,0 +1,190 @@
+import { denseRunner, experiment, forwardCode, layerLines, layerNames } from './code';
+import { denseExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Neurons side by side, layers one after another">
+
+In the previous lesson one neuron turned two inputs into one number. Put three neurons side by side, each with its
+own weights, and feed them the same two inputs: you get three numbers. That row of neurons is a
+<Term id="dense-layer">dense layer</Term> ("dense" because every input connects to every neuron). Feed those three
+numbers into another neuron and you have a small <Term id="neural-network">neural network</Term>: 2 inputs, a
+<Term id="hidden-layer">hidden layer</Term> of 3 units, and 1 output. We call it a 2-3-1 network.
+
+Running inputs through the layers, one after another, to get a prediction is
+<Term id="forward-propagation">forward propagation</Term>, or the forward pass. It is all a trained network does
+when it makes a prediction.
+
+The network in this lesson gets the four corners of a square as inputs, $(0, 0)$, $(0, 1)$, $(1, 0)$ and $(1, 1)$,
+and its weights were picked by hand so that the output is high only when exactly one input is 1 (the "XOR"
+pattern, which no single neuron can produce). You will see how every number it produces comes from a matrix
+multiplication, a bias and an activation.
+
+</Section>
+
+<Section kind="technical" title="Z = X @ W + b, then A = f(Z), for a whole batch">
+
+**One layer, one example.** Hidden unit $j$ is a neuron: $z_j = \sum_k x_k W_{kj} + b_j$ and $a_j = f(z_j)$. Store
+the weights of all 3 hidden units as the columns of one matrix $W_1$ of shape $(2, 3)$: row $k$ holds input $k$'s
+weights, column $j$ holds unit $j$'s weights. Then the whole layer is one vector-matrix product:
+$z = x W_1 + b_1$, with $x$ of shape $(2,)$ and $z$ of shape $(3,)$.
+
+**One layer, a batch.** Training and inference process many examples at once. Stack them as the rows of a matrix
+$X$ of shape $(\text{batch}, 2)$: this first axis is the <Term id="batch">batch</Term> dimension. One
+<Term id="matrix-multiplication">matrix multiplication</Term> then computes every unit for every example:
+
+$$
+Z_1 = X W_1 + b_1 \quad (\text{batch}, 2) \times (2, 3) + (3,) \rightarrow (\text{batch}, 3)
+\qquad A_1 = f(Z_1) \quad (\text{batch}, 3)
+$$
+
+$Z_1[e][j]$ is example $e$'s weighted sum at hidden unit $j$. The bias $b_1$ has shape $(3,)$; NumPy adds it to
+every row by <Term id="broadcasting">broadcasting</Term>. The activation acts on each entry separately, so it keeps
+the shape. The output layer repeats the pattern with the hidden values as its input:
+
+$$
+Z_2 = A_1 W_2 + b_2 \quad (\text{batch}, 3) \times (3, 1) + (1,) \rightarrow (\text{batch}, 1)
+\qquad A_2 = \sigma(Z_2) \quad (\text{batch}, 1)
+$$
+
+In general a layer with `in` inputs and `out` units has $W$ of shape $(\text{in}, \text{out})$ and $b$ of shape
+$(\text{out},)$, and maps $(\text{batch}, \text{in})$ to $(\text{batch}, \text{out})$. The weights do not depend on
+the batch size. This network has $2 \cdot 3 + 3 + 3 \cdot 1 + 1 = 13$ parameters.
+
+**Worked example.** Row 1 of $X$ is $(0, 1)$. With $W_1 = \begin{bmatrix} 2 & 2 & 1 \\ 2 & 2 & -1 \end{bmatrix}$ and
+$b_1 = (-1, -3, 0)$:
+
+$$
+\begin{aligned}
+Z_1[1] &= (0 \cdot 2 + 1 \cdot 2 - 1,\; 0 \cdot 2 + 1 \cdot 2 - 3,\; 0 \cdot 1 + 1 \cdot (-1) + 0) = (1, -1, -1) \\
+A_1[1] &= \tanh(1, -1, -1) = (0.7616, -0.7616, -0.7616) \\
+Z_2[1] &= 0.7616 \cdot 2 + (-0.7616) \cdot (-2) + (-0.7616) \cdot 0.5 + (-1.5) = 1.1656 \\
+A_2[1] &= \sigma(1.1656) = 1 / (1 + e^{-1.1656}) = 0.7623
+\end{aligned}
+$$
+
+<Callout kind="simplification">
+  We store $W$ as (in, out) so that the code reads `X @ W`, as in the matrix lessons. PyTorch's `nn.Linear` stores
+  its weight as (out, in) and computes `X @ W.T + b`; the numbers are the same, only the layout differs. Real
+  networks also start from random weights and learn them (the next lessons); these weights were chosen by hand to
+  make the example readable.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Select a layer, see its numbers and its code">
+
+Pick a layer and a unit: the diagram labels the weights coming into that unit, the box below it writes out the
+unit's arithmetic, the shape list marks the layer's stage, and the code under it marks the lines that compute the
+layer. Pick another example row to see the same network on a different input. You can edit $X$ above the diagram
+and any weight or bias below it; the code, the step-through and the readout further down use the same values.
+
+<Experiment def={experiment} title="A 2-3-1 network">
+  <ForwardPass />
+  <LayerCode example={forwardCode} lines={layerLines} names={layerNames} title="forward.py" />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The forward pass in NumPy">
+
+Hover over, focus or select a part of the code to see what it does. The shape comments are filled in with the
+current batch size.
+
+<Experiment def={experiment} title="forward.py, linked to the diagram" controls={false}>
+  <Code example={forwardCode} title="forward.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+The same forward pass with plain Python lists and loops. `dense` is the layer formula written out: one weighted sum
+per example and per unit. It runs in your browser.
+
+<PythonRunner example={denseRunner} title="forward_lists.py" />
+
+</Section>
+
+<Section kind="experiment" title="Trace the batch through the network">
+
+Change the batch size or the hidden activation, then step through the code. Each step shows the line that runs,
+the arrays with their shapes, and the arithmetic for row 0.
+
+<Experiment def={experiment} title="Batch size and the forward trace">
+  <StepThrough example={forwardCode} title="forward.py" />
+  <Readout />
+</Experiment>
+
+Things to try:
+
+- Set the batch size to 1. Every array keeps two axes: $X$ is $(1, 2)$ and the output is $(1, 1)$, still a matrix
+  with one row.
+- Switch the hidden activation to **None (identity)**. All four outputs now land between 0.88 and 0.96, and
+  $(1, 1)$ gets exactly the same output as $(0, 0)$: without the activation the network is linear, and a linear
+  function cannot make $(0, 1)$ and $(1, 0)$ high while keeping $(0, 0)$ and $(1, 1)$ low.
+- In the Visual section, change $b_1[1]$ from $-3$ to $-1$. Hidden units 0 and 1 then compute the same thing and
+  cancel out in the output layer, since $W_2$ gives them weights $2$ and $-2$.
+
+</Section>
+
+<Section kind="mistakes" title="Shape mistakes in a forward pass">
+
+<CommonMistake
+  title="Weights stored as (out, in)"
+  wrong={'X = np.array([[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]])  # (4, 2)\nW = np.ones((3, 2))  # (out, in), as nn.Linear stores it\nZ = X @ W'}
+  error="ValueError: matmul: Input operand 1 has a mismatch in its core dimension 0, with gufunc signature (n?,k),(k,m?)->(n?,m?) (size 3 is different from 2)"
+  cause="X @ W needs W's rows to match X's columns (the 2 input features). A weight stored as (out, in) must be transposed first."
+  fix={'Z = X @ W.T  # (4, 2) @ (2, 3) -> (4, 3)'}
+/>
+
+<CommonMistake
+  title="A bias with the wrong length"
+  wrong={'Z = np.ones((4, 3))          # (batch, units)\nb = np.array([-1.0, -3.0])  # 2 biases for 3 units\nZ + b'}
+  error="ValueError: operands could not be broadcast together with shapes (4,3) (2,) "
+  cause="Broadcasting lines up the last axes: b must have one entry per unit (3), so it can be added to every row."
+  fix={'b = np.array([-1.0, -3.0, 0.0])  # shape (3,)'}
+/>
+
+<CommonMistake
+  title="A single example without the batch axis"
+  wrong={'x = np.array([1.0, 0.0])  # shape (2,), not (1, 2)\nZ1 = x @ W1 + b1          # shape (3,)\nZ1[:, 0]'}
+  error="IndexError: too many indices for array: array is 1-dimensional, but 2 were indexed"
+  cause="A 1-D input runs through the layers without an error, but every result is 1-D too, so code that expects (batch, units) breaks later, far from the cause."
+  fix={'x = np.array([1.0, 0.0]).reshape(1, -1)  # shape (1, 2): a batch of one'}
+/>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+- An image classifier's first dense layer on 28 × 28 images: $X$ is $(\text{batch}, 784)$, $W_1$ is $(784, 128)$,
+  and every forward pass multiplies them, as in the matrix multiplication lesson.
+- Inference servers group requests into a batch for the same reason this lesson uses $X$: one large matrix
+  multiplication is much faster than many small ones.
+- When a model fails with a shape error, write the shape of every stage as in the list above. The mismatch is the
+  first stage where the inner sizes disagree.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Write a dense layer with lists">
+
+<MiniExercise exercise={denseExercise}>
+  Write `dense(X, W, b)` in plain Python. `X` is a list of rows of shape (batch, in), `W` is (in, out) and `b` has
+  length out. Return `Z = X @ W + b` as a list of rows of shape (batch, out). Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A dense layer is $Z = XW + b$ then $A = f(Z)$, with $X$ (batch, in), $W$ (in, out), $b$ (out,).
+- The batch dimension is the first axis of every activation; the weights are shared by every example.
+- The output of one layer is the input of the next. The output layer's activation fits the task (sigmoid here).
+- Check shapes stage by stage: the inner sizes of each `@` must match, and each bias must have one entry per unit.
+
+Next: [Loss and backpropagation](#/learn/ml/deep/backpropagation) runs this computation backwards to find how each
+weight should change.
+
+</Section>

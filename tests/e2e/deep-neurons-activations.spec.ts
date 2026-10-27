@@ -13,7 +13,10 @@ test.beforeEach(async ({ page, context }) => {
 
 /** The controls shown in the Visual section (the first experiment block with sliders). */
 const controls = (page: Page) =>
-  page.locator('[data-experiment="neuron"]').filter({ has: page.getByRole('slider') }).first();
+  page
+    .locator('[data-experiment="neuron"]')
+    .filter({ has: page.getByRole('slider') })
+    .first();
 
 test('raising w[0] changes the diagram, the code literal, the trace arithmetic and the readout together', async ({
   page,

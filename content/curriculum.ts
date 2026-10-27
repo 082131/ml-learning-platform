@@ -74,7 +74,7 @@ export const tracks: Track[] = [
         project: 'ml/deep/project-neural-net',
         lessons: [
           { id: 'ml/deep/neurons-activations', status: 'written' },
-          { id: 'ml/deep/forward-propagation', status: 'outline' },
+          { id: 'ml/deep/forward-propagation', status: 'written' },
           { id: 'ml/deep/backpropagation', status: 'outline' },
           { id: 'ml/deep/optimizers', status: 'outline' },
           { id: 'ml/deep/training-loop', status: 'outline' },

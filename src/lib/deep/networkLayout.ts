@@ -33,7 +33,10 @@ export function layoutNetwork(sizes: readonly number[], width: number): NetworkL
 }
 
 /** A point a fraction t of the way from a to b. */
-export const along = (a: Point, b: Point, t: number): Point => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+export const along = (a: Point, b: Point, t: number): Point => [
+  a[0] + (b[0] - a[0]) * t,
+  a[1] + (b[1] - a[1]) * t,
+];
 
 /** The segment between two unit circles, trimmed so it starts and ends at their edges. */
 export function edgeSegment(a: Point, b: Point, r = NODE_RADIUS): [Point, Point] {

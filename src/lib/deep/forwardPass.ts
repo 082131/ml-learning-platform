@@ -1,4 +1,4 @@
-import { array, formatNumber as n, scalar, text } from '../trace/values';
+import { array, formatNumber as n, text } from '../trace/values';
 import type { ExperimentDef, Trace, TraceStep, TraceValue } from '../types';
 import { ACTIVATIONS, type ActivationId } from './activations';
 import { forward, type Network } from './mlp';
