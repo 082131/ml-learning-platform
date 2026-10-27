@@ -1,0 +1,47 @@
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0 var(--s-4);
+}
+@media (min-width: 900px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .arithmetic,
+  .diverged {
+    grid-column: 1 / -1;
+  }
+}
+.arithmetic {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  margin: 0 0 var(--s-3);
+  padding: var(--s-3);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+}
+.label {
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.math {
+  font-family: var(--font-mono);
+  font-size: var(--fs-15);
+  overflow-wrap: anywhere;
+}
+.detail {
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}
+.diverged {
+  margin: 0;
+  padding: var(--s-3);
+  border: 1px solid var(--err);
+  color: var(--ink);
+}
+.diverged strong {
+  color: var(--err);
+}

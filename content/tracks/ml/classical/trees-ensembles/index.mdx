@@ -1,0 +1,294 @@
+import { boostExp, boostSklearn, forestExp, forestSklearn, splitExp, splitRunner, splitSearch, treeSklearn } from './code';
+import { giniExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Twenty questions about a penguin">
+
+A field guide tells species apart with yes/no questions: *Is the bill longer than about 42 mm? If so, are the
+flippers longer than about 202 mm?* Each answer sends you down one branch until you reach a name. A
+<Term id="decision-tree">decision tree</Term> is that kind of guide, learned from data: the computer chooses which
+question to ask first, which to ask next, and where to put each cut-off.
+
+To choose a question, the tree needs a score for "how well does this question separate the species?" The score in
+this lesson is <Term id="gini-impurity">Gini impurity</Term>: 0 when a group holds only one species, higher the
+more mixed it is. The tree tries every possible cut-off on every feature and keeps the one that leaves the two
+groups least mixed.
+
+One tree is easy to read but jumpy: change a few training penguins and it can ask different questions. Two ideas
+fix that by combining many trees into an <Term id="ensemble">ensemble</Term>:
+
+- A **random forest** grows many trees on slightly different random versions of the data and lets them vote.
+- **Gradient boosting** grows small trees one after another, each one correcting the mistakes the earlier trees
+  still make.
+
+Every number in this lesson comes from real penguins in the Palmer penguins
+<Term id="dataset">dataset</Term>, most of them from 14 penguins small enough to check by hand.
+
+</Section>
+
+<Section kind="technical" title="Gini, the split search, and two ways to combine trees">
+
+**The toy data.** 14 penguins (rows 12, 15, 16, 56, 96, 136, 177, 183, 250, 256, 298, 305, 311 and 334 of
+`penguins.csv`, drawn once with a seeded NumPy generator): 6 Adelie, 4 Chinstrap and 4 Gentoo, with two
+<Term id="feature">features</Term>, `bill_length_mm` and `flipper_length_mm`. The feature table $X$ has shape
+$(14, 2)$ and the <Term id="label">labels</Term> $y$ have shape $(14,)$.
+
+**Gini impurity of a node.** If a fraction $p_k$ of the rows in a node belongs to class $k$,
+
+$$
+G = 1 - \sum_k p_k^2
+$$
+
+For all 14 penguins:
+
+$$
+G = 1 - \left((6/14)^2 + (4/14)^2 + (4/14)^2\right) = 1 - 68/196 = 0.6531
+$$
+
+A pure node has $G = 0$; two classes in equal shares give $1 - 2 \cdot 0.5^2 = 0.5$. $\sum_k p_k^2$ is the chance that two
+penguins drawn at random (with replacement) from the node are the same species, so $G$ is the chance they differ.
+
+**Scoring a split.** A <Term id="split-threshold">split</Term> "feature ≤ $t$" sends $n_L$ rows left and $n_R$
+right. Its score is the Gini of each side, weighted by the side's share of the $n$ rows:
+
+$$
+G_{\text{split}} = \frac{n_L}{n} G_L + \frac{n_R}{n} G_R
+$$
+
+**The best root split.** "bill_length_mm ≤ 41.95" sends the 6 Adelie left ($G_L = 0$) and 4 Chinstrap + 4 Gentoo
+right ($G_R = 0.5$), so
+
+$$
+G_{\text{split}} = \tfrac{6}{14} \cdot 0 + \tfrac{8}{14} \cdot 0.5 = 0.2857
+$$
+
+The best flipper split, "≤ 197", only reaches 0.3673, so the tree asks about the bill first.
+
+**Which thresholds to try.** Between two neighboring values, every threshold splits the training rows the same
+way, so only one per gap is needed. Like scikit-learn, we use the midpoints of the sorted distinct values: 14
+different bill lengths give 13 candidates, the first being $(35.6 + 36.6)/2 = 36.1$.
+
+**Growing the tree.** Training is greedy: find the best split over all features and thresholds, send the rows
+left or right, and repeat on each side. A node stops splitting when it is pure or when `max_depth` is reached, and
+it predicts its majority class. On the right side of the root (0 Adelie, 4 Chinstrap, 4 Gentoo), the best split is
+"flipper_length_mm ≤ 202.5": left [0, 3, 0], pure; right [0, 1, 4] with $G = 1 - (1/25 + 16/25) = 0.32$, weighted
+$\tfrac{3}{8} \cdot 0 + \tfrac{5}{8} \cdot 0.32 = 0.2$. At depth 2 the tree gets 13 of the 14 penguins right; the
+one it misses is row 305, a Chinstrap with Gentoo-length flippers (205 mm). A third level isolates it with
+"bill_length_mm ≤ 50.6".
+
+**Random forest.** A <Term id="random-forest">random forest</Term> adds two kinds of randomness, both drawn from a
+<Term id="random-seed">random seed</Term>:
+
+1. Each tree trains on a <Term id="bootstrap-sample">bootstrap sample</Term>: $n$ rows drawn *with replacement*
+   from the $n$ training rows. A row is left out with probability $(1 - 1/n)^n \approx 1/e \approx 0.37$, so each
+   tree sees about 63 % of the distinct rows, some of them twice or more. Training many models this way and
+   combining them is called <Term id="bagging">bagging</Term>.
+2. At each split, only a random subset of the features is tried. scikit-learn's default for classifiers is
+   `max_features="sqrt"`: $\lfloor\sqrt{2}\rfloor = 1$ of our 2 features.
+
+The trees are grown to full depth and vote; the class with the most votes wins.
+
+**Gradient boosting.** <Term id="gradient-boosting">Gradient boosting</Term> builds a model $F$ in stages. For a
+numeric target with squared error, it starts from the mean, $F_0(x) = \bar y$, and at stage $m$:
+
+1. compute each row's residual $r_i = y_i - F_{m-1}(x_i)$, what the model still gets wrong;
+2. fit a small regression tree $h_m$ to the residuals (here a *stump*: one split, each side predicting its mean
+   residual);
+3. update $F_m(x) = F_{m-1}(x) + \eta \, h_m(x)$, where $\eta$ is the <Term id="learning-rate">learning rate</Term>.
+
+For the loss $\tfrac12 (y - F)^2$, the residual $y - F$ is exactly the negative gradient with respect to $F$, so
+each stage is a step of <Term id="gradient-descent">gradient descent</Term> taken by adding a function. Here it
+predicts `body_mass_g` from `flipper_length_mm` for the same 14 penguins: $F_0 = 55075/14 = 3933.93$ g, with a
+<Term id="mean-squared-error">mean squared error</Term> of 437,375.6 g². The first stump is "flipper ≤ 202.5":
+the 9 penguins at or below it have a mean residual of −447.82 g, the 5 above +806.07 g.
+
+<Callout kind="simplification">
+  The trees here are the textbook CART algorithm on two features, and their splits match scikit-learn 1.8's
+  `DecisionTreeClassifier` and `GradientBoostingRegressor` node for node (checked in this site's tests).
+  scikit-learn also stores thresholds as 32-bit floats (41.95 is kept as 41.9499989), supports sample weights,
+  missing values and several stopping rules, and its forest averages the trees' class probabilities instead of
+  counting votes. Our forest uses its own seeded random generator, so its trees are not the ones scikit-learn grows
+  with the same seed.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Try a threshold, then watch the tree grow">
+
+Pick a feature and slide through its 13 candidate thresholds. The scatter plot shades the penguins that go left,
+the chart shows the weighted Gini of every candidate (the square marks the lowest), and the box below writes the
+arithmetic out. The depth slider grows the tree with the same greedy search.
+
+<Experiment def={splitExp} title="The split search on 14 penguins">
+  <GiniSplit />
+  <TreeDiagram />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The split search in Python, then in scikit-learn">
+
+Here is the search for one feature in plain Python. The list `xs` is filled from the feature you picked above.
+Select a part of the code to see what it does.
+
+<Experiment def={splitExp} title="split_search.py, linked to the experiment" controls={false}>
+  <Code example={splitSearch} title="split_search.py" />
+</Experiment>
+
+You can run it in your browser on the bill lengths (it needs no packages), and change it: try `x < t` on line 14,
+or a different `ys`.
+
+<PythonRunner example={splitRunner} title="split_search.py" />
+
+scikit-learn runs the same search over both features at every node. The `max_depth` below is the depth slider
+above, and the readout shows what `export_text` prints for it (scikit-learn 1.8, run with CPython 3.13).
+
+<Experiment def={splitExp} title="tree.py, linked to the experiment" controls={false}>
+  <Code example={treeSklearn} title="tree.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+</Section>
+
+<Section kind="experiment" title="Step through the search, then vote and boost">
+
+**The split search, step by step.** Each candidate takes two steps: the midpoint, then the two sides and their
+weighted Gini. A third step appears when the candidate beats the best so far. Change the feature in the Visual
+section and the trace changes with it.
+
+<Experiment def={splitExp} title="Every candidate threshold" controls={false}>
+  <StepThrough example={splitSearch} title="split_search.py" />
+</Experiment>
+
+**A random forest.** The 342 penguins with both measurements are shuffled (seed 0) and split into 239 training
+and 103 held-out rows. The forest grows up to 50 full trees on the training rows, each on its own bootstrap sample
+and trying 1 random feature per split. The single tree for comparison is grown on all 239 training rows with both
+features at every split. Pick a held-out penguin to see how the trees vote.
+
+<Experiment def={forestExp} title="Forest vote vs one tree">
+  <ForestVote />
+  <Readout />
+</Experiment>
+
+Things to try:
+
+- Start at row 191, a Gentoo the single tree calls a Chinstrap. With 25 trees (seed 1) the vote is 15 Gentoo to
+  10 Chinstrap. Set the number of trees to 1: with seed 1, that one random tree gets 94 of 103 held-out penguins
+  right (91.3 %), fewer than the single full tree.
+- Change the seed. The forest's held-out accuracy moves by a penguin or two, but in every seed from 0 to 5 that we
+  checked, 25 trees beat the single tree's 96 of 103 (93.2 %).
+- Watch tree 1's bootstrap sample in the caption: 239 draws, but only about 150 distinct penguins.
+
+**Gradient boosting.** Each stage fits a stump to the current residuals (dashed lines) and adds it, scaled by the
+learning rate. The readout and the code below come from the same state: the MSE in the readout is what the
+scikit-learn code prints.
+
+<Experiment def={boostExp} title="Boosting stumps on body mass">
+  <BoostingStages />
+  <Code example={boostSklearn} title="boost.py" />
+  <Readout />
+</Experiment>
+
+Things to try:
+
+- Learning rate 1.0, stage 1: the prediction jumps all the way to the two side means of the first stump
+  (MSE 76,402.8). With 0.1 it moves a tenth of the way (MSE 368,790.8).
+- Go to 30 stages with each learning rate: 1.0 reaches a training MSE of 7,898.2, 0.3 reaches 27,983.5 and 0.1
+  reaches 47,484.1. A lower training error is not the goal by itself: with 14 penguins, an error near 0 would
+  mean the model reproduces each penguin's weight, measurement noise included. Only held-out rows can tell you
+  when to stop.
+
+</Section>
+
+<Section kind="mistakes" title="Reading trees and ensembles wrong">
+
+<CommonMistake
+  title="Trusting a fully grown tree's training accuracy"
+  wrong={'tree = DecisionTreeClassifier(random_state=0).fit(X_train, y_train)\nprint(tree.score(X_train, y_train))  # 1.0'}
+  error="No error: the score is 1.0, and it means nothing about new penguins."
+  cause="Without max_depth (or another stopping rule) a tree keeps splitting until every leaf is pure, unless two rows have identical features but different labels. It has memorized the training rows. On the 103 held-out penguins in this lesson, scikit-learn's full tree scores 0.922."
+  fix={'print(tree.score(X_test, y_test))  # judge on rows the model never saw'}
+/>
+
+<CommonMistake
+  title="Passing a single feature as a 1-D list"
+  wrong={'X = [182, 185, 195]\nGradientBoostingRegressor().fit(X, [3200, 3700, 3450])'}
+  error={'ValueError: Expected 2D array, got 1D array instead:\narray=[182. 185. 195.].\nReshape your data either using array.reshape(-1, 1) if your data has a single feature or array.reshape(1, -1) if it contains a single sample.'}
+  cause="scikit-learn models take a table of shape (n_samples, n_features), even when there is only one feature. A flat list has no column axis."
+  fix={'X = [[182], [185], [195]]  # shape (3, 1): one row per penguin'}
+/>
+
+<CommonMistake
+  title="Reading a forest's predict_proba as a confidence that the answer is right"
+  wrong={'forest.predict_proba(X_test.iloc[:1])  # [[0.91, 0.09, 0.0]]\n# "91 % sure this is an Adelie"'}
+  error="No error, but 0.91 is the average of the trees' leaf proportions, not a calibrated probability."
+  cause="Each full tree's leaf is almost always pure, so the average is close to the share of trees voting Adelie. Trees trained on overlapping bootstrap samples make correlated mistakes, so 91 % of trees agreeing doesn't mean 91 % of such penguins are Adelie."
+  fix={'from sklearn.calibration import CalibratedClassifierCV\n# calibrate on held-out data if you need real probabilities'}
+/>
+
+<Callout kind="warning">
+  Trees split on thresholds, so they don't need scaled features: multiplying a feature by 10 moves every threshold
+  but not a single split. That also means a tree can't extrapolate. The boosted model above predicts the same mass
+  for every flipper length above 215.5 mm, because no stump can split beyond the largest training value (216 mm).
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet them">
+
+On tables of mixed numeric features (the bread and butter of classical ML), tree ensembles are usually the
+strongest models you can train without much tuning. On the penguins, with the 2 features of this lesson and a
+stratified 70/30 split, scikit-learn 1.8 gives:
+
+<Code example={forestSklearn} title="compare.py" />
+
+| Model                                 | Held-out accuracy (103 penguins) |
+| ------------------------------------- | -------------------------------- |
+| One full `DecisionTreeClassifier`     | 0.922                            |
+| `RandomForestClassifier`, 100 trees   | 0.981                            |
+| `HistGradientBoostingClassifier`      | 0.951                            |
+
+This example reads `penguins.csv` (the file from the palmerpenguins package, linked in the references), so it
+runs on your machine, not in the browser; the outputs were copied from a run with the versions above. One
+split of 103 penguins is a small test: a difference of 3 penguins is 0.03, and another `random_state` can reorder
+the models. [Cross-validation](#/learn/ml/classical/cross-validation) gives a steadier comparison.
+
+In practice:
+
+- **Random forests** are a strong default with almost no tuning: more trees make the vote steadier and don't
+  make it overfit; past a few hundred they mostly cost time.
+- **Gradient boosting** (`HistGradientBoostingClassifier`, XGBoost, LightGBM) usually wins on tabular data once
+  the learning rate, number of stages and tree size are tuned, with early stopping on a validation set.
+- **A single shallow tree** is worth training for its readable rules, even when you deploy something else.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Write the split search">
+
+<MiniExercise exercise={giniExercise}>
+  Write `gini(labels)` and `best_split(xs, ys)` in plain Python. `best_split` tries the midpoint between each pair
+  of neighboring sorted values of `xs` and returns `(threshold, weighted_gini)` for the lowest weighted Gini,
+  keeping the first threshold on a tie. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Gini impurity $1 - \sum_k p_k^2$ is 0 for a pure node. A split is scored by the size-weighted Gini of its sides.
+- A tree tries the midpoint between every pair of neighboring values of every feature, keeps the best split, and
+  repeats on each side until the nodes are pure or `max_depth` is reached.
+- A random forest grows full trees on bootstrap samples, trying a random subset of features at each split, and
+  combines them by voting. Here 25 trees got 99 of 103 held-out penguins right; one tree got 96.
+- Gradient boosting starts from the mean and adds small trees fit to the residuals, each scaled by the learning
+  rate. The training error falls with every stage, so judge the number of stages on held-out data.
+
+Next: [K-means and PCA](#/learn/ml/classical/clustering-dimred) finds structure in the penguins without using
+the species labels at all.
+
+</Section>
