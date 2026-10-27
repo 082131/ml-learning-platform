@@ -1,0 +1,190 @@
+import { experiment, recordedNote, torchCode, torchTrace, tsCode } from './code';
+import { questions, transposeExercise } from './quiz';
+
+<Section kind="intuition" title="The same loop, with the bookkeeping done for you">
+
+In the last two lessons you wrote every part of training yourself: the forward pass, the loss, the backward pass
+and the update. <Term id="pytorch">PyTorch</Term> keeps the same structure but takes over the tedious parts:
+
+- Layers such as `nn.Linear` own their weights and biases, and a model built from them (an
+  <Term id="nn-module">nn.Module</Term>) can list all of its parameters for you.
+- <Term id="autograd">Autograd</Term> records every operation on a <Term id="tensor">tensor</Term> while the
+  forward pass runs (the <Term id="computation-graph">computation graph</Term>), so one call, `loss.backward()`,
+  computes every gradient.
+- An <Term id="optimizer">optimizer</Term> from `torch.optim` applies the update to every parameter.
+
+What stays yours: choosing the layers, writing `forward`, and the five-line training step.
+
+</Section>
+
+<Section kind="technical" title="Modules, layers, autograd and the training step">
+
+**A layer is an object with parameters.** `nn.Linear(in_features, out_features)` holds `weight` of shape
+$(\text{out}, \text{in})$ and `bias` of shape $(\text{out},)$, and maps a batch $X$ of shape
+$(B, \text{in})$ to
+
+$$
+Y = X\,W^\top + b, \qquad (B, \text{in}) \times (\text{in}, \text{out}) \rightarrow (B, \text{out})
+$$
+
+The earlier lessons stored $W$ as $(\text{in}, \text{out})$ and wrote $XW + b$. PyTorch stores the transpose:
+the same numbers, laid out one row per output. For this lesson's hidden layer, `nn.Linear(2, 3)`:
+
+$$
+\texttt{weight} = \begin{bmatrix} 0.5 & -0.3 \\ 0.8 & 0.2 \\ -0.4 & 0.6 \end{bmatrix} \; (3, 2),
+\qquad
+\texttt{bias} = (0.1,\; -0.1,\; 0) \; (3,)
+$$
+
+For the input $x = (0, 1)$: $x W^\top + b = (0 \cdot 0.5 + 1 \cdot (-0.3) + 0.1,\; 0 \cdot 0.8 + 1 \cdot 0.2 - 0.1,\;
+0 \cdot (-0.4) + 1 \cdot 0.6 + 0) = (-0.2,\; 0.1,\; 0.6)$, and tanh turns that into the hidden activations.
+
+**A model is a module made of modules.** Subclass `nn.Module`, create the layers in `__init__`, and write
+`forward(x)`. Calling `model(X)` runs `forward`. The model here, TinyNet, is
+$2 \rightarrow 3 \text{ (tanh)} \rightarrow 1 \text{ (sigmoid)}$ with $2 \cdot 3 + 3 + 3 \cdot 1 + 1 = 13$
+parameters, trained on XOR: inputs $(0,0), (0,1), (1,0), (1,1)$ with labels $0, 1, 1, 0$, which no single linear
+layer can separate.
+
+**Autograd.** Tensors that require gradients (every parameter does) remember the operations applied to them.
+`loss.backward()` walks that record backwards with the chain rule and adds $\partial \text{loss} / \partial p$
+into `p.grad` for every parameter $p$, with the same shape as $p$. *Adds*: gradients accumulate until you clear
+them, which is why each step starts with `optimizer.zero_grad()`.
+
+**The training step** maps one-to-one onto the loop you already know:
+
+| PyTorch                     | What it does                                   | In the training-loop lesson           |
+| --------------------------- | ---------------------------------------------- | ------------------------------------- |
+| `optimizer.zero_grad()`     | clear every `.grad`                            | (gradients were fresh variables)      |
+| `y_hat = model(X)`          | forward pass, recorded by autograd             | forward pass                          |
+| `loss = loss_fn(y_hat, y)`  | mean binary cross-entropy, a 0-d tensor        | loss                                  |
+| `loss.backward()`           | fill `p.grad` for all 13 parameters            | backward pass (hand-written)          |
+| `optimizer.step()`          | `p -= lr * p.grad` for every parameter          | `sgdStep`                             |
+
+**`torch.no_grad()`** switches recording off. Use it to evaluate (no backward pass will follow, so recording
+would only cost memory) and to edit parameters directly, as the code below does to set fixed starting weights.
+
+<Callout kind="simplification">
+  Real PyTorch code feeds batches from a `DataLoader`, moves the model and data to a GPU with `.to(device)`,
+  calls `model.train()` and `model.eval()` (they matter for layers such as dropout and batch norm), and for
+  classification usually leaves out the final sigmoid and uses `nn.BCEWithLogitsLoss`, which combines both in a
+  numerically safer way. `nn.BCELoss` clamps its logarithms at −100, while our TypeScript twin clips
+  probabilities to [1e-7, 1 − 1e-7]; the two agree except for predictions extremely close to 0 or 1.
+</Callout>
+
+</Section>
+
+<Section kind="code" title="TinyNet in PyTorch">
+
+Hover over, focus or select any underlined part. The output below the code was recorded from a run of PyTorch
+2.14.1 on CPU; it does not run in your browser.
+
+<Code example={torchCode} title="tiny_net.py" />
+
+Three steps with a learning rate of 0.5 barely move the loss (0.70559 to 0.702961): XOR needs a few hundred
+steps, which you can run in the Experiment section.
+
+</Section>
+
+<Section kind="visual" title="What every line does to the tensors">
+
+Step through the run: after each line you see the tensors it created or changed, with their shapes. Watch `.grad`
+go from `None` to a tensor of the parameter's shape at `loss.backward()`, and the weights change at
+`optimizer.step()`.
+
+<StepThrough example={torchCode} trace={torchTrace} title="tiny_net.py" simulatedNote={recordedNote} />
+
+The trace is labeled **Simulated trace** because nothing runs in your browser: its values were recorded from a run
+of PyTorch 2.14.1 on CPU (float32) and replayed here.
+
+</Section>
+
+<Section kind="experiment" title="The same network, running live in TypeScript">
+
+This is TinyNet in TypeScript, written with the helper functions from the earlier lessons. It runs in your
+browser: change the learning rate or the number of steps and it retrains from the same starting weights. The
+weights are the PyTorch values transposed into the $(\text{in}, \text{out})$ layout.
+
+<Experiment def={experiment} title="TinyNet, TypeScript twin">
+  <Code example={tsCode} title="tinyNet.ts" />
+  <TinyNetLoss />
+  <Readout title="What the TypeScript run prints" />
+</Experiment>
+
+At learning rate 0.5 and 3 steps the readout compares every recorded PyTorch number (losses, predictions,
+gradients and parameters) with ours. They agree to within about $10^{-7}$: PyTorch computed in 32-bit floats
+(about 7 significant digits) and TypeScript in 64-bit. A unit test checks the same comparison on every build.
+
+Things to try:
+
+- Learning rate 2 and 300 steps: the predictions approach 0, 1, 1, 0 and XOR is learned.
+- Learning rate 0.01: after 300 steps the loss has hardly moved.
+
+</Section>
+
+<Section kind="mistakes" title="Errors you will meet">
+
+<CommonMistake
+  title="Forgetting super().__init__() in a module"
+  wrong={'class TinyNet(nn.Module):\n    def __init__(self):\n        self.hidden = nn.Linear(2, 3)'}
+  error="AttributeError: cannot assign module before Module.__init__() call"
+  cause="nn.Module sets up the registry where layers and parameters are recorded in its own __init__. Assigning a layer before that has nowhere to go."
+  fix={'    def __init__(self):\n        super().__init__()\n        self.hidden = nn.Linear(2, 3)'}
+/>
+
+<CommonMistake
+  title="Editing a parameter in place outside torch.no_grad()"
+  wrong={'model.hidden.weight.copy_(torch.zeros(3, 2))'}
+  error="RuntimeError: a leaf Variable that requires grad is being used in an in-place operation."
+  cause="Autograd would have to record the edit as part of the model's computation. Parameters may only be changed in place when recording is off."
+  fix={'with torch.no_grad():\n    model.hidden.weight.copy_(torch.zeros(3, 2))'}
+/>
+
+<Callout kind="warning">
+  Leaving out `optimizer.zero_grad()` raises no error: gradients silently add up across steps and training
+  behaves strangely. The two errors above were recorded from PyTorch 2.14.1.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Shapes in real models">
+
+| Layer                      | `weight` shape   | `bias` shape | Input → output              |
+| -------------------------- | ---------------- | ------------ | --------------------------- |
+| `nn.Linear(784, 128)`      | (128, 784)       | (128,)       | (B, 784) → (B, 128)         |
+| `nn.Linear(128, 10)`       | (10, 128)        | (10,)        | (B, 128) → (B, 10)          |
+| `nn.Linear(4096, 4096)`    | (4096, 4096)     | (4096,)      | (B, T, 4096) → (B, T, 4096) |
+
+`nn.Linear` works on the last dimension and keeps all others, which is how one layer handles a batch of sequences
+of shape (B, T, features) in a transformer. Print `[(n, p.shape) for n, p in model.named_parameters()]` to check
+every shape in a new model.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="nn.Linear by hand">
+
+<MiniExercise exercise={transposeExercise}>
+  Write `linear(x, weight, bias)` in plain Python for one input row `x`, with `weight` given in PyTorch's
+  (out, in) layout. Output `j` is the dot product of `x` with row `j` of `weight`, plus `bias[j]`.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- `nn.Linear(in, out)` stores `weight` as (out, in) and computes `x @ weight.T + bias`.
+- A model subclasses `nn.Module`: layers in `__init__` (after `super().__init__()`), computation in `forward`.
+- The step: `optimizer.zero_grad()`, `y_hat = model(X)`, `loss = loss_fn(y_hat, y)`, `loss.backward()`,
+  `optimizer.step()`.
+- `backward()` adds gradients into `.grad`; clear them every step.
+- Use `torch.no_grad()` for evaluation and for editing parameters directly.
+
+Next: [Project: train and evaluate a neural network](#/learn/ml/deep/project-neural-net) builds a classifier from
+scratch in NumPy and then in PyTorch.
+
+</Section>

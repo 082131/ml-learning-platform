@@ -20,6 +20,11 @@ interface StepThroughProps {
    */
   trace?: Trace;
   title?: string;
+  /**
+   * Replaces the default caption of a simulated trace, for example when its values were recorded from a
+   * real run outside the browser rather than written by hand. It must still say that nothing runs here.
+   */
+  simulatedNote?: string;
 }
 
 /** Shown on every trace so nobody mistakes a simulation for a real run (constitution II). */
@@ -33,7 +38,7 @@ export function SourceBadge({ source }: { source: TraceSource }) {
 }
 
 /** Steps through code line by line with the variables in scope (FR-005). ←/→ move between steps. */
-export function StepThrough({ example, trace: given, title }: StepThroughProps) {
+export function StepThrough({ example, trace: given, title, simulatedNote }: StepThroughProps) {
   const state = useContext(SlotStateContext);
   const { source } = useMemo(() => fillExample(example, state), [example, state]);
   const recorded = useRecordedTrace(source);
@@ -121,8 +126,8 @@ export function StepThrough({ example, trace: given, title }: StepThroughProps) 
       )}
       {trace?.source === 'simulated' && (
         <figcaption className={s.figcaption}>
-          This trace was written out by hand to show what the code does. It was not produced by running the
-          code.
+          {simulatedNote ??
+            'This trace was written out by hand to show what the code does. It was not produced by running the code.'}
         </figcaption>
       )}
     </figure>

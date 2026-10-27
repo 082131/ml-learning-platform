@@ -78,7 +78,7 @@ export const tracks: Track[] = [
           { id: 'ml/deep/backpropagation', status: 'written' },
           { id: 'ml/deep/optimizers', status: 'written' },
           { id: 'ml/deep/training-loop', status: 'written' },
-          { id: 'ml/deep/pytorch-basics', status: 'outline' },
+          { id: 'ml/deep/pytorch-basics', status: 'written' },
           { id: 'ml/deep/tokenization', status: 'outline' },
           { id: 'ml/deep/embeddings', status: 'outline' },
           { id: 'ml/deep/attention', status: 'outline' },

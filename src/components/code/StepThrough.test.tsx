@@ -89,6 +89,19 @@ describe('StepThrough', () => {
     expect(screen.getByText(/not produced by running the code/)).toBeInTheDocument();
   });
 
+  it("shows a lesson's own caption for a simulated trace recorded from a real run elsewhere", () => {
+    render(
+      <StepThrough
+        example={{ id: 'torch', language: 'python', source: 'y = model(x)', annotations: [] }}
+        trace={{ source: 'simulated', steps: [{ range: { line: 1 }, vars: {}, note: 'Forward pass.' }] }}
+        simulatedNote="Values recorded from a run of PyTorch on CPU; nothing runs in your browser."
+      />,
+    );
+    expect(screen.getByText('Simulated trace')).toBeInTheDocument();
+    expect(screen.getByText(/Values recorded from a run of PyTorch/)).toBeInTheDocument();
+    expect(screen.queryByText(/written out by hand/)).toBeNull();
+  });
+
   it('records a trace in Pyodide when asked', async () => {
     const user = userEvent.setup();
     const runner: PythonRunner = {
