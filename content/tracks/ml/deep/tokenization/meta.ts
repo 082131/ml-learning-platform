@@ -13,7 +13,7 @@ export default {
     'Describe how byte-level BPE (GPT-2) and SentencePiece differ from the toy tokenizer',
   ],
   prerequisites: ['ml/foundations/python-collections'],
-  concepts: ['token', 'tokenizer', 'vocabulary', 'byte-pair-encoding'],
+  concepts: ['token', 'tokenizer', 'token-id', 'vocabulary', 'byte-pair-encoding', 'wordpiece'],
   references: [
     {
       title: 'Sennrich, Haddow and Birch (2016), Neural Machine Translation of Rare Words with Subword Units',

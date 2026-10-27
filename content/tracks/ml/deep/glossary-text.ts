@@ -3,30 +3,13 @@ import type { GlossaryTerm } from '@/lib/types';
 // ml/deep glossary terms taught in the text lessons (merged by ./glossary.ts).
 export default [
   {
-    id: 'token',
-    term: 'Token',
-    short:
-      'One unit of text a language model reads or writes: a word, a piece of a word, a character or a byte.',
-    long: 'A tokenizer splits text into tokens and gives each one an integer ID. Models never see characters directly; they see the sequence of token IDs.',
-    introducedIn: 'ml/deep/tokenization',
-    aliases: ['tokens'],
-  },
-  {
-    id: 'tokenizer',
-    term: 'Tokenizer',
-    short: 'The program that turns text into a list of token IDs (encoding) and back into text (decoding).',
-    long: 'A tokenizer is trained once on a corpus, before the model, and then stays fixed. A model only works with the tokenizer it was trained with.',
-    introducedIn: 'ml/deep/tokenization',
-    aliases: ['tokenization'],
-  },
-  {
     id: 'vocabulary',
     term: 'Vocabulary',
     short:
       'The fixed list of every token a tokenizer can produce; a token’s position in the list is its token ID.',
     long: 'Its size (50,257 for GPT-2) sets the number of rows of the embedding table and the number of outputs of a language model’s last layer.',
     introducedIn: 'ml/deep/tokenization',
-    aliases: ['vocab', 'token ID', 'token IDs'],
+    aliases: ['vocab'],
   },
   {
     id: 'byte-pair-encoding',

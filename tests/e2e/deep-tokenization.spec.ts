@@ -12,7 +12,8 @@ test.beforeEach(async ({ page, context }) => {
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Tokenization');
 });
 
-const playground = (page: Page) => page.locator('[data-experiment="bpe"]').filter({ has: page.getByRole('slider') });
+const playground = (page: Page) =>
+  page.locator('[data-experiment="bpe"]').filter({ has: page.getByRole('slider') });
 
 async function setMerges(page: Page, n: number) {
   const slider = playground(page).getByRole('slider', { name: 'Number of merges' });
@@ -70,7 +71,9 @@ test('selecting a merge shows the pair counts that chose it and the rewritten wo
   );
   const detail = merges.locator('[data-merge="7"]');
   await expect(detail.getByRole('row', { name: /new \+ est 6 ✓ chosen/ })).toBeVisible();
-  await expect(detail.getByRole('listitem', { name: /newest, 6 times: new est becomes newest/ })).toBeVisible();
+  await expect(
+    detail.getByRole('listitem', { name: /newest, 6 times: new est becomes newest/ }),
+  ).toBeVisible();
   await merges.getByRole('button', { name: 'Next merge' }).click();
   await expect(merges.locator('[data-merge="8"]')).toContainText('w + i');
 });
@@ -100,9 +103,12 @@ test.describe('Python in the lesson @network', () => {
   }) => {
     const runner = page.locator('[data-python-runner]').filter({ hasText: 'bpe_run.py' });
     await runner.getByRole('button', { name: 'Run' }).click();
-    await expect(runner.getByRole('group', { name: 'Printed output' })).toHaveText(bpeRunner.expectedOutput!, {
-      timeout: 90_000,
-    });
+    await expect(runner.getByRole('group', { name: 'Printed output' })).toHaveText(
+      bpeRunner.expectedOutput!,
+      {
+        timeout: 90_000,
+      },
+    );
 
     const exercise = page.locator('#section-exercise');
     await exercise.getByRole('button', { name: 'Run tests' }).click();

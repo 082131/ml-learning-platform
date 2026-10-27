@@ -7,7 +7,7 @@ A neural network only does arithmetic on numbers, so before a language model can
 text has to become a list of integers. The program that does this is a
 <Term id="tokenizer">tokenizer</Term>. It cuts the text into pieces called
 <Term id="token">tokens</Term> and replaces each piece with its position in a fixed list, the
-<Term id="vocabulary">vocabulary</Term>. That position is the token's ID.
+<Term id="vocabulary">vocabulary</Term>. That position is the <Term id="token-id">token ID</Term>.
 
 Which pieces? Whole words seem natural, but no vocabulary can list every word: names, typos and new words would
 all be missing. Single characters never miss anything, but then every sentence becomes a very long list, and each
@@ -163,6 +163,12 @@ and limits: context windows and API prices are measured in tokens, not words.
 | This lesson's toy BPE             | Characters of the corpus    | `[UNK]`                             |
 | GPT-2 style byte-level BPE        | 256 byte values             | Never unknown: spelled as bytes     |
 | SentencePiece (BPE or unigram)    | Characters, spaces as `▁`   | `<unk>`, or bytes with byte_fallback |
+| WordPiece (BERT)                  | Characters and `##` pieces  | The whole word becomes `[UNK]`      |
+
+BERT's <Term id="wordpiece">WordPiece</Term> builds its pieces differently: it encodes each word greedily with the
+longest vocabulary entry that fits. The AI track's lesson
+[Tokenization, embeddings and similarity](#/learn/ai/representations/tokens-embeddings) runs a real WordPiece
+tokenizer on real sentences; this lesson builds the BPE algorithm itself.
 
 </Section>
 
