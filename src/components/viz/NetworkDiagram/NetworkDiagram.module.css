@@ -1,11 +1,11 @@
 .wrap {
   display: flex;
-  justify-content: center;
+  justify-content: safe center;
   min-width: 0;
 }
 .svg {
   display: block;
-  max-width: 100%;
+  flex: none;
 }
 .node {
   fill: var(--surface);

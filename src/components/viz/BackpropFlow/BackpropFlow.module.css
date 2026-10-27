@@ -1,0 +1,47 @@
+.layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  min-width: 0;
+}
+.stepper {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--s-2) var(--s-3);
+}
+.jump {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.arithmetic {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  padding: var(--s-3);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+}
+.label {
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.formula {
+  font-family: var(--font-mono);
+  font-size: var(--fs-15);
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+.math {
+  font-family: var(--font-mono);
+  font-size: var(--fs-15);
+  overflow-wrap: anywhere;
+}
+.weights {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-3) var(--s-6);
+  align-items: flex-start;
+}

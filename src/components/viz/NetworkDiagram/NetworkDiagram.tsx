@@ -42,7 +42,9 @@ export interface NetworkDiagramProps {
 
 const FALLBACK_WIDTH = 560;
 const MAX_WIDTH = 640;
-const LABEL_AT = 0.62;
+/** Below this width per layer the labels collide, so the diagram scrolls sideways instead of shrinking. */
+const MIN_COLUMN = 135;
+const LABEL_AT = 0.66;
 const LABEL_CHAR = 7.4;
 const HEAD = 9;
 
@@ -59,8 +61,11 @@ export function NetworkDiagram({
   flow,
 }: NetworkDiagramProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const width = Math.min(useElementWidth(ref, FALLBACK_WIDTH), MAX_WIDTH);
   const sizes = layers.map((l) => l.units.length);
+  const width = Math.max(
+    Math.min(useElementWidth(ref, FALLBACK_WIDTH), MAX_WIDTH),
+    sizes.length * MIN_COLUMN,
+  );
   const { nodes, height } = layoutNetwork(sizes, width);
   const maxAbs = Math.max(...edges.map((e) => Math.abs(e.weight)), 1e-9);
   const isActive = (l: number, i: number) => activeUnits.includes(`${l}:${i}`);

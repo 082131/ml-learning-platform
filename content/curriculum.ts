@@ -75,7 +75,7 @@ export const tracks: Track[] = [
         lessons: [
           { id: 'ml/deep/neurons-activations', status: 'written' },
           { id: 'ml/deep/forward-propagation', status: 'written' },
-          { id: 'ml/deep/backpropagation', status: 'outline' },
+          { id: 'ml/deep/backpropagation', status: 'written' },
           { id: 'ml/deep/optimizers', status: 'outline' },
           { id: 'ml/deep/training-loop', status: 'outline' },
           { id: 'ml/deep/pytorch-basics', status: 'outline' },

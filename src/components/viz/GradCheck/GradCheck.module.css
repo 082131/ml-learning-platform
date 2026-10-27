@@ -1,0 +1,43 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  min-width: 0;
+}
+.scroll {
+  overflow-x: auto;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+}
+.table caption {
+  padding-bottom: var(--s-2);
+  text-align: left;
+  font-family: var(--font-sans);
+  color: var(--ink-2);
+}
+.table th,
+.table td {
+  padding: var(--s-1) var(--s-2);
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+  white-space: nowrap;
+}
+.table th[scope='row'],
+.table thead th:first-child {
+  text-align: left;
+}
+.verdict {
+  margin: 0;
+  padding: var(--s-3);
+  border: 1px solid var(--line-strong);
+}
+.verdict strong {
+  color: var(--ok);
+}
+.wrap[data-grad-check='disagree'] .verdict strong {
+  color: var(--err);
+}

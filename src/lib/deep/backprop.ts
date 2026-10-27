@@ -376,6 +376,13 @@ export function buildStages(s: BackpropState, r: BackpropResult): Stage[] {
   ];
 }
 
+/** A unit as the network diagram shows it: its label, its value and, once known, its gradient. */
+export interface DiagramUnitData {
+  label: string;
+  value: string;
+  sub?: string;
+}
+
 /** What the diagram shows at a stage: values known so far, gradients computed so far, labels on active edges. */
 export function diagramAt(s: BackpropState, r: BackpropResult, stages: Stage[], k: number) {
   const done = new Set(stages.slice(0, k + 1).map((st) => st.id));
@@ -384,7 +391,7 @@ export function diagramAt(s: BackpropState, r: BackpropResult, stages: Stage[], 
   const { dZ, grads } = r.back;
   const grad = (id: string, v: number) => (done.has(id) ? `g ${n(v)}` : undefined);
   const value = (id: string, v: number) => (done.has(id) ? n(v) : '?');
-  const units = [
+  const units: DiagramUnitData[][] = [
     [0, 1].map((i) => ({ label: `x[${i}]`, value: n(s.x[i]!) })),
     [0, 1].map((i) => ({
       label: `h[${i}]`,
@@ -406,7 +413,7 @@ export function diagramAt(s: BackpropState, r: BackpropResult, stages: Stage[], 
   const edges = [
     ...[0, 1].flatMap((i) => [0, 1].map((j) => ({ layer: 1, from: i, to: j, weight: s.W1[i]![j]! }))),
     ...[0, 1].map((i) => ({ layer: 2, from: i, to: 0, weight: s.W2[i]![0]! })),
-    { layer: 3, from: 0, to: 0, weight: 1 },
+    { layer: 3, from: 0, to: 0, weight: 0 },
   ].map((e) => {
     const key = `${e.layer}:${e.from}:${e.to}`;
     return { ...e, active: stage.edges.includes(key), label: label(key) };
@@ -538,7 +545,7 @@ export function backpropExperiment(
       ),
       slider(
         'lr',
-        'Learning rate η',
+        'Learning rate lr',
         0.05,
         5,
         0.05,

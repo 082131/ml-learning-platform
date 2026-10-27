@@ -1,0 +1,201 @@
+import { backpropCode, experiment, gradCheckRunner } from './code';
+import { numericExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Who is to blame, and by how much?">
+
+The network makes a prediction, and the <Term id="loss-function">loss</Term> says how wrong it is. Training needs
+to know, for every weight, which way to nudge it and how strongly that nudge would change the loss: the
+<Term id="gradient">gradient</Term> of the loss with respect to that weight.
+
+You could find it by nudging each weight and rerunning the network, but a real network has millions of weights.
+<Term id="backpropagation">Backpropagation</Term> gets all of them in one backward sweep. It starts at the loss
+and walks the forward computation in reverse, using the <Term id="chain-rule">chain rule</Term> at every step:
+the blame that reaches a unit is split among the weights and inputs that fed it, in proportion to how much each
+one affected it.
+
+This lesson does it by hand on the smallest network that still has a hidden layer: 2 inputs, 2 hidden units, 1
+output.
+
+</Section>
+
+<Section kind="technical" title="The chain rule, layer by layer">
+
+**The network and the loss.** One example $x = (0.5, -1)$ with target $y = 1$. The hidden layer uses tanh, the
+output a sigmoid $\sigma$, and the loss is the <Term id="mean-squared-error">mean squared error</Term> over the one
+prediction:
+
+$$
+z_1 = x W_1 + b_1, \quad a_1 = \tanh(z_1), \quad z_2 = a_1 W_2 + b_2, \quad \hat y = \sigma(z_2), \quad L = (\hat y - y)^2
+$$
+
+With $W_1 = \begin{bmatrix} 0.1 & -0.2 \\ 0.4 & 0.3 \end{bmatrix}$, $b_1 = (0, 0.1)$,
+$W_2 = \begin{bmatrix} 0.5 \\ -0.6 \end{bmatrix}$ and $b_2 = 0.2$, the forward pass gives
+$z_1 = (-0.35, -0.3)$, $a_1 = (-0.3364, -0.2913)$, $z_2 = 0.2066$, $\hat y = 0.5515$ and
+$L = (0.5515 - 1)^2 = 0.2012$.
+
+**Backward, one link at a time.** Each line multiplies the gradient that arrived from the right by one local
+<Term id="partial-derivative">partial derivative</Term>:
+
+$$
+\begin{aligned}
+\frac{\partial L}{\partial \hat y} &= 2(\hat y - y) = 2(0.5515 - 1) = -0.8971 \\
+\frac{\partial L}{\partial z_2} &= \frac{\partial L}{\partial \hat y} \cdot \sigma'(z_2) = -0.8971 \cdot \underbrace{0.5515 \cdot 0.4485}_{\hat y (1 - \hat y)} = -0.2219 \\
+\frac{\partial L}{\partial W_2[i]} &= a_1[i] \cdot \frac{\partial L}{\partial z_2}: \quad (-0.3364)(-0.2219) = 0.0746, \quad (-0.2913)(-0.2219) = 0.0646 \\
+\frac{\partial L}{\partial b_2} &= \frac{\partial L}{\partial z_2} = -0.2219 \\
+\frac{\partial L}{\partial a_1[i]} &= \frac{\partial L}{\partial z_2} \cdot W_2[i]: \quad (-0.2219)(0.5) = -0.1109, \quad (-0.2219)(-0.6) = 0.1331 \\
+\frac{\partial L}{\partial z_1[i]} &= \frac{\partial L}{\partial a_1[i]} \cdot (1 - a_1[i]^2): \quad -0.1109 \cdot 0.8869 = -0.0984, \quad 0.1331 \cdot 0.9151 = 0.1218 \\
+\frac{\partial L}{\partial W_1[k][i]} &= x[k] \cdot \frac{\partial L}{\partial z_1[i]}, \qquad \frac{\partial L}{\partial b_1[i]} = \frac{\partial L}{\partial z_1[i]}
+\end{aligned}
+$$
+
+For example $\partial L / \partial W_1[0][0] = 0.5 \cdot (-0.0984) = -0.0492$. Notice the pattern: a weight's
+gradient is (the input it multiplies) × (the gradient at the unit it feeds). In matrix form, for a batch:
+
+| Gradient | NumPy | Shape (batch $N$) |
+| --- | --- | --- |
+| $\partial L/\partial Z$ of a layer | `dA * f'(Z)` | same as $Z$: $(N, \text{out})$ |
+| $\partial L/\partial W$ | `A_prev.T @ dZ` | same as $W$: $(\text{in}, \text{out})$ |
+| $\partial L/\partial b$ | `dZ.sum(axis=0)` | same as $b$: $(\text{out},)$ |
+| $\partial L/\partial A_\text{prev}$ (passed on) | `dZ @ W.T` | same as $A_\text{prev}$: $(N, \text{in})$ |
+
+A gradient always has the shape of the thing it is the gradient of. That is the quickest check on backprop code.
+
+**Checking it.** A <Term id="gradient-check">gradient check</Term> estimates each gradient without backprop, with
+a central <Term id="finite-difference">finite difference</Term>: nudge one parameter by $\pm\varepsilon$ and rerun
+the forward pass,
+
+$$
+\frac{\partial L}{\partial \theta} \approx \frac{L(\theta + \varepsilon) - L(\theta - \varepsilon)}{2\varepsilon}, \qquad \varepsilon = 10^{-5}
+$$
+
+**Updating.** One step of <Term id="gradient-descent">gradient descent</Term> moves every parameter against its
+gradient, $\theta \leftarrow \theta - \eta \, \partial L / \partial \theta$, with
+<Term id="learning-rate">learning rate</Term> $\eta$. With $\eta = 0.5$:
+$W_2[0] \leftarrow 0.5 - 0.5 \cdot 0.0746 = 0.4627$, and after all 9 parameters move the loss falls from 0.2012 to
+0.1493.
+
+<Callout kind="simplification">
+  We write each derivative by hand so you can see the chain rule. PyTorch and other frameworks record the forward
+  pass as a <Term id="computation-graph">computation graph</Term> and run these same local rules automatically
+  (autograd); you never write `dW1 = X.T @ dZ1` yourself. They also fuse sigmoid with the loss for numerical
+  safety, and train on batches of many examples rather than one.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Watch the gradient flow backwards">
+
+Step through the computation. The forward pass fills in the values (unknown ones show "?"); the backward pass
+carries the gradient, marked **g**, from the loss back through each unit and onto each weight, against the
+direction of the arrows in the forward pass. Change the input, the target or any weight: every number, the code
+and the trace below follow.
+
+<Experiment def={experiment} title="Backpropagation on a 2-2-1 network">
+  <BackpropFlow />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The backward pass in NumPy">
+
+The code mirrors the steps above, one line per link of the chain. The numbers in it are the ones from the
+experiment.
+
+<Experiment def={experiment} title="backprop.py, linked to the diagram" controls={false}>
+  <Code example={backpropCode} title="backprop.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+A gradient check for one weight in plain Python. It runs in your browser.
+
+<PythonRunner example={gradCheckRunner} title="gradient_check.py" />
+
+</Section>
+
+<Section kind="experiment" title="Check every gradient, then take a step">
+
+Every gradient backprop computed, next to its numerical estimate, for the current values. Then step through the
+code: each step shows the chain-rule arithmetic and the arrays with their shapes.
+
+<Experiment def={experiment} title="Gradient check and one update">
+  <GradCheck />
+  <StepThrough example={backpropCode} title="backprop.py" />
+  <Readout />
+</Experiment>
+
+Things to try:
+
+- Set the target $y$ to 0. Every gradient flips sign: $\hat y = 0.5515$ is now above the target, so the update
+  pushes $\hat y$ down instead of up.
+- Raise the learning rate. The loss after one step keeps dropping for a while; the readout flags any step that
+  overshoots and does not lower the loss.
+- Set $x[0]$ to 0. The gradients of $W_1[0][0]$ and $W_1[0][1]$ become exactly 0: a weight whose input is 0 had
+  no effect on this prediction, so it gets no blame.
+
+</Section>
+
+<Section kind="mistakes" title="Backprop bugs: loud and silent">
+
+<CommonMistake
+  title="Forgetting the transpose in dW"
+  wrong={'A1 = np.array([[-0.3364, -0.2913]])  # (1, 2)\ndZ2 = np.array([[-0.2219]])          # (1, 1)\ndW2 = A1 @ dZ2'}
+  error="ValueError: matmul: Input operand 1 has a mismatch in its core dimension 0, with gufunc signature (n?,k),(k,m?)->(n?,m?) (size 1 is different from 2)"
+  cause="dW2 must have W2's shape, (2, 1). The batch axis has to be summed away, which is what `A1.T @ dZ2` does: (2, 1) @ (1, 1)."
+  fix={'dW2 = A1.T @ dZ2  # (2, 1), the shape of W2'}
+/>
+
+<CommonMistake
+  title="Updating integer weights in place"
+  wrong={'W1 = np.array([[1, -2], [4, 3]])  # integers: dtype int64\nW1 -= 0.5 * dW1'}
+  error="numpy._core._exceptions._UFuncOutputCastingError: Cannot cast ufunc 'subtract' output from dtype('float64') to dtype('int64') with casting rule 'same_kind'"
+  cause="An array built from whole numbers stores integers, and an in-place update cannot write fractions into it."
+  fix={'W1 = np.array([[1.0, -2.0], [4.0, 3.0]])  # floats\nW1 -= 0.5 * dW1'}
+/>
+
+<Callout kind="warning">
+  The worst backprop bugs raise no error. Writing `dZ1 = dA1 * (1 - Z1 ** 2)` (the pre-activation instead of
+  `A1`), or forgetting the `/ Y.size` of the mean, still produces arrays of the right shape, and training even
+  makes some progress. Only a gradient check catches them: the relative error jumps far above 1e-7.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+- Every `loss.backward()` call in PyTorch runs this algorithm over the recorded computation graph, layer by layer
+  from the loss back, exactly as in the table above.
+- When you write a custom layer or loss, frameworks offer a gradient check (`torch.autograd.gradcheck`) built on
+  the same central difference. It expects double-precision inputs: in single precision a central difference with
+  a small $\varepsilon$ loses most of its digits to rounding.
+- Vanishing gradients: each layer multiplies the gradient by an activation slope, at most 0.25 for the sigmoid.
+  Through many layers the product shrinks toward 0, which is why deep networks use ReLU in hidden layers.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Write a numerical gradient">
+
+<MiniExercise exercise={numericExercise}>
+  Write `numerical_grad(f, params, i, eps=1e-5)`: the central-difference estimate of the derivative of
+  `f(params)` with respect to `params[i]`. Do not change the list you are given. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Backpropagation applies the chain rule from the loss backwards: each gradient is the next one times a local
+  derivative.
+- Per layer: `dZ = dA * f'(Z)`, `dW = A_prev.T @ dZ`, `db = dZ.sum(axis=0)`, `dA_prev = dZ @ W.T`.
+- Every gradient has the shape of its parameter.
+- Check backprop with central differences; a relative error around 1e-7 or below means it is right.
+- One step $\theta \leftarrow \theta - \eta \, \partial L/\partial \theta$ lowers the loss when $\eta$ is small enough.
+
+Next: [Gradient descent variants and optimizers](#/learn/ml/deep/optimizers) improves on this plain update step.
+
+</Section>
