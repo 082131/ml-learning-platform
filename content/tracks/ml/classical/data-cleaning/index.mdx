@@ -1,0 +1,241 @@
+import { cleaningCode, experiment, iqrLoop, iqrRunner, loadRunner, oneHot } from './code';
+import { fillExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Real data has holes and typos">
+
+The Palmer penguins <Term id="dataset">dataset</Term> has 344 rows, one per penguin: species, island, four body
+measurements, sex and year. It is a clean, well-known dataset, and it still has gaps. Two penguins (rows 3 and 271
+of the file) have no measurements at all, and 9 more have every measurement but no recorded sex. Each gap is a
+<Term id="missing-value">missing value</Term>.
+
+Most models can't work with a hole in a row, so before any training you decide, column by column, what to do:
+
+- **Drop** the rows with holes. Simple, but you lose the rest of each row too.
+- **Fill** the holes with a stand-in, such as the column's median. This is called
+  <Term id="imputation">imputation</Term>. You keep the rows, but the stand-ins are made up and they change the
+  column's statistics.
+
+A second problem is values that are present but wrong. Imagine someone typed a penguin's body mass as 37500 g
+instead of 3750 g. That typo is **not in the real data**; we will inject it on purpose to see what it does. A
+value far from the rest is an <Term id="outlier">outlier</Term>. Some outliers are mistakes and some are real,
+rare animals, and a rule can only point at candidates.
+
+Finally, a model needs numbers, so text categories like species have to be turned into numbers in a way that
+doesn't invent an order.
+
+</Section>
+
+<Section kind="technical" title="Missing values, quartiles and fences">
+
+**Finding missing values.** In a pandas <Term id="dataframe">DataFrame</Term> `df`, `df.isna()` marks every missing cell and `df.isna().sum()` counts them per
+column. pandas shows a missing number as `NaN` ("not a number"). Statistics such as the <Term id="mean">mean</Term> (`mean()`) and the median (`median()`) skip
+missing values, so they quietly describe fewer rows than the DataFrame has.
+
+**Dropping.** `df.dropna()` removes every row with at least one missing cell. On the full dataset that leaves
+$344 - 11 = 333$ rows: the 2 rows with no measurements and the 9 with no sex. `df.dropna(subset=cols)` looks
+only at the listed columns.
+
+**Filling.** `df.fillna(value)` fills holes. For a number column the usual fills are the median or the mean of
+the values that are present. `sex` is categorical text: it has no median or mean. You either drop those rows,
+fill with the most common category, or add an honest new category such as `"unknown"`.
+
+What a fill does to the statistics:
+
+- Filling with the **mean** leaves the mean unchanged but shrinks the <Term id="standard-deviation">standard deviation</Term>: every filled value is
+  at distance 0 from the mean, yet it adds 1 to the count.
+- Filling with the **median** leaves the median unchanged and also pulls the spread inward.
+- If the column contains a typo, the mean you fill with is wrong too.
+
+**Quartiles.** Sort the $n$ values and number the positions from 0. The $q$-quantile sits at position
+$(n - 1) \cdot q$. When that position falls between two values, take the value at the whole part and move the
+fractional part of the way to the next one (linear interpolation, the default of pandas' `quantile` and NumPy's
+`np.quantile`). The first quartile $Q_1$ is the 0.25-quantile and the third quartile $Q_3$ is the 0.75-quantile.
+
+**Worked example.** With 12 body masses, sorted
+3250, 3300, 3450, 3475, 3750, 3800, 4150, 4250, 4500, 4875, 5750, 5850:
+
+$Q_1$ sits at position $11 \cdot 0.25 = 2.75$, between 3450 (position 2) and 3475 (position 3);
+$Q_3$ sits at position $11 \cdot 0.75 = 8.25$, between 4500 and 4875:
+
+$$
+Q_1 = 3450 + (3475 - 3450) \cdot 0.75 = 3468.75
+$$
+
+$$
+Q_3 = 4500 + (4875 - 4500) \cdot 0.25 = 4593.75
+$$
+
+**The 1.5·IQR rule.** The <Term id="interquartile-range">interquartile range</Term> is
+$\text{IQR} = Q_3 - Q_1$, the width of the middle half of the data. Values outside the fences
+
+$$
+Q_1 - 1.5 \cdot \text{IQR} \quad \text{and} \quad Q_3 + 1.5 \cdot \text{IQR}
+$$
+
+are flagged. Here $\text{IQR} = 4593.75 - 3468.75 = 1125$, so the fences are
+$3468.75 - 1687.5 = 1781.25$ and $4593.75 + 1687.5 = 6281.25$, and none of the 12 values is flagged.
+
+**Mean versus median.** The mean uses the size of every value: one typo of $+33750$ g among 9 values raises it by
+$33750 / 9 = 3750$ g. The median uses only their order, so the same typo moves it by at most one position. The
+quartiles are order-based too, which is why the IQR rule still works when the data contains the very outlier it
+is looking for.
+
+<Callout kind="simplification">
+  The 1.5 in the fences is a convention (from John Tukey's box plots), not a law, and the rule assumes a single
+  group of roughly symmetric values. Penguins of three species with different sizes are not one group: a heavy
+  male Gentoo can be flagged although nothing is wrong with it. A flag means "look at this row", not "delete it".
+</Callout>
+
+**Categories to numbers.** <Term id="one-hot-encoding">One-hot encoding</Term> replaces a column with one 0/1
+column per category, with a single 1 per row. Numbering the categories instead (Adelie = 0, Chinstrap = 1,
+Gentoo = 2) tells a model that Gentoo is "more" than Chinstrap and that Adelie is closer to Chinstrap than to
+Gentoo. Species have no such order, so for categories without an order (called nominal categories) one-hot is
+the safe default. A <Term id="feature">feature</Term> with a real order, such as small, medium, large, can keep
+ordered numbers.
+
+</Section>
+
+<Section kind="visual" title="Fourteen rows, before and after">
+
+The lesson works on 14 real rows of `penguins.csv`, chosen to include both all-missing rows (3 and 271) and three
+rows that lack only `sex` (8, 9 and 268). Choose a strategy for each kind of hole, and switch the injected typo
+on and off. The table shows what happens to every row; the strip below plots the body masses that are left,
+with their mean, median and fences.
+
+<Experiment def={experiment} title="Clean the subset">
+  <CleaningView />
+</Experiment>
+
+Try "Fill with the column median" together with "Fill with the category unknown". All 14 rows survive, the IQR
+narrows, and row 267, a real 5850 g male Gentoo, lands outside the high fence. Nothing about that penguin
+changed: the two filled values squeezed the middle of the data.
+
+</Section>
+
+<Section kind="code" title="The same steps in pandas">
+
+`PythonRunner` can't read files, so the code puts the 14 rows into the script as text and reads them with
+`io.StringIO`. The output below comes from running it locally with pandas 3.0.2; select Run to run it in your
+browser.
+
+<PythonRunner example={loadRunner} title="load_subset.py" />
+
+Two things in this output differ from many older tutorials. pandas 3 stores text columns with the `str` dtype
+(older versions printed `object`), and `isna().sum()` shows the 5 rows missing `sex` alongside the 2 missing each
+measurement.
+
+The cleaning code below is filled from the experiment: change a strategy above and the lines with the
+strategies change. The readout is exactly what this code prints for the current choices (checked against
+pandas 3.0.2 for every combination).
+
+<Experiment def={experiment} title="clean.py, linked to the table" controls={false}>
+  <Code example={cleaningCode} title="clean.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+**Categories to numbers.** `pd.get_dummies` does one-hot encoding:
+
+<Code example={oneHot} title="onehot.py" />
+
+The 3 rows now have shape $(3, 4)$: `island` plus three species columns, each row with a single 1.
+
+</Section>
+
+<Section kind="experiment" title="Step through the IQR rule">
+
+The loop below is the 1.5·IQR rule in plain Python, applied to the body masses that the experiment kept. Step
+through it to see each quartile interpolated and each mass compared with the fences. Switch on the typo and
+step again: the high fence moves, but the typo still lands outside it.
+
+<Experiment def={experiment} title="Quartiles, fences and flags" controls={false}>
+  <StepThrough example={iqrLoop} title="iqr_rule.py" />
+  <Readout />
+</Experiment>
+
+Things to try with the controls in the Visual section:
+
+- Typo on, rows dropped: the mean jumps from 4200.0 to 7950.0, the median moves from 3800.0 to 4150.0, and the
+  standard deviation grows from 990.9 to 11124.2.
+- Typo on, "Fill with the column mean" and sex "unknown": rows 3 and 271 are filled with the inflated mean,
+  7012.5 g, heavier than any real penguin in the subset. Fix typos before you impute.
+- Typo off, sex "unknown": the standard deviation is 896.4 when rows are dropped, 828.6 with the median fill and
+  824.6 with the mean fill. Filling shrinks it.
+
+This version runs in your browser without any package, with the typo already in the list:
+
+<PythonRunner example={iqrRunner} title="iqr_rule.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Text columns, typos in the fill, and silent drops">
+
+<CommonMistake
+  title="Asking a whole DataFrame for its median"
+  wrong={'df.fillna(df.median())'}
+  error="TypeError: Cannot perform reduction 'median' with string dtype"
+  cause="`df.median()` tries every column, including the text columns `species`, `island` and `sex`. A median of text is undefined, and pandas 3 raises instead of skipping them."
+  fix={'num_cols = ["bill_length_mm", "bill_depth_mm", "flipper_length_mm", "body_mass_g"]\ndf.fillna(df[num_cols].median())'}
+/>
+
+<CommonMistake
+  title="Misspelling a column name in subset"
+  wrong={'df.dropna(subset=["Sex"])'}
+  error="KeyError: ['Sex']"
+  cause="Column names are case-sensitive. The column is `sex`."
+  fix={'df.dropna(subset=["sex"])'}
+/>
+
+<Callout kind="warning">
+  Some mistakes raise no error. `df.dropna(how="all")` keeps all 14 rows, because rows 3 and 271 still have
+  `species` and `island`. And `df.fillna(...)` returns a new DataFrame: writing it without `clean = ...` (or
+  `df = ...`) changes nothing. Print `len(...)` and `.isna().sum()` before and after every cleaning step.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Cleaning as a decision record">
+
+Cleaning choices change what a model learns, so write them down with their reason. For the penguins:
+
+| Column             | Missing          | Decision                         | Why                                                         |
+| ------------------ | ---------------- | -------------------------------- | ----------------------------------------------------------- |
+| The 4 measurements | 2 rows, all four | Drop the 2 rows                  | Nothing measured; a fill would invent a whole penguin      |
+| `sex`              | 11 rows          | Category `"unknown"` or drop     | Text has no median; a new category keeps the other columns |
+| `body_mass_g`      | (typos)          | Flag with 1.5·IQR, check by hand | The rule can't tell a typo from a heavy Gentoo              |
+| `species`, `island`| none             | One-hot encode                   | Nominal categories have no order                            |
+
+Two habits make this safe in real projects. First, compute fill values (medians, means) from the training data
+only and reuse them for new data; [Train, validation and test sets](#/learn/ml/classical/splits-leakage) shows
+why. Second, keep the raw data untouched and make every cleaning step a line of code, so it can be rerun.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Fill with the median yourself">
+
+<MiniExercise exercise={fillExercise}>
+  Write `fill_median(values)` in plain Python: return a new list where each `None` is replaced by the median of
+  the values that are not `None`, and raise `ValueError` when there are none. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Find holes with `df.isna().sum()`. Statistics skip missing values, so check the count behind every number.
+- Dropping loses whole rows; filling keeps them but invents values. Mean and median fills shrink the spread.
+- Categorical text has no median: drop, use the most common category, or add `"unknown"`.
+- The 1.5·IQR rule flags values outside $Q_1 - 1.5\,\text{IQR}$ and $Q_3 + 1.5\,\text{IQR}$. A flag is a
+  question, not a verdict.
+- The median and quartiles resist a typo; the mean and standard deviation do not. Fix typos before imputing.
+- One-hot encode nominal categories with `pd.get_dummies`; don't number them 0, 1, 2.
+
+Next: [Exploratory data analysis](#/learn/ml/classical/eda) uses the cleaned penguins to ask what the
+measurements say about each other.
+
+</Section>

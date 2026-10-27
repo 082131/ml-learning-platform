@@ -53,7 +53,7 @@ export const tracks: Track[] = [
         level: 'intermediate',
         project: 'ml/classical/project-classification',
         lessons: [
-          { id: 'ml/classical/data-cleaning', status: 'outline' },
+          { id: 'ml/classical/data-cleaning', status: 'written' },
           { id: 'ml/classical/eda', status: 'outline' },
           { id: 'ml/classical/features-scaling', status: 'outline' },
           { id: 'ml/classical/splits-leakage', status: 'written' },

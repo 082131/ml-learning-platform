@@ -1,0 +1,66 @@
+.layout {
+  display: grid;
+  gap: var(--s-4);
+}
+.dropped th,
+.dropped td {
+  color: var(--ink-2);
+  text-decoration: line-through;
+}
+.dropped td:last-child {
+  text-decoration: none;
+}
+.filled {
+  font-style: italic;
+  color: var(--accent);
+}
+.typo {
+  color: var(--err);
+  font-weight: 600;
+}
+.na {
+  color: var(--ink-2);
+}
+.status {
+  min-width: 14ch;
+  text-align: left !important;
+  white-space: normal !important;
+  font-family: var(--font-sans);
+}
+.chart {
+  width: 100%;
+  min-width: 0;
+}
+.chart svg {
+  display: block;
+  overflow: visible;
+}
+.band {
+  fill: var(--accent-soft);
+  stroke: none;
+}
+.fence {
+  stroke: var(--ink-2);
+  stroke-width: 1.5;
+  stroke-dasharray: 2 3;
+}
+.meanLine {
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+.medianLine {
+  stroke: var(--ink);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2) var(--s-4);
+  margin: var(--s-2) 0 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}
