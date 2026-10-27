@@ -81,7 +81,7 @@ export const tracks: Track[] = [
           { id: 'ml/deep/pytorch-basics', status: 'written' },
           { id: 'ml/deep/tokenization', status: 'written' },
           { id: 'ml/deep/embeddings', status: 'written' },
-          { id: 'ml/deep/attention', status: 'outline' },
+          { id: 'ml/deep/attention', status: 'written' },
           { id: 'ml/deep/transformers', status: 'outline' },
           { id: 'ml/deep/project-neural-net', status: 'written' },
         ],

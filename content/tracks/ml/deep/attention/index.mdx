@@ -1,0 +1,200 @@
+import { attentionCode, experiment } from './code';
+import { questions, softmaxExercise } from './quiz';
+
+<Section kind="intuition" title="Every token asks a question of every other token">
+
+In "the cat sat down", the word "sat" means more once you know who sat. A layer that looks at one token at a time
+cannot know that. <Term id="attention">Attention</Term> lets every token build a new vector by mixing in the vectors
+of other tokens, with more weight on the ones that matter to it.
+
+To decide the weights, each token produces three vectors, its <Term id="query-key-value">query, key and
+value</Term>:
+
+- the **query** says what this token is looking for;
+- the **key** says what this token offers to others;
+- the **value** is the information it hands over when it is chosen.
+
+The match between token $i$'s query and token $j$'s key is their <Term id="dot-product">dot product</Term>: large
+when they point the same way. A <Term id="softmax">softmax</Term> turns each token's row of matches into weights
+that are positive and add up to 1, and the token's output is the weighted average of all the values.
+
+</Section>
+
+<Section kind="technical" title="softmax(Q Kᵀ / √d_k) V, with every shape">
+
+Start with the token vectors as rows of a matrix $X$ of <Term id="shape">shape</Term> $(\text{seq}, d_\text{model})$.
+In our example there are 4 tokens with 3 numbers each, so $X$ is $(4, 3)$. Three learned weight matrices of shape
+$(d_\text{model}, d_k) = (3, 2)$ give
+
+$$
+Q = X W_q, \quad K = X W_k, \quad V = X W_v \qquad \text{each } (4, 3) \times (3, 2) \rightarrow (4, 2)
+$$
+
+Then ([Vaswani et al., 2017](https://arxiv.org/abs/1706.03762), section 3.2):
+
+$$
+\text{scores} = \frac{Q K^\top}{\sqrt{d_k}} \;\; (4, 4), \qquad
+\text{weights} = \operatorname{softmax}_\text{row}(\text{scores}) \;\; (4, 4), \qquad
+\text{out} = \text{weights} \, V \;\; (4, 2)
+$$
+
+$K^\top$ is the <Term id="transpose">transpose</Term> of $K$, shape $(2, 4)$, so $QK^\top$ holds the dot product
+of every query with every key. The softmax of a row $z$ is
+
+$$
+\operatorname{softmax}(z)_j = \frac{e^{z_j}}{\sum_k e^{z_k}} = \frac{e^{z_j - m}}{\sum_k e^{z_k - m}}, \quad m = \max_k z_k
+$$
+
+Subtracting the maximum $m$ changes nothing mathematically but keeps $e^{z}$ from overflowing.
+
+**Worked example, row 0 ("the").** With the lesson's matrices, $q_0 = (2, -1)$ and the keys are
+$(1, 2), (2, 2), (2, 1), (1, 3)$.
+
+| key  | $q_0 \cdot k_j$          | $\div \sqrt{2}$ | $e^{s - 2.1213}$ | weight |
+| ---- | ------------------------ | --------------- | ---------------- | ------ |
+| the  | $2 \cdot 1 - 1 \cdot 2 = 0$  | 0               | 0.1199           | 0.0717 |
+| cat  | $2 \cdot 2 - 1 \cdot 2 = 2$  | 1.4142          | 0.4931           | 0.2949 |
+| sat  | $2 \cdot 2 - 1 \cdot 1 = 3$  | 2.1213          | 1                | 0.5981 |
+| down | $2 \cdot 1 - 1 \cdot 3 = -1$ | −0.7071         | 0.0591           | 0.0353 |
+
+The sum of the exponentials is $0.1199 + 0.4931 + 1 + 0.0591 \approx 1.672$, and each weight is its exponential divided
+by it. "the" attends mostly to "sat". Its output is the weighted average of the value rows
+$v = (3, 1), (0, 2), (1, 1), (2, 2)$:
+
+$$
+\text{out}_0 = 0.0717 \cdot (3, 1) + 0.2949 \cdot (0, 2) + 0.5981 \cdot (1, 1) + 0.0353 \cdot (2, 2) \approx (0.8838, 1.3302)
+$$
+
+**Why divide by $\sqrt{d_k}$.** If the entries of $q$ and $k$ are roughly independent with mean 0 and variance 1,
+their dot product has variance $d_k$. With $d_k = 64$, scores of ±20 are common, and a softmax of such scores puts
+almost all weight on one token, where its gradients are tiny. Dividing by $\sqrt{d_k}$ brings the variance back to
+about 1.
+
+**The causal mask.** A model that predicts the next token must not look at it. A
+<Term id="causal-mask">causal mask</Term> sets every score with $j > i$ (a later token) to $-\infty$ before the
+softmax; $e^{-\infty} = 0$, so those weights are exactly 0 and each row still sums to 1 over the tokens up to
+$i$. Encoders (BERT-style) use no mask; decoders (GPT-style) use the causal one.
+
+<Callout kind="simplification">
+  This is one attention head on 4 tokens with $d_k = 2$, computed exactly as written. Production models differ:
+  they run many heads in parallel ([Transformer blocks](#/learn/ml/deep/transformers)), process a batch with an
+  extra leading axis $(B, \text{seq}, d)$, add a bias to the projections in some models, and never build the full
+  $(\text{seq}, \text{seq})$ matrix in memory for long sequences. Fused kernels such as FlashAttention and
+  PyTorch's `scaled_dot_product_attention` compute the same result in tiles, which changes
+  speed and memory but not the math (up to floating-point rounding). During generation, the keys and values of
+  earlier tokens are kept in a <Term id="kv-cache">KV cache</Term> instead of being recomputed.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Attention weights, row by row">
+
+Edit any number in $X$ or the weight matrices, or switch on the causal mask. Select a token in the heatmap to make
+it the query: its row is highlighted and its arithmetic is written out below. The code and the step-through further
+down use the same numbers.
+
+<Experiment def={experiment} title="Attention playground">
+  <AttentionHeatmap />
+  <AttentionRow />
+</Experiment>
+
+Things to try:
+
+- Switch on the causal mask: "the" now attends only to itself (weight 1), and each row has one more unmasked cell
+  than the row above.
+- Make two tokens' keys equal (same rows in $X$, for example): every query gives them the same weight.
+- Multiply all of $W_q$ by 3: the scores grow, and the weights get closer to 0 and 1. This is what $\sqrt{d_k}$
+  guards against.
+
+</Section>
+
+<Section kind="code" title="The same attention in NumPy">
+
+Select a part of the code to see what it does and the shapes it produces. The literals come from the playground,
+and the printed row is the token you selected in the heatmap.
+
+<Experiment def={experiment} title="attention.py, linked to the heatmap" controls={false}>
+  <Code example={attentionCode} title="attention.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+</Section>
+
+<Section kind="experiment" title="Step through attention, line by line">
+
+Each step shows the line that runs, the shape it produces and the numbers of the selected query row. Select a
+different token in the heatmap, or turn on the mask, and step again.
+
+<Experiment def={experiment} title="Attention, step by step" controls={false}>
+  <StepThrough example={attentionCode} title="attention.py" />
+  <Readout />
+</Experiment>
+
+</Section>
+
+<Section kind="mistakes" title="Wrong transpose, wrong axis, mask too late">
+
+<CommonMistake
+  title="Forgetting to transpose K"
+  wrong={'Q = np.ones((4, 2))\nK = np.ones((4, 2))\nscores = Q @ K'}
+  error="ValueError: matmul: Input operand 1 has a mismatch in its core dimension 0, with gufunc signature (n?,k),(k,m?)->(n?,m?) (size 4 is different from 2)"
+  cause="Q and K both have shape (seq, d_k). Each query must meet each key along d_k, so the right operand needs shape (d_k, seq)."
+  fix={'scores = Q @ K.T  # (4, 2) @ (2, 4) -> (4, 4)'}
+/>
+
+<CommonMistake
+  title="Overflow in a softmax without the max trick"
+  wrong={'import math\nscores = [1000, 1001]\nexps = [math.exp(s) for s in scores]'}
+  error="OverflowError: math range error"
+  cause="e^1000 is larger than the biggest float. Subtracting the row maximum first makes the largest exponent e^0 = 1 without changing the result."
+  fix={'m = max(scores)\nexps = [math.exp(s - m) for s in scores]'}
+/>
+
+<Callout kind="warning">
+  Two mistakes give wrong numbers with no error. A softmax over `axis=0` normalizes columns instead of rows, so a
+  query's weights no longer add up to 1; check `weights.sum(axis=1)`. And applying the mask after the softmax
+  (setting weights to 0) leaves rows that sum to less than 1; mask the scores with −∞ before the softmax.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+| Where                         | Queries from        | Keys and values from | Mask   |
+| ----------------------------- | ------------------- | -------------------- | ------ |
+| Encoder self-attention (BERT) | the sequence itself | the sequence itself  | none   |
+| Decoder self-attention (GPT)  | the sequence itself | the sequence itself  | causal |
+| Cross-attention (translation) | the decoder         | the encoder output   | none   |
+
+In PyTorch, `F.scaled_dot_product_attention(q, k, v, is_causal=True)`, where `F` is `torch.nn.functional`,
+computes this lesson's formula for whole batches and heads at once (see the references for the version-specific
+options).
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Write a stable softmax">
+
+<MiniExercise exercise={softmaxExercise}>
+  Write `softmax(scores)` for a list of numbers, without NumPy. Subtract the largest score before exponentiating
+  so that very large scores do not overflow. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- $Q = XW_q$, $K = XW_k$, $V = XW_v$: $(\text{seq}, d_\text{model}) \rightarrow (\text{seq}, d_k)$.
+- Scores $QK^\top/\sqrt{d_k}$ have shape $(\text{seq}, \text{seq})$: one per (query, key) pair.
+- A row-wise softmax turns scores into weights that sum to 1; the output is weights $\times V$.
+- The causal mask sets later positions to $-\infty$ before the softmax, so decoders cannot look ahead.
+
+Next: [Transformer blocks](#/learn/ml/deep/transformers) runs several attention heads side by side and wraps them
+with a feed-forward network, residual connections and layer normalization.
+
+</Section>
