@@ -63,6 +63,7 @@ test('setting x[0] to 0 updates the code, the gradient check, the trace and the 
   await expect(check).toHaveAttribute('data-grad-check', 'agree');
   await expect(check.getByRole('row', { name: /^W1\[0\]\[0\]/ })).toContainText('0.00000000');
   await expect(check.locator('tbody tr')).toHaveCount(9);
+  await expect(check.getByRole('status')).toContainText('far below 1e-6');
 
   const step = page.locator('[data-step-through="backprop-numpy"]');
   const next = step.getByRole('button', { name: 'Next' });

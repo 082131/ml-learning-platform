@@ -1,5 +1,4 @@
 import { gradCheckRows, NUMERIC_EPS, type BackpropResult, type BackpropState } from '@/lib/deep/backprop';
-import { formatNumber as n } from '@/lib/trace/values';
 import { useExperimentContext } from '@/components/experiment/ExperimentContext';
 import { useOverflowFocus } from '@/components/ui';
 import { useRef } from 'react';
@@ -47,7 +46,9 @@ export function GradCheck() {
       <p className={s.verdict} role="status">
         <strong>{ok ? '✓ Agree' : '✗ Disagree'}</strong>: the largest relative error is{' '}
         {sci(result.maxRelError)}
-        {ok ? `, far below ${n(AGREE)}.` : `, above ${n(AGREE)}: the backward pass has a bug.`}
+        {ok
+          ? `, far below ${AGREE.toExponential(0)}.`
+          : `, above ${AGREE.toExponential(0)}: the backward pass has a bug.`}
       </p>
     </div>
   );
