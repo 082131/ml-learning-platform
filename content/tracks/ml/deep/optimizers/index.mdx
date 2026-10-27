@@ -3,9 +3,10 @@ import { momentumExercise, questions } from './quiz';
 
 <Section kind="intuition" title="Walking downhill in a narrow valley">
 
-Training a network means changing its <Term id="parameter">parameters</Term> to make the loss smaller. The
-gradient (the vector of slopes of the loss, one per parameter) points uphill, so the basic move is a step
-against it. An <Term id="optimizer">optimizer</Term> is the rule that decides how big that step is and in which
+Training a network means changing its <Term id="parameter">parameters</Term> to make the
+<Term id="loss-function">loss</Term> smaller. The <Term id="gradient">gradient</Term> (the vector of slopes of
+the loss, one per parameter) points uphill, so the basic move is a step against it:
+<Term id="gradient-descent">gradient descent</Term>. An <Term id="optimizer">optimizer</Term> is the rule that decides how big that step is and in which
 direction, using the gradient and possibly what it saw before.
 
 Picture a long, narrow valley. Its walls are steep and its floor slopes gently towards the lowest point. A walker
@@ -25,7 +26,7 @@ This lesson races the three on two small surfaces where you can see every step.
 
 Write the parameters as a vector $\theta$ (theta). Here $\theta = (x, y)$ has shape $(2,)$; in a network it holds
 every weight and bias. Let $g = \nabla f(\theta)$ be the gradient at the current point and $\eta$ (eta) the
-learning rate, the step-size multiplier.
+<Term id="learning-rate">learning rate</Term>, the step-size multiplier.
 
 **Gradient descent.** $\theta \leftarrow \theta - \eta\, g$. When $g$ is computed on a random
 mini-batch of training data instead of the whole dataset, this is <Term id="sgd">stochastic gradient descent

@@ -47,7 +47,7 @@ export default [
     short: 'A small group of training examples used together for one gradient step.',
     long: 'The batch size B is how many examples it holds. B = 1 is pure stochastic gradient descent; B = the whole training set is full-batch gradient descent.',
     introducedIn: 'ml/deep/training-loop',
-    aliases: ['batch', 'batch size'],
+    aliases: ['batch size'],
   },
   {
     id: 'epoch',
