@@ -1,0 +1,66 @@
+{
+ "bill_length_mm/bill_length_mm": [
+  "1.0",
+  "1.0"
+ ],
+ "bill_length_mm/bill_depth_mm": [
+  "0.876",
+  "0.876"
+ ],
+ "bill_length_mm/flipper_length_mm": [
+  "0.375",
+  "0.375"
+ ],
+ "bill_length_mm/body_mass_g": [
+  "0.141",
+  "0.141"
+ ],
+ "bill_depth_mm/bill_length_mm": [
+  "0.876",
+  "0.876"
+ ],
+ "bill_depth_mm/bill_depth_mm": [
+  "1.0",
+  "1.0"
+ ],
+ "bill_depth_mm/flipper_length_mm": [
+  "0.734",
+  "0.734"
+ ],
+ "bill_depth_mm/body_mass_g": [
+  "0.307",
+  "0.307"
+ ],
+ "flipper_length_mm/bill_length_mm": [
+  "0.375",
+  "0.375"
+ ],
+ "flipper_length_mm/bill_depth_mm": [
+  "0.734",
+  "0.734"
+ ],
+ "flipper_length_mm/flipper_length_mm": [
+  "1.0",
+  "1.0"
+ ],
+ "flipper_length_mm/body_mass_g": [
+  "0.545",
+  "0.545"
+ ],
+ "body_mass_g/bill_length_mm": [
+  "0.141",
+  "0.141"
+ ],
+ "body_mass_g/bill_depth_mm": [
+  "0.307",
+  "0.307"
+ ],
+ "body_mass_g/flipper_length_mm": [
+  "0.545",
+  "0.545"
+ ],
+ "body_mass_g/body_mass_g": [
+  "1.0",
+  "1.0"
+ ]
+}

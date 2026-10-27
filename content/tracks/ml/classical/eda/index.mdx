@@ -1,0 +1,209 @@
+import { corrCode, edaRunner, experiment, pearsonLoop, pearsonRunner, plotCode } from './code';
+import { pearsonExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Look before you model">
+
+Before you train anything on the penguins, you want to know what is in the data: how many penguins of each
+species, how big they are, which measurements move together, and whether anything looks odd. That habit is
+<Term id="exploratory-data-analysis">exploratory data analysis</Term> (EDA): summaries, counts, comparisons
+between groups and plots, with a notebook open to write down what you notice.
+
+EDA has one trap that this lesson is built around. Plot bill length against bill depth for all penguins and the
+cloud slopes downward: longer bills seem to be shallower. Split the same points by species and every species
+slopes upward. Both pictures are correct. They answer different questions, and only one of them describes a
+penguin of a given species. That reversal is called <Term id="simpsons-paradox">Simpson’s paradox</Term>.
+
+</Section>
+
+<Section kind="technical" title="Four summaries and one number for relationships">
+
+Each summary answers a question. Here they are on the full dataset (344 rows), run locally with pandas 3.0.2:
+
+- **`df.describe()`**: per number column, the count of values present, the <Term id="mean">mean</Term>, the
+  <Term id="standard-deviation">standard deviation</Term> (pandas divides by $n - 1$), the minimum, the quartiles
+  and the maximum. Bill length has count 342: the two empty rows from the previous lesson are skipped.
+- **`df["species"].value_counts()`**: rows per category: Adelie 152, Gentoo 124, Chinstrap 68. Unequal groups
+  matter later: a model that always answers "Adelie" is already right $152 / 344 \approx 44\%$ of the time.
+- **`df.groupby("species")[cols].mean()`**: the mean of each column per species. Mean bill length is 38.8 mm for
+  Adelie, 48.8 for Chinstrap and 47.5 for Gentoo; mean bill depth is 18.3, 18.4 and 15.0 mm. Gentoo bills are long
+  and shallow.
+- **Correlation**: how two columns move together.
+
+**Pearson’s r.** For pairs $(x_i, y_i)$ with means $\bar{x}$ and $\bar{y}$, the
+<Term id="correlation">correlation</Term> is
+
+$$
+r = \frac{\sum_i (x_i - \bar{x})(y_i - \bar{y})}{\sqrt{\sum_i (x_i - \bar{x})^2 \cdot \sum_i (y_i - \bar{y})^2}}
+$$
+
+Each penguin adds a positive product when it is above both means or below both, and a negative one when it is
+above one mean and below the other. The denominator removes the units, so $-1 \le r \le 1$: $1$ is a perfect
+rising line, $-1$ a perfect falling line, and $0$ no straight-line trend at all.
+
+**Worked example.** Three points $(1, 2), (2, 4), (3, 5)$: $\bar{x} = 2$, $\bar{y} = 11/3$. The deviations
+of $y$ are $-5/3, 1/3, 4/3$, so
+
+$$
+r = \frac{(-1)(-\tfrac{5}{3}) + 0 + (1)(\tfrac{4}{3})}{\sqrt{2 \cdot \tfrac{42}{9}}} = \frac{3}{\sqrt{9.333}} \approx 0.982
+$$
+
+**Simpson’s paradox in numbers.** For bill length against bill depth on the 342 complete rows, pandas gives
+$r = -0.235$ overall, but $0.391$ for Adelie, $0.654$ for Chinstrap and $0.643$ for Gentoo. Species is a
+<Term id="confounder">confounder</Term> here: it affects both columns. Adelie sit at short and deep, Gentoo at
+long and shallow, so the pooled cloud runs from top left to bottom right even though each species runs upward.
+
+<Callout kind="simplification">
+  Pearson’s r only sees straight-line trends and is pulled around by outliers. For curved or rank-based
+  relationships, pandas also offers `method="spearman"`. And no correlation, pooled or per group, says that one
+  measurement causes the other.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Pick two columns and compare r overall and per species">
+
+Each marker is one penguin, with species shown by shape. The dashed line is the least-squares line through all
+penguins; the solid lines are fitted within each species. Start with bill length and bill depth, then try bill
+depth against flipper length or body mass.
+
+<Experiment def={experiment} title="Correlation explorer">
+  <EdaScatter />
+  <Readout />
+</Experiment>
+
+With bill length on x and bill depth on y, the dashed line falls while all three solid lines rise. The same
+reversal shows up for bill depth against flipper length ($-0.584$ overall) and against body mass ($-0.472$).
+Bill length against flipper length, by contrast, is positive both overall and within each species.
+
+</Section>
+
+<Section kind="code" title="EDA in pandas">
+
+A guided first look at a subset: every 12th row of `penguins.csv` (rows 0, 12, …, 336), 29 penguins with no
+missing values, written into the script because the browser runner can't read files. The output shown comes
+from a local run with pandas 3.0.2; select Run to run it in your browser.
+
+<PythonRunner example={edaRunner} title="eda_subset.py" />
+
+Even 29 penguins show the paradox: $r = -0.268$ overall, and $0.2$, $0.876$ and $0.383$ within the species.
+With 6 to 13 penguins per species these within-group numbers are rough; the full dataset gives the numbers above.
+
+The correlation code below runs on the full file on your own computer. Its column names come from the explorer
+above, and the readout there shows exactly what it prints (checked against pandas 3.0.2 for every pair of
+columns).
+
+<Experiment def={experiment} title="corr.py, linked to the explorer" controls={false}>
+  <Code example={corrCode} title="corr.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+To draw the per-species scatter yourself with Matplotlib (as in
+[Plotting with Matplotlib](#/learn/ml/foundations/matplotlib-plotting)), continue the subset script with the
+lines below. This lesson doesn't run them, so it shows no figure.
+
+<Code example={plotCode} title="scatter_by_species.py" />
+
+</Section>
+
+<Section kind="experiment" title="Compute r by hand for six penguins">
+
+The loop computes Pearson’s r for the 6 Chinstrap penguins of the subset (ringed in the explorer), using the
+columns chosen above. Step through it and watch each penguin push `sxy` up or down.
+
+<Experiment def={experiment} title="Pearson’s r, one penguin at a time" controls={false}>
+  <StepThrough example={pearsonLoop} title="pearson.py" />
+  <Readout />
+</Experiment>
+
+The same loop for bill length and depth runs in your browser without any package:
+
+<PythonRunner example={pearsonRunner} title="pearson.py" />
+
+Things to try in the explorer:
+
+- Put the same column on both axes. Every r is 1.0: a column is perfectly correlated with itself.
+- Swap x and y. r stays the same; only the line slopes change.
+- Compare body mass against flipper length (strong, positive everywhere) with bill length against bill depth.
+
+</Section>
+
+<Section kind="mistakes" title="Text columns in numeric summaries">
+
+<CommonMistake
+  title="Correlating a whole DataFrame that has text columns"
+  wrong={'df.corr()'}
+  error="ValueError: could not convert string to float: 'Adelie'"
+  cause="`corr` needs numbers, and `species`, `island` and `sex` are text. pandas 3 does not drop them silently."
+  fix={'num_cols = ["bill_length_mm", "bill_depth_mm", "flipper_length_mm", "body_mass_g"]\ndf[num_cols].corr()'}
+/>
+
+<CommonMistake
+  title="Averaging every column per group"
+  wrong={'df.groupby("species").mean()'}
+  error="TypeError: dtype 'str' does not support operation 'mean'"
+  cause="After grouping by species, `island` and `sex` are still text columns, and a text column has no mean."
+  fix={'df.groupby("species")[num_cols].mean()\n# or: df.groupby("species").mean(numeric_only=True)'}
+/>
+
+<CommonMistake
+  title="Passing a column name to Series.corr"
+  wrong={'df["bill_length_mm"].corr("bill_depth_mm")'}
+  error="TypeError: unsupported type: <class 'str'>"
+  cause="`Series.corr` takes another Series, not the name of a column."
+  fix={'df["bill_length_mm"].corr(df["bill_depth_mm"])'}
+/>
+
+<Callout kind="warning">
+  The worst EDA mistake raises no error: reporting a pooled correlation for data made of different groups.
+  Check every relationship within the obvious groups (species, island, sex) before you write it down.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Write down questions and hypotheses">
+
+EDA ends with a written list, not a model. Each entry says what you saw, what you suspect, and how you would
+check it on data you haven't browsed. For the penguins:
+
+| Observation                                              | Question or hypothesis                                      | How to check                                                          |
+| -------------------------------------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------- |
+| Bill depth vs length: $r = -0.235$ overall, positive within species | Species, not bill shape, drives the pooled trend   | Compare r within species; color plots by species                      |
+| Gentoo have long, shallow bills                          | Bill depth and length together could separate the species  | Train a classifier on those two features and measure accuracy         |
+| Adelie 152, Gentoo 124, Chinstrap 68                     | Chinstrap may be hardest to learn                           | Look at per-species errors, not just overall accuracy                 |
+| Flipper length and body mass: $r = 0.871$                | One of them may add little once the other is known         | Compare models with one, the other, and both                          |
+| Gentoo live only on Biscoe, Chinstrap only on Dream      | Island alone may "predict" species in this sample          | Ask whether a new sample would keep that pattern before using island |
+
+Two cautions. A pattern found by browsing many plots can be luck, so confirm it on data you set aside before
+exploring ([Train, validation and test sets](#/learn/ml/classical/splits-leakage)). And a hypothesis that can't
+be checked ("penguins prefer deep bills") belongs in a different list.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Pearson’s r from scratch">
+
+<MiniExercise exercise={pearsonExercise}>
+  Write `pearson(xs, ys)` in plain Python. Return Pearson’s r for two equal-length lists, and raise `ValueError`
+  when the lengths differ or when either list is constant. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Start with `describe()`, `value_counts()` and `groupby(...).mean()`; check the counts behind every number.
+- Pearson’s r measures straight-line association, from −1 to 1, and has no units.
+- A pooled correlation can reverse inside every group (Simpson’s paradox): bill length vs depth is −0.235
+  overall and positive for each species.
+- Compute statistics on number columns only; pandas 3 raises on text columns.
+- End EDA with written, testable questions. Correlation is not causation.
+
+Next: [Feature engineering and scaling](#/learn/ml/classical/features-scaling) builds new columns from these
+measurements and puts them on comparable scales.
+
+</Section>

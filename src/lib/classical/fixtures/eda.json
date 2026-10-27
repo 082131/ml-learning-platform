@@ -1,0 +1,18 @@
+{
+ "bill_length_mm/bill_length_mm": "all 342 1.0\nAdelie 151 1.0\nChinstrap 68 1.0\nGentoo 123 1.0",
+ "bill_length_mm/bill_depth_mm": "all 342 -0.235\nAdelie 151 0.391\nChinstrap 68 0.654\nGentoo 123 0.643",
+ "bill_length_mm/flipper_length_mm": "all 342 0.656\nAdelie 151 0.326\nChinstrap 68 0.472\nGentoo 123 0.661",
+ "bill_length_mm/body_mass_g": "all 342 0.595\nAdelie 151 0.549\nChinstrap 68 0.514\nGentoo 123 0.669",
+ "bill_depth_mm/bill_length_mm": "all 342 -0.235\nAdelie 151 0.391\nChinstrap 68 0.654\nGentoo 123 0.643",
+ "bill_depth_mm/bill_depth_mm": "all 342 1.0\nAdelie 151 1.0\nChinstrap 68 1.0\nGentoo 123 1.0",
+ "bill_depth_mm/flipper_length_mm": "all 342 -0.584\nAdelie 151 0.308\nChinstrap 68 0.58\nGentoo 123 0.707",
+ "bill_depth_mm/body_mass_g": "all 342 -0.472\nAdelie 151 0.576\nChinstrap 68 0.604\nGentoo 123 0.719",
+ "flipper_length_mm/bill_length_mm": "all 342 0.656\nAdelie 151 0.326\nChinstrap 68 0.472\nGentoo 123 0.661",
+ "flipper_length_mm/bill_depth_mm": "all 342 -0.584\nAdelie 151 0.308\nChinstrap 68 0.58\nGentoo 123 0.707",
+ "flipper_length_mm/flipper_length_mm": "all 342 1.0\nAdelie 151 1.0\nChinstrap 68 1.0\nGentoo 123 1.0",
+ "flipper_length_mm/body_mass_g": "all 342 0.871\nAdelie 151 0.468\nChinstrap 68 0.642\nGentoo 123 0.703",
+ "body_mass_g/bill_length_mm": "all 342 0.595\nAdelie 151 0.549\nChinstrap 68 0.514\nGentoo 123 0.669",
+ "body_mass_g/bill_depth_mm": "all 342 -0.472\nAdelie 151 0.576\nChinstrap 68 0.604\nGentoo 123 0.719",
+ "body_mass_g/flipper_length_mm": "all 342 0.871\nAdelie 151 0.468\nChinstrap 68 0.642\nGentoo 123 0.703",
+ "body_mass_g/body_mass_g": "all 342 1.0\nAdelie 151 1.0\nChinstrap 68 1.0\nGentoo 123 1.0"
+}

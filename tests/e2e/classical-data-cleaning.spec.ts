@@ -46,7 +46,9 @@ test('a fill strategy changes the table, the code, the strip, the readout and th
 });
 
 test('the injected typo moves the mean far more than the median and is flagged', async ({ page }) => {
-  await controls(page).getByRole('combobox', { name: 'Data-entry typo (not in the real data)' }).selectOption('on');
+  await controls(page)
+    .getByRole('combobox', { name: 'Data-entry typo (not in the real data)' })
+    .selectOption('on');
   await expect(page.locator('[data-code-example="cleaning-pandas"]')).toContainText(
     'df.loc[0, "body_mass_g"] = 37500.0  # injected typo, not in the real data',
   );

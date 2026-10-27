@@ -360,11 +360,14 @@ export function cleaningReadout(r: CleaningExperimentResult): ReadoutItem[] {
 
 const csvValue = (v: number | string | null) => (v === null ? 'NA' : String(v));
 
-/** The subset as CSV text, laid out as in penguins.csv (row number first, year left out). */
-export function cleaningCsv(): string {
+/** Rows as CSV text, laid out as in penguins.csv (row number first, year left out). */
+export function subsetCsv(rows: readonly Penguin[]): string {
   const header = 'row,species,island,bill_length_mm,bill_depth_mm,flipper_length_mm,body_mass_g,sex';
-  const lines = cleaningSubset().map((p) =>
+  const lines = rows.map((p) =>
     [p.row, p.species, p.island, ...NUMERIC_COLUMNS.map((c) => p[c]), p.sex].map(csvValue).join(','),
   );
   return `${[header, ...lines].join('\n')}\n`;
 }
+
+/** The cleaning subset as CSV text. */
+export const cleaningCsv = (): string => subsetCsv(cleaningSubset());
