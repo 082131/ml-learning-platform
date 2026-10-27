@@ -115,8 +115,8 @@ export function OptimizerRace() {
               />
               <text
                 className={svg.label}
-                x={x(surface.minimum[0]) + 8}
-                y={y(surface.minimum[1]) - 8}
+                x={x(surface.minimum[0]) + 6}
+                y={y(surface.minimum[1]) + 20}
                 stroke="none"
               >
                 min
