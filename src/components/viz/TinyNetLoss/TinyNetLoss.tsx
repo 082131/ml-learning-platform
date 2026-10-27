@@ -13,6 +13,7 @@ export function TinyNetLoss() {
       title="XOR loss per step"
       xLabel="step"
       yLabel="BCE loss"
+      yDomain={[0, Math.max(...result.steps.map((s) => s.loss))]}
       series={[
         {
           id: 'loss',
