@@ -61,7 +61,7 @@ export const tracks: Track[] = [
           { id: 'ml/classical/logistic-regression', status: 'outline' },
           { id: 'ml/classical/trees-ensembles', status: 'outline' },
           { id: 'ml/classical/clustering-dimred', status: 'outline' },
-          { id: 'ml/classical/fit-regularization', status: 'outline' },
+          { id: 'ml/classical/fit-regularization', status: 'written' },
           { id: 'ml/classical/cross-validation', status: 'outline' },
           { id: 'ml/classical/metrics-error-analysis', status: 'outline' },
           { id: 'ml/classical/project-classification', status: 'written' },

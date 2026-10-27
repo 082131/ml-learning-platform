@@ -1,0 +1,226 @@
+import { experiment, ridgeNumpy, ridgeSklearn } from './code';
+import { questions, ridgeExercise } from './quiz';
+
+<Section kind="intuition" title="Too stiff, too wiggly, and in between">
+
+Imagine tracing a hill's outline from 20 noisy altitude readings. A ruler gives a straight line: it misses the
+hill's shape however carefully you place it. A very bendy wire can pass through every single reading, including the
+ones that were measurement errors, and between readings it swings wildly. A moderately flexible strip follows the
+shape and ignores the jitter.
+
+Those are the three situations of this lesson:
+
+- <Term id="underfitting">Underfitting</Term>: the model is too stiff to follow the real pattern. Its error is high
+  on the points it was fitted to _and_ on new points.
+- <Term id="overfitting">Overfitting</Term>: the model is flexible enough to follow the noise. Its error on its own
+  training points is tiny, but on new points it is large.
+- In between: a model that captures the pattern and generalizes.
+
+You can't tell overfitting apart from a good fit by looking at training error alone; you need held-out points,
+the <Term id="validation-set">validation set</Term> from the previous lesson. And besides choosing a less flexible
+model, you can keep a flexible one but _penalize_ it for bending: <Term id="regularization">regularization</Term>.
+
+</Section>
+
+<Section kind="technical" title="Polynomial regression with a penalty">
+
+**The data.** Synthetic, so we know the truth: 20 training points and 20 validation points with $x$ drawn uniformly
+from $[0, 1]$ and
+
+$$
+y = \sin(2\pi x) + \varepsilon, \qquad \varepsilon \sim \mathcal{N}(0,\ 0.3^2)
+$$
+
+(Gaussian noise with standard deviation 0.3, from a fixed seed, rounded to 3 decimals). The noise variance is
+$0.3^2 = 0.09$: even the true curve has an expected <Term id="mean-squared-error">mean squared error</Term> (MSE) of
+about 0.09 on new points, so no model can do much better than that on average.
+
+**The model.** A polynomial of degree $d$ in $t = 2x - 1$ (mapping $[0, 1]$ to $[-1, 1]$ keeps every power between
+−1 and 1, which keeps the computation accurate):
+
+$$
+\hat{y} = w_0 + w_1 t + w_2 t^2 + \dots + w_d t^d
+$$
+
+This is still linear regression: build a design matrix $X$ of shape $(20, d + 1)$ whose columns are
+$1, t, t^2, \dots, t^d$, and the prediction is $Xw$. The degree is a <Term id="hyperparameter">hyperparameter</Term>:
+degree 0 is a flat line at the mean, degree 1 a straight line, and each extra degree allows one more bend.
+
+**The penalty.** <Term id="ridge-regression">Ridge regression</Term> (L2 regularization) minimizes the squared
+error plus $\lambda$ times the sum of the squared weights, leaving the intercept $w_0$ out of the penalty:
+
+$$
+\text{minimize} \quad \sum_{i=1}^{20} (y_i - \hat{y}_i)^2 \;+\; \lambda \sum_{j=1}^{d} w_j^2
+$$
+
+Large weights are what make a polynomial swing, so the penalty trades a little training error for a calmer curve.
+$\lambda = 0$ is plain least squares; the larger $\lambda$, the stiffer the curve. Setting the gradient to zero gives
+a <Term id="closed-form-solution">closed form</Term>, the normal equations of [linear regression](#/learn/ml/classical/linear-regression)
+with $\lambda$ added. With $P$ the identity matrix except $P_{00} = 0$ (so $w_0$ is not penalized):
+
+$$
+(X^\top X + \lambda P)\, w = X^\top y
+$$
+
+$X^\top X$ has shape $(d + 1, d + 1)$, so this is a small system to solve. We leave the intercept unpenalized, as
+scikit-learn's `Ridge` does: penalizing it would pull the whole curve toward $y = 0$, which has nothing to do with
+how wiggly it is.
+
+**Scoring.** Fit $w$ on the 20 training points only, then compute the MSE on each set:
+
+$$
+\text{MSE} = \frac{1}{n} \sum_{i=1}^{n} (\hat{y}_i - y_i)^2
+$$
+
+<Callout kind="simplification">
+  We solve the normal equations, which is fine here because $t \in [-1, 1]$, the degree stops at 12 and
+  $\lambda \ge 10^{-8}$; the matrix's condition number stays below $1.2 \cdot 10^{9}$, so about 7 of the 16 digits of
+  double precision survive (and the printed 4 decimals agree with NumPy, as this project's tests check). Libraries
+  avoid forming $X^\top X$ at high degrees and use a QR or SVD factorization instead, and for many features they
+  standardize the columns first, because the same $\lambda$ hits large-valued and small-valued features differently.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="The fit and its two errors">
+
+The filled circles are the training points the curve is fitted to; the hollow triangles are validation points it
+never sees. The dashed line is the true curve. Move the sliders: the curve, both error plots, the code in the next
+section and the readout all follow the same two numbers.
+
+<Experiment def={experiment} title="Degree and penalty">
+  <PolyFitPlot />
+  <FitCurves />
+</Experiment>
+
+Read the error-versus-degree plot from left to right. On the left both errors are high: underfitting. Training
+error keeps falling as the degree grows. Validation error falls, reaches its lowest point, then climbs: past that
+point, extra flexibility fits noise. The error-versus-λ plot is the same story mirrored: small $\lambda$ (left) is
+the flexible end, large $\lambda$ (right) the stiff end.
+
+</Section>
+
+<Section kind="code" title="Ridge in NumPy, linked to the sliders">
+
+The `degree` and `lam` lines are filled from the sliders above. The readout shows what the last line prints for the
+current values.
+
+<Experiment def={experiment} title="ridge.py, linked to the sliders" controls={false}>
+  <Code example={ridgeNumpy} title="ridge.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+The printout is computed in your browser by the same algorithm in TypeScript. The project's tests run this NumPy
+code for degrees 0, 1, 3, 5, 9 and 12 and several values of $\lambda$ and check that the fitted weights agree and
+the printed line is identical.
+
+scikit-learn does the same with a pipeline. `Ridge(alpha=...)` minimizes the same objective, with `alpha` playing
+the role of $\lambda$, so at degree 12 and $\lambda = 10^{-2.5}$ it prints the same two errors as the NumPy code with
+those settings:
+
+<Code example={ridgeSklearn} title="ridge_sklearn.py" />
+
+</Section>
+
+<Section kind="experiment" title="Find the underfit, the overfit and the fix">
+
+Use the sliders in the Visual section; this view follows them.
+
+<Experiment def={experiment} title="Diagnosis" controls={false}>
+  <FitCurves />
+  <Readout />
+</Experiment>
+
+Try these, with $\log_{10} \lambda = -8$ (practically no penalty) unless noted:
+
+1. **Degree 0 and 1.** Training MSE 0.3788 and 0.2935, validation 0.5139 and 0.2852: both high, both far above the
+   noise level of 0.09. Underfitting.
+2. **Degree 3.** Training 0.0682, validation 0.0656: both near 0.09. This is the validation minimum over degrees.
+   (Validation error below training error happens with only 20 points: these validation points happen to sit a
+   little closer to the curve.)
+3. **Degree 9 and 12.** Training error drops further (0.0420, 0.0303) while validation error jumps to 0.8582 and
+   3.6556. In the plot the curve shoots off between training points. Overfitting.
+4. **Keep degree 12 and raise λ.** At $\log_{10}\lambda = -2.5$ validation MSE falls to 0.1833; the lowest point of
+   the λ curve is at $-0.5$ (0.1453). Push to $\log_{10}\lambda = 1$ and the curve flattens: training 0.3036,
+   validation 0.3829, underfitting again, now caused by the penalty.
+
+Regularization did not beat degree 3 here; it rescued a model that was far too flexible. That is its everyday use:
+pick a flexible model and let $\lambda$, chosen on validation data, decide how much of the flexibility to use.
+
+<Callout kind="note">
+  The <Term id="bias-variance-tradeoff">bias–variance trade-off</Term> names the same picture. A stiff model makes
+  systematic errors (bias); a flexible one changes a lot from one training sample to the next (variance). Degree
+  and $\lambda$ move you along the trade-off; validation error tells you where you are.
+</Callout>
+
+</Section>
+
+<Section kind="mistakes" title="Common mistakes">
+
+<CommonMistake
+  title="Passing a 1-D array as X to scikit-learn"
+  wrong={'Ridge(alpha=1.0).fit(x_train, y_train)   # x_train has shape (20,)'}
+  error={'ValueError: Expected 2D array, got 1D array instead:\narray=[0.003 0.067 0.139 0.154 0.248 0.281 0.395 0.404 0.426 0.455 0.489 0.489\n 0.527 0.613 0.627 0.721 0.767 0.968 0.981 0.995].\nReshape your data either using array.reshape(-1, 1) if your data has a single feature or array.reshape(1, -1) if it contains a single sample.'}
+  cause="scikit-learn expects X as a table of shape (rows, features), even with a single feature."
+  fix={'Ridge(alpha=1.0).fit(x_train.reshape(-1, 1), y_train)   # shape (20, 1)'}
+/>
+
+<CommonMistake
+  title="More weights than the data can pin down, with no penalty"
+  wrong={'x = np.array([0.0, 0.0, 1.0])               # only 2 distinct x values\nX = np.vander(2 * x - 1, 3, increasing=True)  # degree 2: 3 weights\nnp.linalg.solve(X.T @ X, X.T @ np.array([1.0, 2.0, 3.0]))'}
+  error="LinAlgError: Singular matrix"
+  cause="Two distinct x values can't determine three weights, so many polynomials fit equally well and XᵀX has no inverse. Near this situation (high degree, few points) the matrix is not exactly singular but the weights become huge and unstable."
+  fix={'penalty = np.eye(3)\npenalty[0, 0] = 0\nnp.linalg.solve(X.T @ X + 0.1 * penalty, X.T @ np.array([1.0, 2.0, 3.0]))  # λ > 0: solvable'}
+/>
+
+Mistakes that raise no error:
+
+- **Choosing the degree or λ by training error.** It always prefers the most flexible model. Use validation error.
+- **Choosing them on the test set.** Then the test score is no longer an honest estimate (the previous lesson's
+  leak). Keep the test set for the end.
+- **Penalizing the intercept.** The curve is pulled toward $y = 0$. scikit-learn's `Ridge` does not penalize it;
+  hand-written code must zero that entry, as `penalty[0, 0] = 0` does.
+- **Unscaled features.** One λ penalizes all weights equally, so a feature measured in grams and one in kilograms
+  are penalized very differently. Standardize the features (fitted on training rows) before ridge.
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+- **Every model has a flexibility knob**: tree depth, number of neighbors, network size, training epochs. The
+  same two curves diagnose them all.
+- **Weight decay** in neural networks is the L2 penalty of ridge, added to the loss during gradient descent.
+- **Choosing λ reliably** takes more than one validation split; [Cross-validation](#/learn/ml/classical/cross-validation)
+  averages over several, using this same polynomial setup.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="The penalty in one division">
+
+<MiniExercise exercise={ridgeExercise}>
+  Write `mse(predictions, targets)` and `ridge_slope(xs, ys, lam)`, the ridge solution for a line through the
+  origin, $w = \sum xy \,/\, (\sum x^2 + \lambda)$. Watch what a large `lam` does to the slope.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Underfitting: training and validation error both high. Overfitting: training error low, validation error much
+  higher.
+- Training error falls as flexibility grows; validation error falls, then rises. Choose at its minimum.
+- Ridge adds $\lambda \sum w_j^2$ to the squared error and solves $(X^\top X + \lambda P)w = X^\top y$, with the
+  intercept unpenalized. Larger $\lambda$, stiffer model.
+- On this data: degree 3 gives validation MSE 0.0656; degree 12 overfits (3.6556) until $\lambda$ reins it in
+  (0.1453 at $\lambda = 10^{-0.5}$).
+
+Next: [Cross-validation](#/learn/ml/classical/cross-validation) replaces the single validation split with several,
+because 20 validation points give a noisy score.
+
+</Section>
