@@ -1,0 +1,190 @@
+import { embeddingCode, experiment } from './code';
+import { cosineExercise, questions } from './quiz';
+
+<Section kind="intuition" title="From an ID to a point in space">
+
+After tokenization, a sentence is a list of <Term id="token-id">token IDs</Term> such as `[0, 1]`. The numbers are
+labels, not quantities: ID 1 is not "more" than ID 0, and IDs 0 and 1 being neighbours says nothing about the
+words. A network needs inputs it can compare and combine, so each ID is replaced by a
+<Term id="vector">vector</Term> of numbers, its <Term id="embedding">embedding</Term>.
+
+Picture every token as a point. If tokens that are used in similar ways sit close together, pointing in similar
+directions, the network can treat "kitten" a lot like "cat" without having seen every sentence with both. In a
+trained model the points are learned: training nudges them until such positions help predict text.
+
+In this lesson the points are **written by hand** in 2 dimensions so you can see and move them. Real embeddings
+have hundreds or thousands of dimensions and nobody chooses their values.
+
+</Section>
+
+<Section kind="technical" title="A table lookup and a cosine">
+
+**The embedding table.** With a vocabulary of $V$ tokens and vectors of $d$ numbers, the embeddings form one matrix
+$E$ of shape $(V, d)$. Row $i$ is the embedding of token ID $i$. Our toy table has $V = 8$ and $d = 2$:
+
+| ID | token  | $E[i]$     |
+| -- | ------ | ---------- |
+| 0  | cat    | (3, 1)     |
+| 1  | kitten | (2, 1)     |
+| 2  | dog    | (2.5, 2)   |
+| 3  | puppy  | (1.5, 1.5) |
+| 4  | car    | (−1, 3.5)  |
+| 5  | truck  | (−2, 4)    |
+| 6  | apple  | (−3, −2)   |
+| 7  | banana | (−2.5, −3) |
+
+GPT-2 small has $V = 50{,}257$ and $d = 768$, so its table alone has $50{,}257 \cdot 768 = 38{,}597{,}376$
+parameters. A batch of token IDs with shape $(B, T)$ (B sequences of T tokens) becomes a tensor of shape
+$(B, T, d)$ after the lookup: every ID gains a last axis of $d$ numbers.
+
+**One-hot vs dense.** Another way to turn ID $i$ into numbers is a one-hot vector: $V$ numbers, all 0 except a 1
+at position $i$. It is long ($V$ numbers) and says nothing about similarity, because any two different one-hot
+vectors have dot product 0. Multiplying a one-hot vector by $E$ selects one row:
+
+$$
+\text{one\_hot}(0) \, E = 1 \cdot E[0] + 0 \cdot E[1] + \dots + 0 \cdot E[7] = E[0] = (3, 1)
+$$
+
+So an embedding layer is a matrix multiplication with a one-hot input, computed as a cheap row lookup. The dense
+vector $E[0]$ is short ($d$ numbers) and every number is learned.
+
+**Cosine similarity.** To ask how similar two embeddings $a$ and $b$ are, compare their directions with the
+<Term id="cosine-similarity">cosine similarity</Term>, the <Term id="dot-product">dot product</Term> divided by
+both lengths (<Term id="norm">norms</Term>):
+
+$$
+\cos(a, b) = \frac{a \cdot b}{\lVert a \rVert \, \lVert b \rVert}
+$$
+
+For cat $= (3, 1)$ and kitten $= (2, 1)$:
+
+$$
+a \cdot b = 3 \cdot 2 + 1 \cdot 1 = 7, \quad \lVert a \rVert = \sqrt{10} \approx 3.1623, \quad
+\lVert b \rVert = \sqrt{5} \approx 2.2361, \quad \cos = \frac{7}{3.1623 \cdot 2.2361} \approx 0.9899
+$$
+
+Kitten is shorter than cat, but that does not matter: only the angle counts. The value is 1 for the same
+direction, 0 for perpendicular vectors and −1 for opposite ones. Ranking every other token by its cosine with
+cat gives cat's nearest neighbours: kitten (0.9899), dog (0.9383), puppy (0.8944).
+
+<Callout kind="simplification">
+  These vectors are made up to illustrate the geometry. Learned embeddings differ in three ways: they have
+  hundreds of dimensions (768 in GPT-2 small); their individual axes rarely mean anything you could name; and
+  similarity in them reflects how tokens are used in the training text, including its biases, not a dictionary
+  meaning. A 2-D picture of real embeddings is a projection (for example with PCA) that distorts distances, so
+  similarities should be computed on the full vectors. Inside a transformer, a token's vector also changes from
+  layer to layer as it mixes with its context; the table here is only the input layer.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Move the tokens and watch the similarities">
+
+Choose the two tokens to compare below, or select a point to make it the query $a$. Drag a point, or focus it and
+press the arrow keys, to change its row of $E$: the lookup, the cosine, the neighbours, the code and the
+step-through all follow.
+
+<Experiment def={experiment} title="Embedding playground">
+  <EmbeddingPlane />
+  <EmbeddingLookup />
+</Experiment>
+
+Things to try:
+
+- Move kitten to $(1.5, 0.5)$, exactly half of cat. Its cosine with cat becomes 1, although it is much shorter.
+- Drag apple next to cat: it becomes cat's nearest neighbour. The model would then treat them as similar.
+- Make banana point exactly opposite to cat, $(-3, -1)$: the cosine is −1.
+
+</Section>
+
+<Section kind="code" title="Lookup and cosine in NumPy">
+
+The table in the code is the one on the map. Select a part of the code to see what it does.
+
+<Experiment def={experiment} title="embeddings.py, linked to the map" controls={false}>
+  <Code example={embeddingCode} title="embeddings.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+`print(one_hot @ E)` shows decimal points even when $E$ holds whole numbers, because `np.eye` makes a float array;
+`print(E[a_id])` keeps $E$'s own type.
+
+</Section>
+
+<Section kind="experiment" title="Step through the lookup and the similarity">
+
+Each step shows the line that runs and the shapes it produces. Pick other tokens or move points on the map, then
+step again.
+
+<Experiment def={experiment} title="Lookup and cosine, step by step" controls={false}>
+  <StepThrough example={embeddingCode} title="embeddings.py" />
+  <Readout />
+</Experiment>
+
+</Section>
+
+<Section kind="mistakes" title="Out-of-range IDs and zero vectors">
+
+<CommonMistake
+  title="Looking up an ID that is not in the table"
+  wrong={'E = np.zeros((8, 2))  # vocabulary of 8 tokens: IDs 0 to 7\nE[8]'}
+  error="IndexError: index 8 is out of bounds for axis 0 with size 8"
+  cause="The table has one row per token, so valid IDs run from 0 to V − 1. This happens when IDs come from a different tokenizer, or when special tokens were added to the tokenizer but the table was not resized."
+  fix={'assert ids.max() < E.shape[0]  # check before the lookup'}
+/>
+
+<CommonMistake
+  title="Cosine similarity with a zero vector"
+  wrong={'a = np.array([0., 0.])\nb = np.array([1., 2.])\ncos = a @ b / (np.linalg.norm(a) * np.linalg.norm(b))'}
+  error="RuntimeWarning: invalid value encountered in scalar divide"
+  cause="A zero vector has length 0 and no direction, so the formula divides 0 by 0 and NumPy returns nan with a warning. The map above never lets a point sit exactly on the origin for this reason."
+  fix={'den = np.linalg.norm(a) * np.linalg.norm(b)\ncos = a @ b / den if den > 0 else 0.0'}
+/>
+
+<Callout kind="warning">
+  The dot product alone is not a similarity: a long vector has a large dot product with almost everything. Use the
+  cosine, or normalize the vectors to length 1 first, in which case the dot product equals the cosine.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+| Where                                 | What is embedded           | Shape                                      |
+| ------------------------------------- | -------------------------- | ------------------------------------------ |
+| Input layer of every language model   | Token IDs                  | $(B, T) \rightarrow (B, T, d)$             |
+| Semantic search and retrieval         | Whole sentences or chunks  | one vector per text, compared by cosine    |
+| Recommendation systems                | Users and items            | one row per user or item                   |
+
+The AI track's lesson [Tokenization, embeddings and similarity](#/learn/ai/representations/tokens-embeddings) uses a
+real sentence-embedding model and searches sentences by cosine similarity. In PyTorch, the table is
+`torch.nn.Embedding(num_embeddings, embedding_dim)`, a layer whose weight has shape $(V, d)$.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Write cosine similarity">
+
+<MiniExercise exercise={cosineExercise}>
+  Write `cosine(a, b)` for two equal-length lists of numbers, without NumPy: the dot product divided by the product
+  of the two lengths. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- An embedding table $E$ has shape $(V, d)$; token ID $i$ looks up row $i$. A batch $(B, T)$ becomes $(B, T, d)$.
+- A one-hot vector times $E$ gives the same row: an embedding layer is a matrix multiplication done as a lookup.
+- Cosine similarity, $a \cdot b / (\lVert a \rVert \lVert b \rVert)$, compares directions and ignores lengths.
+- The vectors here were made by hand in 2-D. Real ones are learned, with hundreds of dimensions.
+
+Next: [Attention](#/learn/ml/deep/attention) uses dot products between token vectors to decide which tokens each
+token should look at.
+
+</Section>
