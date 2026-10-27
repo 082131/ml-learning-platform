@@ -4,6 +4,9 @@ import { expect, test } from '@playwright/test';
 const CAPSTONES = [
   { id: 'capstone-classification', heading: 'classification', milestones: 8 },
   { id: 'capstone-neural-net', heading: 'neural network', milestones: 7 },
+  { id: 'capstone-finetune', heading: 'fine-tune', milestones: 7 },
+  { id: 'capstone-nlp', heading: 'NLP', milestones: 7 },
+  { id: 'capstone-reproduce', heading: 'reproduce', milestones: 7 },
 ];
 
 for (const c of CAPSTONES) {

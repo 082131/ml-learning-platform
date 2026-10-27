@@ -106,9 +106,9 @@ export const tracks: Track[] = [
         lessons: [
           { id: 'ml/projects/capstone-classification', status: 'written' },
           { id: 'ml/projects/capstone-neural-net', status: 'written' },
-          { id: 'ml/projects/capstone-finetune', status: 'outline' },
-          { id: 'ml/projects/capstone-nlp', status: 'outline' },
-          { id: 'ml/projects/capstone-reproduce', status: 'outline' },
+          { id: 'ml/projects/capstone-finetune', status: 'written' },
+          { id: 'ml/projects/capstone-nlp', status: 'written' },
+          { id: 'ml/projects/capstone-reproduce', status: 'written' },
         ],
       },
     ],

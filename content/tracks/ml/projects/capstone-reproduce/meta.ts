@@ -13,4 +13,20 @@ export default {
   ],
   prerequisites: ['ml/practice/experiment-tracking', 'ml/practice/ablations'],
   concepts: [],
+  references: [
+    {
+      title: 'Pineau et al., Improving Reproducibility in Machine Learning Research (JMLR 2021)',
+      url: 'https://jmlr.org/papers/v22/20-303.html',
+    },
+    {
+      title: 'scikit-learn: LinearRegression',
+      url: 'https://scikit-learn.org/1.9/modules/generated/sklearn.linear_model.LinearRegression.html',
+      version: 'scikit-learn 1.9',
+    },
+    {
+      title: 'Python statistics module (mean, stdev)',
+      url: 'https://docs.python.org/3/library/statistics.html',
+      version: 'Python 3.13',
+    },
+  ],
 } satisfies LessonMeta;

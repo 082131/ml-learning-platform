@@ -1,0 +1,111 @@
+import { brief, demoOutput, demoQueries, searchCode, setupCode } from './code';
+import { metricsExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Find the right page for a question">
+
+Ask a colleague "how do I check that a download was not corrupted?" and they will point you at `hashlib`, even
+though its documentation never uses the words *download* or *corrupted*. A search system has to bridge that gap.
+Keyword search matches the words people type; embedding search matches what they mean. Each fails in its own way.
+
+In this capstone you build both over a real document collection, the Python standard library documentation, write
+the questions and answers you evaluate them with, and find out which kinds of questions each one gets wrong. The
+evaluation set you build is as much a result as the search system.
+
+</Section>
+
+<Section kind="technical" title="What you will build">
+
+**Passages.** Each documentation file is split into passages of whole paragraphs (at least 40 words). A file's
+rank is the rank of its best passage.
+
+**BM25** scores a passage $d$ for a query $q$ by summing over the query terms $t$:
+
+$$
+\text{score}(q, d) = \sum_{t \in q} \text{idf}(t) \cdot \frac{f_{t,d}\,(k_1 + 1)}{f_{t,d} + k_1\left(1 - b + b\,\frac{|d|}{\text{avgdl}}\right)},
+\qquad \text{idf}(t) = \ln\!\left(1 + \frac{N - n_t + 0.5}{n_t + 0.5}\right)
+$$
+
+where $f_{t,d}$ is how often $t$ occurs in $d$, $|d|$ the passage length, $N$ the number of passages, $n_t$ the
+number containing $t$, and $k_1 = 1.5$, $b = 0.75$.
+
+**Embedding search** encodes every passage and every query with a sentence-embedding model into a vector (384
+numbers for all-MiniLM-L6-v2) and ranks passages by cosine similarity. **Fusion** combines the two rankings,
+for example with reciprocal rank fusion: a file scores $\sum_r 1 / (60 + \text{rank}_r)$ over the rankings $r$.
+
+**Metrics.** For each query, find the rank of the first relevant file. Recall@k is the share of queries with that
+rank at most $k$; the mean reciprocal rank (MRR) averages $1/\text{rank}$, counting 0 when nothing relevant is
+found.
+
+</Section>
+
+<Section kind="code" title="Run it locally">
+
+<Code example={setupCode} title="terminal" />
+
+`search.py` uses only the standard library: it splits the documents into passages, builds a BM25 index and
+evaluates it on a query file.
+
+<Code example={searchCode} title="search.py" />
+
+To check it, we ran it on a three-file demo corpus (short excerpts describing `json`, `csv` and `hashlib`) with
+five labeled queries:
+
+<Code example={demoQueries} title="queries.jsonl" />
+
+<Code example={demoOutput} title="terminal" />
+
+The last query is a paraphrase that shares almost no words with the `hashlib` page, so BM25 ranks it third. Your
+query set should contain many such questions.
+
+</Section>
+
+<Section kind="practice" title="The brief">
+
+Tick each milestone when it is done; your progress is saved in this browser.
+
+<Project brief={brief} />
+
+</Section>
+
+<Section kind="mistakes" title="Where search projects go wrong">
+
+<CommonMistake
+  title="Writing queries by copying sentences from the documents"
+  wrong={'{"query": "json.dumps serializes obj to a JSON formatted str", "relevant": ["library/json.txt"]}'}
+  error="No error. Every system scores near 1.0, and the evaluation cannot tell them apart."
+  cause="Copied wording makes keyword search trivially right. Real users describe what they want, not what the page says."
+  fix={'{"query": "turn a dictionary into text I can send to a web API", "relevant": ["library/json.txt"]}'}
+/>
+
+<CommonMistake
+  title="Re-encoding the whole collection for every query"
+  wrong={'for q in queries:\n    passage_vectors = model.encode(passages)  # minutes, every time\n    ...'}
+  error="No error, but evaluation takes hours."
+  cause="Passage embeddings do not depend on the query."
+  fix={'passage_vectors = model.encode(passages, normalize_embeddings=True)\nnp.save("passages.npy", passage_vectors)  # once\n# per query: model.encode(q, normalize_embeddings=True) @ passage_vectors.T'}
+/>
+
+</Section>
+
+<Section kind="check" title="Self-assessment">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Compute recall@k and MRR">
+
+<MiniExercise exercise={metricsExercise}>
+  Write `retrieval_metrics(rankings, relevant, k)` in plain Python and use it for all three systems.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Keyword search (BM25) matches words; embedding search matches meaning; fusion often combines their strengths.
+- Build the evaluation set with realistic, paraphrased queries, label it carefully, and freeze a test part.
+- Report recall@k and MRR per query type, with the number of queries.
+- Read the failures and name their causes: that is what tells you what to build next.
+
+</Section>

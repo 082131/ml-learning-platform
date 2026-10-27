@@ -102,8 +102,8 @@ Close each content thread with: content validation green, `check`, `e2e` and `bu
 - [ ] M411 `project-neural-net`.
 
 ## Thread 8: ML Practice and Projects (`ml/practice`, `ml/projects`, 11 entries)
-- [ ] M501 to M506 experiment tracking, tuning (a search visualizer on a known function), versioning (lineage FlowDiagram), ablations, model testing, GPU training (throughput model labeled as an estimate with its formula; link to the inference track).
-- [ ] M601 to M605 five capstone briefs with milestones, rubric, hints, local-run instructions (pinned versions, official docs) and self-assessment checklists.
+- [x] M501 to M506 experiment tracking, tuning (a search visualizer on a known function), versioning (lineage FlowDiagram), ablations, model testing, GPU training (throughput model labeled as an estimate with its formula; link to the inference track).
+- [x] M601 to M605 five capstone briefs with milestones, rubric, hints, local-run instructions (pinned versions, official docs) and self-assessment checklists.
 
 ## Thread 9: Data Engineering flagship (3 lessons)
 - [x] D001 `data/relational/joins-indexes`: a join visualizer with SQL linked to the result rows, implemented in TypeScript over small tables. Index vs full-scan step-through counting rows touched (computed). Optional: real SQL via sql.js only if justified in the plan's decision log.

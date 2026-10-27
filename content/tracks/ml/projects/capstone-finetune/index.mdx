@@ -1,0 +1,113 @@
+import { brief, finetuneCode, setupCode, smokeOutput } from './code';
+import { confidentErrorsExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Reuse what a large model already learned">
+
+Training a language model from scratch takes far more text and compute than most teams have. Fine-tuning starts
+from a model that was pretrained on a large corpus and adjusts it, with a small learning rate, for one task such as
+sentiment. A few thousand labeled reviews and an hour on one GPU are often enough to beat a classical model.
+
+Often, but not always, and never for free. This capstone asks you to measure both sides: how much accuracy the
+transformer adds over a strong, cheap baseline, what it costs in time and memory, and which reviews both models
+still get wrong.
+
+</Section>
+
+<Section kind="technical" title="What you will build">
+
+**The model.** DistilBERT (67 million parameters) is a smaller version of BERT trained to imitate it. For
+classification, `AutoModelForSequenceClassification` adds a linear layer on the representation of the first token
+and trains the whole network with cross-entropy. Only that head starts from random weights.
+
+**The baseline.** TF-IDF features (word and word-pair counts, weighted by how rare each term is) and logistic
+regression. It trains in seconds on a CPU and is the bar the transformer has to clear.
+
+**The comparison.** Both models see the same seeded 5,000 training and 2,000 evaluation reviews. Report accuracy
+with a bootstrap interval of the difference between the models, plus measured cost:
+
+| Measure | How |
+| --- | --- |
+| Training time | wall clock around `trainer.train()`, with the GPU type |
+| Peak GPU memory | `torch.cuda.max_memory_allocated()` after training |
+| Model size | bytes of the saved weights |
+| Prediction time | reviews per second on the evaluation set |
+
+**Failure analysis.** Read the most confident mistakes of each model and group them. The categories, not the
+overall accuracy, tell you what to try next.
+
+</Section>
+
+<Section kind="code" title="Run it locally">
+
+<Code example={setupCode} title="terminal" />
+
+The script has two modes. `--smoke` builds a tiny random model and six reviews in memory to check the whole code
+path without a download; the default mode fine-tunes DistilBERT on IMDb.
+
+<Code example={finetuneCode} title="finetune.py" />
+
+We ran the smoke test with the pinned versions; it prints:
+
+<Code example={smokeOutput} title="terminal" />
+
+The full run downloads the model and the dataset from the Hugging Face Hub, which was not reachable from the
+machine this brief was written on, so no full-run numbers are given here. Measuring them is part of your project.
+
+</Section>
+
+<Section kind="practice" title="The brief">
+
+Tick each milestone when it is done; your progress is saved in this browser.
+
+<Project brief={brief} />
+
+</Section>
+
+<Section kind="mistakes" title="Where fine-tuning projects go wrong">
+
+<CommonMistake
+  title="Selecting a subset without shuffling"
+  wrong={'train = imdb["train"].select(range(5000))'}
+  error="No error. Every selected review is negative, so the model learns nothing useful."
+  cause="The IMDb splits are stored grouped by label: rows 0 to 12,499 are negative."
+  fix={'train = imdb["train"].shuffle(seed=42).select(range(5000))'}
+/>
+
+<CommonMistake
+  title="Using a tutorial written for an older version"
+  wrong={'Trainer(model=model, args=args, tokenizer=tokenizer, ...)\nTrainingArguments(..., evaluation_strategy="epoch")'}
+  error="TypeError: Trainer.__init__() got an unexpected keyword argument 'tokenizer' (and the same for evaluation_strategy in TrainingArguments)."
+  cause="transformers 5 renamed these arguments."
+  fix={'Trainer(model=model, args=args, processing_class=tokenizer, ...)\nTrainingArguments(..., eval_strategy="epoch")'}
+/>
+
+<Callout kind="warning">
+  Evaluate both models on reviews neither was trained or tuned on. If you choose hyperparameters on the 2,000
+  evaluation reviews, hold out another set for the final comparison.
+</Callout>
+
+</Section>
+
+<Section kind="check" title="Self-assessment">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Find the confident mistakes">
+
+<MiniExercise exercise={confidentErrorsExercise}>
+  Write `confident_errors(texts, labels, probs, k)` in plain Python. You will run it on both models’ predictions
+  for the failure analysis.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Fine-tuning adapts a pretrained model with a small learning rate; only the classification head starts random.
+- Compare against a cheap baseline on identical data, with an interval, and report measured cost.
+- A smoke test with a tiny model catches pipeline errors before an expensive run.
+- Read the confident mistakes and group them: that is where the next improvement comes from.
+
+</Section>

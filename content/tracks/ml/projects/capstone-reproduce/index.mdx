@@ -1,0 +1,108 @@
+import { brief, setupCode, targetTable } from './code';
+import { pairedExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Can someone else get your number?">
+
+A result that only its author can produce is a claim, not a finding. Reproducing an experiment from its written
+description is how the field checks claims, and it is also the best way to learn what a description must contain:
+you discover every detail that was left out the moment you need it.
+
+In this capstone you reproduce a result from a description alone. The default target is the ablation table from
+this course, described below the way a paper's methods section would describe it. You will find out which of your
+numbers match, which do not, and why, and you will separate "the numbers reproduced" from "the conclusions
+reproduced".
+
+</Section>
+
+<Section kind="technical" title="The description to reproduce">
+
+**Data.** 200 deliveries, generated in order `order_id` = 0 to 199 with a 32-bit linear congruential generator
+seeded with 7: state ← (1664525 · state + 1013904223) mod 2³², and each random number is state / 2³². For each
+delivery draw, in this order: distance km = 0.5 + 14.5u; stops = ⌊4u⌋; rain = 1 if u < 0.3 else 0; region =
+(city, suburb, rural)[⌊3u⌋]; noise = 8u − 4. Then
+
+$$
+\text{minutes} = 6 + 2.5\,\text{km} + 3\,\text{stops} + 7\,\text{rain} + r(\text{region}) + \text{noise}, \qquad
+r = \{\text{city}: 0,\ \text{suburb}: 2,\ \text{rural}: 8\}
+$$
+
+**Model.** Ordinary least-squares linear regression with an intercept on five components: distance, stops, rain,
+region (one-hot suburb and rural, city as reference) and order_id / 100.
+
+**Protocol.** For each seed $s \in \{0, \dots, 4\}$, shuffle the row indices with a Fisher–Yates shuffle driven by
+the same generator seeded with $s$ (walking from the last index down, swapping with index ⌊u · (i + 1)⌋), take the
+first 50 as validation and the remaining 150 for training, fit, and compute the validation mean absolute error.
+Report the mean and the sample standard deviation over the 5 seeds, for the full model and for each model with one
+component removed.
+
+**Target.**
+
+<Code example={targetTable} title="target" />
+
+</Section>
+
+<Section kind="code" title="Run it locally">
+
+<Code example={setupCode} title="terminal" />
+
+There is no starter code on purpose: writing the reproduction from the description is the project. Print your
+table in the target format so the two can be compared line by line.
+
+</Section>
+
+<Section kind="practice" title="The brief">
+
+Tick each milestone when it is done; your progress is saved in this browser.
+
+<Project brief={brief} />
+
+</Section>
+
+<Section kind="mistakes" title="Where reproductions go wrong">
+
+<CommonMistake
+  title="Filling a gap in the description with your usual habit"
+  wrong={'X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=50, random_state=seed)'}
+  error="No error. The numbers come out close to the target but not equal, and it is unclear why."
+  cause="The description specifies its own shuffle. A different split gives different validation rows, so every number moves a little."
+  fix={'order = list(range(200))\nLCG(seed).shuffle(order)   # exactly as described\nval, train = order[:50], order[50:]'}
+/>
+
+<CommonMistake
+  title="Comparing numbers without the noise"
+  wrong={'# target 3.602, mine 3.441: "stops reproduced badly"'}
+  error="No error. A conclusion is drawn from a difference that may be noise."
+  cause="Each number has a seed spread of about 0.3 here. A difference smaller than that is not evidence of a mismatch."
+  fix={'# compare the difference with the spreads, or compare paired per-seed differences,\n# and check whether the conclusion (the ranking, what is within noise) still holds'}
+/>
+
+<Callout kind="warning">
+  Reproduce first, then improve. Fixing what you think is a flaw in the original before you have matched it makes
+  every later difference impossible to attribute.
+</Callout>
+
+</Section>
+
+<Section kind="check" title="Self-assessment">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Compare on the same seeds">
+
+<MiniExercise exercise={pairedExercise}>
+  Write `paired_difference(a, b)` in plain Python. Use it to compare your reproduction with an ablated variant
+  seed by seed.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Reproduce from the description alone, and list every detail it fixes and every gap you had to fill.
+- Compare number by number against the seed spread, and separately check whether the conclusions hold.
+- Explain at least one difference with an ablation that changes only that detail.
+- Your report should end with what the original description needed to say to be reproducible.
+
+</Section>
