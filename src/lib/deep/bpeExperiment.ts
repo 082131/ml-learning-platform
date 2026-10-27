@@ -123,7 +123,10 @@ export const describeWords = (words: readonly WordState[]) =>
 const pairText = (p: readonly [string, string]) => `(${p[0]}, ${p[1]})`;
 
 /** The highest pair counts, highest first (stable, so ties keep first-seen order). */
-export function topPairs(m: { pairCounts: { pair: readonly [string, string]; count: number }[] }, n = TOP_PAIRS) {
+export function topPairs(
+  m: { pairCounts: { pair: readonly [string, string]; count: number }[] },
+  n = TOP_PAIRS,
+) {
   return [...m.pairCounts].sort((a, b) => b.count - a.count).slice(0, n);
 }
 
@@ -215,7 +218,9 @@ export function buildBpeTrace(s: BpeState, r: BpeResult = computeBpe(s)): Trace 
     vars: { ...base(), ids: array(ids) },
     note:
       `encode splits "${s.text}" into ${r.tokens.length} tokens.` +
-      (unknown.length ? ` ${unknown.join(', ')} never appeared in the corpus, so it becomes ${UNK} (ID 0).` : ''),
+      (unknown.length
+        ? ` ${unknown.join(', ')} never appeared in the corpus, so it becomes ${UNK} (ID 0).`
+        : ''),
   });
   steps.push({
     range: { line: LINE.print },
@@ -266,8 +271,14 @@ export function bpeExperiment(
     traceExample,
     readout: (s, r) => [
       { label: 'Merges learned', value: `${r.model.merges.length} of ${s.numMerges} requested` },
-      { label: 'Vocabulary size', value: `1 [UNK] + ${r.model.base.length} characters + ${r.model.vocab.length - 1 - r.model.base.length} merged = ${r.model.vocab.length}` },
-      { label: 'Characters in the text → tokens', value: `${[...s.text.replace(/\s+/gu, '')].length} → ${r.tokens.length}` },
+      {
+        label: 'Vocabulary size',
+        value: `1 [UNK] + ${r.model.base.length} characters + ${r.model.vocab.length - 1 - r.model.base.length} merged = ${r.model.vocab.length}`,
+      },
+      {
+        label: 'Characters in the text → tokens',
+        value: `${[...s.text.replace(/\s+/gu, '')].length} → ${r.tokens.length}`,
+      },
       { label: 'What the program prints', value: r.output },
     ],
   };

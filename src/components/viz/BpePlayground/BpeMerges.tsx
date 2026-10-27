@@ -53,10 +53,9 @@ export function BpeMerges() {
                   type="button"
                   className={s.mergeButton}
                   aria-pressed={i === index}
-                  aria-label={`Merge ${m.step}: ${m.pair[0]} + ${m.pair[1]} → ${m.token}`}
                   onClick={() => select(i)}
                 >
-                  {m.step}. {m.token}
+                  {m.step}. {m.pair[0]} + {m.pair[1]} → {m.token}
                 </button>
               </li>
             ))}
@@ -124,7 +123,10 @@ function MergeDetail({ merge }: { merge: BpeMerge }) {
 function WordRow({ before, after, token }: { before: WordState; after: WordState; token: string }) {
   const changed = before.symbols.length !== after.symbols.length;
   return (
-    <li className={s.word} aria-label={`${before.word}, ${before.count} times: ${before.symbols.join(' ')} becomes ${after.symbols.join(' ')}`}>
+    <li
+      className={s.word}
+      aria-label={`${before.word}, ${before.count} times: ${before.symbols.join(' ')} becomes ${after.symbols.join(' ')}`}
+    >
       <span className={s.wordName}>
         {before.word} ×{before.count}
       </span>

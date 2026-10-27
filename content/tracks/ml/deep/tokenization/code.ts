@@ -71,7 +71,7 @@ export const bpeTrain: CodeExample = {
       match: 'list(w)',
       kind: 'function',
       title: 'list(w)',
-      what: 'Turns a word into a list of its characters: list("low") is [\'l\', \'o\', \'w\'].',
+      what: "Turns a word into a list of its characters: list(\"low\") is ['l', 'o', 'w'].",
       why: 'BPE starts from the smallest units and builds bigger tokens from them.',
     },
     {
@@ -82,7 +82,7 @@ export const bpeTrain: CodeExample = {
       title: 'The base vocabulary',
       what: 'Joins all distinct words, keeps each character once (set) and sorts them.',
       why: 'Every character of the corpus gets an ID, so any word made only of these characters can be tokenized. "[UNK]" goes first, with ID 0.',
-      output: 'A list such as [\'[UNK]\', \'d\', \'e\', …]',
+      output: "A list such as ['[UNK]', 'd', 'e', …]",
     },
     {
       id: 'zip',

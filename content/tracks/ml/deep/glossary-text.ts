@@ -5,7 +5,8 @@ export default [
   {
     id: 'token',
     term: 'Token',
-    short: 'One unit of text a language model reads or writes: a word, a piece of a word, a character or a byte.',
+    short:
+      'One unit of text a language model reads or writes: a word, a piece of a word, a character or a byte.',
     long: 'A tokenizer splits text into tokens and gives each one an integer ID. Models never see characters directly; they see the sequence of token IDs.',
     introducedIn: 'ml/deep/tokenization',
     aliases: ['tokens'],
@@ -98,7 +99,8 @@ export default [
   {
     id: 'residual-connection',
     term: 'Residual connection',
-    short: 'Adds a sub-layer’s input to its output (x + f(x)), so information and gradients can pass around it.',
+    short:
+      'Adds a sub-layer’s input to its output (x + f(x)), so information and gradients can pass around it.',
     introducedIn: 'ml/deep/transformers',
     aliases: ['skip connection'],
   },

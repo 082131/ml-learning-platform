@@ -128,7 +128,15 @@ export function trainBpe(corpus: string, numMerges: number): BpeModel {
     const token = best.pair[0] + best.pair[1];
     if (!vocab.includes(token)) vocab.push(token);
     const after = words.map((w) => ({ ...w, symbols: mergePair(w.symbols, best.pair) }));
-    learned.push({ step: step + 1, pair: best.pair, count: best.count, token, pairCounts, before: words, after });
+    learned.push({
+      step: step + 1,
+      pair: best.pair,
+      count: best.count,
+      token,
+      pairCounts,
+      before: words,
+      after,
+    });
     words = after;
   }
   const merges = learned.map((m) => ({ ...m, id: vocab.indexOf(m.token) }));

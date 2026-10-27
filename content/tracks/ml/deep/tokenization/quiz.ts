@@ -24,14 +24,12 @@ export const questions: QuizQuestion[] = [
   {
     id: 'encode-order',
     type: 'choice',
-    prompt:
-      'The merges, in order, are e+s, es+t, l+o, lo+w. How is the unseen word “lowest” tokenized?',
+    prompt: 'The merges, in order, are e+s, es+t, l+o, lo+w. How is the unseen word “lowest” tokenized?',
     options: [
       {
         text: 'low | est',
         correct: true,
-        explain:
-          'Replaying the merges in order: l o w e s t → l o w es t → l o w est → lo w est → low est.',
+        explain: 'Replaying the merges in order: l o w e s t → l o w es t → l o w est → lo w est → low est.',
       },
       {
         text: 'lowest',
@@ -95,7 +93,8 @@ export const questions: QuizQuestion[] = [
       {
         text: 'It makes the vocabulary as small as possible',
         correct: false,
-        explain: 'A character-level vocabulary would be smaller. Subwords trade a larger vocabulary for shorter sequences.',
+        explain:
+          'A character-level vocabulary would be smaller. Subwords trade a larger vocabulary for shorter sequences.',
       },
     ],
   },

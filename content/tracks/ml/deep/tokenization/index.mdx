@@ -1,0 +1,196 @@
+import { bpeRunner, bpeTrain, experiment } from './code';
+import { countPairsExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Text has to become numbers first">
+
+A neural network only does arithmetic on numbers, so before a language model can read "lowest newer wider!", the
+text has to become a list of integers. The program that does this is a
+<Term id="tokenizer">tokenizer</Term>. It cuts the text into pieces called
+<Term id="token">tokens</Term> and replaces each piece with its position in a fixed list, the
+<Term id="vocabulary">vocabulary</Term>. That position is the token's ID.
+
+Which pieces? Whole words seem natural, but no vocabulary can list every word: names, typos and new words would
+all be missing. Single characters never miss anything, but then every sentence becomes a very long list, and each
+token carries little meaning. Modern tokenizers sit in between: frequent words become one token, and rare words are
+spelled out from smaller pieces that are in the vocabulary.
+
+<Term id="byte-pair-encoding">Byte-pair encoding</Term> (BPE) is the most common way to choose those pieces. It
+starts from single characters and keeps gluing together the pair of neighbours that occurs most often. After a few
+merges, "est" is one token, because it shows up in both "newest" and "widest".
+
+</Section>
+
+<Section kind="technical" title="The BPE training loop and the encoder">
+
+**Training** takes a corpus (a body of example text) and a number of merges.
+
+1. Split the corpus into words at whitespace and count each word. This lesson's corpus, from the paper that
+   brought BPE to language models (Sennrich et al., 2016), is `low` ×5, `lower` ×2, `newest` ×6, `widest` ×3.
+2. Write each word as a list of characters. The base vocabulary is every distinct character, here the 10 letters
+   `d e i l n o r s t w`, plus a fallback token `[UNK]` (unknown) with ID 0.
+3. Count every pair of neighbouring symbols. A pair inside a word that occurs 6 times counts 6.
+4. Merge the most frequent pair everywhere it appears, and add the joined symbol to the vocabulary as a new token.
+5. Repeat steps 3 and 4 for the requested number of merges.
+
+**Worked example, merge 1.** The pair (e, s) occurs once in `newest` and once in `widest`, so its count is
+$6 + 3 = 9$. The pair (s, t) also counts $6 + 3 = 9$, and (l, o) only $5 + 2 = 7$. Two pairs tie at 9; this
+implementation keeps the one it counted first, (e, s). Every `e s` becomes `es`, so `newest` is now
+`n e w es t`, and `es` gets the next free ID, 11.
+
+**Merge 2** counts again over the new symbols. (es, t) occurs in `newest` and `widest`: $6 + 3 = 9$, the highest,
+so `est` (ID 12) is born from a token learned one step earlier. That is why counting is redone after every merge.
+
+**Encoding** a new text replays the learned merges, in training order, on each word. For `lowest` with the first
+four merges (e+s, es+t, l+o, lo+w):
+
+$$
+\texttt{l o w e s t} \rightarrow \texttt{l o w es t} \rightarrow \texttt{l o w est} \rightarrow \texttt{lo w est} \rightarrow \texttt{low est}
+$$
+
+`lowest` never appeared in the corpus, yet it becomes two known tokens. A character that is not in the base
+vocabulary, such as `!`, has no token at all; this toy tokenizer replaces it with `[UNK]`, and the information is
+lost.
+
+**Sizes.** The vocabulary has $1 + (\text{base characters}) + (\text{merges that made a new token})$ entries:
+$1 + 10 + 10 = 21$ after 10 merges. The output of encoding is a list of integers of length
+$(\text{number of tokens})$, which is what the model's first layer receives.
+
+<Callout kind="simplification">
+  This tokenizer is a teaching version. Production tokenizers differ in ways that matter:
+
+- **Byte-level BPE (GPT-2 and later GPT models).** The base vocabulary is the 256 possible byte values, and the text
+  is first encoded as UTF-8 bytes. Every possible string can be written with them, so there is no `[UNK]`: an
+  unseen character costs a few byte tokens instead. GPT-2 learned 50,000 merges, for a vocabulary of 50,257
+  tokens (256 bytes, 50,000 merges and one end-of-text token).
+- **Spaces are kept.** Our `split()` throws spaces away, so decoding cannot put them back. GPT-2 splits text with a
+  regular expression that keeps a leading space attached to the next word, so `" lowest"` and `"lowest"` are
+  different tokens. SentencePiece (used by T5 and Llama 2) replaces spaces with the visible symbol `▁` and never
+  splits on whitespace at all, which also works for languages written without spaces. It can train BPE or a
+  different algorithm (the unigram model), and its `byte_fallback` option turns unknown characters into byte
+  tokens.
+- **Speed.** Real encoders do not loop over every merge for every word. They repeatedly merge the pair with the
+  best rank (the earliest learned merge) present in the word, in compiled code, with a cache.
+- **Special tokens** such as end-of-text or padding are added by hand, not learned.
+
+The references list the documentation for each.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Merges, pair counts and tokens">
+
+Change the corpus, the number of merges or the text in the controls below. Select a merge to see the pair counts
+that chose it and how every word changed. The Code and Experiment sections use the same inputs.
+
+<Experiment def={experiment} title="Tokenizer playground">
+  <BpeMerges />
+  <BpeTokens />
+</Experiment>
+
+Things to try:
+
+- Set the number of merges to 0: every token is one character, and `lowest` takes 6 tokens.
+- Type a word with a letter the corpus lacks, such as `zest`: the `z` becomes `[UNK]`, while `est` is still one
+  token.
+- Add the word `lowest` to the corpus several times and watch which merges change.
+
+</Section>
+
+<Section kind="code" title="The whole tokenizer in Python">
+
+The program below trains the tokenizer and encodes the text. The literals at the top come from the playground.
+Select a highlighted part of the code to see what it does and why.
+
+<Experiment def={experiment} title="bpe.py, linked to the playground" controls={false}>
+  <Code example={bpeTrain} title="bpe.py" />
+  <Readout title="What the program prints" />
+</Experiment>
+
+The printout above is computed in your browser by a TypeScript port of this program; its output was checked against
+real CPython 3.13 runs. You can also run the Python itself, with the starting inputs, and edit it:
+
+<PythonRunner example={bpeRunner} title="bpe_run.py" />
+
+</Section>
+
+<Section kind="experiment" title="Step through the merge loop">
+
+Each merge takes three steps: count the pairs, pick the most frequent one, and rewrite the words. The variables
+panel shows the top pair counts and the words after each step. Change the merge slider in the Visual section to
+make the loop longer or shorter.
+
+<Experiment def={experiment} title="The merge loop" controls={false}>
+  <StepThrough example={bpeTrain} title="bpe.py" />
+  <Readout />
+</Experiment>
+
+</Section>
+
+<Section kind="mistakes" title="Missing tokens and mismatched tokenizers">
+
+<CommonMistake
+  title="Encoding a character the vocabulary does not contain"
+  wrong={'vocab = ["[UNK]", "a", "b"]\nids = [vocab.index(ch) for ch in "ab!"]'}
+  error="ValueError: '!' is not in list"
+  cause="Without a fallback, a character the corpus never contained has no ID. This is why the lesson's encoder maps unknown characters to [UNK] first, and why byte-level tokenizers start from all 256 bytes."
+  fix={'ids = [vocab.index(ch) if ch in vocab else 0 for ch in "ab!"]  # 0 is [UNK]'}
+/>
+
+<CommonMistake
+  title="Picking the best pair when there are no pairs left"
+  wrong={'pairs = {}  # every word is already a single token\nbest = max(pairs, key=pairs.get)'}
+  error="ValueError: max() iterable argument is empty"
+  cause="Once every word has merged into one symbol there are no neighbours to count, and max of an empty dict fails. The program checks `if not pairs: break` first."
+  fix={'if not pairs:\n    break\nbest = max(pairs, key=pairs.get)'}
+/>
+
+<Callout kind="warning">
+  Two mistakes raise no error at all. Token IDs only mean something for the tokenizer that produced them: feeding
+  IDs from one tokenizer to a model trained with another gives fluent-looking nonsense. And a token count is not a
+  word or character count; check the real tokenizer when you budget a model's context length.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+Every language model API and library starts with a tokenizer. The token IDs it produces are the row numbers of the
+model's embedding table, which turns each ID into a vector: that is the next lesson. Token counts also set cost
+and limits: context windows and API prices are measured in tokens, not words.
+
+| Tokenizer                         | Base units                  | Unknown characters                  |
+| --------------------------------- | --------------------------- | ----------------------------------- |
+| This lesson's toy BPE             | Characters of the corpus    | `[UNK]`                             |
+| GPT-2 style byte-level BPE        | 256 byte values             | Never unknown: spelled as bytes     |
+| SentencePiece (BPE or unigram)    | Characters, spaces as `▁`   | `<unk>`, or bytes with byte_fallback |
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Count the pairs yourself">
+
+<MiniExercise exercise={countPairsExercise}>
+  Write `count_pairs(words, counts)`: `words` maps each word to its current list of symbols and `counts` maps each
+  word to how often it occurs. Return a dict from each adjacent pair (a tuple of two symbols) to its total count.
+  Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A tokenizer turns text into token IDs: positions in a fixed vocabulary. Models only see these integers.
+- BPE training counts adjacent pairs (weighted by word frequency), merges the most frequent one, and repeats.
+- Encoding replays the merges in training order, so unseen words split into known pieces.
+- The toy version loses spaces and needs `[UNK]`; byte-level BPE and SentencePiece keep spaces and can always
+  encode any text.
+
+Next: [Embeddings and vector similarity](#/learn/ml/deep/embeddings) turns each token ID into a vector the network
+can compute with.
+
+</Section>

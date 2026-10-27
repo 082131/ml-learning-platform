@@ -48,7 +48,8 @@ export function BpeTokens() {
       </section>
       <section className={s.section} aria-label="Vocabulary">
         <h3 className={s.heading}>
-          Vocabulary: {vocab.length} tokens ({base.length} characters, {vocab.length - 1 - base.length} merged)
+          Vocabulary: {vocab.length} tokens ({base.length} characters, {vocab.length - 1 - base.length}{' '}
+          merged)
         </h3>
         <ol className={s.chips} data-vocab>
           {vocab.map((t, i) => (

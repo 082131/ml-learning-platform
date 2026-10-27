@@ -79,7 +79,13 @@ describe('trainBpe and encode', () => {
       ['est', 9, 12],
       ['lo', 7, 13],
     ]);
-    expect(model.merges[0]!.after.find((w) => w.word === 'widest')!.symbols).toEqual(['w', 'i', 'd', 'es', 't']);
+    expect(model.merges[0]!.after.find((w) => w.word === 'widest')!.symbols).toEqual([
+      'w',
+      'i',
+      'd',
+      'es',
+      't',
+    ]);
   });
 
   it('maps unseen characters to [UNK] and remembers what they replaced', () => {
@@ -110,7 +116,11 @@ describe('trainBpe and encode', () => {
 });
 
 describe('bpeExperiment', () => {
-  const def = bpeExperiment('bpe', { corpus: SENNRICH, text: 'lowest newer wider!', numMerges: 10 }, 'bpe-train');
+  const def = bpeExperiment(
+    'bpe',
+    { corpus: SENNRICH, text: 'lowest newer wider!', numMerges: 10 },
+    'bpe-train',
+  );
 
   it('is valid, and its trace fits the filled source', () => {
     expect(validateExperiment(def)).toEqual([]);
