@@ -249,7 +249,14 @@ export function train(cfg: TrainConfig): TrainRun {
     for (let s = 0; s < spe; s++) {
       const idx = order.slice(s * batch, (s + 1) * batch);
       const l = stepFlat(f, data.train.X, data.train.y, idx, lr);
-      iters.push({ iter: iters.length + 1, epoch: e, step: s, loss: l, size: idx.length, idx: e === 1 ? idx : undefined });
+      iters.push({
+        iter: iters.length + 1,
+        epoch: e,
+        step: s,
+        loss: l,
+        size: idx.length,
+        idx: e === 1 ? idx : undefined,
+      });
     }
     records.push(evaluate(f, data, e));
   }

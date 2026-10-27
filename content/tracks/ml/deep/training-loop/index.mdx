@@ -1,0 +1,189 @@
+import { experiment, loopCode, numpyLoop } from './code';
+import { batchesExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Learning from a deck of flash cards">
+
+Imagine studying 100 flash cards. You could read all 100, think about every mistake, and then adjust how you think,
+once. Or you could shuffle the deck, look at 10 cards, adjust a little, look at the next 10, and so on. The second
+way gives you ten small adjustments per pass instead of one big one, and each is based on only part of the
+evidence, so each is a bit off.
+
+Training a network works the same way. A <Term id="mini-batch">mini-batch</Term> is the handful of cards, one
+adjustment is an <Term id="iteration">iteration</Term>, and one pass through the whole shuffled deck is an
+<Term id="epoch">epoch</Term>. Plotting the loss as training goes on gives a <Term id="loss-curve">loss
+curve</Term>, the main instrument for seeing whether training is working.
+
+</Section>
+
+<Section kind="technical" title="Iterations, epochs and the noisy gradient">
+
+Take $N$ training examples and batch size $B$. One epoch shuffles the indices $0, \dots, N-1$ and cuts them into
+consecutive slices of $B$. That takes
+
+$$
+\text{steps per epoch} = \left\lceil \frac{N}{B} \right\rceil
+$$
+
+iterations ($\lceil \cdot \rceil$ rounds up). With $N = 100$ and $B = 32$: $100 / 32 = 3.125$, so 4 iterations,
+three batches of 32 and a last batch of $100 - 3 \cdot 32 = 4$. Training for $E$ epochs takes
+$E \cdot \lceil N / B \rceil$ iterations in total.
+
+Each iteration does four things on its batch $X_b$ of shape $(B, 2)$ with labels $y_b$ of shape $(B, 1)$:
+
+1. **Forward pass**: predictions $\hat y_b = f_\theta(X_b)$, shape $(B, 1)$.
+2. **Loss**: the mean binary cross-entropy over the batch,
+   $L_b = -\frac{1}{B}\sum_i \big[y_i \log \hat y_i + (1 - y_i)\log(1 - \hat y_i)\big]$, a
+   <Term id="loss-function">loss function</Term> for yes/no labels.
+3. **Backward pass**: the <Term id="gradient">gradient</Term> $\nabla_\theta L_b$ by backpropagation.
+4. **Update**: $\theta \leftarrow \theta - \eta \nabla_\theta L_b$, plain <Term id="sgd">SGD</Term> with
+   <Term id="learning-rate">learning rate</Term> $\eta$.
+
+**Why the batch gradient is noisy.** The loss we care about is the average over all $N$ training examples. The
+batch loss averages only $B$ of them, chosen at random, so it is an estimate: right on average, but it scatters.
+The scatter of an average of $B$ independent values shrinks like $1/\sqrt{B}$, so batch size 1 is very noisy, and
+batch size $N$ (full-batch gradient descent) has no sampling noise at all. Smaller batches give more updates per
+epoch but each points less precisely downhill.
+
+**Why shuffle.** Without shuffling, every epoch would see the same batches in the same order. If the data were
+sorted by class, early batches would contain one class only and pull the network one way, then the other.
+Reshuffling each epoch makes every batch a fair sample and varies the noise from pass to pass.
+
+**Two curves, two datasets.** We hold out 50 of the 150 points as a validation set: points never used for
+updates. The training loss says how well the network fits what it learns from; the validation loss estimates how
+well it does on new data. When the training loss keeps falling but the validation loss turns up, the network is
+learning quirks of its training points (overfitting); keeping the weights from the best validation epoch is
+<Term id="early-stopping">early stopping</Term>.
+
+<Callout kind="simplification">
+  The experiment trains a network with 33 parameters on 100 points, in your browser, from scratch every time you
+  change a control. Real training streams batches from disk with a data loader, runs on a GPU, evaluates the
+  validation set less often, and usually uses Adam or SGD with momentum and a learning-rate schedule. The loop
+  itself (shuffle, slice, forward, loss, backward, update) is the same.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Train a tiny network">
+
+The network has 2 inputs, 8 tanh hidden units and a sigmoid output: weights $W_1$ of shape $(2, 8)$, $b_1$ of
+shape $(8,)$, $W_2$ of shape $(8, 1)$ and $b_2$ of shape $(1,)$. Every control change retrains it from the same
+<Term id="random-seed">random seed</Term>, so the run is reproducible; change the seed to see another draw of the
+data, the starting weights and the shuffles.
+
+<Experiment def={experiment} title="Training run">
+  <TrainingBoundary />
+  <TrainingCurves />
+  <Readout title="Run summary" />
+</Experiment>
+
+Things to try (all with seed 1 on the two moons):
+
+- Batch size 1: 100 iterations per epoch and a mini-batch loss that jumps all over the plot, because each point is
+  one example's loss.
+- Batch size 100: one iteration per epoch, a perfectly smooth curve, and only 50 updates in 50 epochs, so the
+  boundary is still rough.
+- Learning rate 5 with batch size 10: the training loss falls to about 0.03, while the validation loss bottoms out
+  around epoch 32 and then rises. That gap is overfitting.
+- Learning rate 0.01: both curves fall slowly. Nothing is wrong except the step size.
+
+</Section>
+
+<Section kind="code" title="The loop that runs on this page">
+
+This is the training loop the experiment runs, in TypeScript with the helper functions from this site's library.
+Its literals are the current control values. (The page runs an equivalent version on flat arrays for speed; a
+unit test checks that it produces exactly the same losses and weights.)
+
+<Experiment def={experiment} title="trainingLoop.ts, linked to the run" controls={false}>
+  <Code example={loopCode} title="trainingLoop.ts" />
+</Experiment>
+
+The same loop in NumPy, with the backward pass written out. It uses NumPy's random generator, so its data,
+weights and shuffles, and therefore its numbers, differ from the run above; the output shown was recorded from a
+run with NumPy 2.5.3.
+
+<Code example={numpyLoop} title="training_loop.py" />
+
+</Section>
+
+<Section kind="experiment" title="Step through the first epoch">
+
+The step-through follows epoch 1 of the current run: the shuffle, each batch's indices and size, and its loss
+before the update. For long epochs it shows the first two steps and the last one. Set the batch size to 32 to see
+the short last batch.
+
+<Experiment def={experiment} title="Epoch 1, step by step" controls={false}>
+  <StepThrough example={loopCode} title="trainingLoop.ts" />
+  <Readout title="Run summary" />
+</Experiment>
+
+</Section>
+
+<Section kind="mistakes" title="Bugs that hide in training loops">
+
+<CommonMistake
+  title="Averaging the last batch's loss over the wrong count"
+  wrong={'dZ2 = (P - yb) / batch_size  # but the last batch has only 4 examples'}
+  error="No error: the last step of every epoch is 8 times too small when 4 examples are divided by 32."
+  cause="When B does not divide N, the last batch is shorter. Dividing by the nominal batch size under-weights it."
+  fix={'dZ2 = (P - yb) / len(idx)  # the actual number of examples in this batch'}
+/>
+
+<CommonMistake
+  title="Shuffling once, outside the epoch loop"
+  wrong={'order = rng.permutation(n)\nfor epoch in range(epochs):\n    for step in range(steps_per_epoch):\n        ...'}
+  error="No error: every epoch sees the same batches in the same order."
+  cause="The permutation is drawn once, so the gradient noise repeats exactly each epoch."
+  fix={'for epoch in range(epochs):\n    order = rng.permutation(n)  # new order every epoch\n    ...'}
+/>
+
+<Callout kind="warning">
+  Judge progress from the smooth curves (whole training set, validation set), not from single mini-batch losses.
+  With batch size 1, two consecutive batch losses can differ by a factor of 10 while the network is improving.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Reading loss curves">
+
+| What you see                                                   | Likely cause                                | What to try                                  |
+| -------------------------------------------------------------- | ------------------------------------------- | -------------------------------------------- |
+| Both losses fall slowly and steadily                           | Learning rate too small                     | Raise η by 3× at a time                      |
+| Loss jumps up, oscillates, or becomes NaN                      | Learning rate too large                     | Lower η; check the inputs are scaled          |
+| Training loss falls, validation loss turns up                  | Overfitting                                 | Stop earlier, get more data, regularize       |
+| Both losses flat and high from the start                       | A bug, or a model too small for the data    | Overfit 10 examples first to test the loop   |
+| Mini-batch loss very noisy but the epoch losses fall           | Small batches (normal)                      | Nothing, or a larger B                       |
+
+In PyTorch the shuffling and slicing are done by `torch.utils.data.DataLoader(dataset, batch_size=B,
+shuffle=True)`; `drop_last=True` drops the short last batch. The next lesson writes this loop in PyTorch.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Cut an epoch into batches">
+
+<MiniExercise exercise={batchesExercise}>
+  Write `make_batches(order, batch_size)`: split a list of (already shuffled) indices into consecutive batches of
+  `batch_size`, with a shorter last batch when the size does not divide the length.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- An iteration is one forward pass, loss, backward pass and update on a mini-batch; an epoch is one pass over all
+  N training examples, which takes ceil(N / B) iterations.
+- Shuffle every epoch. The last batch holds N − (ceil(N / B) − 1)·B examples; average its loss over its real size.
+- Mini-batch losses are noisy because each is measured on only B examples; the noise shrinks roughly like 1/√B.
+- Watch the training and validation losses: a slow fall means η is small, jumps mean η is large, and a widening
+  gap means overfitting.
+
+Next: [Building networks with PyTorch](#/learn/ml/deep/pytorch-basics) writes the same loop with `nn.Module`,
+a loss object and `torch.optim`.
+
+</Section>
