@@ -2,7 +2,7 @@ import type { LessonMeta } from '@/lib/types';
 
 export default {
   id: 'ml/math/gradients-chain-rule',
-  title: 'Partial derivatives, gradients, chain rule',
+  title: 'Partial derivatives, gradients and the chain rule',
   level: 'intermediate',
   minutes: 45,
   kind: 'lesson',
