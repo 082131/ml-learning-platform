@@ -12,7 +12,7 @@ That is a <Term id="neuron">neuron</Term>. The importance numbers are its **weig
 <Term id="activation-function">activation function</Term> $f$. Weights and bias are the neuron's
 <Term id="parameter">parameters</Term>: the numbers training adjusts.
 
-If you have met logistic regression, you have already met a neuron: logistic regression computes a weighted sum
+If you have met [logistic regression](#/learn/ml/classical/logistic-regression), you have already met a neuron: logistic regression computes a weighted sum
 and passes it through the sigmoid function. A <Term id="neural-network">neural network</Term> is many neurons
 wired in layers, each one feeding the next. This lesson is about one neuron, and about the activation function,
 the small step that makes stacking neurons worthwhile.
@@ -29,8 +29,8 @@ z = w \cdot x + b = \sum_{i=0}^{n-1} w_i x_i + b \qquad\qquad a = f(z)
 $$
 
 $z$ is the <Term id="pre-activation">pre-activation</Term>: a <Term id="dot-product">dot product</Term> plus the
-bias. $a$ is the neuron's output, or activation. Here $x$ and $w$ both have shape $(2,)$ and $z$ and $a$ are single
-numbers.
+bias. $a$ is the neuron's output, or activation. Here $x$ and $w$ are <Term id="vector">vectors</Term> of
+<Term id="shape">shape</Term> $(2,)$, and $z$ and $a$ are single numbers (<Term id="scalar">scalars</Term>).
 
 **Worked example.** With $x = (1, 2)$, $w = (0.5, -1)$ and $b = 0.5$:
 
@@ -39,7 +39,7 @@ z = 0.5 \cdot 1 + (-1) \cdot 2 + 0.5 = 0.5 - 2 + 0.5 = -1
 $$
 
 **Three activation functions.** Each takes $z$ and returns $a$. The slope $f'(z)$ matters later: training
-(backpropagation) multiplies by it, so where an activation is flat, learning is slow.
+computes a <Term id="gradient">gradient</Term> for every weight, and that gradient is multiplied by $f'(z)$, so where an activation is flat, learning is slow.
 
 | Activation | Formula | Output range | Slope $f'(z)$ | At $z = -1$ |
 | --- | --- | --- | --- | --- |

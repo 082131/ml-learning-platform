@@ -90,6 +90,6 @@ export default [
     short:
       'Comparing backpropagation’s gradients with numerical estimates (L(θ + ε) − L(θ − ε)) / 2ε. A relative error around 1e-7 or below means the backward pass is right.',
     introducedIn: 'ml/deep/backpropagation',
-    aliases: ['numerical gradient', 'central difference', 'finite differences'],
+    aliases: ['numerical gradient check'],
   },
 ] satisfies GlossaryTerm[];
