@@ -31,7 +31,7 @@ export function AttentionHeatmap() {
           rows={result.weights.map((r, i) => [tokens[i]!, ...r.map(formatNumber)])}
         />
       }
-      caption={`Row ${row} ("${tokens[row]}") spreads its attention as ${result.weights[row]!.map((w, j) => `${tokens[j]} ${fmt(w)}`).join(', ')}. Every row adds up to 1.${state.causal ? ' Causal mask on: cells above the diagonal are masked.' : ''}`}
+      caption={`Row ${row} ("${tokens[row]}") spreads its attention as ${result.weights[row]!.map((w, j) => `"${tokens[j]}" ${fmt(w)}`).join(', ')}. Every row adds up to 1.${state.causal ? ' Causal mask on: cells above the diagonal are masked.' : ''}`}
     >
       <table className={s.grid} data-heatmap>
         <caption className="visually-hidden">
