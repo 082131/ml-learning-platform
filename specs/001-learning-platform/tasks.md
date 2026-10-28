@@ -95,11 +95,11 @@ Close each content thread with: content validation green, `check`, `e2e` and `bu
 - [ ] M312 `project-classification`.
 
 ## Thread 7: ML Deep Learning (`ml/deep`, 11 entries)
-- [ ] M401 to M403 neurons and activations, forward propagation (NNDiagram: selecting a layer highlights its code), backpropagation (a computed gradient-flow step-through on a 2-2-1 net, checked against numerical gradients in tests).
-- [ ] M404 to M405 optimizers race (SGD, momentum, Adam on a 2-D surface), training loop (a tiny MLP trained live in TypeScript; lr, batch and epoch controls; loss curve).
-- [ ] M406 `pytorch-basics`: annotated PyTorch (current stable docs cited), a simulated trace with the badge, and the TypeScript equivalent run live.
+- [x] M401 to M403 neurons and activations, forward propagation (NNDiagram: selecting a layer highlights its code), backpropagation (a computed gradient-flow step-through on a 2-2-1 net, checked against numerical gradients in tests).
+- [x] M404 to M405 optimizers race (SGD, momentum, Adam on a 2-D surface), training loop (a tiny MLP trained live in TypeScript; lr, batch and epoch controls; loss curve).
+- [x] M406 `pytorch-basics`: annotated PyTorch (current stable docs cited), a simulated trace with the badge, and the TypeScript equivalent run live.
 - [ ] M407 to M410 tokenization (toy BPE, computed), embeddings (2-D map, cosine), attention (Q/K/V computed on small matrices, heatmap, selecting a token), transformers (block diagram with shapes).
-- [ ] M411 `project-neural-net`.
+- [x] M411 `project-neural-net`.
 
 ## Thread 8: ML Practice and Projects (`ml/practice`, `ml/projects`, 11 entries)
 - [x] M501 to M506 experiment tracking, tuning (a search visualizer on a known function), versioning (lineage FlowDiagram), ablations, model testing, GPU training (throughput model labeled as an estimate with its formula; link to the inference track).
