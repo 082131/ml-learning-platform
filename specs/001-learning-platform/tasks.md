@@ -98,7 +98,7 @@ Close each content thread with: content validation green, `check`, `e2e` and `bu
 - [x] M401 to M403 neurons and activations, forward propagation (NNDiagram: selecting a layer highlights its code), backpropagation (a computed gradient-flow step-through on a 2-2-1 net, checked against numerical gradients in tests).
 - [x] M404 to M405 optimizers race (SGD, momentum, Adam on a 2-D surface), training loop (a tiny MLP trained live in TypeScript; lr, batch and epoch controls; loss curve).
 - [x] M406 `pytorch-basics`: annotated PyTorch (current stable docs cited), a simulated trace with the badge, and the TypeScript equivalent run live.
-- [ ] M407 to M410 tokenization (toy BPE, computed), embeddings (2-D map, cosine), attention (Q/K/V computed on small matrices, heatmap, selecting a token), transformers (block diagram with shapes).
+- [x] M407 to M410 tokenization (toy BPE, computed), embeddings (2-D map, cosine), attention (Q/K/V computed on small matrices, heatmap, selecting a token), transformers (block diagram with shapes).
 - [x] M411 `project-neural-net`.
 
 ## Thread 8: ML Practice and Projects (`ml/practice`, `ml/projects`, 11 entries)
