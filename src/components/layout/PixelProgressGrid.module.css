@@ -5,8 +5,8 @@
   background-color: var(--band);
   /* Faint pixel grid behind the cells, as in reference 01. */
   background-image:
-    linear-gradient(var(--band-line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--band-line) 1px, transparent 1px);
+    linear-gradient(var(--band-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--band-grid) 1px, transparent 1px);
   background-size: 24px 24px;
   color: var(--band-ink);
   border-bottom: 1px solid var(--line);

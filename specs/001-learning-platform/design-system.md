@@ -5,7 +5,7 @@ Source: the user's three reference images in `design/reference/`. We keep their 
 ## What we take from the references
 | Reference element | How we use it |
 |---|---|
-| Dark pixel-grid band with blue cells (01) | **Pixel progress grid**: a slim (~120px) dark band at the top of the dashboard and each track page. Each cell is a lesson. Filled blue means complete, outlined blue means in progress, and dim means not started. Hovering or focusing a cell shows the lesson title, and Enter opens it. This makes the decoration functional |
+| Dark pixel-grid band with blue cells (01) | **Pixel progress grid**: a slim (~120px) band at the top of the dashboard and each track page. Each cell is a lesson. Filled blue means complete, outlined blue means in progress, and dim means not started. Hovering or focusing a cell shows the lesson title, and Enter opens it. This makes the decoration functional |
 | Monospace bracket labels `[N.01/11] —— > KEY VALUE` (01, 02) | **Section labels** on every lesson section: `[03/12] —— > INTUITION`. Track codes `T.01` to `T.04`, lesson numbers `// 001` on cards |
 | Inline `<HOME>` style nav chips in mono caps (01) | Top nav: mono uppercase chips, with the active chip filled in the accent color |
 | Big grotesk headline with `/` slashes and a bracketed accent word (01, 02) | Lesson and track titles: large sans with a leading `/` in muted gray. Accent color is reserved for the single key term |
@@ -23,7 +23,7 @@ Source: the user's three reference images in `design/reference/`. We keep their 
   --ink: #0e0e10;         --ink-2: #4a4a50;       --ink-3: #8a8a90;    /* ink-3: labels only, large/mono */
   --line: #e4e4e1;        --line-strong: #c9c9c4; --dot: #d6d6d1;
   --accent: #1d4aff;      --accent-ink: #ffffff;  --accent-soft: #e8edff;
-  --band: #0d0f14;        --band-cell: #171a22;   --band-line: #232733;
+  --band: #f7f7f5;        --band-cell: #ffffff;   --band-line: #d6d6d1;  --band-grid: #ececea;
   --ok: #0f7b4a;          --warn: #9a5b00;        --err: #c0262d;
 }
 [data-theme="dark"] {
@@ -31,7 +31,7 @@ Source: the user's three reference images in `design/reference/`. We keep their 
   --ink: #ececee;         --ink-2: #a9abb2;       --ink-3: #74767e;
   --line: #23262d;        --line-strong: #353943; --dot: #1d2026;
   --accent: #5b7fff;      --accent-ink: #0b0c0f;  --accent-soft: #151d3a;
-  --band: #050608;        --band-cell: #0f1117;   --band-line: #1b1e27;
+  --band: #050608;        --band-cell: #0f1117;   --band-line: #1b1e27;  --band-grid: #1b1e27;
   --ok: #3ccf8e;          --warn: #f0b048;        --err: #ff6b70;
 }
 ```

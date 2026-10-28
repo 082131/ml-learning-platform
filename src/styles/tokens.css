@@ -14,10 +14,17 @@
   --accent: #1d4aff;
   --accent-ink: #ffffff;
   --accent-soft: #e8edff;
-  --band: #0d0f14;
-  --band-cell: #171a22;
-  --band-line: #232733;
-  --band-ink: #c9ccd6;
+  --band: #f7f7f5;
+  --band-cell: #ffffff;
+  --band-line: #d6d6d1;
+  --band-grid: #ececea;
+  --band-ink: #4a4a50;
+  --band-idle: #e3e6ee;
+  --band-idle-line: #a9afbd;
+  --band-accent: #1d4aff;
+  --band-accent-2: #1d4aff;
+  --band-text: #0e0e10;
+  --band-code: #1d4aff;
   --ok: #0f7b4a;
   --warn: #9a5b00;
   --err: #c0262d;
@@ -41,7 +48,14 @@
   --band: #050608;
   --band-cell: #0f1117;
   --band-line: #1b1e27;
+  --band-grid: #1b1e27;
   --band-ink: #a9abb2;
+  --band-idle: #1c2130;
+  --band-idle-line: #3a4152;
+  --band-accent: #2f5bff;
+  --band-accent-2: #5b7fff;
+  --band-text: #e6e8ee;
+  --band-code: #8fa6ff;
   --ok: #3ccf8e;
   --warn: #f0b048;
   --err: #ff6b70;
@@ -76,14 +90,6 @@
   --wide: 960px;
   --page: 1280px;
   --nav-h: 56px;
-
-  /* The pixel band is dark in both themes, so its cell colors don't switch. */
-  --band-idle: #1c2130;
-  --band-idle-line: #3a4152;
-  --band-accent: #2f5bff;
-  --band-accent-2: #5b7fff;
-  --band-text: #e6e8ee;
-  --band-code: #8fa6ff;
 }
 
 @media (prefers-reduced-motion: reduce) {
