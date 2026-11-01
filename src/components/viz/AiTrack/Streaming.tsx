@@ -70,7 +70,12 @@ export function StreamCompare() {
                   <rect className={s.boxAccent} x={x(result.total) - 3} y={y} width={6} height={ROW - 12} />
                 )}
                 {!r.ok && (
-                  <text className={s.svgText} x={x(state.timeout) + 6} y={y + 16}>
+                  <text
+                    className={s.svgText}
+                    x={x(state.timeout) + (x(state.timeout) + 70 > width ? -6 : 6)}
+                    y={y + 16}
+                    textAnchor={x(state.timeout) + 70 > width ? 'end' : 'start'}
+                  >
                     timed out
                   </text>
                 )}

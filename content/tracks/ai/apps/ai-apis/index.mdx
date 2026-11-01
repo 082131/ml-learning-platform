@@ -1,0 +1,159 @@
+import { clientCode, serverCode, sseRunner, stream } from './code';
+import { questions, sseExercise } from './quiz';
+
+<Section kind="intuition" title="A kitchen pass, not a front door">
+
+In a restaurant, guests never walk into the kitchen. They order from a waiter, who checks the order, passes it through,
+and brings each dish out as soon as it is ready. Your AI feature needs the same separation. The browser is the guest:
+it talks only to your server. Your server is the waiter: it checks the request, holds the keys to the kitchen (the
+model provider's API key), and passes the answer back piece by piece as it is written.
+
+Getting this right is what makes an AI feature feel fast and fail gracefully: the user sees words after a second instead
+of a spinner for twenty, and a provider hiccup becomes a "try again" message instead of a blank screen.
+
+</Section>
+
+<Section kind="technical" title="Endpoint, stream, errors">
+
+**The endpoint.** An <Term id="http-endpoint">HTTP endpoint</Term> such as `POST /api/ask` does four things:
+<Term id="input-validation">validates</Term> the request (types, lengths, who is asking), calls the model with the
+server's <Term id="api-key">API key</Term>, streams the reply back, and logs what happened (tokens, latency, errors).
+Validation comes first because rejecting a bad request costs nothing; a model call always costs money.
+
+**Why stream.** A reply of $N$ tokens takes about
+
+$$
+t_\text{total} = t_\text{first token} + \frac{N}{\text{tokens per second}}
+$$
+
+With a 1 s <Term id="time-to-first-token">time to first token</Term>, 40 tokens per second and 800 tokens, that is
+1 + 800 / 40 = 21 seconds. Without streaming the user stares at a spinner for 21 s; with streaming they start reading at
+1 s. Streaming also keeps bytes flowing, so timeouts on silent connections (common in HTTP clients, proxies and load
+balancers) don't cut the request off.
+
+**The format.** Model APIs and your own endpoint stream with <Term id="server-sent-events">server-sent events</Term>:
+plain text where each event is an `event:` line, one or more `data:` lines and a blank line. The client reads the body as
+it arrives. Network reads end at arbitrary byte positions, so the client keeps a buffer and completes an event only at
+its blank line.
+
+**Errors.** Before the stream starts, use HTTP statuses: 422 for invalid input, 429 when a user exceeds your own rate
+limit, 503 when the provider is down after retries. After the first byte, the status (200) is already sent, so failures
+travel as an `error` event that the frontend turns into a message with a retry button. Keep the user's question in the
+page so a retry doesn't make them type it again.
+
+<Callout kind="simplification">
+  The timing model is the formula above with the values you choose; real time to first token and speed vary with load,
+  prompt length and model. The timeout here is a limit on silence, how most proxies and many HTTP clients time out; a
+  limit on total time would cut a long stream off too. The reply text is scripted; the encoding, the network split and
+  the parsing run for real.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Stream, or wait for the whole reply">
+
+Change the model's speed, the reply length and the client timeout.
+
+<Experiment def={stream} title="Streaming a reply">
+  <StreamCompare />
+  <Readout title="This request" />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="A streaming endpoint and its frontend">
+
+The server: FastAPI validates the body with Pydantic, streams from the Anthropic SDK, and re-emits each piece of text as
+an event in its own small format (not run on this page).
+
+<Code example={serverCode} title="server.py" />
+
+The browser reads the stream with `fetch` and the same incremental parser as the experiment (not run on this page):
+
+<Code example={clientCode} title="ask.ts" />
+
+The parsing logic in plain Python, fed three pieces cut in the middle of lines:
+
+<PythonRunner example={sseRunner} title="parse_sse.py" />
+
+</Section>
+
+<Section kind="experiment" title="Cut the stream into pieces">
+
+The same scripted reply, encoded as SSE and cut into network pieces at random positions. The settings at the top of the
+Visual section control both views.
+
+<Experiment def={stream} title="SSE on the wire" controls={false}>
+  <SseWire />
+</Experiment>
+
+Things to try:
+
+- With the defaults (1 s, 40 tokens/s, 800 tokens, 15 s timeout) the waiting client times out at 15 s and loses the
+  whole 21-second reply, while the streaming client shows text at 1 s and finishes.
+- Shorten the reply to 400 tokens. Both succeed, but waiting shows nothing until 11 s.
+- Raise the time to first token to 5 s and lower the timeout to 5 s. Now even streaming fails: nothing arrives before
+  the timeout. Long prompts and overloaded providers raise the time to first token.
+- Move "Network pieces" from 1 to 12. The cut points move, events complete after different pieces, and the parsed text
+  never changes. Try to find a cut in the middle of `data:`: the parser waits for the rest.
+
+</Section>
+
+<Section kind="mistakes" title="Buffered streams and swallowed errors">
+
+<CommonMistake
+  title="Parsing each network read on its own"
+  wrong={'for await (const chunk of body) {\n  const data = JSON.parse(chunk.split("data: ")[1]);\n  append(data.text);\n}'}
+  error={'SyntaxError: Unterminated string in JSON at position 19 (line 1 column 20)   // for a read ending in {"text": "Error E-4'}
+  cause="A read can stop anywhere, including inside the JSON of one event. Each read is a slice of bytes, not an event."
+  fix={'const parser = new SseParser();\nfor await (const chunk of body) {\n  for (const e of parser.feed(chunk)) append(JSON.parse(e.data).text);\n}'}
+/>
+
+<CommonMistake
+  title="Letting a mid-stream failure look like the end"
+  wrong={'async for text in stream.text_stream:\n    yield sse("text_delta", {"text": text})\n# provider error: the generator dies, the browser sees the stream close'}
+  error="(no error shown: the user reads half an answer and thinks it is complete)"
+  cause="The stream closed without a done or error event, and the frontend treated any close as success."
+  fix={'except anthropic.APIError:\n    yield sse("error", {"message": "The assistant is unavailable. Please try again."})\n# and the frontend treats a close without "done" as a failure'}
+/>
+
+</Section>
+
+<Section kind="practice" title="A production checklist for an AI endpoint">
+
+- **Keys** stay on the server, in environment variables or a secret manager.
+- **Validate** input size and type; authenticate the user; apply a per-user rate limit and daily budget.
+- **Timeouts** on the provider call (seconds, not the SDK's long default) and retries only for retryable errors.
+- **Stream** long replies. Send `done` at the end and `error` on failure; the frontend treats any other close as a
+  failure.
+- **Keep the request**: the question stays in the input box until the answer completes, so retry is one click.
+- **Log** per request: model, prompt version, tokens in and out, time to first token, total time, outcome. The
+  [operations lessons](#/learn/ai/ops/latency-cost-security) build on these logs.
+- **Structured endpoints** (classification, extraction) don't need streaming: return validated JSON as in [structured
+  outputs](#/learn/ai/prompting/structured-outputs).
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Format an event">
+
+<MiniExercise exercise={sseExercise}>
+  Write `sse(event, payload)` as used by the endpoint. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- The browser calls your endpoint; your endpoint validates, holds the key, calls the model and logs.
+- Total time is time to first token plus tokens divided by speed. Streaming shows text after the first part only.
+- SSE is event and data lines ended by a blank line; parse it incrementally because reads end anywhere.
+- Before the stream, report errors with HTTP statuses; during it, with error events.
+- Keep the user's request so a failure costs one click, not retyping.
+
+</Section>
