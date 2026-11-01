@@ -211,7 +211,7 @@ export function cpuGpuPrintout(r: CpuGpuResult): string[] {
   return [`CPU ${ms(r.cpu.total).padStart(9, ' ')} ms`, `GPU ${ms(r.gpu.total).padStart(9, ' ')} ms   (of which copies ${ms(r.gpu.transfer)} ms)`];
 }
 
-export function cpuGpuReadout(s: CpuGpuState, r: CpuGpuResult): ReadoutItem[] {
+export function cpuGpuReadout(_s: CpuGpuState, r: CpuGpuResult): ReadoutItem[] {
   const faster = r.gpu.total < r.cpu.total ? 'GPU' : 'CPU';
   const ratio = faster === 'GPU' ? r.cpu.total / r.gpu.total : r.gpu.total / r.cpu.total;
   const bound = (t: DeviceTime) => (t.memoryBound ? 'memory-bound' : 'compute-bound');

@@ -1,0 +1,44 @@
+.hist {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 180px;
+  padding-top: 18px;
+  border-bottom: 1px solid var(--ink-2);
+}
+.bar,
+.overflow {
+  flex: 1;
+  min-height: 0;
+}
+.bar {
+  background: var(--accent);
+}
+.overflow {
+  background: repeating-linear-gradient(45deg, var(--err) 0 3px, var(--surface) 3px 6px);
+  border: 1px solid var(--err);
+}
+.mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 2px dashed var(--ink);
+}
+.markLabel {
+  position: absolute;
+  top: 0;
+  left: 3px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  color: var(--ink);
+  background: var(--surface);
+}
+.axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: var(--s-1);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}

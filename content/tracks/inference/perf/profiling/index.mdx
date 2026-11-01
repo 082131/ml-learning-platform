@@ -1,0 +1,201 @@
+import { benchCode, experiment, omission, stageCode, stageOutput, torchProfile } from './code';
+import { percentileExercise, questions } from './quiz';
+
+<Section kind="intuition" title="A stopwatch that lies">
+
+Timing a model looks easy: read the clock, call the model, read the clock again. Done naively, every part of that
+can mislead. The first call includes one-time setup that no later call pays. On a GPU the call returns before the
+work is finished, so the clock measures how fast Python handed work over. A handful of calls cannot show the rare
+slow ones users complain about. And a load test that waits politely for each reply never sends the requests that
+would have piled up behind a freeze.
+
+This lesson builds a benchmark that avoids each trap, then uses a profiler to find where a request's time and
+memory actually go. The rule throughout: measure before optimizing, and know what your measurement measured.
+
+</Section>
+
+<Section kind="technical" title="What to measure and how">
+
+**Latency** is the time for one request; **throughput** is requests (or items) per second. Report latency as
+<Term id="latency-percentile">percentiles</Term>: p50 is the median, p99 the time only 1% of requests exceed. The
+mean is useful for capacity math but hides the tail, because one 900 ms call among 200 calls of 12 ms moves the
+mean by $900 / 200 = 4.5$ ms while the median barely changes.
+
+A sound benchmark has four parts:
+
+1. <Term id="warm-up">Warm-up</Term>: run untimed calls first. The first GPU call creates the CUDA context, loads
+   and selects kernels, and grows the memory allocator's pool; compilers such as `torch.compile` or TensorRT do
+   even more work on the first call. A long-running server pays this once.
+2. **Synchronization**: GPU kernels are queued and run asynchronously. Call `torch.cuda.synchronize()` (or copy the
+   result to the CPU) before reading the clock, or use CUDA events.
+3. **Enough samples**: estimating p99 needs well over 100 calls; hundreds to thousands is better. Repeat the whole
+   run, since results drift with clock speeds, temperature and neighbors on shared machines.
+4. **Fixed conditions**: the same batch size, input shapes, precision and hardware you will deploy, recorded next
+   to the result.
+
+**Throughput under load** needs a load generator, and its design matters. A *closed-loop* client sends the next
+request only after the previous reply arrives. If the server freezes, the client stops sending, so it records one
+slow request instead of the dozens real users would have sent meanwhile. That is
+<Term id="coordinated-omission">coordinated omission</Term>. An *open-loop* client sends on a schedule regardless of
+replies, like independent users, and measures each request from when it should have been sent.
+
+**Where the time goes** comes from a <Term id="profiler">profiler</Term>. Time each stage of the request
+(parsing, preprocessing, host-to-device copy, model, postprocessing, serialization) before profiling the model
+itself. Amdahl's law sets the ceiling: speeding up a part that takes a fraction $f$ of the time by a factor $s$
+gives an overall speed-up of $1 / ((1 - f) + f / s)$, never more than $1 / (1 - f)$.
+
+**Peak memory** decides whether a batch fits. Measure it (`tracemalloc` for NumPy on the CPU,
+`torch.cuda.max_memory_allocated()` on a GPU) and compare it with your estimate from the
+[memory lesson](#/learn/inference/memory/memory-estimation); a gap points to a temporary you forgot.
+
+<Callout kind="simplification">
+  The benchmark and load-test experiments below are simulations with stated models, because this site runs in your
+  browser and has no GPU to time: each GPU call takes about 12 ms with small random variation, the first three calls
+  cost 900, 60 and 15 ms of setup, every 100th call stalls for 40 ms, and queueing the kernels takes 0.25 ms. The
+  request breakdown in the Code section is a real measurement.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="The distribution, not a single number">
+
+Each bar counts how many timed calls took that long, and the dashed lines mark p50 and p95. The striped bar on the
+right collects every call too slow for the axis. All of it is computed from the simulated calls for the current
+settings; change them in the Experiment section.
+
+<Experiment def={experiment} title="Latency of 200 timed calls" controls={false}>
+  <LatencyHistogram />
+</Experiment>
+
+With no warm-up, the striped bar holds five calls: the first three (914.81, 71.12 and 29.05 ms, setup included) and two
+stalls of about 51 ms. They drag the mean to 17.49 ms while the median stays at 12.02, and they are what p99 and max are for.
+
+</Section>
+
+<Section kind="code" title="A benchmark harness, a breakdown, a profiler">
+
+A harness that warms up, synchronizes and reports percentiles. The slots follow the Experiment controls:
+
+<Code example={benchCode} title="bench.py" />
+
+Timing each stage of a real request: a batch of 64 digit images arrives as JSON, is parsed and scaled, runs
+through a two-layer network, and is serialized back.
+
+<Code example={stageCode} title="stages.py" />
+
+<Code example={stageOutput} title="terminal" />
+
+The model is 18% of the request; parsing JSON is 80%. By Amdahl's law, an infinitely fast model would cut the
+median from 5.36 ms to 4.38 ms. Sending the pixels as binary (for example raw bytes or a NumPy buffer) would attack
+the part that matters. The memory estimate matched only after counting both (64, 2048) arrays that exist at once.
+
+On a GPU, the PyTorch profiler shows time per operator and a timeline. (Not run while writing the lesson: no GPU
+or PyTorch in the build environment.)
+
+<Code example={torchProfile} title="profile_gpu.py" />
+
+</Section>
+
+<Section kind="experiment" title="Break the benchmark, then the load test">
+
+<Experiment def={experiment} title="Benchmark settings">
+  <LatencyHistogram />
+  <Readout />
+</Experiment>
+
+Things to try:
+
+- Raise warm-up from 0 to 10. The mean falls from 17.49 to 12.58 ms, p99 from 52.99 to 17.79, and the maximum
+  from 914.81 to 52.81: the one-time setup is gone and only the periodic stall remains.
+- With 10 warm-up calls, turn synchronization off. The benchmark reports a mean of 0.25 ms, about 50 times faster
+  than the 12.58 ms the GPU really took.
+- Set timed calls to 20. Those calls happen to miss the stall, so p99 reads 16.45 ms. At 2,000 calls it is
+  19.69 ms. Change the seed to see how much small samples vary.
+
+Now the load test. The server answers each request in 10 ms and freezes once, 2 seconds into a 5-second run.
+
+<Experiment def={omission} title="Closed-loop and open-loop load">
+  <OmissionChart />
+  <Readout />
+</Experiment>
+
+- With the closed-loop client and a 1,000 ms freeze, 400 requests complete with p99 10.0 ms. The freeze appears
+  once, as the 1,010 ms maximum.
+- Switch to the open-loop client: 250 requests, p99 985.1 ms, and 36.4% of requests take longer than 100 ms. Every
+  request that arrived during the freeze waited for it.
+- Raise the freeze to 2,000 ms. The open-loop median reaches 765.0 ms and p99 1,985.1 ms.
+
+</Section>
+
+<Section kind="mistakes" title="Benchmarking mistakes">
+
+<CommonMistake
+  title="Timing GPU work without synchronizing"
+  wrong={'t0 = time.perf_counter()\ny = model(x)\nprint(time.perf_counter() - t0)   # 0.25 ms?'}
+  error="No error. The number is the time to queue kernels, not to run them."
+  cause="CUDA calls return as soon as the work is queued. The next operation that needs the result (or a synchronize) waits."
+  fix={'t0 = time.perf_counter()\ny = model(x)\ntorch.cuda.synchronize()\nprint(time.perf_counter() - t0)'}
+/>
+
+<CommonMistake
+  title="Including the first call"
+  wrong={'times = [timed(model, x) for _ in range(200)]   # the first call creates the CUDA context'}
+  error="No error. The mean and max are inflated by one-time setup that a running server never pays again."
+  cause="The first calls initialize the device, select kernels, compile graphs and grow memory pools."
+  fix={'for _ in range(10):\n    model(x)            # warm-up, untimed\ntimes = [timed(model, x) for _ in range(200)]'}
+/>
+
+<Callout kind="warning">
+  Do not benchmark with a closed-loop client and call the result a user-facing latency. Use an open-loop generator
+  at a fixed arrival rate (Locust and k6 can do this with constant-arrival settings; wrk2 does it by design), and
+  report the rate along with the percentiles.
+</Callout>
+
+<Callout kind="warning">
+  A benchmark on random inputs can be wrong for models whose cost depends on the data: language models stop
+  generating at different lengths, and detection models postprocess more boxes on busy images. Benchmark on a
+  sample of real requests.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="A benchmark checklist">
+
+1. **Write down the question** first: "p99 at 200 requests per second on one L4", not "is it fast".
+2. **Record the setup** with each result: hardware, driver and library versions, batch size, input shapes,
+   precision, and the commit of the model.
+3. **Warm up, synchronize, and take enough samples**; report p50, p95, p99, max and throughput, not only the mean.
+4. **Break the request into stages** before optimizing anything, and profile the slowest stage.
+5. **Load test open-loop** at several arrival rates up to and beyond the expected peak.
+6. **Measure peak memory** at the largest batch you will allow, and keep headroom for fragmentation.
+7. **Repeat runs** and compare distributions; treat differences smaller than run-to-run noise as no difference.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Compute a percentile yourself">
+
+<MiniExercise exercise={percentileExercise}>
+  Write `percentile(values, p)` using linear interpolation, the method NumPy uses by default. Run the tests to check
+  it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Report latency as percentiles from hundreds to thousands of calls; the mean hides the tail.
+- Warm up before timing and synchronize GPU work before reading the clock.
+- Closed-loop load tests hide freezes (coordinated omission); use an open-loop generator at a stated rate.
+- Time each stage of a request before optimizing the model: here JSON parsing took 80% of the time.
+- Measure peak memory and compare it with an estimate; a gap points to a forgotten temporary.
+
+Next: [GPU utilization and bottleneck analysis](#/learn/inference/perf/gpu-bottlenecks) asks why a GPU that looks
+busy can still be slow.
+
+</Section>

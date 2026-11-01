@@ -140,7 +140,7 @@ export function prunePrintout(r: PruneResult): string[] {
   ];
 }
 
-export function pruneReadout(s: PruneState, r: PruneResult): ReadoutItem[] {
+export function pruneReadout(_s: PruneState, r: PruneResult): ReadoutItem[] {
   const keptAll = r.kept[0] + r.kept[1];
   const totalAll = r.total[0] + r.total[1];
   const drop = r.floatCorrect - r.correct;
