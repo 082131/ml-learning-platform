@@ -264,7 +264,7 @@ export const tracks: Track[] = [
         title: 'Operations',
         level: 'advanced',
         lessons: [
-          { id: 'ai/ops/latency-cost-security', status: 'outline' },
+          { id: 'ai/ops/latency-cost-security', status: 'written' },
           { id: 'ai/ops/deploy-monitor', status: 'outline' },
         ],
       },
