@@ -1,0 +1,191 @@
+import { estimateCode, experiment, measureCpu, measureOutput, timeGpu } from './code';
+import { questions, timingExercise } from './quiz';
+
+<Section kind="intuition" title="A few experts or a stadium full of helpers">
+
+A CPU is a handful of very capable workers. Each can do complicated, branching jobs quickly, one after another.
+A GPU is a stadium full of helpers who can each only do simple arithmetic, but all at the same time. Give them a
+million identical sums and the stadium wins easily. Give them one small sum and the experts win, because the
+stadium spends longer handing out the work than doing it.
+
+There is a second limit that matters just as much: how fast the workers can fetch their numbers. A matrix
+multiplication needs every weight of a layer. If each weight is used for only one sum, the workers spend their
+time waiting for numbers, and the faster calculators sit idle. Whether a GPU is worth it for a model depends on
+both: how much parallel arithmetic there is, and how much of it there is per byte fetched.
+
+</Section>
+
+<Section kind="technical" title="Arithmetic, bandwidth and overhead">
+
+**Parallel arithmetic.** A CPU core with two 256-bit fused multiply-add units does
+$2 \text{ units} \cdot 8 \text{ floats} \cdot 2 = 32$ float32 FLOPs per cycle. Eight cores at 3.0 GHz give
+$8 \cdot 32 \cdot 3.0 \cdot 10^9 = 768$ GFLOP/s. An NVIDIA L4 runs thousands of threads and is rated at 30.3
+TFLOP/s in float32, about 40 times more.
+
+**Memory bandwidth.** Each operand has to be read from memory. <Term id="memory-bandwidth">Memory bandwidth</Term>
+for DDR5 is channels × 8 bytes × transfers per second: two channels of DDR5-5600 give 89.6 GB/s. The L4's GDDR6
+gives 300 GB/s, an A100's HBM2e 1,935 GB/s.
+
+**Which one limits a layer.** A dense layer of width $d$ on a batch of $B$ rows does $2Bd^2$ FLOPs and moves
+$4(d^2 + 2Bd)$ bytes in float32. Its time is about
+
+$$
+t \approx \max\left(\frac{2Bd^2}{\text{peak}},\ \frac{4(d^2 + 2Bd)}{\text{bandwidth}}\right) + \text{overhead}
+$$
+
+At batch 1 a 4096-wide layer moves 67,141,632 bytes for 33,554,432 FLOPs: half a FLOP per byte. Both the CPU and
+the GPU wait on memory; the layer is <Term id="memory-bound">memory-bound</Term>. At batch 256 the bytes barely
+change and the FLOPs grow 256 times; the layer becomes compute-bound and the GPU's arithmetic advantage shows.
+
+**Overhead.** Every GPU operation is a <Term id="kernel-launch">kernel launch</Term>, queued by the CPU, costing a
+few microseconds whatever its size. A tiny layer can take longer to launch than to run.
+
+**Copies.** A GPU computes on data in its own memory. The model's weights are copied there once at startup; each
+request's input must be copied in and its output copied back, a
+<Term id="host-device-transfer">host-to-device transfer</Term> over PCIe. PCIe Gen4 x16 is rated at 31.5 GB/s, a
+tenth of the L4's memory bandwidth.
+
+For the default settings, eight 4096-wide layers at batch 1, the estimate gives 7.509 ms on an 8-core laptop CPU
+and 2.289 ms on an L4, of which 0.011 ms are the copies. Both are memory-bound: the L4 wins because its memory is
+faster, not because of its arithmetic.
+
+<Callout kind="simplification">
+  The numbers are an estimate from a stated model, not a benchmark: peaks from datasheets, an assumed 70% of peak
+  arithmetic, 80% of peak bandwidth, 80% of the PCIe rate, 2 µs per CPU operation and 5 µs per kernel launch.
+  Real kernels vary, caches help small layers on a CPU, and GPUs run float16 far faster than float32 on their
+  tensor cores. Use the model to reason about trends, then measure.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Where the GPU starts to win">
+
+The chart shows the estimated time per batch for every batch size from 1 to 256; the bars split the time at the
+current batch size into work, per-operation overhead and copies. Change the settings in the Experiment section.
+
+<Experiment def={experiment} title="CPU vs GPU, eight 4096-wide layers" controls={false}>
+  <CpuGpuTiming />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The model in Python, and a real measurement">
+
+The estimate in plain Python, with the current settings filled in. Select a part of the code to see what it does.
+
+<Experiment def={experiment} title="cpu_vs_gpu.py, linked to the chart" controls={false}>
+  <Code example={estimateCode} title="cpu_vs_gpu.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+A real measurement on a CPU: one 4096 × 4096 layer at four batch sizes, with a warm-up call and the median of 20
+runs. Run it in your browser; Pyodide's NumPy is single-threaded WebAssembly, so expect slower numbers.
+
+<PythonRunner example={measureCpu} title="measure_cpu.py" />
+
+On a 4-thread cloud VM it printed:
+
+<Code example={measureOutput} title="terminal" />
+
+At batch 1 the layer took 0.774 ms to read 64 MiB of weights: $67{,}108{,}864 / 0.000774 \approx 87$ GB/s, close
+to the machine's memory bandwidth, while the arithmetic ran at 43 GFLOP/s. At batch 512 the same weights served
+512 rows and the CPU reached 392 GFLOP/s. That is the memory-bound to compute-bound transition, measured.
+
+Timing on a GPU needs two extra steps. Kernel launches are asynchronous, so the CPU must wait for the GPU before
+reading the clock:
+
+<Code example={timeGpu} title="time_gpu.py" />
+
+</Section>
+
+<Section kind="experiment" title="Find the crossover">
+
+<Experiment def={experiment} title="CPU vs GPU estimator">
+  <CpuGpuTiming />
+  <Readout />
+</Experiment>
+
+Things to try:
+
+- Set the width to 256 and the layers to 2: a small model. The CPU is faster below batch 47, because the GPU's
+  launch overheads and copies cost more than the work.
+- Switch the CPU to the 32-core server. At batch 1 it takes 2.202 ms against the L4's 2.289 ms: 307 GB/s against
+  300 GB/s, a tie decided by bandwidth. At batch 256 the L4 is 10.6 times faster.
+- Raise the batch size to 64 with the laptop CPU. The CPU becomes compute-bound (31.973 ms) while the L4 is still
+  memory-bound (2.440 ms).
+- Switch the GPU to the H100 at batch 64: 0.458 ms, of which 0.052 ms are copies. With fast enough compute, the
+  copies become a visible share.
+
+</Section>
+
+<Section kind="mistakes" title="Timing mistakes that flatter the GPU, or the CPU">
+
+<CommonMistake
+  title="Stopping the clock before the GPU has finished"
+  wrong={'t0 = time.perf_counter()\ny = model(x_gpu)\nprint(time.perf_counter() - t0)   # 0.05 ms'}
+  error="No error. The time is far too short: it measures queueing the kernels, not running them."
+  cause="CUDA operations are asynchronous. The Python call returns as soon as the work is queued."
+  fix={'torch.cuda.synchronize()\nt0 = time.perf_counter()\ny = model(x_gpu)\ntorch.cuda.synchronize()\nprint(time.perf_counter() - t0)'}
+/>
+
+<CommonMistake
+  title="Timing the first call"
+  wrong={'t0 = time.perf_counter()\nmodel(x)                      # first call after loading\nprint(time.perf_counter() - t0)'}
+  error="No error. The time includes one-time setup: creating the CUDA context, selecting kernels, growing the memory pool."
+  cause="The first call does work later calls skip. A server pays it once; a benchmark that times it overstates every request."
+  fix={'for _ in range(10):\n    model(x)                  # warm up\ntorch.cuda.synchronize()\n# then time many calls and report the median'}
+/>
+
+<Callout kind="warning">
+  Leaving the copies out flatters the GPU. A benchmark with the input already on the GPU measures a case your
+  server never sees; include `.to("cuda")` and `.cpu()` if each request starts and ends on the CPU.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="When a CPU is the right choice">
+
+CPU inference is common and often right:
+
+- **Small models.** Gradient-boosted trees, linear models and small networks finish in microseconds on a CPU. A
+  GPU adds launch overhead and copies for little gain.
+- **Light or irregular traffic.** If requests arrive one at a time and rarely, a GPU idles most of the day. A CPU
+  instance that costs a fraction as much per hour can meet the latency target.
+- **Memory-bound decoding at batch 1.** A server CPU with many memory channels reads weights about as fast as an
+  entry-level GPU. This is why language models with quantized weights run usefully on CPUs and laptops.
+
+A GPU pays off when there is enough parallel work per weight: large layers, convolutions, large batches, or many
+concurrent requests grouped by a [dynamic batcher](#/learn/inference/throughput/batching-throughput). Estimate both
+sides, then measure on the hardware you will deploy on.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Memory-bound or compute-bound?">
+
+<MiniExercise exercise={timingExercise}>
+  Write `layer_time(batch, width, peak, bandwidth)` and `is_memory_bound(batch, width, peak, bandwidth)` for one
+  float32 dense layer, using the max of compute time and memory time. Run the tests to check them.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A GPU has far more parallel arithmetic than a CPU; both are limited by memory bandwidth when each weight is used
+  only a few times.
+- Time per layer ≈ max(FLOPs / peak, bytes / bandwidth) + a fixed overhead per operation.
+- At batch 1 most layers are memory-bound; bigger batches turn them compute-bound, where the GPU's advantage is
+  largest.
+- Copy weights to the GPU once; copy only request data per call, and include those copies when you benchmark.
+- Time GPUs after warm-up, with `torch.cuda.synchronize()` or CUDA events.
+
+Next: [memory, VRAM, parameters, activations and KV cache](#/learn/inference/memory/memory-estimation) works out
+whether a model fits in the GPU's memory at all.
+
+</Section>

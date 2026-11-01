@@ -297,7 +297,7 @@ export const tracks: Track[] = [
         id: 'hardware',
         title: 'Hardware',
         level: 'intermediate',
-        lessons: [{ id: 'inference/hardware/cpu-vs-gpu', status: 'outline' }],
+        lessons: [{ id: 'inference/hardware/cpu-vs-gpu', status: 'written' }],
       },
       {
         id: 'memory',
