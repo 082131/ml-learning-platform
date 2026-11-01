@@ -13,5 +13,19 @@ export default {
     'Roll back a bad prompt or model change quickly',
   ],
   prerequisites: ['ai/ops/latency-cost-security', 'ai/reliability/evals-guardrails'],
-  concepts: [],
+  concepts: ['canary-release', 'feature-flag', 'rollback', 'eval-set', 'latency-percentile', 'guardrail'],
+  references: [
+    {
+      title: 'Google SRE Workbook: Canarying releases',
+      url: 'https://sre.google/workbook/canarying-releases/',
+    },
+    {
+      title: 'OpenTelemetry semantic conventions for generative AI (spans and metrics for model calls)',
+      url: 'https://opentelemetry.io/docs/specs/semconv/gen-ai/',
+    },
+    {
+      title: 'Anthropic: Define success criteria and build evaluations',
+      url: 'https://docs.anthropic.com/en/docs/test-and-evaluate/develop-tests',
+    },
+  ],
 } satisfies LessonMeta;

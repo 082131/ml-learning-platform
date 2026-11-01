@@ -34,7 +34,7 @@ export function CostBreakdown() {
   return (
     <VizFrame
       title="Cost of one model request (estimate)"
-      badge={<Badge tone="simulated">Estimate at example prices</Badge>}
+      badge={<Badge tone="simulated">Example prices</Badge>}
       caption={`${formatUsd(p.total)} per request × ${state.requestsPerDay.toLocaleString('en-US')} a day × 30 days × ${Math.round((1 - state.responseCacheRate) * 100)}% that reach the model = ${formatUsd(result.monthly)} a month.`}
       table={
         <VizTable
@@ -120,7 +120,7 @@ export function CanaryChart() {
   return (
     <LineChart
       title="Observed bad-answer rate, cumulative"
-      badge={<Badge tone="simulated">Simulated traffic (seed {state.seed})</Badge>}
+      badge={<Badge tone="simulated">Simulated, seed {state.seed}</Badge>}
       xLabel="hour"
       yLabel="bad answers / answers"
       xDomain={[1, HOURS]}

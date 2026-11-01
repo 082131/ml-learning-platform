@@ -1,0 +1,181 @@
+import { canary, canaryNoRollback, canaryRunner, loggingCode, releaseCode } from './code';
+import { bucketExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Taste the soup before you serve the room">
+
+A cook who changes a recipe doesn't send the new soup to every table at once. They taste it (the offline test), serve
+it to one table and watch faces (a small release), and keep the old pot on the stove in case the new one is wrong. If
+that table sends it back, everyone else still gets the old soup.
+
+A new prompt or a new model is a new recipe. It can pass every case in your
+<Term id="eval-set">evaluation set</Term> and still fail on questions nobody thought to include. Releasing it to a
+small share of users first, comparing it with the current version on live traffic, and being able to switch back in
+seconds turns a risky change into a measured one.
+
+</Section>
+
+<Section kind="technical" title="Flags, canaries, monitoring and rollback">
+
+**Treat prompts and model choices as versioned configuration.** Store each prompt version in source control, pin an
+exact model id, and choose the version per request with a <Term id="feature-flag">feature flag</Term>. Changing the
+flag needs no build or deploy.
+
+**Before release: compare offline.** Run the evaluation set on the candidate and the current version and compare per
+case: new failures in critical categories block the release, as in the
+[evals lesson](#/learn/ai/reliability/evals-guardrails).
+
+**During release: a <Term id="canary-release">canary release</Term>.** Send a small share of users (1% to 10%) to the
+candidate, chosen by a stable hash of the user id so each user stays on one version. Both versions then serve the same
+kind of traffic at the same time, so differences come from the version, not from the day.
+
+**What to monitor, split by version:**
+
+| Signal | Examples | Why |
+| --- | --- | --- |
+| Quality | online code checks (citations, unsupported numbers), thumbs down, <Term id="guardrail">guardrail</Term> blocks, graded samples | model output fails while looking fine: HTTP 200, fast, wrong |
+| Latency | time to first token and total time, p50 and p95 <Term id="latency-percentile">percentiles</Term> | longer prompts or outputs slow every request |
+| Cost | input, output and cached tokens per request | a prompt that doubles output length doubles that part of the bill |
+| Errors | API errors, timeouts, rate-limit responses, `max_tokens` stops | cut-off answers and provider trouble |
+
+**When to alert.** A difference between two observed rates needs enough data to mean something. One common rule
+compares the bad-answer rates with a two-proportion z statistic and alerts when it passes a threshold, after a minimum
+number of answers:
+
+$$
+z = \frac{\hat p_{\text{new}} - \hat p_{\text{current}}}{\sqrt{\hat p\,(1-\hat p)\left(\frac{1}{n_{\text{new}}} + \frac{1}{n_{\text{current}}}\right)}}
+$$
+
+where $\hat p$ is the bad rate of both versions pooled. A z above 2.33 happens by chance about 1% of the time in a
+single check; checking every hour raises the chance of a false alarm over a day.
+
+**<Term id="rollback">Rollback</Term>** sets the candidate's share back to 0. It should be one setting, ideally
+triggered automatically by the alert, because every hour of waiting serves more bad answers.
+
+<Callout kind="simplification">
+  The canary on this page is simulated: 1,000 requests an hour, each answer bad with a fixed true probability (5% for
+  the current version; 5%, 8% or 15% for the new one), drawn with a seeded random generator. Real bad-answer signals
+  are noisier and arrive late (feedback comes after the answer), and real traffic changes over the day. The alert
+  rule is a simple one-sided z test checked every hour; production systems often use sequential tests designed for
+  repeated checking.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="A regression with nobody watching the switch">
+
+The new prompt version is worse: 8% bad answers instead of 5%. It gets 5% of traffic, and the alert fires, but nothing
+acts on it.
+
+<Experiment def={canaryNoRollback} title="Canary without automatic rollback" controls={false}>
+  <CanaryChart />
+  <Readout title="24 hours" />
+</Experiment>
+
+The alert fires in hour 5, but the canary keeps serving for the rest of the day: 1,171 requests and about 35 more bad
+answers than the current version would have given.
+
+</Section>
+
+<Section kind="code" title="The alert rule, the flag and the log line">
+
+The alert rule on the first five hours of that run:
+
+<PythonRunner example={canaryRunner} title="canary.py" />
+
+Choosing a version per user, calling the model with it, and rolling back (a sketch, not run on this page):
+
+<Code example={releaseCode} title="release.py" />
+
+What to log for every model request, so you can split every signal by version (a sketch, not run on this page):
+
+<Code example={loggingCode} title="log.py" />
+
+</Section>
+
+<Section kind="experiment" title="Run a canary with automatic rollback">
+
+Now the alert sets the canary's traffic to 0. Change how bad the new version really is, how much traffic it gets, and
+the random seed.
+
+<Experiment def={canary} title="Canary release">
+  <CanaryChart />
+  <Readout title="24 hours" />
+</Experiment>
+
+Things to try:
+
+- With the defaults, the alert fires in hour 5 as before, but rollback stops the damage: 267 requests and about 8
+  extra bad answers, instead of 35.
+- Set traffic to 1%: the alert never fires in 24 hours. Too little data to see a 3-point difference. Across seeds 1 to
+  99, about half of the 1% runs never alert within the day.
+- Set traffic to 25%: the alert fires in hour 1, after 255 requests, with about 8 extra bad answers. A bigger canary
+  learns faster, so with automatic rollback the damage stays small. Turn rollback off at 25%: 5,949 requests and
+  about 178 extra bad answers.
+- Choose the bad regression (15%) at 1% traffic: the alert waits until hour 20 for enough answers. At 10% traffic it
+  fires in hour 2.
+- Choose "same as now" and seed 2: the alert fires in hour 11 although both versions are equally good. That is a false
+  alarm; with hourly checks a few runs in a hundred raise one (4 of seeds 1 to 99 at 5% traffic).
+
+</Section>
+
+<Section kind="mistakes" title="Releases you can't measure or undo">
+
+<CommonMistake
+  title="Not logging which version answered"
+  wrong={'logger.info("answered", extra={"latency_ms": ms})  # no prompt or model version'}
+  error="(no error: thumbs down rose 40% this week, and nobody can tell which change caused it)"
+  cause="Without the version on every log line, quality, latency and cost can't be split by version, so a canary has nothing to compare."
+  fix={'logger.info("answered", extra={"prompt_version": version, "model": response.model, "latency_ms": ms})'}
+/>
+
+<CommonMistake
+  title="Picking the version at random per request"
+  wrong={'version = "v8" if random.random() < 0.05 else "v7"'}
+  error="(no error: users see the assistant change tone between messages, and a conversation mixes two prompts)"
+  cause="Random choice per request moves the same user between versions, which confuses users and blurs the comparison."
+  fix={'bucket = int(hashlib.sha256(f"{flag}:{user_id}".encode()).hexdigest(), 16) % 10_000\nversion = "v8" if bucket < 500 else "v7"'}
+/>
+
+</Section>
+
+<Section kind="practice" title="A release checklist for prompt and model changes">
+
+1. **Version everything** that changes behavior: prompt text, model id, retrieval settings, tool definitions. Pin the
+   model id; a provider's newer model is a release like any other.
+2. **Gate on the eval set**: no new failures in critical categories, and no large cost or latency increase.
+3. **Canary**: start at 1% to 5%, with the alert rule and a minimum sample size decided before you look.
+4. **Watch quality, latency, cost and errors by version**, with automatic rollback on the quality alert and dashboards
+   for the rest.
+5. **Widen in steps** (5%, 25%, 50%, 100%), waiting for enough data at each step.
+6. **After release**, keep the online checks running: provider changes, new documents and new kinds of questions can
+   degrade answers without any change on your side. Add every failure to the eval set.
+
+The [capstone](#/learn/ai/capstone/ai-app) puts the whole track together: retrieval or tools, an eval set, cost limits,
+guardrails and this monitoring.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Assign users to versions">
+
+<MiniExercise exercise={bucketExercise}>
+  Write `pick_version` so that each user stays on one version and the share is close to the target. Run the tests to
+  check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Version prompts and models, pin model ids, and pick the version per user with a feature flag.
+- Compare the candidate with the current version on the eval set before release.
+- Release to a small share first and compare quality, latency, cost and errors by version on live traffic.
+- Alert only on enough data, and expect occasional false alarms when checking repeatedly.
+- Make rollback a single setting, triggered automatically, so a bad version stops serving within the hour.
+
+</Section>

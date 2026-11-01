@@ -156,7 +156,6 @@ export function canaryExperiment(id: string, initial: CanaryState): ExperimentDe
       {
         label: 'Alert',
         value: r.alertHour ? `fired in hour ${r.alertHour}` : 'did not fire in 24 hours',
-        status: r.alertHour ? 'error' : 'ok',
       },
       { label: 'Requests served by the new version', value: r.newRequests.toLocaleString('en-US') },
       {

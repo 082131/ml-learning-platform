@@ -23,7 +23,7 @@ export function RetryTimeline() {
   return (
     <VizFrame
       title="Requests and waits over time"
-      badge={<Badge tone="simulated">Scripted server, simulated time</Badge>}
+      badge={<Badge tone="simulated">Simulated time</Badge>}
       caption={`${scenario.describe} ${result.stopReason} after ${result.attempts.length} request${result.attempts.length === 1 ? '' : 's'} and ${s2(result.total)}.`}
       table={
         <VizTable
