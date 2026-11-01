@@ -1,0 +1,171 @@
+import { apiCall, localModel, responseShape, retry, retryCode, retryRunner } from './code';
+import { backoffExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Renting a model by the word, or keeping one at home">
+
+A <Term id="model-api">hosted model API</Term> is like a translation agency that bills by the word: you send text,
+you get text back, and you never see their office. A <Term id="pretrained-model">pretrained model</Term> you download
+is like hiring a translator full time: you pay whether there is work or not, but the documents never leave the
+building.
+
+Both start the same way in code: build a request, send it, read the response. What makes it production code is
+everything around that call: keeping the key secret, reading how many tokens you paid for, and deciding what to do
+when the answer is "try again later".
+
+</Section>
+
+<Section kind="technical" title="Request, response, errors">
+
+**The request.** A chat-style API takes the model name, a cap on output tokens, optional system instructions and the
+conversation as a list of messages. The API keeps no memory between calls: to continue a conversation you send the whole
+history again, and pay for it again as input tokens. Requests are authenticated with an
+<Term id="api-key">API key</Term>, which must stay on a server.
+
+**The response** carries the generated content, a stop reason ("end_turn" when the model finished, "max_tokens" when
+it was cut off) and usage: the input and output tokens you are billed for. Log usage with every request.
+
+**Errors.** HTTP status codes tell you whether to retry:
+
+| Status | Meaning | Retry? |
+| --- | --- | --- |
+| 400, 422 | The request is invalid | No: fix it |
+| 401, 403 | Missing or wrong key, or not allowed | No |
+| 408, 409 | Timeout or conflict | Yes |
+| 429 | <Term id="rate-limit">Rate limit</Term> reached | Yes, after Retry-After |
+| 500, 503 (529 at some providers) | Server error or overloaded | Yes, with backoff |
+
+**Retrying well** means three rules. Respect the server's Retry-After header when there is one. Otherwise use
+<Term id="exponential-backoff">exponential backoff</Term>: wait $b \cdot 2^i$ seconds before retry $i$ (1, 2, 4, 8 s for
+$b = 1$), up to a cap. Add <Term id="jitter">jitter</Term> so many clients don't retry in lockstep. And always stop:
+after a few retries, fail clearly instead of hanging.
+
+**Running a model yourself.** Libraries such as Hugging Face Transformers download a pretrained model and run it on
+your hardware. Small models (classifiers, embedding models, models of a few billion parameters) run on a single GPU or
+even a CPU; the largest models need several GPUs and a serving runtime.
+
+<Callout kind="simplification">
+  The server in the experiment is scripted (each scenario's behavior is stated next to it) and its clock is simulated,
+  so you can see a minute of retries instantly. Real latencies vary from request to request. The official SDKs already
+  retry 429 and 5xx errors with backoff (the Python SDK twice by default); write your own loop only when you need
+  different behavior, and turn the SDK's retries off when you do, or the two multiply.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Retry against a scripted server">
+
+Choose how the server behaves and how your client retries. The timeline, the table and the code below come from the
+same settings.
+
+<Experiment def={retry} title="A retry loop">
+  <RetryTimeline />
+  <Readout title="This run" />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="Calling an API, and retrying it">
+
+A first call with the Anthropic Python SDK. Other providers' SDKs have the same shape: a client, a create call, content
+blocks and usage. This code is not run on this page.
+
+<Code example={apiCall} title="call.py" />
+
+The response, as JSON (values illustrative):
+
+<Code example={responseShape} title="response.json" />
+
+The retry loop with your settings from the experiment filled in:
+
+<Experiment def={retry} title="retry.py, linked to the experiment" controls={false}>
+  <Code example={retryCode} title="retry.py" />
+</Experiment>
+
+Running a small pretrained model on your own machine takes a few lines with Transformers (not run on this page; the
+first run downloads the model):
+
+<Code example={localModel} title="local_model.py" />
+
+</Section>
+
+<Section kind="experiment" title="Retry badly, then well">
+
+Start from "Rate limited" with the default settings, then:
+
+- Set "Respect Retry-After" to No and jitter to No. The client retries after 1 and 2 seconds, both inside the 4-second
+  window, and gets two more 429s. It finishes later than the client that simply waited 4 seconds.
+- Choose "Bad request (400)". Whatever the settings, the client stops after one request: retrying can't fix a wrong
+  request.
+- Choose "Outage" and set max retries to 6 with a base delay of 4 s. The waits grow 4, 8, 16, 30, 30, 30 (capped) and
+  the user waits about two minutes for an error. Decide how long your users can wait, and fail sooner.
+- Set max retries to 0 with "Brief server errors": the first 500 goes straight to the user, though the third request
+  would have worked.
+
+The pure-Python version below replays the rate-limit case with a fake server; its times match the simulator.
+
+<PythonRunner example={retryRunner} title="retry_sim.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Keys in the browser, retries without end">
+
+<CommonMistake
+  title="Calling the API from the browser with your key"
+  wrong={'// frontend code\nfetch("https://api.provider.com/v1/messages", {\n  headers: { "x-api-key": "sk-live-..." },\n})'}
+  error="(no error until someone opens the developer tools, copies the key and spends your budget)"
+  cause="Everything shipped to a browser or mobile app can be read by its users. A key there is public."
+  fix={'// frontend calls your own server, which holds the key\nfetch("/api/ask", { method: "POST", body: JSON.stringify({ question }) })'}
+/>
+
+<CommonMistake
+  title="Retrying everything, forever"
+  wrong={'while True:\n    try:\n        return client.messages.create(**request)\n    except Exception:\n        time.sleep(1)'}
+  error="(a 400 or 401 loops forever; an outage turns into a flood of requests from every client)"
+  cause="Some errors are permanent, and fixed one-second retries from many clients keep an overloaded server overloaded."
+  fix={'# Catch only retryable errors, back off with jitter, and give up after a few tries\nexcept (anthropic.RateLimitError, anthropic.InternalServerError):\n    ...'}
+/>
+
+</Section>
+
+<Section kind="practice" title="Hosted or local?">
+
+| | Hosted API | Pretrained model you run |
+| --- | --- | --- |
+| Start-up time | Minutes | Days (servers, serving, monitoring) |
+| Cost shape | Per token | Per hour, busy or idle |
+| Quality ceiling | The provider's largest models | What fits on your hardware |
+| Data | Leaves your servers (under the provider's terms) | Stays with you |
+| Latency | Network plus queueing at the provider | Under your control |
+| Changes | The provider updates and retires models | You decide when to upgrade |
+
+Whichever you choose, wrap the model call in one function of your own (`ask_model(...)`), so you can switch providers,
+add retries, log usage and run evaluations in one place. The [inference track](#/learn/inference/basics/what-is-inference)
+covers what it takes to serve models yourself.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="A backoff schedule">
+
+<MiniExercise exercise={backoffExercise}>
+  Write `waits(base, retries, cap)` returning the capped exponential backoff waits. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A model API call is a request (model, max tokens, system, messages) and a response (content, stop reason, usage).
+- The API is stateless: you resend the history and pay for it each time.
+- Retry 408, 409, 429 and 5xx; never 400 or 401. Respect Retry-After, back off exponentially with jitter, and stop.
+- Keep API keys on the server.
+- Running a pretrained model yourself trades per-token cost and data sharing for servers you must operate.
+
+Next: [Prompt engineering and structured outputs](#/learn/ai/prompting/structured-outputs).
+
+</Section>

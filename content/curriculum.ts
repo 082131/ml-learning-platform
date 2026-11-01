@@ -224,7 +224,7 @@ export const tracks: Track[] = [
         id: 'usage',
         title: 'Using pretrained models',
         level: 'intermediate',
-        lessons: [{ id: 'ai/usage/pretrained-apis', status: 'outline' }],
+        lessons: [{ id: 'ai/usage/pretrained-apis', status: 'written' }],
       },
       {
         id: 'prompting',
