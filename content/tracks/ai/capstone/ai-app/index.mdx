@@ -1,0 +1,115 @@
+import { brief, harnessCode, setupCode } from './code';
+import { questions, regressionExercise } from './quiz';
+
+<Section kind="intuition" title="From a demo to a product">
+
+A demo that answers three questions well takes an afternoon. A product that answers the four hundredth question
+honestly, says when it doesn't know, can't be talked into leaking data, stays within budget and can be changed
+without fear takes everything in this track at once.
+
+In this capstone you build that product for a document collection you choose: an assistant that answers from the
+documents with citations. Calling the model is the easy part. The work is in measuring it (an evaluation set you
+write first), limiting it (guardrails, permissions, cost limits) and changing it safely (versions, a flag, monitoring).
+
+</Section>
+
+<Section kind="technical" title="What you will build">
+
+A repository with the application, its evaluation set and results, and a model card:
+
+| Part | Contains | From lesson |
+| --- | --- | --- |
+| Approach | why an API model with retrieval, not training or fine-tuning | [the AI landscape](#/learn/ai/fundamentals/ai-landscape) |
+| `retrieval/` | chunking, embeddings, index, reranking; recall@k and MRR | [RAG pipeline](#/learn/ai/rag/rag-pipeline), [vector databases](#/learn/ai/rag/vector-db-eval) |
+| `prompts/` | versioned prompts with citations and a JSON reply format | [prompting](#/learn/ai/prompting/structured-outputs) |
+| `eval/`, `results/` | cases, code graders, per-case results for every version | [evals and guardrails](#/learn/ai/reliability/evals-guardrails) |
+| `app/` | an API with streaming, retries, input checks, a guardrail and caching | [AI APIs](#/learn/ai/apps/ai-apis), [cost and security](#/learn/ai/ops/latency-cost-security) |
+| flags, logs | version per request, tokens, latency, check results; rollback | [deploying and monitoring](#/learn/ai/ops/deploy-monitor) |
+| `MODEL_CARD.md` | intended use, model id, results by category, cost, known failures, how to reproduce | this capstone |
+
+**The system** is <Term id="retrieval-augmented-generation">retrieval-augmented generation</Term>: retrieve the chunks
+most likely to contain the answer, put them in the prompt with numbers, and ask for an answer that cites them or says
+the documents don't cover the question.
+
+**Measure the two halves separately.** Retrieval is measured with <Term id="recall-at-k">recall@k</Term>: did the
+chunk with the answer reach the prompt? Generation is measured with the failure categories from your
+<Term id="eval-set">evaluation set</Term>, graded by code where possible. When an answer is wrong, the retrieval
+result tells you which half to fix.
+
+**Limit it, then ship it.** An input <Term id="guardrail">guardrail</Term> with measured catches and wrong blocks, a
+plan for <Term id="prompt-injection">prompt injection</Term> in the documents, a cost estimate with a spending limit,
+and a <Term id="canary-release">canary release</Term> for every new prompt or model version.
+
+</Section>
+
+<Section kind="code" title="Start with the evaluation harness">
+
+Set up the project (needs your own API key; not run on this page):
+
+<Code example={setupCode} title="terminal" />
+
+A starting point for `eval.py`: it runs every case through your system with one prompt version and saves per-case
+results with tokens and time. `retrieve`, `build_prompt`, `load_prompt` and `grade` are yours to write, from the
+earlier lessons. It is not run on this page.
+
+<Code example={harnessCode} title="eval.py" />
+
+</Section>
+
+<Section kind="practice" title="The brief">
+
+Tick each milestone when it is done; your progress is saved in this browser.
+
+<Project brief={brief} />
+
+</Section>
+
+<Section kind="mistakes" title="Where projects like this go wrong">
+
+<CommonMistake
+  title="Writing the evaluation set after the system"
+  wrong={'cases = [q for q in tried_in_the_demo if answer_looked_good(q)]'}
+  error="(no error: 95% pass rate, and real users find the gaps in the first week)"
+  cause="Questions chosen after seeing the answers are the ones the system already handles. Unanswerable questions are missing entirely."
+  fix={'# Write cases from real user questions first, including ones the documents do not answer\ncases = load_jsonl("eval/cases.jsonl")  # written before the first prompt'}
+/>
+
+<CommonMistake
+  title="Comparing only totals"
+  wrong={'print(f"v1 {passed_v1}/40, v2 {passed_v2}/40")  # v2 wins by one'}
+  error="(no error: v2 ships, and a case about refunds that v1 answered correctly is now wrong)"
+  cause="A total can rise while individual cases break. With 40 cases, one case is 2.5 points, within the noise."
+  fix={'for case in regressions(results_v1, results_v2):\n    print("now failing:", case)'}
+/>
+
+<Callout kind="warning">
+  Your evaluation numbers describe your documents, your questions and the model you pinned, on the day you ran them.
+  Say so in the model card, together with the number of cases behind each result.
+</Callout>
+
+</Section>
+
+<Section kind="check" title="Self-assessment">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Find the regressions">
+
+<MiniExercise exercise={regressionExercise}>
+  Write `regressions(current, candidate)` in plain Python. You will run the same check on your saved results before
+  every release.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Choose the approach on purpose: an API model with retrieval answers from changing documents with citations.
+- Write the evaluation set first, with unanswerable questions, and grade by failure category.
+- Measure retrieval and generation separately, so each failure points at the half to fix.
+- Measure guardrails, cost and latency, and limit what a successful injection could do.
+- Version prompts and models, release behind a flag, monitor by version, and compare per case before every release.
+
+</Section>

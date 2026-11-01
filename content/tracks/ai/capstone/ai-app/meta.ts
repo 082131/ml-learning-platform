@@ -14,4 +14,23 @@ export default {
   ],
   prerequisites: ['ai/ops/deploy-monitor', 'ai/agents/tool-calling', 'ai/rag/vector-db-eval'],
   concepts: [],
+  references: [
+    {
+      title: 'Anthropic: Messages API reference',
+      url: 'https://docs.anthropic.com/en/api/messages',
+    },
+    {
+      title: 'Anthropic: Define success criteria and build evaluations',
+      url: 'https://docs.anthropic.com/en/docs/test-and-evaluate/develop-tests',
+    },
+    {
+      title: 'OWASP Top 10 for LLM Applications',
+      url: 'https://genai.owasp.org/llm-top-10/',
+      version: '2025',
+    },
+    {
+      title: 'Mitchell et al., Model Cards for Model Reporting (2019)',
+      url: 'https://arxiv.org/abs/1810.03993',
+    },
+  ],
 } satisfies LessonMeta;

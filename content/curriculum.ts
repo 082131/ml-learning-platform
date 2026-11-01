@@ -273,7 +273,7 @@ export const tracks: Track[] = [
         title: 'Capstone',
         level: 'advanced',
         project: 'ai/capstone/ai-app',
-        lessons: [{ id: 'ai/capstone/ai-app', status: 'outline' }],
+        lessons: [{ id: 'ai/capstone/ai-app', status: 'written' }],
       },
     ],
   },
