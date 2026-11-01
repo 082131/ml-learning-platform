@@ -1,0 +1,208 @@
+import { digits, distillLoss, distillOutput, experiment, pruneCode, tempExperiment, torchPrune } from './code';
+import { pruneExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Three ways to pack lighter">
+
+Suppose you must fit a library into a smaller room. You can print every book in smaller type (it all stays, each
+page is a little harder to read). You can tear out the pages nobody reads (less paper, but only if you knew which
+pages those were). Or you can have an expert write a short summary of the whole library (a new, smaller book that
+captures what matters, which takes real work to write).
+
+These are the three main ways to shrink a trained model. <Term id="quantization">Quantization</Term> stores every
+weight with fewer bits. <Term id="pruning">Pruning</Term> removes weights. <Term id="knowledge-distillation">Distillation</Term>
+trains a smaller model to imitate the big one. Each removes something different, costs something different to
+apply, and saves memory or time only under certain conditions.
+
+</Section>
+
+<Section kind="technical" title="What each method removes, and when it pays">
+
+**Quantization** keeps every weight and lowers its precision, as the
+[precision lesson](#/learn/inference/precision/precision-quantization) showed. It needs no training (post-training
+quantization) or a short fine-tune (quantization-aware training). It cuts weight memory directly, and speeds up
+memory-bound layers because fewer bytes are read; integer kernels can speed up the arithmetic too.
+
+**Magnitude pruning** sets the weights with the smallest absolute values to zero, on the theory that they change
+the output least. With a per-layer threshold every matrix loses the same share; a global threshold lets layers
+with many small weights lose more. After pruning, a short fine-tune usually recovers some accuracy.
+
+The catch is that zeros in a dense matrix still cost memory and time. A dense kernel multiplies them like any
+other number. Savings need either a <Term id="sparse-matrix">sparse format</Term>, which stores values and their
+positions and only beats dense below about 50% nonzeros, or sparse hardware (NVIDIA's 2:4 pattern: two zeros in
+every group of four), or **structured pruning**, which removes whole neurons, channels or attention heads so the
+matrices themselves get smaller.
+
+**Distillation** trains a new, smaller student to match the teacher's outputs. The teacher's probabilities are
+softened with a <Term id="softmax-temperature">temperature</Term> $T$:
+
+$$
+p_i = \frac{e^{z_i / T}}{\sum_j e^{z_j / T}}
+$$
+
+At $T = 1$ the teacher says test image 0 is a 7 with probability 0.989. At $T = 4$ it says 7: 0.600, 9: 0.194:
+this 7 looks a little like a 9, which a one-hot label cannot say. The student minimizes the KL divergence to these
+soft targets (times $T^2$), usually mixed with the ordinary loss on the labels. Distillation costs a full training
+run, but the student can have any architecture, so it saves memory and time everywhere, and the teacher can label
+data that has no labels.
+
+**On the digits model** (349 of 360 right in float32, 1,184 weights in W1 and W2):
+
+| Method | Result | Weight memory | Faster? | Cost to apply |
+| --- | --- | --- | --- | --- |
+| INT8, symmetric per tensor | 349 of 360 | ÷4 | yes, if memory-bound or with integer kernels | none (minutes) |
+| INT4, per channel | 345 of 360 | ÷8 | yes, if memory-bound | none |
+| Magnitude pruning, 50% global | 338 of 360 | unchanged if stored dense | no, with dense kernels | none, plus optional fine-tune |
+| Distilled 64 → 8 → 10 student | 344.0 mean of 5 seeds | ÷2 | yes, everywhere | a training run |
+
+<Callout kind="simplification">
+  A 1,210-parameter model on 360 test images is a teaching example. Large networks tolerate much more pruning and
+  quantization, because they have more redundancy, and published results for them use fine-tuning after pruning.
+  The ranking of costs and the conditions for real speedups carry over; the exact percentages do not.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Pruning the digits classifier">
+
+The chart is computed in your browser: the real model is pruned at every sparsity from 0 to 95% and evaluated on
+the 360 test images. The grid shows which of the first layer's weights survive at the current setting. Change it
+in the Experiment section.
+
+<Experiment def={experiment} title="Magnitude pruning, 50% per layer" controls={false}>
+  <PruneLab model={digits} />
+</Experiment>
+
+What the teacher's outputs look like at different temperatures. Slide the temperature and pick other test images:
+
+<Experiment def={tempExperiment} title="Softened teacher outputs">
+  <SoftTargets model={digits} />
+  <Readout />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="Pruning in NumPy, distillation in a training loop">
+
+The pruning code, with the current settings filled in. The readout shows exactly what it prints.
+
+<Experiment def={experiment} title="prune.py, linked to the chart" controls={false}>
+  <Code example={pruneCode} title="prune.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+The same thing in PyTorch, with its pruning utilities. (Not run while writing the lesson: PyTorch was not
+installed in the build environment.)
+
+<Code example={torchPrune} title="prune_torch.py" />
+
+The distillation loss: KL divergence to the softened teacher, scaled by $T^2$, mixed with cross-entropy on labels.
+
+<Code example={distillLoss} title="distill_loss.py" />
+
+`distill.py` (in this lesson's folder in the repository) trains a student half the teacher's width three ways,
+with five seeds each, and evaluates on the same 360 held-out images:
+
+<Code example={distillOutput} title="terminal" />
+
+With all 1,437 labels, distillation adds 2.6 correct images on average (341.4 to 344.0), smaller than the spread
+between seeds (338 to 349). The big difference is in the last line: if only 100 of those images had labels, a
+student trained on the labels gets 292.4, while the distilled student, which never saw a label, gets 344.0. The
+comparison flatters distillation a little, since this teacher learned from all 1,437 labels; in practice the
+teacher is a large model trained elsewhere, and the lesson holds: a teacher can label data you have no labels for.
+
+</Section>
+
+<Section kind="experiment" title="How far can you prune?">
+
+<Experiment def={experiment} title="Pruning lab">
+  <PruneLab model={digits} />
+  <Readout />
+</Experiment>
+
+Things to try:
+
+- Raise the sparsity in steps of 5% with the per-layer threshold. Accuracy holds near 349 up to about 30%, drops to
+  317 at 50%, and collapses after 75%.
+- Switch to the global threshold. At 80% it keeps 244 correct instead of 201: it takes more from W1 (166 weights
+  left of 1,024) and less from the small output layer (71 left of 160).
+- Watch the storage line. Sparse storage beats dense float32 only above 50% sparsity, where accuracy has already
+  started to fall.
+- Compare with the dashed line: removing random weights loses about 61 images on average at just 5%. Magnitude is what makes pruning
+  work.
+
+</Section>
+
+<Section kind="mistakes" title="Compression mistakes">
+
+<CommonMistake
+  title="Expecting unstructured sparsity to be faster"
+  wrong={'W = magnitude_prune(W, 0.9)   # 90% zeros\ny = x @ W.T                   # same dense matmul'}
+  error="No error. Latency and memory are unchanged: the dense kernel multiplies the zeros too."
+  cause="Dense kernels do not skip zeros, and a dense array stores them."
+  fix={'# Either remove whole rows or channels (structured pruning), so W itself is smaller,\n# or use a sparse format and kernels, or hardware sparsity (2:4), and measure the speedup.'}
+/>
+
+<CommonMistake
+  title="Judging compression on the training data"
+  wrong={'acc = (predict(P1, P2, X_train) == y_train).mean()   # looks fine at 80% sparsity'}
+  error="No error. The number is optimistic: it measures how well the pruned model remembers data it was fit to."
+  cause="Compression can remove what made the model generalize while keeping what it memorized."
+  fix={'acc = (predict(P1, P2, X_test) == y_test).mean()     # held-out data, never used for training'}
+/>
+
+<Callout kind="warning">
+  Measure what compression changes per slice, not only overall. A model can keep its average accuracy while losing
+  most of it on one rare class. Compare the confusion matrix before and after, as in
+  [error analysis](#/learn/ml/practice/ablations).
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Choosing a method">
+
+Start from the constraint and the budget you have to apply the method:
+
+1. **The weights do not fit, or decoding is memory-bound.** Quantize the weights first: INT8 or 4-bit formats with
+   per-channel or per-group scales. No training needed; check accuracy on a held-out set.
+2. **The model fits but is too slow on compute-bound layers.** Use INT8 or FP8 kernels if the hardware has them;
+   consider structured pruning (remove heads or channels) with a fine-tune.
+3. **You need a much smaller or different architecture**, for example to run on a phone. Distill: it costs a
+   training run, but the student can be any shape, and unlabeled data becomes training data.
+4. **Combine them.** A distilled student can then be quantized. Measure each step separately so you know what each
+   one cost.
+
+Whatever you choose, write down the accuracy tolerance before you start, measure on held-out data, and measure
+the latency and memory on the target hardware: compression that does not speed anything up is not worth its
+accuracy loss.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Prune by magnitude">
+
+<MiniExercise exercise={pruneExercise}>
+  Write `magnitude_prune(W, sparsity)`. Return a copy of `W` with the `int(sparsity * W.size)` smallest-magnitude
+  weights set to zero. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Quantization lowers precision, pruning removes weights, distillation trains a smaller model.
+- Quantization is cheap and saves memory directly; unstructured pruning saves nothing without sparse formats,
+  kernels or hardware; structured pruning and distillation shrink the actual computation.
+- Magnitude beats random pruning by a wide margin; global thresholds protect small layers.
+- Soft targets at temperature $T$ carry the teacher's view of similar classes, and let unlabeled data train the
+  student.
+- Measure accuracy on held-out data and speed on the target hardware, for each step.
+
+Next: [ONNX, ONNX Runtime and serving runtimes](#/learn/inference/runtimes/onnx-serving) runs a model outside its
+training framework and lets a runtime optimize its graph.
+
+</Section>

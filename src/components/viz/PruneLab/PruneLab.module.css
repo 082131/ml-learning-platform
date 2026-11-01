@@ -1,0 +1,17 @@
+.layout {
+  display: grid;
+  gap: var(--s-4);
+}
+.grid {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.kept {
+  fill: var(--accent);
+}
+.pruned {
+  fill: none;
+  stroke: var(--line-strong);
+  stroke-width: 0.6;
+}

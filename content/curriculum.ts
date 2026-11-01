@@ -321,7 +321,7 @@ export const tracks: Track[] = [
         id: 'compression',
         title: 'Compression',
         level: 'advanced',
-        lessons: [{ id: 'inference/compression/quantize-prune-distill', status: 'outline' }],
+        lessons: [{ id: 'inference/compression/quantize-prune-distill', status: 'written' }],
       },
       {
         id: 'runtimes',
