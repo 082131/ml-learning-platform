@@ -309,7 +309,7 @@ export const tracks: Track[] = [
         id: 'runtime',
         title: 'Runtime',
         level: 'intermediate',
-        lessons: [{ id: 'inference/runtime/loading-serialization', status: 'outline' }],
+        lessons: [{ id: 'inference/runtime/loading-serialization', status: 'written' }],
       },
       {
         id: 'precision',

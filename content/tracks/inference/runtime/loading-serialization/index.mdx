@@ -1,0 +1,197 @@
+import { experiment, formatFromScratch, inspectCode, lazyLoad, lazyOutput, pickleDemo, saveCode, torchLoad } from './code';
+import { prefixExercise, questions } from './quiz';
+
+<Section kind="intuition" title="A parcel and its packing list">
+
+A trained model is two things: an architecture (the code that says which layers exist and how they connect) and
+millions of numbers that fill those layers. Saving a model usually means saving only the numbers, in a
+<Term id="checkpoint">checkpoint</Term>, and rebuilding the architecture from code when loading.
+
+Think of a parcel with a packing list taped to it. The list says what each item is, how big it is and where it
+sits in the box. A good loader reads the list, checks it against what it expects, and takes out only the items it
+needs. A dangerous format is a parcel that comes with instructions, "to unpack me, run this", and a loader that
+follows them without reading. Both kinds exist, and the difference matters every time a server loads a model file
+it downloaded.
+
+</Section>
+
+<Section kind="technical" title="What is in a checkpoint file">
+
+**The state dict.** In PyTorch, a model's numbers are a <Term id="state-dict">state_dict</Term>: a dictionary from
+names to tensors, such as `"fc1.weight"` → a (16, 64) tensor. The names come from the attribute names in the
+model's code. Loading copies each tensor into the parameter with the same name; it never matches by position or
+shape.
+
+**Three common formats:**
+
+| Format | What it stores | Loading runs code? | Read one tensor without the rest? |
+| --- | --- | --- | --- |
+| `.pt` / `.bin` (torch.save) | a <Term id="pickle">pickle</Term> of the state dict, tensor data in a zip | yes, unless `weights_only=True` | no |
+| `.safetensors` | 8-byte length, JSON header, raw bytes | never | yes |
+| `.onnx` | the graph and the weights (protobuf) | no, the runtime interprets the graph | large weights can live in an external data file |
+
+**The <Term id="safetensors">safetensors</Term> layout** is simple enough to write by hand. The first 8 bytes are
+an unsigned little-endian integer, the length of the header. The header is JSON: for each tensor its dtype, shape
+and `data_offsets`, the byte range of its values after the header. The header is padded with spaces to a multiple
+of 8. Then come the raw values, ordered by dtype (8-byte types first, for alignment) and then by name.
+
+For the digits classifier in float32, the header is 272 bytes and the four tensors take
+$4 \cdot (16 \cdot 64 + 16 + 10 \cdot 16 + 10) = 4{,}840$ bytes, so the file is $8 + 272 + 4{,}840 = 5{,}120$ bytes.
+
+**Strict loading** checks three things: no name the model needs is missing, no name in the file is unexpected,
+and every shape matches. A checkpoint saved from an `nn.DataParallel` wrapper fails all three at once, because
+every name starts with `module.`. Dtype differences are not errors: values are converted when copied into the
+parameter.
+
+**Loading fast.** A loader that reads the whole file pays for every byte. Because safetensors records every
+tensor's byte range, a loader can <Term id="memory-mapping">memory-map</Term> the file and let the operating
+system read only the pages actually used, or read just the tensors a process needs: one GPU's shard of a large
+model, or only the layers being swapped in.
+
+<Callout kind="simplification">
+  The visual stores zeros: the layout depends only on names, dtypes and shapes. Real checkpoints often add a
+  `"__metadata__"` entry (free-form strings such as `{"format": "pt"}`), which comes first in the header and is
+  ignored when loading tensors.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="The file, byte by byte">
+
+The bar shows the file's byte ranges at their true proportions (with a minimum width so the small parts stay
+visible), the exact JSON header, and what happens when the file is loaded into a 64 → 16 → 10 model. Change the
+checkpoint and dtype in the Experiment section.
+
+<Experiment def={experiment} title="model.safetensors" controls={false}>
+  <FileLayout />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="Writing, inspecting and loading">
+
+`save.py` writes the checkpoint shown above, with the current settings filled in. `inspect.py` reads it back with
+only `json` and `struct`, and runs the same checks as strict loading. The readout shows exactly what it prints for
+the file `save.py` writes.
+
+<Experiment def={experiment} title="save.py and inspect.py, linked to the file" controls={false}>
+  <Code example={saveCode} title="save.py" />
+  <Code example={inspectCode} title="inspect.py" />
+  <Readout title="What inspect.py prints" />
+</Experiment>
+
+The format is small enough to implement from scratch. This writes and reads a two-tensor file without the
+safetensors library (which reads the result without complaint). Run it in your browser:
+
+<PythonRunner example={formatFromScratch} title="safetensors_by_hand.py" />
+
+Now the danger. A pickle stores, for each object, a function to call to rebuild it. This "checkpoint" names
+`print`; a malicious one would name something worse:
+
+<PythonRunner example={pickleDemo} title="pickle_payload.py" />
+
+In PyTorch, load safetensors files into a model built in code, keep strict loading on, and restrict any old
+pickle-based file to tensors. (This snippet was not run while writing the lesson, because PyTorch was not
+installed in the build environment.)
+
+<Code example={torchLoad} title="load.py" />
+
+Lazy loading in practice, on a 512 MiB file of 16 float16 tensors:
+
+<Code example={lazyLoad} title="lazy.py" />
+
+<Code example={lazyOutput} title="terminal" />
+
+Reading the header and one 32 MiB tensor took 24.8 ms, against 391.1 ms for all 512 MiB. The ratio is about the
+ratio of bytes read.
+
+</Section>
+
+<Section kind="experiment" title="Break the load">
+
+<Experiment def={experiment} title="Checkpoint inspector">
+  <FileLayout />
+  <Readout />
+</Experiment>
+
+Things to try:
+
+- Choose the DataParallel checkpoint. All four names gain `module.`: four missing, four unexpected. The header grows
+  from 272 to 304 bytes because the names are longer.
+- Choose the 32-hidden-unit checkpoint. The names match, but three shapes are wrong; `fc2.bias` (10 values) is
+  fine.
+- Switch the dtype to float16. The data shrinks from 4,840 to 2,420 bytes and the file still loads: values are
+  converted to float32 on copy. Try float64 to see it double.
+- Choose the checkpoint without fc2's bias. Only one name is missing, which `strict=False` would silently ignore,
+  leaving that bias at its initial value.
+
+</Section>
+
+<Section kind="mistakes" title="Loading mistakes">
+
+<CommonMistake
+  title="Turning off the check instead of fixing the names"
+  wrong={'model.load_state_dict(state, strict=False)   # the error went away'}
+  error="No error. Every parameter whose name did not match keeps its random initial value."
+  cause="strict=False skips mismatched names and returns them instead of raising. If nothing checks the returned lists, the model is partly untrained."
+  fix={'state = {k.removeprefix("module."): v for k, v in state.items()}\nmodel.load_state_dict(state)   # strict, and it loads'}
+/>
+
+<CommonMistake
+  title="Loading a GPU checkpoint on a CPU-only machine"
+  wrong={'state = torch.load("model.pt", weights_only=True)'}
+  error="RuntimeError: Attempting to deserialize object on a CUDA device but torch.cuda.is_available() is False."
+  cause="torch.save records the device each tensor was on, and torch.load puts it back there by default."
+  fix={'state = torch.load("model.pt", map_location="cpu", weights_only=True)'}
+/>
+
+<Callout kind="warning">
+  Never call `pickle.load`, `torch.load(..., weights_only=False)` or `joblib.load` on a file you did not produce
+  yourself. Prefer safetensors for weights you share or download, and pin model downloads to a known revision.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Loading in a production server">
+
+A model server loads its checkpoint once, at startup, and the load is part of how long a new replica takes to
+become ready:
+
+1. **Build, then fill.** Construct the architecture from versioned code, load the tensors, keep strict loading on,
+   and fail startup if anything is missing.
+2. **Check before serving.** Compare names, shapes and dtypes with what the code expects, then run a few recorded
+   inputs and compare the outputs with values saved at training time.
+3. **Load only what you need.** Serving checkpoints should not carry optimizer state; it can triple the file.
+   Large models are sharded into several safetensors files with an index, so each GPU reads only its part.
+4. **Load fast.** Memory-map from local disk instead of downloading on every start; replicas on one machine then
+   share one copy in the page cache.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Fix a prefixed state dict">
+
+<MiniExercise exercise={prefixExercise}>
+  Write `fix_keys(state, expected)`. Remove a leading `module.` from every key and return the fixed dictionary
+  with the sorted lists of missing and unexpected names. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A checkpoint holds named tensors; the architecture comes from code, and loading matches by name.
+- Pickle-based files can run code when loaded. Use safetensors, or `torch.load(..., weights_only=True)`.
+- A safetensors file is an 8-byte length, a JSON header with byte ranges, and raw values.
+- Strict loading catches missing, unexpected and wrong-shape names; `strict=False` hides them.
+- Byte ranges make lazy loading and memory mapping possible, so startup reads only what is used.
+
+Next: [FP32, FP16, BF16, INT8 and quantization error](#/learn/inference/precision/precision-quantization) looks
+at the dtypes stored in these files.
+
+</Section>
