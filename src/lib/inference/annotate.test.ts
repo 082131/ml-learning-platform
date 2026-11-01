@@ -4,7 +4,7 @@ import { ann, annLine, lineOf, spanOf } from './annotate';
 describe('annotation helpers', () => {
   const src = 'a = 1\nb = “x” + {{slot}}\nc = b';
   it('finds code-point columns on a 1-based line', () => {
-    expect(spanOf(src, 2, '{{slot}}')).toEqual({ range: { line: 2, startCol: 12, endCol: 20 }, match: '{{slot}}' });
+    expect(spanOf(src, 2, '{{slot}}')).toEqual({ range: { line: 2, startCol: 10, endCol: 18 }, match: '{{slot}}' });
     expect(spanOf(src, 1, '1').range).toEqual({ line: 1, startCol: 4, endCol: 5 });
   });
   it('finds later occurrences and lines by content', () => {

@@ -1,0 +1,179 @@
+import { experiment, fixedBatchError, fixedBatchOutput, graphCode, onnxGraph, onnxOutput } from './code';
+import { batchExercise, questions } from './quiz';
+
+<Section kind="intuition" title="A form with fixed boxes">
+
+A model is like an office that only accepts one form. The form has a fixed number of boxes, each box takes one kind
+of entry, and the office processes a whole stack of forms at once. Hand in a form with the boxes in a different
+layout, or a single loose page instead of a stack, and it is rejected at the door. Hand in a correctly laid-out form
+with the numbers written in the wrong unit, and it is accepted and processed, and the answer is wrong.
+
+A model's input form is a <Term id="tensor">tensor</Term>: an array with a <Term id="shape">shape</Term> (how many
+numbers along each axis) and a <Term id="dtype">dtype</Term> (what kind of number each one is). Most of the errors
+you will see when deploying a model are mismatches between the tensor a client sends and the tensor the model was
+built for.
+
+</Section>
+
+<Section kind="technical" title="Shapes, batches and the graph">
+
+The running example is the digits classifier from the [precision lesson](#/learn/inference/precision/precision-quantization):
+8 × 8 grayscale images of handwritten digits, pixel values 0 to 16, a hidden layer of 16 units and 10 output scores.
+
+**Inputs.** The model was trained on each image as a row of 64 pixels divided by 16, in float64 (NumPy's default).
+One image is a vector of shape (64,).
+
+**Batches.** Models process several inputs at once, stacked along a new first axis, the
+<Term id="batch">batch</Term> dimension. Eight images are a tensor of shape (8, 64). Every tensor inside the model
+carries the batch dimension in front:
+
+$$
+\underbrace{(B, 64)}_{x} \xrightarrow{\;@\,W_1:\,(64,\,16)\;} (B, 16) \xrightarrow{\;\text{ReLU}\;} (B, 16) \xrightarrow{\;@\,W_2:\,(16,\,10)\;} \underbrace{(B, 10)}_{\text{logits}} \xrightarrow{\;\text{argmax, axis } 1\;} \underbrace{(B,)}_{\text{labels}}
+$$
+
+A matrix multiplication (B, 64) @ (64, 16) only needs the inner sizes to match; B passes through. The bias of shape
+(16,) is added to every row by <Term id="broadcasting">broadcasting</Term>. So the same weights work for any batch
+size, and one call on 8 images does the work of 8 calls with one read of the weights.
+
+**Outputs.** The model returns one row of 10 scores per image; `argmax(axis=1)` picks the highest score in each row.
+Postprocessing has its own assumptions: `axis=1` assumes the batch is axis 0.
+
+**The graph.** Written as a list of operations with named inputs and outputs, the forward pass is a
+<Term id="computation-graph">computational graph</Term>: MatMul, Add, Relu, MatMul, Add. Frameworks record it
+(PyTorch while running, ONNX as a file) so that a runtime can check shapes, plan memory and optimize. In an
+exported graph, a dimension can be fixed (1) or a
+<Term id="symbolic-dimension">symbolic dimension</Term> with a name ("batch") that accepts any size.
+
+**Three ways to get it wrong:**
+
+| Mistake | First operation that notices | What you see |
+| --- | --- | --- |
+| Image not flattened: (B, 8, 8) | `x @ W1` | ValueError: … size 64 is different from 8 |
+| No batch dimension: (64,) | `argmax(axis=1)`, four steps later | AxisError: axis 1 is out of bounds |
+| Pixels divided by 255 | nothing | 229 of 360 right instead of 349 |
+
+</Section>
+
+<Section kind="visual" title="Follow the shapes">
+
+The graph shows the shape after each step for the current settings, computed with the real model in your browser.
+A step that raises turns red and the rest are not reached. Change the preprocessing in the Experiment section.
+
+<Experiment def={experiment} title="Shapes through the digits classifier" controls={false}>
+  <GraphShapes />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The forward pass in NumPy, then as an ONNX graph">
+
+The code the graph is drawn from, with the current batch size and preprocessing filled in. Select a part to see
+what it does; the readout shows exactly what it prints.
+
+<Experiment def={experiment} title="forward.py, linked to the graph" controls={false}>
+  <Code example={graphCode} title="forward.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+The same five operations, written as ONNX nodes and run by ONNX Runtime. The input is declared as
+`["batch", 64]`, float32:
+
+<Code example={onnxGraph} title="digits_onnx.py" />
+
+<Code example={onnxOutput} title="terminal" />
+
+The runtime checks the dtype before running anything: float64 is rejected even though the values would work. Had
+the batch dimension been exported as a fixed 1, a batch of 5 would be rejected too:
+
+<Code example={fixedBatchOutput} title="terminal" />
+
+</Section>
+
+<Section kind="experiment" title="Break it on purpose">
+
+<Experiment def={experiment} title="Batch size and preprocessing">
+  <GraphShapes />
+  <Readout />
+</Experiment>
+
+Things to try:
+
+- Raise the batch size to 360, the whole test set. Every shape's first number changes and nothing else does: 349
+  of 360 are right.
+- Choose “Forget to flatten”. The first matmul sees an inner size of 8 where it needs 64 and raises.
+- Choose “Send one image without a batch dimension”. Three operations succeed, because NumPy multiplies a vector
+  by a matrix happily, and the error appears only at `argmax(axis=1)`, far from its cause.
+- Choose “Divide by 255” at batch 360. No error, and 229 of 360 right. Inputs 16 times too small let the biases
+  dominate.
+
+</Section>
+
+<Section kind="mistakes" title="Shape and dtype mistakes at the boundary">
+
+<CommonMistake
+  title="Feeding NumPy's default dtype to a float32 model"
+  wrong={'x = np.array(pixels) / 16          # float64\nsess.run(None, {"x": x})'}
+  error="InvalidArgument: [ONNXRuntimeError] : 2 : INVALID_ARGUMENT : Unexpected input data type. Actual: (tensor(double)) , expected: (tensor(float))"
+  cause="NumPy creates float64 arrays by default. Exported models almost always expect float32 (or float16)."
+  fix={'x = (np.array(pixels) / 16).astype(np.float32)'}
+/>
+
+<CommonMistake
+  title="Exporting with a fixed batch size"
+  wrong={'# exported with an example batch of 1 and no dynamic axis\nsess.run(None, {"x": images[:5]})'}
+  error={fixedBatchError}
+  cause="The exporter recorded the example input's batch size as a fixed dimension."
+  fix={'# mark the batch dimension as dynamic when exporting, for example in PyTorch:\ntorch.onnx.export(model, (example,), "m.onnx", input_names=["x"],\n                  dynamic_axes={"x": {0: "batch"}})'}
+/>
+
+<Callout kind="warning">
+  Silent mismatches are worse than errors. Pixel scale, channel order (RGB vs BGR), image layout (B, C, H, W) vs
+  (B, H, W, C) and tokenizer version all keep the shapes right and change the answers. Test the served model on a
+  few inputs whose correct outputs you recorded at training time.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Checking requests before they reach the model">
+
+A server should turn every accepted input into exactly the tensor the model expects, and reject everything else
+with a clear message, before calling the model:
+
+1. Read the model's input names, shapes and dtypes once at startup (`sess.get_inputs()` in ONNX Runtime).
+2. Convert each request: add the batch dimension if it is missing, reshape, cast to the expected dtype, apply the
+   same scaling as in training.
+3. Reject anything whose shape still does not match, with the expected and received shapes in the error.
+4. Keep a handful of recorded inputs and outputs from training and check the served model against them after every
+   deployment.
+
+The exercise below is step 2 and 3 for the digits model.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Normalize any input to a batch">
+
+<MiniExercise exercise={batchExercise}>
+  Write `to_batch(images)`. It accepts one image as (64,) or (8, 8), or a batch of either, and returns float32 of
+  shape (batch, 64) divided by 16. Anything else raises ValueError. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A tensor is a shape plus a dtype; a model accepts exactly one kind of each per input.
+- Batching adds a leading dimension that passes through every operation; weights are shared across the batch.
+- A computational graph lists operations and the tensors between them; exported graphs can fix or name dimensions.
+- Shape errors can appear far from their cause, and scale or layout errors appear nowhere: check inputs at the
+  boundary and test against recorded outputs.
+
+Next: [CPU vs GPU execution](#/learn/inference/hardware/cpu-vs-gpu) looks at the hardware that runs these
+matrix multiplications.
+
+</Section>

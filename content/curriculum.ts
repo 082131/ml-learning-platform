@@ -290,7 +290,7 @@ export const tracks: Track[] = [
         level: 'beginner',
         lessons: [
           { id: 'inference/basics/what-is-inference', status: 'written' },
-          { id: 'inference/basics/tensors-graphs', status: 'outline' },
+          { id: 'inference/basics/tensors-graphs', status: 'written' },
         ],
       },
       {
