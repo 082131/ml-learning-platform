@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { parseExercise } from '../../content/tracks/ai/prompting/structured-outputs/quiz';
 import { expectAccessibleBothThemes, openLesson } from './foundations-helpers';
-import { nudge, passExercise, runPython } from './ai-helpers';
+import { passExercise, runPython } from './ai-helpers';
 import { servePyodideLocally } from './pyodide';
 
 test.beforeEach(async ({ page, context }) => {

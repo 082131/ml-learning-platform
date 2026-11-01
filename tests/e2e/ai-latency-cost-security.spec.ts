@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { policyExercise } from '../../content/tracks/ai/ops/latency-cost-security/quiz';
 import { expectAccessibleBothThemes, openLesson } from './foundations-helpers';
-import { nudge, passExercise, runPython } from './ai-helpers';
+import { passExercise, runPython } from './ai-helpers';
 import { servePyodideLocally } from './pyodide';
 
 test.beforeEach(async ({ page, context }) => {
