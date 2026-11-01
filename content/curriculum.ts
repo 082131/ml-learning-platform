@@ -327,7 +327,7 @@ export const tracks: Track[] = [
         id: 'runtimes',
         title: 'Runtimes',
         level: 'advanced',
-        lessons: [{ id: 'inference/runtimes/onnx-serving', status: 'outline' }],
+        lessons: [{ id: 'inference/runtimes/onnx-serving', status: 'written' }],
       },
       {
         id: 'throughput',

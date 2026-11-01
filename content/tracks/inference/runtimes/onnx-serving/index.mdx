@@ -1,0 +1,186 @@
+import { experiment, exportCode, optimizeOutput, parityCode, sessionCode } from './code';
+import { parityExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Sheet music instead of a recording">
+
+A model trained in PyTorch lives inside PyTorch: running it needs Python, the framework, and the code that defines
+the model. Exporting it is like writing the piece down as sheet music. Any orchestra that reads standard notation
+can play it, and a good conductor can rearrange the parts to play it more efficiently without changing the tune.
+
+<Term id="onnx">ONNX</Term> is that standard notation: a file holding the model as a
+<Term id="computation-graph">graph</Term> of standard operators plus its weights. A runtime such as ONNX Runtime
+is the orchestra and the conductor: it reads the graph, rewrites it into fewer, faster steps, and runs it on
+whatever hardware it has. This lesson shows what that rewriting does, on a graph small enough to read node by node.
+
+</Section>
+
+<Section kind="technical" title="Export, optimize, execute">
+
+**Export.** `torch.onnx.export` runs the model on an example input and records the operations as ONNX nodes,
+with the weights stored as constants (initializers). Each operator is defined by the ONNX specification at an
+*opset* version; the file also has an *IR version* for its format. The runtime you deploy must support both.
+
+**Optimize.** When a session is created, ONNX Runtime rewrites the graph without changing what it computes:
+
+- <Term id="constant-folding">Constant folding</Term> computes, once, every node whose inputs are all constants.
+  Exporters often write a weight in PyTorch's (out, in) layout followed by a Transpose; folding stores the
+  transposed weight and deletes the node.
+- <Term id="operator-fusion">Operator fusion</Term> merges a pattern into one kernel: MatMul + Add becomes Gemm
+  (general matrix multiply with a bias), and at the extended level Gemm + Relu becomes FusedGemm.
+
+For the digits classifier, written as an exporter might write it, this is what ONNX Runtime 1.29.0 did:
+
+| Level | Nodes | Graph |
+| --- | --- | --- |
+| disabled | 9 | Mul, Transpose, MatMul, Add, Relu, Transpose, MatMul, Add, Softmax |
+| basic | 5 | Mul, Gemm, Relu, Gemm, Softmax |
+| extended | 4 | Mul, FusedGemm, Gemm, Softmax |
+
+Each node is a kernel launch, and each tensor passed between nodes is written to memory and read back. At batch
+1 the unoptimized graph moves $8 \cdot (132 + 1{,}184) = 10{,}528$ bytes between nodes, of which 9,472 are the two
+weight transposes; the extended graph moves $8 \cdot 90 = 720$. The outputs were identical at every level.
+
+**Execute.** An <Term id="execution-provider">execution provider</Term> runs nodes on a device: CPU, CUDA,
+TensorRT, OpenVINO, CoreML and others. You list providers in order of preference; nodes the first cannot run fall
+back to the next, usually the CPU, with copies in between.
+
+**Serving runtimes** go beyond running one graph:
+
+| Runtime | Strong at | Typical use |
+| --- | --- | --- |
+| ONNX Runtime | portable, many providers, CPU and GPU | general models from any framework |
+| TensorRT | NVIDIA GPUs: aggressive fusion, FP16/INT8/FP8 kernels | lowest latency on NVIDIA hardware |
+| OpenVINO | Intel CPUs, GPUs and NPUs | CPU-heavy deployments |
+| Triton Inference Server | a server around many backends: dynamic batching, model versions, metrics | many models behind one service |
+| vLLM, TensorRT-LLM, llama.cpp | language models: KV cache management, continuous batching, quantized formats | LLM serving |
+
+<Callout kind="simplification">
+  This graph is tiny, so the measured speed differences between levels on our shared CPU were smaller than the
+  run-to-run noise (6 to 23 µs per call at batch 1 across repeated runs). Fusion and folding matter when the saved
+  launches and memory round trips are a large share of the time: many small operations, large activations, or a
+  GPU where each launch costs microseconds.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="What the optimizer did">
+
+The node list is what ONNX Runtime saved at each level; the bars are computed from the tensor shapes for the
+current batch size. Change the level and batch in the Experiment section.
+
+<Experiment def={experiment} title="The digits graph in ONNX Runtime" controls={false}>
+  <OnnxGraph />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="Running, inspecting and checking a model">
+
+Creating a session with an optimization level, saving the optimized graph, and choosing providers:
+
+<Code example={sessionCode} title="run_onnx.py" />
+
+`optimize.py` (in this lesson's folder in the repository) builds the graph above, runs it at each level on the 360
+test images, and compares the result with NumPy:
+
+<Code example={optimizeOutput} title="terminal" />
+
+The parity check at the end is the most important part of any export:
+
+<Code example={parityCode} title="parity.py" />
+
+From PyTorch, the export and the parity test look like this. (Not run while writing the lesson: PyTorch was not
+installed in the build environment.)
+
+<Code example={exportCode} title="export.py" />
+
+</Section>
+
+<Section kind="experiment" title="Change the level and the batch">
+
+<Experiment def={experiment} title="Graph optimization levels">
+  <OnnxGraph />
+  <Readout />
+</Experiment>
+
+Things to try:
+
+- Step from disabled to basic at batch 1. Two Transposes disappear and two MatMul + Add pairs become Gemm: 9 nodes
+  become 5, and the bytes between nodes drop from 10,528 to 848.
+- Switch to extended. Relu is absorbed into the first Gemm: 4 nodes, 720 bytes.
+- Raise the batch to 512. The fixed cost of the transposes matters less and the per-row intermediates more: the
+  extended graph still passes 33% fewer bytes than the unoptimized one.
+
+</Section>
+
+<Section kind="mistakes" title="Export and runtime mistakes">
+
+<CommonMistake
+  title="Writing a file newer than the runtime can read"
+  wrong={'model = helper.make_model(graph)   # onnx 1.23 writes IR version 14\nort.InferenceSession(model.SerializeToString())   # onnxruntime 1.29'}
+  error="Fail: [ONNXRuntimeError] : 1 : FAIL : Load model from digits.onnx failed: … Unsupported model IR version: 14, max supported IR version: 13"
+  cause="The onnx package and the runtime are released separately. A newer onnx writes a newer file format by default."
+  fix={'model = helper.make_model(graph, opset_imports=[helper.make_opsetid("", 21)], ir_version=10)'}
+/>
+
+<CommonMistake
+  title="Assuming the GPU is used"
+  wrong={'sess = ort.InferenceSession("m.onnx", providers=["CUDAExecutionProvider", "CPUExecutionProvider"])'}
+  error="No error. If the CUDA provider cannot load, the session runs everything on the CPU."
+  cause="Providers are a preference list with silent fallback, and the plain onnxruntime package has no CUDA provider."
+  fix={'assert sess.get_providers()[0] == "CUDAExecutionProvider", sess.get_providers()'}
+/>
+
+<Callout kind="warning">
+  An export that succeeds is not an export that is correct. Data-dependent Python control flow is recorded for the
+  example input only, and unsupported operations can be traced as constants. Always run a parity test on real
+  inputs, including different batch sizes.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Choosing a runtime">
+
+1. **Stay in the framework** (PyTorch with `torch.compile`) when you need flexibility, the model changes often,
+   and the latency target is easy.
+2. **Export to ONNX and use ONNX Runtime** for portability: one file runs on CPUs, NVIDIA and other accelerators,
+   from Python, C++, C#, Java or JavaScript.
+3. **Compile with TensorRT** (directly or as an ONNX Runtime provider) when the hardware is NVIDIA and every
+   millisecond counts. Engines are specific to the GPU model and TensorRT version: build them per target.
+4. **Use an LLM server** (vLLM, TensorRT-LLM, llama.cpp) for language models; their KV-cache management and
+   continuous batching matter more than graph fusion.
+5. **Put a model server** (Triton, or your own) in front when you need batching, multiple versions and metrics.
+
+Whatever you pick: pin the exporter, opset and runtime versions, save the optimized graph, run a parity test, and
+benchmark on the target hardware.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="A parity report">
+
+<MiniExercise exercise={parityExercise}>
+  Write `parity(actual, expected, atol)` returning the largest absolute difference, the number of rows whose
+  predicted class differs, and whether both are acceptable. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- ONNX stores a model as a graph of standard operators plus weights; any compatible runtime can run it.
+- Runtimes fold constants and fuse operators, so fewer kernels run and fewer intermediate tensors touch memory.
+- Execution providers map nodes to hardware, with silent fallback: check which ones you got.
+- Pin opset, IR and runtime versions, and test parity on real inputs after every export.
+- Choose the runtime by model type and hardware: ONNX Runtime for portability, TensorRT for NVIDIA latency, LLM
+  servers for language models.
+
+Next: [batching, dynamic batching, concurrency and throughput](#/learn/inference/throughput/batching-throughput)
+looks at how a server groups requests for the runtime.
+
+</Section>

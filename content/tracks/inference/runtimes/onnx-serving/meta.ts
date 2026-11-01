@@ -13,5 +13,29 @@ export default {
     'Compare serving runtimes and choose one for a given model and hardware',
   ],
   prerequisites: ['inference/runtime/loading-serialization'],
-  concepts: [],
+  concepts: ['onnx', 'execution-provider', 'operator-fusion', 'constant-folding', 'computation-graph'],
+  references: [
+    { title: 'ONNX operator specifications (opsets)', url: 'https://onnx.ai/onnx/operators/', version: 'onnx 1.23' },
+    {
+      title: 'ONNX Runtime: graph optimizations (basic, extended, layout levels)',
+      url: 'https://onnxruntime.ai/docs/performance/model-optimizations/graph-optimizations.html',
+      version: 'onnxruntime 1.29',
+    },
+    {
+      title: 'ONNX Runtime: execution providers',
+      url: 'https://onnxruntime.ai/docs/execution-providers/',
+      version: 'onnxruntime 1.29',
+    },
+    {
+      title: 'ONNX Runtime compatibility (supported IR and opset versions per release)',
+      url: 'https://onnxruntime.ai/docs/reference/compatibility.html',
+    },
+    {
+      title: 'torch.onnx: exporting a PyTorch model to ONNX',
+      url: 'https://pytorch.org/docs/stable/onnx.html',
+      version: 'PyTorch stable docs, read 2026-11-01',
+    },
+    { title: 'NVIDIA Triton Inference Server documentation', url: 'https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/' },
+    { title: 'vLLM documentation', url: 'https://docs.vllm.ai/' },
+  ],
 } satisfies LessonMeta;

@@ -38,7 +38,7 @@ export function PruneLab({ model }: { model: DigitsModel }) {
       />
       <VizFrame
         title="Which weights of W1 survive"
-        caption={`W1 has 16 rows (hidden units) × 64 columns (pixels). ${r.kept[0]} of 1,024 weights are left. Filled cells are kept, empty cells were set to zero. Columns for corner pixels, which are almost always blank, were near zero to begin with and go first.`}
+        caption={`W1 has 16 rows (hidden units) × 64 columns (pixels). ${r.kept[0]} of 1,024 weights are left. Filled cells are kept, empty cells were set to zero. Columns for edge pixels, which are almost always blank, had weights near zero to begin with and go first.`}
       >
         <svg
           className={s.grid}

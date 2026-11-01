@@ -1,0 +1,44 @@
+.layout {
+  display: grid;
+  gap: var(--s-4);
+}
+.chain {
+  display: grid;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+}
+.io {
+  color: var(--ink-2);
+}
+.node {
+  display: grid;
+  gap: 2px;
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+}
+.node[data-changed='true'] {
+  border-color: var(--accent);
+  border-width: 2px;
+}
+.op {
+  font-weight: 600;
+  font-size: var(--fs-15);
+}
+.mark {
+  font-weight: 400;
+  font-size: var(--fs-13);
+  color: var(--accent);
+}
+.does,
+.why {
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+.out {
+  color: var(--ink);
+}
