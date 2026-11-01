@@ -5,7 +5,8 @@ export default [
   {
     id: 'natural-language-processing',
     term: 'Natural language processing (NLP)',
-    short: 'The part of AI that works with human language: classifying, extracting from, translating or generating text.',
+    short:
+      'The part of AI that works with human language: classifying, extracting from, translating or generating text.',
     long: 'Older NLP systems used rules and task-specific models; most current NLP uses pretrained transformers, often large language models.',
     introducedIn: 'ai/fundamentals/ai-landscape',
     aliases: ['NLP'],
@@ -29,7 +30,8 @@ export default [
   {
     id: 'fine-tuning',
     term: 'Fine-tuning',
-    short: 'Continuing to train a pretrained model on your own, smaller labeled dataset so it adapts to your task.',
+    short:
+      'Continuing to train a pretrained model on your own, smaller labeled dataset so it adapts to your task.',
     long: 'Fine-tuning changes the model’s weights. It needs labeled examples (usually hundreds to many thousands), an evaluation set and a way to version and serve the new model.',
     introducedIn: 'ai/fundamentals/ai-landscape',
     aliases: ['fine-tune', 'fine-tuned'],
@@ -37,7 +39,8 @@ export default [
   {
     id: 'model-api',
     term: 'Hosted model API',
-    short: 'A model run by a provider on its servers, which you call over HTTP and pay for per use, usually per token.',
+    short:
+      'A model run by a provider on its servers, which you call over HTTP and pay for per use, usually per token.',
     long: 'You send your input to the provider and get the output back. You don’t manage GPUs, but your data leaves your servers and you depend on the provider’s prices, limits and model versions.',
     introducedIn: 'ai/fundamentals/ai-landscape',
     aliases: ['model API', 'hosted API', 'LLM API'],

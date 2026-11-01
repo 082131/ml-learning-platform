@@ -41,7 +41,8 @@ export const questions: QuizQuestion[] = [
       {
         text: 'Your server sends an error event in the stream, because the 200 status was already sent',
         correct: true,
-        explain: 'Once streaming starts, the status line is gone. Errors must be events your frontend handles.',
+        explain:
+          'Once streaming starts, the status line is gone. Errors must be events your frontend handles.',
       },
       {
         text: 'The HTTP status changes to 500',
@@ -63,7 +64,8 @@ export const questions: QuizQuestion[] = [
       {
         text: 'A read can end in the middle of a line or event, so incomplete text must wait for the next piece',
         correct: true,
-        explain: 'TCP delivers bytes, not events. The parser completes an event only at the blank line that ends it.',
+        explain:
+          'TCP delivers bytes, not events. The parser completes an event only at the blank line that ends it.',
       },
       {
         text: 'To slow the text down so it is readable',
@@ -80,12 +82,14 @@ export const questions: QuizQuestion[] = [
   {
     id: 'validation',
     type: 'choice',
-    prompt: 'Why validate the request (for example, a question of 1 to 2,000 characters) before calling the model?',
+    prompt:
+      'Why validate the request (for example, a question of 1 to 2,000 characters) before calling the model?',
     options: [
       {
         text: 'Bad or huge inputs are rejected for free with a clear 4xx error instead of costing a model call',
         correct: true,
-        explain: 'Every model call costs money and time. Limits on input size also bound your worst-case cost per request.',
+        explain:
+          'Every model call costs money and time. Limits on input size also bound your worst-case cost per request.',
       },
       {
         text: 'The model can’t read long text',
@@ -103,7 +107,8 @@ export const questions: QuizQuestion[] = [
 
 export const sseExercise: Exercise = {
   id: 'sse-format',
-  prompt: 'Write `sse(event, payload)` that returns one server-sent event with the payload as JSON on the data line.',
+  prompt:
+    'Write `sse(event, payload)` that returns one server-sent event with the payload as JSON on the data line.',
   starter: `import json
 
 def sse(event, payload):

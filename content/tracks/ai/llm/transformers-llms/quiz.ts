@@ -17,17 +17,20 @@ export const questions: QuizQuestion[] = [
   {
     id: 'temperature',
     type: 'choice',
-    prompt: 'You extract invoice numbers from emails and want the same answer every time. Which setting fits?',
+    prompt:
+      'You extract invoice numbers from emails and want the same answer every time. Which setting fits?',
     options: [
       {
         text: 'A temperature of 0 (or close to it), so the most likely token is chosen',
         correct: true,
-        explain: 'Low temperature makes output nearly deterministic, which suits extraction and classification.',
+        explain:
+          'Low temperature makes output nearly deterministic, which suits extraction and classification.',
       },
       {
         text: 'A temperature of 1.5, so the model considers more options',
         correct: false,
-        explain: 'High temperature samples unlikely tokens more often: useful for brainstorming, harmful for extraction.',
+        explain:
+          'High temperature samples unlikely tokens more often: useful for brainstorming, harmful for extraction.',
       },
       {
         text: 'Top-p of 1 with temperature 1',
@@ -44,7 +47,8 @@ export const questions: QuizQuestion[] = [
     answer: 0.9,
     tolerance: 0.005,
     hint: 'Dividing a log by 0.5 doubles it: ln 3 / 0.5 = ln 9. Softmax of ln 9 and ln 1 is 9 / (9 + 1).',
-    explain: 'ln 3 / 0.5 = ln 9 and ln 1 / 0.5 = 0, so the probabilities are 9/10 and 1/10. The first one is 0.90.',
+    explain:
+      'ln 3 / 0.5 = ln 9 and ln 1 / 0.5 = 0, so the probabilities are 9/10 and 1/10. The first one is 0.90.',
   },
   {
     id: 'context',
@@ -64,7 +68,8 @@ export const questions: QuizQuestion[] = [
       {
         text: 'It is trained to produce likely text, and likely-sounding text is not the same as checked facts',
         correct: true,
-        explain: 'Nothing in next-token prediction checks the claim against a source. Fluency comes from the training objective; truth does not.',
+        explain:
+          'Nothing in next-token prediction checks the claim against a source. Fluency comes from the training objective; truth does not.',
       },
       {
         text: 'It is lying on purpose',
@@ -74,7 +79,8 @@ export const questions: QuizQuestion[] = [
       {
         text: 'It only happens when the temperature is above 1',
         correct: false,
-        explain: 'Greedy decoding can also produce false statements; the most likely continuation can be wrong.',
+        explain:
+          'Greedy decoding can also produce false statements; the most likely continuation can be wrong.',
       },
     ],
   },
@@ -82,7 +88,8 @@ export const questions: QuizQuestion[] = [
 
 export const softmaxExercise: Exercise = {
   id: 'softmax-temperature',
-  prompt: 'Write `softmax_t(logits, t)` that returns softmax(logits / t), and returns a one-hot list for t == 0.',
+  prompt:
+    'Write `softmax_t(logits, t)` that returns softmax(logits / t), and returns a one-hot list for t == 0.',
   starter: `import math
 
 def softmax_t(logits, t):

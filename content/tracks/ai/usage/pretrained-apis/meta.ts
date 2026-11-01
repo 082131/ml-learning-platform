@@ -12,7 +12,15 @@ export default {
     'Compare hosted and local models on cost, latency, quality and data privacy',
   ],
   prerequisites: ['ai/llm/transformers-llms', 'ai/fundamentals/ai-landscape'],
-  concepts: ['model-api', 'api-key', 'rate-limit', 'exponential-backoff', 'jitter', 'pretrained-model', 'token'],
+  concepts: [
+    'model-api',
+    'api-key',
+    'rate-limit',
+    'exponential-backoff',
+    'jitter',
+    'pretrained-model',
+    'token',
+  ],
   references: [
     {
       title: 'Anthropic: Messages API reference',

@@ -9,12 +9,14 @@ export const questions: QuizQuestion[] = [
       {
         text: 'Yes: replies can be cut off by max_tokens, and business rules the schema can’t express still need checking',
         correct: true,
-        explain: 'Constrained decoding removes most format errors, not all failures, and it can’t know that a refund over $500 needs a person.',
+        explain:
+          'Constrained decoding removes most format errors, not all failures, and it can’t know that a refund over $500 needs a person.',
       },
       {
         text: 'No: the schema guarantees a correct answer',
         correct: false,
-        explain: 'It guarantees the shape, not the content. A valid object can still have the wrong category.',
+        explain:
+          'It guarantees the shape, not the content. A valid object can still have the wrong category.',
       },
       {
         text: 'Only when the temperature is above 0',
@@ -31,12 +33,14 @@ export const questions: QuizQuestion[] = [
       {
         text: 'Unwrap that exact fence pattern before parsing, and treat any other extra text as a validation failure',
         correct: true,
-        explain: 'The fence is a predictable wrapper. Guessing where JSON starts inside arbitrary prose is how silent bugs begin.',
+        explain:
+          'The fence is a predictable wrapper. Guessing where JSON starts inside arbitrary prose is how silent bugs begin.',
       },
       {
         text: 'Take everything between the first { and the last }',
         correct: false,
-        explain: 'It works until the prose contains a brace, or the model returns two objects. Then it silently parses the wrong thing.',
+        explain:
+          'It works until the prose contains a brace, or the model returns two objects. Then it silently parses the wrong thing.',
       },
       {
         text: 'Ignore the reply',
@@ -53,7 +57,8 @@ export const questions: QuizQuestion[] = [
       {
         text: 'Send the validation errors back to the model once, then fall back (a default, a person, or an error) if it fails again',
         correct: true,
-        explain: 'Models usually fix a precise error message on the first retry. A limit keeps cost and latency bounded.',
+        explain:
+          'Models usually fix a precise error message on the first retry. A limit keeps cost and latency bounded.',
       },
       {
         text: 'Retry the same request until it passes',
@@ -63,7 +68,8 @@ export const questions: QuizQuestion[] = [
       {
         text: 'Use the parts that look right',
         correct: false,
-        explain: 'Partially valid data spreads into the rest of your system, where it is much harder to find.',
+        explain:
+          'Partially valid data spreads into the rest of your system, where it is much harder to find.',
       },
     ],
   },
@@ -75,14 +81,22 @@ export const questions: QuizQuestion[] = [
     answer: 30,
     tolerance: 0,
     hint: 'Convert both to percentages first.',
-    explain: '90% − 60% = 30 percentage points. With only 10 examples, though, one ticket is 10 points: collect more before trusting small gaps.',
+    explain:
+      '90% − 60% = 30 percentage points. With only 10 examples, though, one ticket is 10 points: collect more before trusting small gaps.',
   },
   {
     id: 'parts',
     type: 'order',
     prompt: 'Put the parts of the triage prompt in the order this lesson uses.',
-    items: ['Role and task', 'Category definitions', 'Rules for the other fields', 'Output format', 'A worked example'],
-    explain: 'Context first, then the rules, then the exact format, then an example that shows the format in use.',
+    items: [
+      'Role and task',
+      'Category definitions',
+      'Rules for the other fields',
+      'Output format',
+      'A worked example',
+    ],
+    explain:
+      'Context first, then the rules, then the exact format, then an example that shows the format in use.',
   },
 ];
 

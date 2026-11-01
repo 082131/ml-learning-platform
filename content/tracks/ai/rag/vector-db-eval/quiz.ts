@@ -9,17 +9,20 @@ export const questions: QuizQuestion[] = [
       {
         text: 'Recall goes up and each query compares more vectors, so it gets slower',
         correct: true,
-        explain: 'Searching more clusters finds neighbors that sat just across a cluster boundary, at the cost of more comparisons.',
+        explain:
+          'Searching more clusters finds neighbors that sat just across a cluster boundary, at the cost of more comparisons.',
       },
       {
         text: 'The index has to be rebuilt',
         correct: false,
-        explain: 'nprobe is a query-time setting. nlist (the number of clusters) is fixed when the index is built.',
+        explain:
+          'nprobe is a query-time setting. nlist (the number of clusters) is fixed when the index is built.',
       },
       {
         text: 'Recall goes down because there is more noise',
         correct: false,
-        explain: 'Searching more clusters can only add true neighbors; at nprobe = nlist the search is exact.',
+        explain:
+          'Searching more clusters can only add true neighbors; at nprobe = nlist the search is exact.',
       },
     ],
   },
@@ -31,12 +34,14 @@ export const questions: QuizQuestion[] = [
       {
         text: 'Re-embed every chunk with the new model; until then, query only vectors from one model',
         correct: true,
-        explain: 'Vectors from different models live in different spaces. A cosine between them is meaningless.',
+        explain:
+          'Vectors from different models live in different spaces. A cosine between them is meaningless.',
       },
       {
         text: 'Nothing: all embeddings of the same size are compatible',
         correct: false,
-        explain: 'Two 384-number vectors from different models are as comparable as two phone numbers from different countries.',
+        explain:
+          'Two 384-number vectors from different models are as comparable as two phone numbers from different countries.',
       },
       {
         text: 'Only rebuild the index',
@@ -73,17 +78,20 @@ export const questions: QuizQuestion[] = [
       {
         text: 'Probably skip it, or look for a cheaper fix: 2 points may be noise on a small set and the latency is certain',
         correct: true,
-        explain: 'Decide with numbers on both sides. Check whether the gain holds on more questions, and whether hybrid search gets it for less.',
+        explain:
+          'Decide with numbers on both sides. Check whether the gain holds on more questions, and whether hybrid search gets it for less.',
       },
       {
         text: 'Always add it: rerankers improve RAG',
         correct: false,
-        explain: 'They often do, but not always enough to pay for themselves. The point of measuring is to find out.',
+        explain:
+          'They often do, but not always enough to pay for themselves. The point of measuring is to find out.',
       },
       {
         text: 'Increase k to 20 instead, since more chunks can only help',
         correct: false,
-        explain: 'More chunks cost tokens and can distract the model; measure answer quality, not only recall.',
+        explain:
+          'More chunks cost tokens and can distract the model; measure answer quality, not only recall.',
       },
     ],
   },
@@ -91,10 +99,14 @@ export const questions: QuizQuestion[] = [
 
 export const recallExercise: Exercise = {
   id: 'recall-at-k',
-  prompt: 'Write `recall_at_k(ranked, gold, k)` where `ranked[i]` is the list of ids returned for question i and `gold[i]` its answer id.',
+  prompt:
+    'Write `recall_at_k(ranked, gold, k)` where `ranked[i]` is the list of ids returned for question i and `gold[i]` its answer id.',
   starter: `def recall_at_k(ranked, gold, k):
     pass`,
-  hints: ['A question counts as a hit when gold[i] is in ranked[i][:k].', 'Divide the hits by the number of questions.'],
+  hints: [
+    'A question counts as a hit when gold[i] is in ranked[i][:k].',
+    'Divide the hits by the number of questions.',
+  ],
   solution: `def recall_at_k(ranked, gold, k):
     hits = sum(g in r[:k] for r, g in zip(ranked, gold))
     return hits / len(gold)`,

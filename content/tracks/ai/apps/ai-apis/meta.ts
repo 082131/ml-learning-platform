@@ -13,7 +13,14 @@ export default {
     'Keep API keys on the server and out of the browser',
   ],
   prerequisites: ['ai/usage/pretrained-apis', 'ai/prompting/structured-outputs'],
-  concepts: ['http-endpoint', 'input-validation', 'server-sent-events', 'time-to-first-token', 'api-key', 'rate-limit'],
+  concepts: [
+    'http-endpoint',
+    'input-validation',
+    'server-sent-events',
+    'time-to-first-token',
+    'api-key',
+    'rate-limit',
+  ],
   references: [
     {
       title: 'WHATWG HTML Standard: Server-sent events (the event stream format)',

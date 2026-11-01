@@ -9,7 +9,8 @@ export const questions: QuizQuestion[] = [
       {
         text: 'Real questions, hard edge cases, past failures, and questions the documents can’t answer',
         correct: true,
-        explain: 'Questions without an answer test whether the assistant admits it; past failures make sure fixed bugs stay fixed.',
+        explain:
+          'Questions without an answer test whether the assistant admits it; past failures make sure fixed bugs stay fixed.',
       },
       {
         text: 'Only the questions the current prompt already answers well',
@@ -19,7 +20,8 @@ export const questions: QuizQuestion[] = [
       {
         text: 'Questions generated from the documents by copying their sentences',
         correct: false,
-        explain: 'They share exact words with the answer passage, so they overstate retrieval and answer quality.',
+        explain:
+          'They share exact words with the answer passage, so they overstate retrieval and answer quality.',
       },
     ],
   },
@@ -31,12 +33,14 @@ export const questions: QuizQuestion[] = [
       {
         text: 'A rubric graded by a model (LLM-as-judge), checked against people’s grades on a sample',
         correct: true,
-        explain: 'Tone has no exact answer for code to compare against. A judge scales; a human sample keeps it honest.',
+        explain:
+          'Tone has no exact answer for code to compare against. A judge scales; a human sample keeps it honest.',
       },
       {
         text: 'An exact string match against a reference answer',
         correct: false,
-        explain: 'A polite answer can be worded in countless ways; exact match would fail almost all of them.',
+        explain:
+          'A polite answer can be worded in countless ways; exact match would fail almost all of them.',
       },
       {
         text: 'A regular expression for rude words',
@@ -54,12 +58,14 @@ export const questions: QuizQuestion[] = [
       {
         text: 'An unsupported claim: the number 100 appears in no cited source',
         correct: true,
-        explain: 'The citation exists, but the source doesn’t back the claim. This is the most common hallucination in RAG answers.',
+        explain:
+          'The citation exists, but the source doesn’t back the claim. This is the most common hallucination in RAG answers.',
       },
       {
         text: 'A bad citation',
         correct: false,
-        explain: 'The citation points at a real source. The problem is what the answer claims, not where it points.',
+        explain:
+          'The citation points at a real source. The problem is what the answer claims, not where it points.',
       },
       {
         text: 'Correct, because it cites a source',
@@ -86,12 +92,14 @@ export const questions: QuizQuestion[] = [
       {
         text: 'Limit what a successful injection can do: few permissions, checked tool calls, a person approving side effects',
         correct: true,
-        explain: 'Filters miss rephrased or translated attacks. Limiting the damage works even when detection fails.',
+        explain:
+          'Filters miss rephrased or translated attacks. Limiting the damage works even when detection fails.',
       },
       {
         text: 'A long list of blocked phrases',
         correct: false,
-        explain: 'The strict guardrail in this lesson still misses an attack in Spanish, and blocks four normal questions.',
+        explain:
+          'The strict guardrail in this lesson still misses an attack in Spanish, and blocks four normal questions.',
       },
       {
         text: 'Telling the model in the system prompt to ignore injections',

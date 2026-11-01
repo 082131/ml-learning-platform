@@ -21,14 +21,16 @@ export default [
   {
     id: 'temperature',
     term: 'Temperature',
-    short: 'A number T that divides the logits before softmax: below 1 sharpens the distribution, above 1 flattens it.',
+    short:
+      'A number T that divides the logits before softmax: below 1 sharpens the distribution, above 1 flattens it.',
     long: 'T = 1 keeps the model’s distribution. As T approaches 0, sampling becomes greedy (always the most likely token); large T makes unlikely tokens more common.',
     introducedIn: 'ai/llm/transformers-llms',
   },
   {
     id: 'top-p-sampling',
     term: 'Top-p (nucleus) sampling',
-    short: 'Sampling only from the smallest set of most likely tokens whose probabilities add up to at least p.',
+    short:
+      'Sampling only from the smallest set of most likely tokens whose probabilities add up to at least p.',
     long: 'With p = 0.9 the long tail of unlikely tokens is cut, then the kept probabilities are rescaled to sum to 1. p = 1 keeps everything.',
     introducedIn: 'ai/llm/transformers-llms',
     aliases: ['top-p', 'nucleus sampling'],
@@ -44,7 +46,8 @@ export default [
   {
     id: 'context-window',
     term: 'Context window',
-    short: 'The maximum number of tokens a model can read and write in one request: instructions, history, documents and output together.',
+    short:
+      'The maximum number of tokens a model can read and write in one request: instructions, history, documents and output together.',
     long: 'Tokens beyond the window are not seen at all. Self-attention compares every token with every other one, so its work grows with the square of the context length.',
     introducedIn: 'ai/llm/transformers-llms',
     aliases: ['context length', 'context'],

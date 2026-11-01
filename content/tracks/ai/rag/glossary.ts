@@ -47,7 +47,8 @@ export default [
   {
     id: 'vector-database',
     term: 'Vector database',
-    short: 'A store for embeddings with their text and metadata, built to find the nearest vectors to a query quickly.',
+    short:
+      'A store for embeddings with their text and metadata, built to find the nearest vectors to a query quickly.',
     long: 'Examples are dedicated systems and extensions to existing databases (such as pgvector for PostgreSQL). Most use an approximate nearest-neighbor index and support metadata filters.',
     introducedIn: 'ai/rag/vector-db-eval',
     aliases: ['vector store', 'vector DB', 'pgvector'],
@@ -55,7 +56,8 @@ export default [
   {
     id: 'ann-index',
     term: 'Approximate nearest-neighbor (ANN) index',
-    short: 'A data structure that finds most of the nearest vectors while comparing the query with only a fraction of them.',
+    short:
+      'A data structure that finds most of the nearest vectors while comparing the query with only a fraction of them.',
     long: 'It trades a little recall for a lot of speed. IVF and HNSW are the two most common kinds; each has a setting (nprobe, ef_search) that moves along that trade-off at query time.',
     introducedIn: 'ai/rag/vector-db-eval',
     aliases: ['ANN', 'approximate nearest neighbor', 'approximate search'],
@@ -63,14 +65,16 @@ export default [
   {
     id: 'ivf-index',
     term: 'IVF index',
-    short: 'An inverted-file index: k-means splits the vectors into nlist clusters, and a query searches only the nprobe clusters with the closest centers.',
+    short:
+      'An inverted-file index: k-means splits the vectors into nlist clusters, and a query searches only the nprobe clusters with the closest centers.',
     introducedIn: 'ai/rag/vector-db-eval',
     aliases: ['IVF', 'inverted file index', 'nprobe', 'nlist'],
   },
   {
     id: 'hnsw',
     term: 'HNSW',
-    short: 'Hierarchical navigable small world: a graph index where each vector links to near neighbors, searched greedily from a sparse top layer down.',
+    short:
+      'Hierarchical navigable small world: a graph index where each vector links to near neighbors, searched greedily from a sparse top layer down.',
     long: 'Fast and accurate at high recall, at the cost of memory for the links and slower inserts. ef_search sets how many candidates the search keeps.',
     introducedIn: 'ai/rag/vector-db-eval',
     aliases: ['hierarchical navigable small world', 'ef_search'],
@@ -93,7 +97,8 @@ export default [
   {
     id: 'metadata-filter',
     term: 'Metadata filter',
-    short: 'A condition on stored fields (document, product, language, permissions) applied together with vector search.',
+    short:
+      'A condition on stored fields (document, product, language, permissions) applied together with vector search.',
     long: 'Used to search only what a user may see or what the question is about. Filtering after an approximate search can return fewer than k results, so databases offer filtered or iterative search.',
     introducedIn: 'ai/rag/vector-db-eval',
     aliases: ['metadata filtering', 'filtered search'],
@@ -101,7 +106,8 @@ export default [
   {
     id: 'hybrid-search',
     term: 'Hybrid search',
-    short: 'Combining keyword search (such as BM25) with vector search, so both exact terms and paraphrases are found.',
+    short:
+      'Combining keyword search (such as BM25) with vector search, so both exact terms and paraphrases are found.',
     introducedIn: 'ai/rag/vector-db-eval',
     aliases: ['hybrid retrieval'],
   },

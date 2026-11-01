@@ -27,7 +27,8 @@ export default {
   ],
   references: [
     {
-      title: 'Malkov and Yashunin, Efficient and robust approximate nearest neighbor search using HNSW graphs',
+      title:
+        'Malkov and Yashunin, Efficient and robust approximate nearest neighbor search using HNSW graphs',
       url: 'https://arxiv.org/abs/1603.09320',
     },
     {
@@ -40,7 +41,8 @@ export default {
       url: 'https://github.com/facebookresearch/faiss/wiki/Faster-search',
     },
     {
-      title: 'Thakur et al., BEIR: a heterogeneous benchmark for information retrieval (BM25 vs dense retrieval)',
+      title:
+        'Thakur et al., BEIR: a heterogeneous benchmark for information retrieval (BM25 vs dense retrieval)',
       url: 'https://arxiv.org/abs/2104.08663',
     },
   ],

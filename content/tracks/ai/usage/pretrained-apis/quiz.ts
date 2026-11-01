@@ -41,7 +41,8 @@ export const questions: QuizQuestion[] = [
       {
         text: 'So clients that failed at the same moment spread their retries out instead of hitting the server together again',
         correct: true,
-        explain: 'Without jitter, a burst of failures turns into a burst of synchronized retries at 1 s, 2 s, 4 s …',
+        explain:
+          'Without jitter, a burst of failures turns into a burst of synchronized retries at 1 s, 2 s, 4 s …',
       },
       {
         text: 'To make each retry faster',
@@ -91,7 +92,8 @@ export const questions: QuizQuestion[] = [
 
 export const backoffExercise: Exercise = {
   id: 'backoff-schedule',
-  prompt: 'Write `waits(base, retries, cap)` returning the list of exponential backoff waits (no jitter), each capped at `cap`.',
+  prompt:
+    'Write `waits(base, retries, cap)` returning the list of exponential backoff waits (no jitter), each capped at `cap`.',
   starter: `def waits(base, retries, cap):
     pass`,
   hints: ['The wait before retry i (from 0) is base * 2 ** i.', 'Use min(cap, ...) to cap each one.'],

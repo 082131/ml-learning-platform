@@ -9,17 +9,20 @@ export const questions: QuizQuestion[] = [
       {
         text: 'Deep learning is a kind of machine learning, and machine learning is one way to build AI',
         correct: true,
-        explain: 'The fields nest: AI is the goal, ML learns behavior from data, and DL does that with many-layer neural networks.',
+        explain:
+          'The fields nest: AI is the goal, ML learns behavior from data, and DL does that with many-layer neural networks.',
       },
       {
         text: 'Machine learning is a kind of deep learning',
         correct: false,
-        explain: 'It is the other way round. A decision tree or a linear regression is machine learning with no deep network at all.',
+        explain:
+          'It is the other way round. A decision tree or a linear regression is machine learning with no deep network at all.',
       },
       {
         text: 'Generative AI and NLP mean the same thing',
         correct: false,
-        explain: 'They overlap. A spam filter is NLP but not generative; an image generator is generative but not NLP.',
+        explain:
+          'They overlap. A spam filter is NLP but not generative; an image generator is generative but not NLP.',
       },
     ],
   },
@@ -32,17 +35,20 @@ export const questions: QuizQuestion[] = [
       {
         text: 'Train a classical model such as gradient boosting on your own rows',
         correct: true,
-        explain: 'Tabular prediction with many labels is where training your own model works best: it is cheap, fast and measurable.',
+        explain:
+          'Tabular prediction with many labels is where training your own model works best: it is cheap, fast and measurable.',
       },
       {
         text: 'Send each row to a language model API and ask whether the customer will cancel',
         correct: false,
-        explain: 'Language models are not built to learn patterns from columns of numbers, and you would pay per row forever.',
+        explain:
+          'Language models are not built to learn patterns from columns of numbers, and you would pay per row forever.',
       },
       {
         text: 'Fine-tune a large language model on the rows',
         correct: false,
-        explain: 'Fine-tuning adapts a pretrained model to language tasks. A tabular model trained from scratch is simpler and usually better here.',
+        explain:
+          'Fine-tuning adapts a pretrained model to language tasks. A tabular model trained from scratch is simpler and usually better here.',
       },
     ],
   },
@@ -55,7 +61,8 @@ export const questions: QuizQuestion[] = [
       {
         text: 'Run a pretrained language model on the hospital’s own servers',
         correct: true,
-        explain: 'A pretrained model needs no training data to start, and running it in house keeps the notes where they must stay.',
+        explain:
+          'A pretrained model needs no training data to start, and running it in house keeps the notes where they must stay.',
       },
       {
         text: 'Call a hosted model API',
@@ -65,7 +72,8 @@ export const questions: QuizQuestion[] = [
       {
         text: 'Train a language model from scratch on the hospital’s notes',
         correct: false,
-        explain: 'Pretraining needs far more text and compute than one hospital has, and a pretrained model already handles language.',
+        explain:
+          'Pretraining needs far more text and compute than one hospital has, and a pretrained model already handles language.',
       },
     ],
   },
@@ -87,12 +95,14 @@ export const questions: QuizQuestion[] = [
       {
         text: 'You have thousands of labeled examples of a consistent format or domain, and prompting alone falls short on your evaluation set',
         correct: true,
-        explain: 'Fine-tuning pays off when you can show, on measured examples, that a prompt is not enough and you have the data to teach the model.',
+        explain:
+          'Fine-tuning pays off when you can show, on measured examples, that a prompt is not enough and you have the data to teach the model.',
       },
       {
         text: 'You want the model to know facts that change every week',
         correct: false,
-        explain: 'Facts that change belong in retrieval (RAG), not in weights you would have to retrain every week.',
+        explain:
+          'Facts that change belong in retrieval (RAG), not in weights you would have to retrain every week.',
       },
       {
         text: 'You have 20 examples and want better answers',
