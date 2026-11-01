@@ -126,6 +126,19 @@ Close each content thread with: content validation green, `check`, `e2e` and `bu
 - [x] A001 `ai/representations/tokens-embeddings`: a tokenizer playground and similarity search over a bundled precomputed embedding table. Generate it offline with a named small open model, record the model and version, keep it ≤300 KB, and commit the generation script.
 - [x] A002 `ai/rag/rag-pipeline`: chunking controls (size and overlap), real cosine retrieval over the bundled embeddings, a reranking step, prompt assembly shown verbatim, and generation shown as a labeled simulated response.
 - [x] A003 `ai/agents/tool-calling`: an agent loop step-through. Model turns are a scripted, labeled trace, while tool execution (calculator, doc search) really runs in the browser. Includes a failure and retry case.
+
+## AI Engineer track: remaining lessons (10)
+- [x] A004 `ai/fundamentals/ai-landscape`: approach chooser (train, fine-tune, pretrained, API) with a cost break-even estimate.
+- [x] A005 `ai/llm/transformers-llms`: a bigram model over the Lumen docs with live temperature, top-p and seeded sampling.
+- [x] A006 `ai/usage/pretrained-apis`: a retry loop with backoff, jitter and Retry-After over scripted server behaviors.
+- [x] A007 `ai/prompting/structured-outputs`: parse and schema-validate scripted replies; score two prompts on 10 labeled tickets.
+- [x] A008 `ai/rag/vector-db-eval`: an IVF index (nlist, nprobe) over seeded vectors, and recall@k and MRR on the Lumen questions.
+- [x] A009 `ai/apps/ai-apis`: streaming against waiting with a timeout, and an incremental SSE parser on randomly split pieces.
+- [x] A010 `ai/reliability/evals-guardrails`: code graders with failure categories on 10 cases, and a rule guardrail measured on 16 labeled inputs.
+- [x] A011 `ai/ops/latency-cost-security`: a cost and latency estimate with prompt and response caching, and a tool-call policy against an injected note.
+- [x] A012 `ai/ops/deploy-monitor`: a seeded canary simulation with a z-test alert and automatic rollback.
+- [x] A013 `ai/capstone/ai-app`: project brief (milestones, rubric, hints), an evaluation harness sketch, self-assessment and exercise.
+- [x] A014 e2e specs for A004 to A013 (interaction, axe in both themes, no horizontal scroll, Python @network).
 - [x] A004 Fill objectives and prerequisites for all 10 outline lessons, including the "train vs fine-tune vs pretrained vs API" distinction in `ai-landscape`'s objectives.
 
 ## Thread 11: Inference Engineer flagship (3 lessons)
