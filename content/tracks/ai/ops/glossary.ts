@@ -21,15 +21,6 @@ export default [
     aliases: ['answer cache', 'semantic cache'],
   },
   {
-    id: 'least-privilege',
-    term: 'Least privilege',
-    short:
-      'Giving a component only the permissions its current task needs, so a mistake or an attack can do as little as possible.',
-    long: 'For AI agents: offer only the tools the task needs, scope their credentials to the current user, and require approval for actions with side effects.',
-    introducedIn: 'ai/ops/latency-cost-security',
-    aliases: ['principle of least privilege'],
-  },
-  {
     id: 'canary-release',
     term: 'Canary release',
     short:

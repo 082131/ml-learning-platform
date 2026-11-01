@@ -21,14 +21,6 @@ export default [
     aliases: ['rate limits', 'rate limited', '429', 'Retry-After'],
   },
   {
-    id: 'exponential-backoff',
-    term: 'Exponential backoff',
-    short: 'Waiting longer after each failed attempt (for example 1 s, 2 s, 4 s, 8 s) before retrying.',
-    long: 'Doubling the wait gives a struggling server room to recover. It is combined with a cap on the wait, a limit on attempts and jitter.',
-    introducedIn: 'ai/usage/pretrained-apis',
-    aliases: ['backoff'],
-  },
-  {
     id: 'jitter',
     term: 'Jitter',
     short:
