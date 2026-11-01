@@ -1,0 +1,208 @@
+/* Shared styles for the AI Engineer track visualizations. Colors come from tokens. */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  font-size: var(--fs-13);
+}
+.table th,
+.table td {
+  padding: var(--s-1) var(--s-2);
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+.table thead th {
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-weight: 400;
+  white-space: nowrap;
+}
+.num {
+  font-family: var(--font-mono);
+  text-align: right !important;
+  white-space: nowrap;
+}
+.mono {
+  font-family: var(--font-mono);
+}
+.muted {
+  color: var(--ink-2);
+}
+.highlight {
+  background: var(--accent-soft);
+}
+.highlight > th:first-child {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.status {
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+.status[data-tone='ok'] {
+  color: var(--ok);
+}
+.status[data-tone='err'] {
+  color: var(--err);
+}
+.status[data-tone='warn'] {
+  color: var(--accent);
+}
+.status::before {
+  content: '● ';
+}
+.status[data-tone='err']::before {
+  content: '✕ ';
+}
+.status[data-tone='ok']::before {
+  content: '✓ ';
+}
+.status[data-tone='warn']::before {
+  content: '◐ ';
+}
+.reasons {
+  margin: 0;
+  padding-left: 1.1em;
+  color: var(--ink-2);
+}
+.bars {
+  display: grid;
+  grid-template-columns: minmax(5.5em, max-content) 1fr minmax(4.5em, max-content);
+  align-items: center;
+  gap: var(--s-1) var(--s-2);
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+}
+.track {
+  position: relative;
+  height: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+.fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--accent);
+}
+.fill[data-cut] {
+  background: transparent;
+  border: 1px dashed var(--ink-2);
+}
+.panel {
+  min-width: 0;
+  margin: 0 0 var(--s-3);
+  padding: var(--s-3);
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.panelTitle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  margin: 0 0 var(--s-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.pre {
+  margin: 0;
+  max-height: 280px;
+  overflow: auto;
+  padding: var(--s-2) var(--s-3);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.list {
+  margin: 0;
+  padding-left: 1.2em;
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+}
+.tokens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.token {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2px var(--s-2);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+}
+.token small {
+  color: var(--ink-2);
+  font-size: 11px;
+}
+.token[data-start] {
+  border-style: dashed;
+}
+.piece {
+  margin: 0 0 var(--s-1);
+  padding: var(--s-1) var(--s-2);
+  border: 1px dashed var(--ink-2);
+  background: var(--surface-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.pieceHead {
+  display: block;
+  color: var(--ink-2);
+}
+.svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.svgText {
+  fill: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.svgMuted {
+  fill: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.boxOk {
+  fill: var(--ok);
+}
+.boxErr {
+  fill: var(--err);
+}
+.boxWait {
+  fill: none;
+  stroke: var(--ink-2);
+  stroke-dasharray: 4 3;
+}
+.boxAccent {
+  fill: var(--accent);
+}
+.boxSoft {
+  fill: var(--surface-2);
+  stroke: var(--line);
+}
+.rule {
+  stroke: var(--err);
+  stroke-width: 2;
+  stroke-dasharray: 5 3;
+}
+.scroll {
+  overflow-x: auto;
+}

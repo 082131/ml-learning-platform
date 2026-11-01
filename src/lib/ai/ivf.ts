@@ -28,7 +28,9 @@ export interface VectorSet {
 /** Unit vectors around N_TOPICS random topic directions, and queries near randomly chosen vectors. */
 export function makeVectors(seed: number, n = N_VECTORS, nq = N_QUERIES, spread = 0.6): VectorSet {
   const rand = seededRandom(seed);
-  const topics = Array.from({ length: N_TOPICS }, () => unit(Array.from({ length: DIM }, () => normal(rand))));
+  const topics = Array.from({ length: N_TOPICS }, () =>
+    unit(Array.from({ length: DIM }, () => normal(rand))),
+  );
   const vectors = Array.from({ length: n }, () => {
     const t = topics[Math.floor(rand() * N_TOPICS)]!;
     return unit(t.map((x) => x + (spread / Math.sqrt(DIM)) * normal(rand) * 1.5));
@@ -41,7 +43,12 @@ export function makeVectors(seed: number, n = N_VECTORS, nq = N_QUERIES, spread 
 }
 
 /** Indices of the k largest dot products, best first (ties by index). */
-export function topK(query: readonly number[], vectors: readonly (readonly number[])[], ids: readonly number[], k: number): number[] {
+export function topK(
+  query: readonly number[],
+  vectors: readonly (readonly number[])[],
+  ids: readonly number[],
+  k: number,
+): number[] {
   return ids
     .map((i) => ({ i, s: dot(query, vectors[i]!) }))
     .sort((a, b) => b.s - a.s || a.i - b.i)
@@ -55,7 +62,12 @@ export interface IvfIndex {
 }
 
 /** Spherical k-means: assign by largest dot product, recompute centers as normalized means. */
-export function buildIvf(vectors: readonly (readonly number[])[], nlist: number, seed: number, iters = KMEANS_ITERS): IvfIndex {
+export function buildIvf(
+  vectors: readonly (readonly number[])[],
+  nlist: number,
+  seed: number,
+  iters = KMEANS_ITERS,
+): IvfIndex {
   const rand = seededRandom(seed);
   const picked = new Set<number>();
   while (picked.size < nlist) picked.add(Math.floor(rand() * vectors.length));
@@ -84,8 +96,19 @@ export function buildIvf(vectors: readonly (readonly number[])[], nlist: number,
   return { centroids, lists };
 }
 
-export function searchIvf(index: IvfIndex, vectors: readonly (readonly number[])[], query: readonly number[], nprobe: number, k: number): { ids: number[]; scanned: number } {
-  const probe = topK(query, index.centroids, index.centroids.map((_, j) => j), nprobe);
+export function searchIvf(
+  index: IvfIndex,
+  vectors: readonly (readonly number[])[],
+  query: readonly number[],
+  nprobe: number,
+  k: number,
+): { ids: number[]; scanned: number } {
+  const probe = topK(
+    query,
+    index.centroids,
+    index.centroids.map((_, j) => j),
+    nprobe,
+  );
   const ids = probe.flatMap((j) => index.lists[j]!);
   return { ids: topK(query, vectors, ids, k), scanned: ids.length };
 }
@@ -139,7 +162,11 @@ export const NLIST_OPTIONS = [16, 32, 64] as const;
 export const MAX_PROBE = 16;
 
 /** Indexes are cached per nlist, so moving nprobe only re-runs the queries. */
-export function ivfExperiment(id: string, seed: number, initial: IvfState): ExperimentDef<IvfState, IvfResult> {
+export function ivfExperiment(
+  id: string,
+  seed: number,
+  initial: IvfState,
+): ExperimentDef<IvfState, IvfResult> {
   let set: VectorSet | undefined;
   const curves = new Map<number, { curve: IvfPoint[]; sizes: number[] }>();
   const curveFor = (nlist: number) => {

@@ -159,7 +159,10 @@ export function canaryExperiment(id: string, initial: CanaryState): ExperimentDe
         status: r.alertHour ? 'error' : 'ok',
       },
       { label: 'Requests served by the new version', value: r.newRequests.toLocaleString('en-US') },
-      { label: 'Extra bad answers users received (expected)', value: Math.round(r.excessBad).toLocaleString('en-US') },
+      {
+        label: 'Extra bad answers users received (expected)',
+        value: Math.round(r.excessBad).toLocaleString('en-US'),
+      },
     ],
   };
 }

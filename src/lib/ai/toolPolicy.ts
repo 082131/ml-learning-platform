@@ -77,8 +77,9 @@ export function runPolicy(s: PolicyState): PolicyResult {
   const rows = PROPOSED.map((c) => decide(c, s));
   return {
     rows,
-    harmfulRuns: rows.filter((r) => r.decision === 'runs' && AGENT_TOOLS.find((t) => t.name === r.call.tool)?.sideEffect)
-      .length,
+    harmfulRuns: rows.filter(
+      (r) => r.decision === 'runs' && AGENT_TOOLS.find((t) => t.name === r.call.tool)?.sideEffect,
+    ).length,
   };
 }
 

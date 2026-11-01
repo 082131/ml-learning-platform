@@ -8,7 +8,16 @@ import {
   selfHostMonthly,
   type ApproachState,
 } from './approach';
-import { candidates, detokenize, generate, sampleIndex, softmaxT, topPMask, trainBigram, wordTokens } from './nextToken';
+import {
+  candidates,
+  detokenize,
+  generate,
+  sampleIndex,
+  softmaxT,
+  topPMask,
+  trainBigram,
+  wordTokens,
+} from './nextToken';
 
 const base: ApproachState = {
   task: 'general-language',

@@ -62,7 +62,18 @@ export function splitRandomly(text: string, n: number, seed: number): string[] {
   return [0, ...sorted].map((c, i) => text.slice(c, sorted[i] ?? text.length));
 }
 
-export const REPLY_DELTAS = ['Error', ' E-402', ' means', ' your', ' storage', ' quota', ' is', ' full', ' [1]', '.'];
+export const REPLY_DELTAS = [
+  'Error',
+  ' E-402',
+  ' means',
+  ' your',
+  ' storage',
+  ' quota',
+  ' is',
+  ' full',
+  ' [1]',
+  '.',
+];
 
 /** The stream of a scripted reply, shaped like a typical model API: start, text deltas, stop. */
 export function replyEvents(deltas: readonly string[] = REPLY_DELTAS): SseEvent[] {
@@ -201,7 +212,10 @@ export function streamExperiment(id: string, initial: StreamState): ExperimentDe
     ],
     compute: computeStream,
     readout: (s, r) => [
-      { label: 'Generation time', value: `${sec(r.total)} = ${s.ttft} + ${s.outputTokens} / ${s.tokensPerSecond}` },
+      {
+        label: 'Generation time',
+        value: `${sec(r.total)} = ${s.ttft} + ${s.outputTokens} / ${s.tokensPerSecond}`,
+      },
       {
         label: 'Streaming: first text at',
         value: r.streaming.ok ? sec(r.streaming.firstText) : 'timed out',

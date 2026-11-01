@@ -40,10 +40,16 @@ export interface RetrievalEvalResult {
   baseline: { recall: Record<number, number>; mrr: number };
 }
 
-function evaluate(data: RagData, s: RetrievalEvalState): { rows: EvalRow[]; recall: Record<number, number>; mrr: number } {
+function evaluate(
+  data: RagData,
+  s: RetrievalEvalState,
+): { rows: EvalRow[]; recall: Record<number, number>; mrr: number } {
   const answerable = data.queries.filter((q) => data.docs.some((d) => d.text.includes(q.answer)));
   const rows = answerable.map((q) => {
-    const r = computeRag({ query: q.id, size: s.size, overlap: s.overlap, k: 1, keywordWeight: s.keywordWeight }, data);
+    const r = computeRag(
+      { query: q.id, size: s.size, overlap: s.overlap, k: 1, keywordWeight: s.keywordWeight },
+      data,
+    );
     return { query: q.id, text: q.text, rank: r.candidates.find((c) => c.hasAnswer)?.rank };
   });
   const ranks = rows.map((r) => r.rank);

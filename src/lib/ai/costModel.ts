@@ -25,7 +25,12 @@ export interface CostState {
 export const CACHE_READ_FACTOR = 0.1;
 export const DAYS = 30;
 /** Latency model: time to first token grows with the prompt; then tokens arrive at a steady rate. */
-export const LATENCY = { baseTtft: 0.4, secondsPerKInput: 0.15, cachedSecondsPerKInput: 0.02, tokensPerSecond: 60 };
+export const LATENCY = {
+  baseTtft: 0.4,
+  secondsPerKInput: 0.15,
+  cachedSecondsPerKInput: 0.02,
+  tokensPerSecond: 60,
+};
 export const CACHE_HIT_LATENCY = 0.05;
 
 export interface CostResult {
@@ -49,7 +54,8 @@ export function computeCost(s: CostState): CostResult {
   const output = (s.outputTokens * s.outputPrice) / m;
   const total = uncachedInput + cachedInput + output;
   const modelRequests = s.requestsPerDay * DAYS * (1 - s.responseCacheRate);
-  const baselinePerRequest = ((s.fixedPromptTokens + s.variableTokens) * s.inputPrice + s.outputTokens * s.outputPrice) / m;
+  const baselinePerRequest =
+    ((s.fixedPromptTokens + s.variableTokens) * s.inputPrice + s.outputTokens * s.outputPrice) / m;
   const ttft =
     LATENCY.baseTtft +
     (uncachedTokens / 1000) * LATENCY.secondsPerKInput +
@@ -161,7 +167,10 @@ export function costExperiment(id: string, initial: CostState): ExperimentDef<Co
       { label: 'Per month (estimate)', value: usd(r.monthly) },
       { label: 'Without caching (estimate)', value: usd(r.monthlyBaseline) },
       { label: 'Time to first token', value: `${r.ttft.toFixed(2)} s` },
-      { label: 'Full reply', value: `${r.latency.toFixed(2)} s (mean ${r.meanLatency.toFixed(2)} s with cache hits)` },
+      {
+        label: 'Full reply',
+        value: `${r.latency.toFixed(2)} s (mean ${r.meanLatency.toFixed(2)} s with cache hits)`,
+      },
     ],
   };
 }

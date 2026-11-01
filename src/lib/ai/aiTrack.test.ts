@@ -86,9 +86,11 @@ describe('JSON schema validation', () => {
       '$.summary: string is 87 characters, longer than 80',
       '$: unexpected property "sentiment"',
     ]);
-    expect([scorePrompt('a', false).correct, scorePrompt('a', true).correct, scorePrompt('b', true).correct]).toEqual([
-      5, 6, 9,
-    ]);
+    expect([
+      scorePrompt('a', false).correct,
+      scorePrompt('a', true).correct,
+      scorePrompt('b', true).correct,
+    ]).toEqual([5, 6, 9]);
   });
 });
 
@@ -106,7 +108,18 @@ describe('IVF index', () => {
   });
   it('recall is the overlap with the exact result', () => {
     expect(recallAtK([1, 2, 3, 4], [4, 9, 1, 8])).toBe(0.5);
-    expect(topK([1, 0], [[0, 1], [1, 0], [0.6, 0.8]], [0, 1, 2], 2)).toEqual([1, 2]);
+    expect(
+      topK(
+        [1, 0],
+        [
+          [0, 1],
+          [1, 0],
+          [0.6, 0.8],
+        ],
+        [0, 1, 2],
+        2,
+      ),
+    ).toEqual([1, 2]);
   });
 });
 
@@ -118,7 +131,12 @@ describe('retrieval evaluation', () => {
     expect(meanReciprocalRank(ranks)).toBeCloseTo((1 + 0.5 + 0 + 0.25) / 4, 12);
   });
   it('on the Lumen questions, reranking lifts E-402 from rank 2 to rank 1', () => {
-    const data = { docs: lumenDocs, queries: lumenQueries, vectors: lumenVectors(), vocab: parseVocab(vocabText) };
+    const data = {
+      docs: lumenDocs,
+      queries: lumenQueries,
+      vectors: lumenVectors(),
+      vocab: parseVocab(vocabText),
+    };
     const exp = retrievalEvalExperiment('t', data, { size: 40, overlap: 10, keywordWeight: 0.5 });
     const r = exp.compute(exp.initial);
     expect(r.rows).toHaveLength(6);
@@ -171,10 +189,12 @@ describe('evals and guardrails', () => {
     expect(v2.rows.find((r) => r.id === 'monthly-refund')!.category).toBe('missed answer');
   });
   it('trades catches for false blocks as rules get stricter', () => {
-    expect(['lenient', 'standard', 'strict'].map((s) => {
-      const r = runGuardrail(s as 'lenient');
-      return [r.caught, r.missed, r.wronglyBlocked];
-    })).toEqual([
+    expect(
+      ['lenient', 'standard', 'strict'].map((s) => {
+        const r = runGuardrail(s as 'lenient');
+        return [r.caught, r.missed, r.wronglyBlocked];
+      }),
+    ).toEqual([
       [1, 7, 0],
       [5, 3, 0],
       [7, 1, 4],

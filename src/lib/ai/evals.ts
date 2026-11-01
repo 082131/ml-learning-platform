@@ -155,7 +155,8 @@ export function gradeCase(c: EvalCase, answer: string): Graded {
   const sources = c.sources.map((id) => lumenDocs.find((d) => d.id === id)!.text);
   const citations = citationsIn(answer);
   const refused = REFUSAL.test(answer);
-  const citationsOk = citations.every((n) => n >= 1 && n <= sources.length) && (refused || citations.length > 0);
+  const citationsOk =
+    citations.every((n) => n >= 1 && n <= sources.length) && (refused || citations.length > 0);
   const cited = citations.filter((n) => n >= 1 && n <= sources.length).map((n) => sources[n - 1]!);
   const unsupported = claimsIn(answer).filter((claim) => !cited.some((t) => t.includes(claim)));
   const fact = c.expect === null ? refused : answer.toLowerCase().includes(c.expect.toLowerCase());
@@ -189,7 +190,11 @@ export interface EvalResult {
 
 const PASSING: Category[] = ['correct', 'correct refusal'];
 
-export function runEval(version: Version): { rows: Graded[]; passed: number; byCategory: Partial<Record<Category, number>> } {
+export function runEval(version: Version): {
+  rows: Graded[];
+  passed: number;
+  byCategory: Partial<Record<Category, number>>;
+} {
   const rows = EVAL_CASES.map((c) => gradeCase(c, c.answers[version]));
   const byCategory: Partial<Record<Category, number>> = {};
   for (const r of rows) byCategory[r.category] = (byCategory[r.category] ?? 0) + 1;
@@ -219,7 +224,10 @@ export function evalExperiment(id: string, initial: EvalState): ExperimentDef<Ev
     },
     readout: (s, r) => [
       { label: `Passed (${s.version})`, value: `${r.passed} of ${r.rows.length}` },
-      { label: `Passed (${s.version === 'v1' ? 'v2' : 'v1'})`, value: `${r.other.passed} of ${r.rows.length}` },
+      {
+        label: `Passed (${s.version === 'v1' ? 'v2' : 'v1'})`,
+        value: `${r.other.passed} of ${r.rows.length}`,
+      },
       {
         label: 'Failures',
         value:

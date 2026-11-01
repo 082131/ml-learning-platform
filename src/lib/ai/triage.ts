@@ -117,7 +117,10 @@ export function triageExperiment(id: string, initial: TriageState): ExperimentDe
         value: r.valid ? 'valid' : `${r.errors.length} problem${r.errors.length === 1 ? '' : 's'}`,
         status: r.valid ? 'ok' : 'error',
       },
-      { label: 'Next step', value: r.valid ? 'use the object' : 'send the retry message (once), then fall back' },
+      {
+        label: 'Next step',
+        value: r.valid ? 'use the object' : 'send the retry message (once), then fall back',
+      },
     ],
   };
 }
@@ -241,7 +244,10 @@ export interface CompareResult {
   b: { rows: Scored[]; correct: number };
 }
 
-export function compareExperiment(id: string, initial: CompareState): ExperimentDef<CompareState, CompareResult> {
+export function compareExperiment(
+  id: string,
+  initial: CompareState,
+): ExperimentDef<CompareState, CompareResult> {
   return {
     id,
     initial,

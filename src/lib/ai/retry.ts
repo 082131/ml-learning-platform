@@ -43,7 +43,8 @@ export const SCENARIOS: { id: Scenario; label: string; describe: string }[] = [
   {
     id: 'bad-request',
     label: 'Bad request (400)',
-    describe: 'Rejects the request with 400 because a parameter is invalid. Sending it again changes nothing.',
+    describe:
+      'Rejects the request with 400 because a parameter is invalid. Sending it again changes nothing.',
   },
 ];
 
@@ -115,12 +116,23 @@ export function simulateRetries(s: RetryState): RetryResult {
   let t = 0;
   for (let n = 0; ; n++) {
     const reply = serverReply(s.scenario, n, t);
-    const a: Attempt = { n, start: t, end: t + reply.took, status: reply.status, retryAfter: reply.retryAfter };
+    const a: Attempt = {
+      n,
+      start: t,
+      end: t + reply.took,
+      status: reply.status,
+      retryAfter: reply.retryAfter,
+    };
     attempts.push(a);
     t = a.end;
     if (reply.status < 400) return { attempts, ok: true, total: t, stopReason: 'Succeeded' };
     if (!isRetryable(reply.status))
-      return { attempts, ok: false, total: t, stopReason: `${reply.status} is not retryable: fix the request` };
+      return {
+        attempts,
+        ok: false,
+        total: t,
+        stopReason: `${reply.status} is not retryable: fix the request`,
+      };
     if (n >= s.maxRetries)
       return {
         attempts,

@@ -36,7 +36,9 @@ export function validate(schema: Schema, value: unknown, path = '$'): string[] {
   if (!matches(schema.type, value)) return [`${path}: expected ${schema.type}, got ${typeOf(value)}`];
   const errors: string[] = [];
   if (schema.enum && !schema.enum.includes(value as string | number))
-    errors.push(`${path}: ${JSON.stringify(value)} is not one of ${schema.enum.map((e) => JSON.stringify(e)).join(', ')}`);
+    errors.push(
+      `${path}: ${JSON.stringify(value)} is not one of ${schema.enum.map((e) => JSON.stringify(e)).join(', ')}`,
+    );
   if (typeof value === 'number') {
     if (schema.minimum !== undefined && value < schema.minimum)
       errors.push(`${path}: ${value} is less than the minimum ${schema.minimum}`);
@@ -62,8 +64,7 @@ export function validate(schema: Schema, value: unknown, path = '$'): string[] {
 }
 
 export type ParseResult =
-  | { ok: true; value: unknown; cleaned: string }
-  | { ok: false; error: string; cleaned: string };
+  { ok: true; value: unknown; cleaned: string } | { ok: false; error: string; cleaned: string };
 
 const FENCE = /^```(?:json)?\s*\n([\s\S]*?)\n?```$/;
 

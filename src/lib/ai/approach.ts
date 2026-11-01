@@ -52,9 +52,7 @@ export const LABEL_OPTIONS = [0, 100, 1000, 10000, 100000] as const;
 
 /** Dollars per request at the example prices: 1500 · 1/1e6 + 300 · 5/1e6 = 0.003. */
 export function apiCostPerRequest(): number {
-  return (
-    (REQUEST_TOKENS.input * API_PRICE.inputPerM + REQUEST_TOKENS.output * API_PRICE.outputPerM) / 1e6
-  );
+  return (REQUEST_TOKENS.input * API_PRICE.inputPerM + REQUEST_TOKENS.output * API_PRICE.outputPerM) / 1e6;
 }
 
 export function apiMonthly(requestsPerDay: number): number {
@@ -93,10 +91,14 @@ export function computeApproach(s: ApproachState): ApproachResult {
     if (verdict === 'fits') {
       reasons.push('No training and no servers: you can try it today with a prompt.');
       if (s.task === 'domain-language')
-        reasons.push('Check quality on your own examples first; specialized wording can trip general models.');
+        reasons.push(
+          'Check quality on your own examples first; specialized wording can trip general models.',
+        );
     }
     if (api > host && language)
-      reasons.push(`At this volume the API (${money(api)}/month) costs more than one GPU server (${money(host)}/month).`);
+      reasons.push(
+        `At this volume the API (${money(api)}/month) costs more than one GPU server (${money(host)}/month).`,
+      );
     rows.push({ id: 'api', name: 'Call a hosted model API', verdict, reasons, monthly: api });
   }
 
@@ -162,7 +164,10 @@ export function computeApproach(s: ApproachState): ApproachResult {
 
 export const VOLUME_STEPS = [100, 1000, 5000, 10000, 20000, 50000, 100000] as const;
 
-export function approachExperiment(id: string, initial: ApproachState): ExperimentDef<ApproachState, ApproachResult> {
+export function approachExperiment(
+  id: string,
+  initial: ApproachState,
+): ExperimentDef<ApproachState, ApproachResult> {
   return {
     id,
     initial,
@@ -221,18 +226,19 @@ export function approachExperiment(id: string, initial: ApproachState): Experime
       },
     ],
     compute: computeApproach,
-    readout: (s, r) => [
-      { label: 'Suggested start', value: r.rows.find((x) => x.id === r.recommended)!.name },
-      { label: 'API cost (estimate)', value: `${money(r.apiMonthly)}/month` },
-      { label: 'One GPU server (estimate)', value: `${money(r.selfHostMonthly)}/month` },
-      {
-        label: 'Break-even volume',
-        value: `${Math.round(r.breakEvenPerDay).toLocaleString('en-US')} requests/day`,
-      },
-      {
-        label: 'Cheaper at this volume',
-        value: r.apiMonthly <= r.selfHostMonthly ? 'the API' : 'self-hosting',
-      },
-    ].concat(s.task === 'tabular' ? [{ label: 'Note', value: 'costs compare language models only' }] : []),
+    readout: (s, r) =>
+      [
+        { label: 'Suggested start', value: r.rows.find((x) => x.id === r.recommended)!.name },
+        { label: 'API cost (estimate)', value: `${money(r.apiMonthly)}/month` },
+        { label: 'One GPU server (estimate)', value: `${money(r.selfHostMonthly)}/month` },
+        {
+          label: 'Break-even volume',
+          value: `${Math.round(r.breakEvenPerDay).toLocaleString('en-US')} requests/day`,
+        },
+        {
+          label: 'Cheaper at this volume',
+          value: r.apiMonthly <= r.selfHostMonthly ? 'the API' : 'self-hosting',
+        },
+      ].concat(s.task === 'tabular' ? [{ label: 'Note', value: 'costs compare language models only' }] : []),
   };
 }
