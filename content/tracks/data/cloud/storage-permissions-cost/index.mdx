@@ -1,0 +1,181 @@
+import { configCode, cost, costPython, iamPolicy, policyRunner } from './code';
+import { questions, unusedExercise } from './quiz';
+
+<Section kind="intuition" title="Renting a warehouse by the shelf and by the visit">
+
+In the cloud you do not buy disks. You rent <Term id="object-storage">object storage</Term> by the gigabyte per
+month, and you pay query engines by the amount of data they read. That changes how pipelines are designed: a
+layout decision that costs nothing on your laptop can cost thousands a month in the cloud.
+
+It is like renting a storage facility that charges by the shelf each month and by the box every time someone
+fetches one. Boxes you rarely open can move to a cheaper back room. The real money, though, often goes on staff
+fetching every box for every question, when a well-labelled shelf would have let them grab just one.
+
+The same facility needs keys. Each job and each person should get a key to the rooms they use and no others, so a
+lost key or a clumsy worker can only do limited damage. That is <Term id="least-privilege">least privilege</Term>.
+
+</Section>
+
+<Section kind="technical" title="Storage classes, scan costs, permissions and configuration">
+
+**Storage classes.** Providers sell several <Term id="storage-class">storage classes</Term>. Standard costs the most
+per GB-month and is cheap to read. Infrequent access costs less to keep, charges per read and has a minimum
+storage period. Archive is cheapest to keep, but objects must be restored (taking minutes to hours, depending on
+the class) before they can be read. A lifecycle rule moves objects to a colder class automatically as they age.
+
+**The bill after a year.** Suppose 500 GB lands every month and data older than 3 months moves to infrequent
+access. In month 12 there are $3 \times 500 = 1{,}500$ GB hot and $9 \times 500 = 4{,}500$ GB cold. With the
+lesson's example prices:
+
+$$
+\text{storage} = 1{,}500 \times 0.023 + 4{,}500 \times 0.0125 = 34.50 + 56.25 = 90.75 \text{ USD}
+$$
+
+$$
+\text{queries} = q \times 30 \times \frac{\text{GB read per query}}{1000} \times 5 \text{ USD per TB}
+$$
+
+A dashboard running 100 queries a day that each read the last 7 days ($500 \times 7 / 30 \approx 117$ GB) costs
+$100 \times 30 \times 0.117 \times 5 = 1{,}750$ USD. If each query reads the whole 6,000 GB table instead, it costs
+90,000 USD. Storage is rarely the expensive part; reading is. Partitioning and column pruning from the
+[lakehouse lesson](#/learn/data/storage/warehouse-lake-lakehouse) are cost controls.
+
+The third cost is <Term id="egress">egress</Term>: data moved out of a region or provider is billed per GB, while
+moving data in is usually free. Run compute in the same region as the data.
+
+**Permissions.** Every request is made by an identity (a person, or a role or service account for a job), for an
+action, on a resource. Cloud IAM evaluates the applicable policies in a fixed order:
+
+1. If any statement explicitly **denies** the request, it is denied.
+2. Otherwise, if any statement **allows** it, it is allowed.
+3. Otherwise it is denied by default.
+
+Least privilege means one identity per job, actions listed explicitly, resources scoped to prefixes, and an
+explicit deny protecting what must never change, such as the raw data you replay from.
+
+**Configuration and secrets.** The same pipeline code is deployed to development, staging and production; only its
+configuration differs (bucket names, database hosts). Read configuration from the environment, and get credentials
+from the identity the job runs as, or from a secrets manager. Never put keys or passwords in code.
+
+<Callout kind="simplification">
+  The prices are example values chosen as round numbers, not any provider's current price list, and the model leaves
+  out per-request charges, retrieval fees, minimum storage durations, free tiers and discounts. Real IAM also has
+  resource policies, permission boundaries and conditions. Use the formula with your provider's current prices.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Find what drives the bill">
+
+Set how much data arrives each month, where old data goes, how many queries run and how much each reads. The
+estimate is for month 12, once a year of data has built up.
+
+<Experiment def={cost} title="Monthly cost of a growing dataset">
+  <CloudCost />
+</Experiment>
+
+Things to try:
+
+- With the defaults (full scans, 50 queries a day) queries are about 99.7% of the bill. Switch to "last 7 days":
+  the bill drops from about 45,000 USD to about 1,000 USD.
+- Set queries to 0 and try the lifecycle rules: infrequent access saves 4,500 × (0.023 − 0.0125) = 47.25 USD a month.
+- Choose archive with full scans. It looks cheapest, but the queries could not run: archived objects must be
+  restored before anything can read them.
+
+</Section>
+
+<Section kind="code" title="The estimate, a permission check, a policy and configuration">
+
+The estimate in Python, filled from the controls:
+
+<Experiment def={cost} title="cost.py, linked to the estimate" controls={false}>
+  <Code example={costPython} title="cost.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+**How a permission check works.** A simplified policy evaluator: explicit deny first, then allow, then deny by
+default. Add a statement or a request and run it.
+
+<PythonRunner example={policyRunner} title="policy.py" />
+
+The same rules as a real AWS IAM policy attached to the transform job's role. It can read `raw/`, write `clean/`,
+and nobody can delete from `raw/`:
+
+<Code example={iamPolicy} title="transform-job-policy.json" />
+
+**Configuration from the environment, credentials from the role.** The job's code names no bucket and holds no
+key:
+
+<Code example={configCode} title="land.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Bills and breaches that start small">
+
+<CommonMistake
+  title="SELECT * on a big table behind a dashboard"
+  wrong={"SELECT * FROM events WHERE country = 'NO'  -- refreshed every 5 minutes"}
+  error="(no error: each refresh scans every column of every day, and the bill arrives at the end of the month)"
+  cause="Serverless engines bill by bytes read. SELECT * reads all columns, and a filter on a non-partition column reads all files."
+  fix={"SELECT day, SUM(amount) FROM events\nWHERE day >= CURRENT_DATE - INTERVAL 7 DAY AND country = 'NO'\nGROUP BY day"}
+/>
+
+<CommonMistake
+  title="Access keys in the repository"
+  wrong={"s3 = boto3.client(\"s3\", aws_access_key_id=\"AKIA...\", aws_secret_access_key=\"...\")"}
+  error="(no error until someone finds the key in the git history, which automated scanners do within minutes of a public push)"
+  cause="Anything committed stays in every clone and in history, even after the line is deleted."
+  fix={"s3 = boto3.client(\"s3\")  # credentials from the job's role; rotate any key that was ever committed"}
+/>
+
+<CommonMistake
+  title="A public bucket to make sharing easy"
+  wrong={"bucket policy: Allow, Principal \"*\", Action s3:GetObject, Resource acme-lake/*"}
+  error="(no error: anyone on the internet can download every object, including customer data)"
+  cause={"\"*\" as a principal means everyone, not everyone in the company."}
+  fix={"grant a specific role or group read access to one prefix, and keep the provider's block-public-access setting on"}
+/>
+
+</Section>
+
+<Section kind="practice" title="Running data in the cloud">
+
+- **Tag and budget.** Tag buckets, warehouses and jobs by team and pipeline, set budget alerts, and look at the
+  biggest line items monthly. Query scans and forgotten clusters usually top the list.
+- **Lifecycle rules from day one.** Raw landing data older than a few months can move to a colder class or be
+  deleted when nothing replays it; check minimum storage periods and retrieval fees first.
+- **One role per job, reviewed regularly.** Compare granted permissions with what audit logs show was used, and
+  remove the rest.
+- **Deploy like software.** The pipeline's code, infrastructure (buckets, roles, schedules) and configuration live
+  in version control and are deployed per environment by CI, with secrets injected at run time.
+- **For ML,** training data is often the most sensitive data a company has. Give training jobs read access to
+  exactly the feature tables they use, and keep personal data out of them where you can.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Review unused permissions">
+
+<MiniExercise exercise={unusedExercise}>
+  Write `unused_grants(grants, log)`. Return, sorted, every `(principal, action)` grant that never appears in the
+  access log: the permissions an access review would remove.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Object storage is billed per GB-month by storage class; lifecycle rules move old data to cheaper classes, and
+  archived data must be restored before it can be read.
+- Query engines bill by bytes read, so partitioning and selecting columns are usually the biggest cost levers.
+- Permissions: explicit deny wins, then allow, otherwise denied. Give each job its own narrowly scoped identity.
+- Keep configuration in the environment and credentials in roles or a secrets manager, never in code.
+
+Next: [feature pipelines and training-serving consistency](#/learn/data/features/training-serving).
+
+</Section>

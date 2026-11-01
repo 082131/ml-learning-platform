@@ -13,5 +13,34 @@ export default {
     'Deploy a pipeline with its configuration and secrets kept out of the code',
   ],
   prerequisites: ['data/storage/warehouse-lake-lakehouse'],
-  concepts: ['data-warehouse'],
+  concepts: ['object-storage', 'storage-class', 'least-privilege', 'egress', 'data-lake', 'data-warehouse'],
+  references: [
+    { title: 'Amazon S3 pricing', url: 'https://aws.amazon.com/s3/pricing/' },
+    {
+      title: 'Amazon S3: storage classes',
+      url: 'https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.html',
+    },
+    {
+      title: 'Amazon S3: managing the lifecycle of objects',
+      url: 'https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lifecycle-mgmt.html',
+    },
+    {
+      title: 'AWS IAM: policy evaluation logic (explicit deny, allow, implicit deny)',
+      url: 'https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_evaluation-logic.html',
+    },
+    {
+      title: 'Google Cloud Storage: storage classes',
+      url: 'https://cloud.google.com/storage/docs/storage-classes',
+    },
+    {
+      title: 'BigQuery pricing (on-demand bytes processed)',
+      url: 'https://cloud.google.com/bigquery/pricing',
+    },
+    { title: 'The Twelve-Factor App: config', url: 'https://12factor.net/config' },
+    {
+      title: 'Python: fnmatch (shell-style patterns)',
+      url: 'https://docs.python.org/3.13/library/fnmatch.html',
+      version: 'Python 3.13',
+    },
+  ],
 } satisfies LessonMeta;

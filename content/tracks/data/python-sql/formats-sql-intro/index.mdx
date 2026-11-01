@@ -1,0 +1,181 @@
+import { formatsCode, pandasSql, sql, sqlPython, sqlRunner } from './code';
+import { groupExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Ask the data a question instead of looping over it">
+
+You already know how to hold a table in a pandas <Term id="dataframe">DataFrame</Term>. Most of the data a
+pipeline touches, though, lives in databases, and in files that move between systems. Data engineering starts with
+two skills: asking a database a question, and choosing how to write data down.
+
+Asking happens in <Term id="sql">SQL</Term>. Instead of writing a loop that walks every row, you describe the
+result you want: "the total sales per city, largest first". The database works out how to compute it, close to
+the data, and sends back only the answer. It is the difference between asking a librarian for "every book on
+birds, newest first" and carrying the whole library home to sort it yourself.
+
+Writing data down means choosing a file format. <Term id="csv-format">CSV</Term> is a plain text table that every
+tool opens. <Term id="json-format">JSON</Term> is what web APIs speak. <Term id="parquet">Parquet</Term> is a
+compressed, column-by-column format built for analysis. Each one is the right choice somewhere.
+
+</Section>
+
+<Section kind="technical" title="A table, its schema and one SELECT">
+
+The lesson uses one table, `sales`, with eight rows. Its <Term id="table-schema">schema</Term> declares four
+columns: `id INTEGER PRIMARY KEY`, `city TEXT`, `product TEXT` and `amount INTEGER`. Every row has exactly
+these columns, `id` is unique, and `amount` is a whole number, so a query can add amounts without converting text.
+
+A `SELECT` statement has up to five parts. The database applies them in this order, which is not the order they
+are written in:
+
+| Order | Clause | What it does | Example |
+| --- | --- | --- | --- |
+| 1 | `FROM sales` | start from every row of the table | 8 rows |
+| 2 | `WHERE amount >= 15` | keep the rows that pass a test | 5 rows: amounts 30, 25, 15, 20, 40 |
+| 3 | `GROUP BY city` | collapse the kept rows into one row per city | Austin, Leeds, Oslo |
+| 4 | `SELECT city, COUNT(*), SUM(amount)` | compute the output columns | Leeds: 2 rows, 30 + 15 = 45 |
+| 5 | `ORDER BY total DESC, city` | sort the result (ties by name) | Leeds 45, Oslo 45, Austin 40 |
+
+<Term id="group-by">GROUP BY</Term> is where SQL earns its keep. Without the filter, the totals per city are
+Oslo 12 + 25 + 20 = 57, Leeds 30 + 15 + 9 = 54 and Austin 8 + 40 = 48. `COUNT(*)` counts the rows in each group
+and `SUM(amount)` adds their amounts. A grouped query can only output the grouping column and aggregates: there is
+no single `product` for "Oslo", so asking for it is an error in most databases.
+
+**Without ORDER BY, row order is not defined.** A database returns rows in whatever order is cheapest. SQLite
+happens to return the ungrouped rows in `id` order and the groups sorted by name here, but that is an accident of
+how it stores and groups them, not a promise.
+
+</Section>
+
+<Section kind="visual" title="Build a query">
+
+Choose a filter, a grouping and an order. The source table marks which rows the filter keeps, and the result
+table shows what comes back, in order.
+
+<Experiment def={sql} title="Query the sales table">
+  <SqlQueryTable />
+</Experiment>
+
+Things to try:
+
+- Filter `amount >= 15`, then group by city. Leeds drops from 54 to 45: the 9 was removed before grouping.
+- Group by product and order by largest total. Coffee comes first with 30 + 25 + 40 = 95.
+- Filter `product = 'tea'` and group by product. Three rows collapse into one: `('tea', 3, 35)`.
+
+</Section>
+
+<Section kind="code" title="The same query from Python">
+
+Python's built-in `sqlite3` module runs the query. The `query` line is filled from the controls above, and the
+readout shows what the loop prints.
+
+<Experiment def={sql} title="sql.py, linked to the query builder" controls={false}>
+  <Code example={sqlPython} title="sql.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+Run your own queries in the browser. Change the city, add a `WHERE amount > 10`, or try `AVG(amount)`.
+
+<PythonRunner example={sqlRunner} title="query.py" />
+
+**From SQL to pandas and back.** `pd.read_sql` turns a query result into a DataFrame, and `DataFrame.to_sql`
+writes one to a table. Let the database do the filtering and grouping, then pull only the small result into
+pandas.
+
+<Code example={pandasSql} title="pandas_sql.py" />
+
+**Three formats, one table.** The program below writes the same 10,000 orders as CSV, JSON Lines and Parquet,
+then reads the timestamp column back from two of them. It was run with pandas 3.0.5 and pyarrow 26.0.0.
+
+<Code example={formatsCode} title="formats.py" />
+
+| | CSV | JSON Lines | Parquet |
+| --- | --- | --- | --- |
+| Size here | 366,671 bytes | 866,639 bytes | 174,419 bytes |
+| Types stored | no, all text | strings, numbers, booleans, null | yes, the full schema |
+| Nested values | no | yes | yes |
+| Read a few columns | must parse every row | must parse every row | reads only those columns |
+| Human-readable | yes | yes | no (binary) |
+
+Parquet is about half the size of the CSV and a fifth of the JSON here, and the timestamp comes back as a
+timestamp. From CSV it comes back as `str`: the file had no way to say it was a date.
+
+<Callout kind="simplification">
+  Sizes depend on the data. Columns with few distinct values (like `city`) compress very well in Parquet; random
+  text compresses less. JSON is often gzip-compressed in transit, which shrinks the repeated keys a lot. Measure
+  with your own data before choosing.
+</Callout>
+
+</Section>
+
+<Section kind="mistakes" title="Queries that run but answer the wrong question">
+
+<CommonMistake
+  title="Filtering a total with WHERE"
+  wrong={"SELECT city, SUM(amount) AS total FROM sales WHERE SUM(amount) > 50 GROUP BY city"}
+  error="sqlite3.OperationalError: misuse of aggregate: SUM()"
+  cause="WHERE runs before GROUP BY, row by row, so no sum exists yet when it runs."
+  fix={"SELECT city, SUM(amount) AS total FROM sales GROUP BY city HAVING SUM(amount) > 50"}
+/>
+
+<CommonMistake
+  title="Relying on the order of rows without ORDER BY"
+  wrong={"rows = conn.execute(\"SELECT city, SUM(amount) FROM sales GROUP BY city\").fetchall()\ntop_city = rows[0][0]  # assumes the first row is... what?"}
+  error="(no error: today it is 'Austin', the first name alphabetically, which is not the top city)"
+  cause="Without ORDER BY the database may return rows in any order. The code also never said which order it wanted."
+  fix={"rows = conn.execute(\"SELECT city, SUM(amount) AS total FROM sales GROUP BY city ORDER BY total DESC\").fetchall()\ntop_city = rows[0][0]  # 'Oslo'"}
+/>
+
+<CommonMistake
+  title="Building SQL by pasting values into the string"
+  wrong={"city = \"O'Brien Street\"\nconn.execute(f\"SELECT * FROM sales WHERE city = '{city}'\")"}
+  error={"sqlite3.OperationalError: near \"Brien\": syntax error"}
+  cause="The quote inside the value ends the SQL string early. With hostile input, the same hole lets someone run their own SQL (SQL injection)."
+  fix={"conn.execute(\"SELECT * FROM sales WHERE city = ?\", (city,))"}
+/>
+
+<Callout kind="warning">
+  Reading a CSV and trusting the types is a classic pipeline bug. An ID column like `00042` loses its leading
+  zeros when read as a number, and a date stays text. Declare the types you expect when you read
+  (`pd.read_csv(..., dtype=...)`, `parse_dates=...`), or use a format that stores them.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Where this shows up">
+
+- **Analysts and reports** query the warehouse in SQL. Pipelines exist so those queries read clean, current tables.
+- **ML training data** is usually the result of a SQL query: filter to the period you want, join the tables
+  (next lesson), aggregate to one row per example, then load it into pandas or a training job.
+- **Files between systems**: CSV for small exports people open in a spreadsheet, JSON for APIs and nested
+  events, Parquet for anything analytical or large. Data lakes are mostly folders of Parquet files.
+
+The next lesson, [schemas, joins, indexes and query plans](#/learn/data/relational/joins-indexes), combines
+tables with joins and shows how an index makes a query fast.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="GROUP BY in plain Python">
+
+<MiniExercise exercise={groupExercise}>
+  Write `group_totals(rows, key)`. It returns one `(group, count, total)` tuple per distinct value of `row[key]`,
+  sorted by group, exactly like `SELECT key, COUNT(*), SUM(amount) FROM ... GROUP BY key ORDER BY key`.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- SQL describes the result; the database computes it. Clauses run as FROM, WHERE, GROUP BY, SELECT, ORDER BY.
+- WHERE filters rows before grouping; HAVING filters groups after. Only ORDER BY guarantees an order.
+- `pd.read_sql` and `DataFrame.to_sql` move results between the database and pandas; use `?` placeholders for values.
+- CSV is universal text with no types, JSON nests and suits APIs, Parquet is columnar, compressed and typed.
+
+Next: [schemas, joins, indexes and query plans](#/learn/data/relational/joins-indexes).
+
+</Section>

@@ -1,0 +1,169 @@
+import { checksPython, dbtTests, pytestRun, quality } from './code';
+import { lineageExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Green pipelines, wrong numbers">
+
+An orchestrator tells you whether every task ran. It cannot tell you whether the data is right. A source can stop
+sending, a partner can rename a column, a bug can duplicate a day's orders, and every task still finishes with
+success. The first person to notice is often an executive looking at a strange dashboard.
+
+Data quality work closes that gap. On every run, <Term id="data-test">data tests</Term> check what actually
+arrived: is it recent, is there about as much as usual, does it have the expected columns, are the values in
+range? Together with <Term id="data-lineage">lineage</Term>, the map of which tables feed which, this is
+<Term id="data-observability">data observability</Term>: knowing that something is wrong, where it started and
+what it affects, before your users do.
+
+Think of a smoke detector and a building plan. The detector says there is a problem; the plan says which rooms to
+check and which to evacuate.
+
+</Section>
+
+<Section kind="technical" title="Six checks, two severities, one graph">
+
+The lesson checks today's load of `orders_clean` with six checks, each targeting a real failure pattern:
+
+| Check | Rule | Catches | Severity |
+| --- | --- | --- | --- |
+| schema | the columns are exactly the expected five | a renamed or dropped column | block |
+| unique | no `order_id` repeats | a double-loaded batch | block |
+| range | no negative amounts | sign errors, refunds in the wrong table | block |
+| freshness | newest order at most 26 hours old | a source that stopped sending | warn |
+| volume | row count within a tolerance of the 7-day median | partial loads, broken filters | warn |
+| nulls | at most 1% of emails empty | a broken field upstream | warn |
+
+**Volume against history.** The last 7 loads had 980, 1012, 1003, 995, 1040, 870 and 1021 rows. Sorted, the middle
+one is 1003, the median. A normal but quiet day has 902 rows: $902 / 1003 - 1 = -10.1\%$. With a ±10% tolerance
+that day raises an alarm; with ±15% it passes. A load of 412 rows ($-58.9\%$) fails any sensible tolerance. The
+median is used rather than the mean so one unusual day (the 870) does not move the baseline much.
+
+**Block or warn.** A blocking check works as a <Term id="circuit-breaker">circuit breaker</Term>: today's data is
+not published, and every table downstream keeps yesterday's version. Stale but correct is better than fresh but
+wrong, so block on failures that make numbers wrong (duplicates, a missing column, impossible values). Warn on
+failures that only make data unusual (a quiet day, a late feed, more empty emails): publish, and alert the owner.
+Blocking too often trains people to ignore the alarms and teaches the business that the data is never current.
+
+**Lineage decides the blast radius.** `orders_clean` is built from `orders_raw` and feeds `daily_revenue` (and a
+dashboard) and `features` (and a churn model). When a check fails, lineage answers two questions: what upstream
+could have caused it, and what downstream is affected. Lineage tools build this graph from SQL and job definitions.
+
+**Unit tests and data tests catch different things.** A unit test runs your transform on hand-written rows
+before you deploy, so it catches bugs in your code. A data test runs on the real data every time, so it catches
+changes in your inputs. A pipeline needs both.
+
+</Section>
+
+<Section kind="visual" title="Break today's load">
+
+Pick an incident and the volume tolerance. The table shows each check; the lineage graph shows what happens to every
+table downstream.
+
+<Experiment def={quality} title="Daily checks on orders_clean">
+  <QualityChecks />
+</Experiment>
+
+Things to try:
+
+- **amount renamed** (the default): the schema check blocks, and the dashboard and churn model keep yesterday's
+  data instead of loading NULL revenue.
+- **Nothing happened**, tolerance ±10%: a false alarm on a normal quiet day. Move to ±15% and it passes.
+- **Only 412 rows**: the volume check warns at every tolerance up to ±50%. Should a 59% drop block? It is a
+  judgment call; many teams block above some threshold.
+- **The source stopped**: only freshness notices. Every other check passes on the old data.
+
+</Section>
+
+<Section kind="code" title="Checks in Python, tests with pytest and dbt">
+
+The checks the visual runs. The incident and tolerance are filled from the controls.
+
+<Experiment def={quality} title="checks.py, linked to the experiment" controls={false}>
+  <Code example={checksPython} title="checks.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+**Unit-testing a transform.** Keep transforms pure (a row in, a row out) and test them with pytest. These tests ran
+with pytest 9.2.0. The last test is deliberately weak: it passes for `"UK"`, which is not a valid country code.
+
+<Code example={pytestRun} title="transform.py and test_transform.py" />
+
+**Declaring data tests.** In a dbt project the same checks are declared next to each model in YAML; dbt turns each
+into a SQL query that returns the offending rows and runs it after every build. `accepted_values` catches the
+`"UK"` that the unit test missed.
+
+<Code example={dbtTests} title="schema.yml and sources.yml" />
+
+</Section>
+
+<Section kind="mistakes" title="Checks that never fire, or always do">
+
+<CommonMistake
+  title="Checking only that the pipeline ran"
+  wrong={"if run.state == \"success\":\n    print(\"data OK\")"}
+  error="(no error: the source has sent nothing for three days and every run is green)"
+  cause="Task success means the code finished, not that the data is current, complete or correct."
+  fix={"assert lag_hours(\"orders_clean\") <= 26, \"orders_clean is stale\"\nassert abs(rows_today / median(history) - 1) <= 0.15"}
+/>
+
+<CommonMistake
+  title="A fixed row-count threshold"
+  wrong={"assert rows_today > 500"}
+  error="(no error: when the business doubles, a load with half the rows still passes)"
+  cause="A fixed number does not follow growth or weekly patterns, so it is either too loose or soon too tight."
+  fix={"assert abs(rows_today / median(last_7_days) - 1) <= TOLERANCE"}
+/>
+
+<CommonMistake
+  title="Alerting on everything, blocking on everything"
+  wrong={"for check in checks:\n    if not check.passed:\n        raise PipelineError(check.name)  # every warning stops publishing"}
+  error="(no error: dashboards are stale twice a week for normal variation, and people stop trusting them)"
+  cause="Not every anomaly makes data wrong. Treating a quiet day like duplicated revenue blocks good data and wears out the on-call engineer."
+  fix={"blocking = [c for c in checks if not c.passed and c.severity == \"block\"]\nif blocking:\n    raise PipelineError(blocking)\nalert([c for c in checks if not c.passed])"}
+/>
+
+<Callout kind="simplification">
+  The lesson's metrics are given for one load. A real pipeline computes them with SQL on each run (`COUNT(*)`,
+  `MAX(ordered_at)`, `AVG(email IS NULL)`), stores them per run so history accumulates, and often checks
+  distributions too (a column's mean or its share of each category) to catch subtler drift.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Quality in production">
+
+- **Write-audit-publish.** Build each run into a staging table, run the checks there, and only swap it into the
+  production table when blocking checks pass. Downstream readers never see unchecked data.
+- **Quarantine rows, block tables.** Row-level problems (one bad email) go to a
+  [quarantine](#/learn/data/etl/etl-vs-elt); table-level problems (half the rows missing) stop the publish.
+- **Own every alert.** Each check has an owner and a runbook line: what it means and what to do first.
+- **For ML,** the same checks protect training data and features. A feature table with a broken column trains a
+  worse model silently; [training-serving consistency](#/learn/data/features/training-serving) adds checks that
+  compare features at training time with features in production.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Walk the lineage">
+
+<MiniExercise exercise={lineageExercise}>
+  Write `upstream_of(lineage, table)`. `lineage` maps each table to the tables it is built from. Return every table
+  upstream of `table`, directly or indirectly, sorted.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Pipelines can be green and wrong: check the data itself on every run (schema, uniqueness, ranges, freshness,
+  volume, nulls).
+- Compare volumes with recent history (a median), and tune tolerances so normal days pass.
+- Block publishing for failures that make data wrong; warn for failures that make it unusual.
+- Lineage shows what could have caused a failure and what it affects; unit tests check code, data tests check inputs.
+
+Next: [cloud storage, permissions and cost](#/learn/data/cloud/storage-permissions-cost).
+
+</Section>

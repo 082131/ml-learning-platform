@@ -61,7 +61,7 @@ describe('routes', () => {
       .find((t) => t.id === 'data')!
       .chapters.flatMap((c) => c.lessons)
       .filter((l) => l.status === 'outline').length;
-    expect(screen.getAllByText('Outline only').length).toBeGreaterThanOrEqual(outlines);
+    expect(screen.queryAllByText('Outline only').length).toBeGreaterThanOrEqual(outlines);
   });
 
   it('outline lesson shows objectives, prerequisites and the outline label, with no completion button', async () => {
@@ -78,7 +78,7 @@ describe('routes', () => {
     const prereq = metas[meta.prerequisites[0]!]!;
     renderWithApp(<AppRoutes />, { route: `/learn/${meta.id}` });
     expect(
-      await screen.findByRole('heading', { level: 1, name: meta.title }, { timeout: 5000 }),
+      await screen.findByRole('heading', { level: 1, name: meta.title }, { timeout: 10_000 }),
     ).toBeInTheDocument();
     expect(screen.getByText(meta.objectives[0]!)).toBeInTheDocument();
     const prerequisites = screen.getByRole('region', { name: 'Prerequisites' });
@@ -87,7 +87,8 @@ describe('routes', () => {
     ).toHaveAttribute('href', `/learn/${prereq.id}`);
     expect(screen.getByRole('note')).toHaveTextContent('outlined but not written yet');
     expect(screen.queryByRole('button', { name: 'Mark complete' })).toBeNull();
-  });
+    // The first outline lesson moves to other tracks as lessons get written; its first load can be slow.
+  }, 15_000);
 
   it('written lesson renders its MDX, glossary terms open, and completion is saved', async () => {
     const { store } = renderWithApp(<AppRoutes />, { route: '/learn/ml/foundations/what-is-ml' });

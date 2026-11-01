@@ -1,0 +1,53 @@
+.ids {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+  gap: var(--s-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.id {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--s-1) 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: var(--surface);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+}
+.missing {
+  border-style: dashed;
+  color: var(--ink-2);
+}
+.dup {
+  border-color: var(--err);
+  border-width: 2px;
+  background: var(--surface-2);
+}
+.count {
+  font-size: 0.75rem;
+  color: var(--ink-2);
+}
+.dup .count {
+  color: var(--err);
+  font-weight: 600;
+}
+.log {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+}
+.log li {
+  display: flex;
+  gap: var(--s-2);
+  padding: 2px 0;
+  border-bottom: 1px dashed var(--line);
+}
+.glyph {
+  flex: 0 0 1.2em;
+  text-align: center;
+}

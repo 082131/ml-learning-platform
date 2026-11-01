@@ -78,18 +78,18 @@ IDs are `track/chapter/lesson`. Prerequisites are written as short IDs within th
 ---
 
 ## T.02 Data Engineering (`data`)
-1. `data/python-sql/formats-sql-intro`: Python for data, SQL and data formats overview · B · O
+1. `data/python-sql/formats-sql-intro`: Python for data, SQL and data formats overview · B · **W** · query builder (WHERE, GROUP BY, ORDER BY) with the SQL, the Python loop and real file-format sizes
 2. `data/relational/joins-indexes` ★: Schemas, joins, indexes and query plans · B · **W** · interactive join visualizer (inner, left, full) with SQL linked to the result, plus an index lookup vs scan step-through
-3. `data/ingestion/apis-formats`: APIs, JSON, CSV, Parquet, ingestion · I · O
+3. `data/ingestion/apis-formats`: APIs, JSON, CSV, Parquet, ingestion · I · **W** · paginated API ingestion simulator with faults, retries with backoff, and append vs upsert
 4. `data/etl/etl-vs-elt` ★: ETL vs ELT, cleaning, validation, transformation · I · **W** · interactive ETL pipeline diagram where you inject a bad record and watch validation catch it or let it through
 5. `data/processing/batch-vs-stream` ★: Batch vs stream processing · I · **W** · side-by-side event-time simulator with windowing, late events and latency vs completeness
-6. `data/storage/warehouse-lake-lakehouse`: Warehouses, lakes, lakehouses · I · O
-7. `data/orchestration/dags-retries`: Orchestration, scheduling, retries, dependencies · I · O (release 2: DAG failure and retry simulator)
-8. `data/distributed/spark-concepts`: Distributed processing with Spark (partitions, shuffles) · A · O
-9. `data/quality/observability-testing`: Data quality, lineage, observability, pipeline tests · A · O
-10. `data/cloud/storage-permissions-cost`: Cloud storage, permissions, cost, deployment · A · O
-11. `data/features/training-serving`: Feature pipelines and training-serving consistency · A · O
-12. `data/capstone/ml-ready-pipeline`: Capstone: reliable pipeline that prepares data for an ML model · A · O
+6. `data/storage/warehouse-lake-lakehouse`: Warehouses, lakes, lakehouses · I · **W** · bytes read by CSV, Parquet and day-partitioned Parquet, measured from real files
+7. `data/orchestration/dags-retries`: Orchestration, scheduling, retries, dependencies · I · **W** · DAG failure and retry simulator with a timeline of attempts
+8. `data/distributed/spark-concepts`: Distributed processing with Spark (partitions, shuffles) · A · **W** · partitions, shuffles, skew and broadcast joins, with real PySpark plans
+9. `data/quality/observability-testing`: Data quality, lineage, observability, pipeline tests · A · **W** · six checks with block or warn severities and the lineage blast radius
+10. `data/cloud/storage-permissions-cost`: Cloud storage, permissions, cost, deployment · A · **W** · month-12 cost estimate (example prices) and an IAM policy evaluator
+11. `data/features/training-serving`: Feature pipelines and training-serving consistency · A · **W** · point-in-time join of daily snapshots (as-of, same-day, latest) and a PSI skew check
+12. `data/capstone/ml-ready-pipeline`: Capstone: reliable pipeline that prepares data for an ML model · A · **W** · brief with a run, idempotent stdlib + SQLite reference pipeline
 
 ## T.03 AI Engineer (`ai`)
 1. `ai/fundamentals/ai-landscape`: AI, ML, DL, NLP, GenAI, and when to train, fine-tune, use a pretrained model or call an API · B · O (release 2 builds a decision-tree tool)
@@ -126,7 +126,7 @@ IDs are `track/chapter/lesson`. Prerequisites are written as short IDs within th
 
 ## Counts
 - ML: 55 entries (46 lessons, 4 chapter projects, 5 capstones), all written.
-- Data: 12 (3 written). AI: 13 (3 written). Inference: 14 (3 written).
+- Data: 12, all written. AI: 13 (3 written). Inference: 14 (3 written).
 - Release 2: write the remaining 30 outline lessons, one thread per track.
 
 ## Progression rules

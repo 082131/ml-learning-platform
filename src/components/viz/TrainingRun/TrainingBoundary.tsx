@@ -40,7 +40,12 @@ export function TrainingBoundary() {
       const cls = data[set].y[i]![0]!;
       return (
         <g key={`${set}${i}`} className={cls === 1 ? svg.accent : svg.ink} opacity={set === 'val' ? 0.55 : 1}>
-          <Marker shape={cls === 1 ? 'square' : 'circle'} x={x(p[0]!)} y={y(p[1]!)} size={width < NARROW ? PHONE_POINT : POINT} />
+          <Marker
+            shape={cls === 1 ? 'square' : 'circle'}
+            x={x(p[0]!)}
+            y={y(p[1]!)}
+            size={width < NARROW ? PHONE_POINT : POINT}
+          />
         </g>
       );
     });

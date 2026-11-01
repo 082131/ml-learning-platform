@@ -1,0 +1,115 @@
+.rows {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+}
+.row {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr 4.5rem;
+  align-items: center;
+  gap: var(--s-2);
+}
+.name {
+  white-space: nowrap;
+}
+.track {
+  position: relative;
+  height: 22px;
+  border-bottom: 1px dashed var(--line);
+}
+.window {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+}
+.leakWindow {
+  background: color-mix(in srgb, var(--err) 14%, transparent);
+  border: 2px dashed var(--err);
+}
+.now {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 0;
+  border-left: 2px solid var(--ink);
+}
+.order {
+  position: absolute;
+  top: 6px;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  border-radius: 50%;
+  border: 2px solid var(--ink-2);
+  background: var(--surface);
+}
+.key {
+  position: relative;
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--ink-2);
+  background: var(--surface);
+}
+.counted {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.future {
+  border-style: dotted;
+  border-color: var(--err);
+}
+.counted.future {
+  background: var(--err);
+  border-style: solid;
+}
+.value {
+  text-align: right;
+  white-space: nowrap;
+}
+.value small {
+  font-size: 0.6875rem;
+}
+.bad {
+  color: var(--err);
+  font-weight: 600;
+}
+.axis {
+  display: flex;
+  justify-content: space-between;
+  margin: 4px calc(4.5rem + var(--s-2)) 0 calc(5.5rem + var(--s-2));
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: var(--s-2) 0 0;
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+}
+.keyLine {
+  display: inline-block;
+  height: 14px;
+  border-left: 2px solid var(--ink);
+}
+@media (max-width: 480px) {
+  .row {
+    grid-template-columns: 4.5rem 1fr 3.5rem;
+  }
+  .axis {
+    margin-left: calc(4.5rem + var(--s-2));
+    margin-right: calc(3.5rem + var(--s-2));
+  }
+}

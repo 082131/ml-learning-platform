@@ -1,0 +1,48 @@
+.bars {
+  display: grid;
+  gap: var(--s-3);
+  margin: 0;
+}
+.row {
+  display: grid;
+  gap: var(--s-1);
+}
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--s-2);
+  font-size: var(--fs-13);
+}
+.value {
+  font-family: var(--font-mono);
+}
+.detail {
+  margin: 0;
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}
+.days {
+  display: grid;
+  grid-template-columns: repeat(15, minmax(0, 1fr));
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.day {
+  padding: 2px 0;
+  border: 1px dashed var(--line-strong);
+  border-radius: 3px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--ink-2);
+}
+.read {
+  border-style: solid;
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--ink);
+  font-weight: 600;
+}

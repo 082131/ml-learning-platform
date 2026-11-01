@@ -1,0 +1,146 @@
+{
+ "none,none,none": {
+  "query": "SELECT id, city, product, amount FROM sales",
+  "printed": "(1, 'Oslo', 'tea', 12)\n(2, 'Leeds', 'coffee', 30)\n(3, 'Oslo', 'coffee', 25)\n(4, 'Austin', 'tea', 8)\n(5, 'Leeds', 'tea', 15)\n(6, 'Oslo', 'cake', 20)\n(7, 'Austin', 'coffee', 40)\n(8, 'Leeds', 'cake', 9)"
+ },
+ "none,none,big": {
+  "query": "SELECT id, city, product, amount FROM sales ORDER BY amount DESC",
+  "printed": "(7, 'Austin', 'coffee', 40)\n(2, 'Leeds', 'coffee', 30)\n(3, 'Oslo', 'coffee', 25)\n(6, 'Oslo', 'cake', 20)\n(5, 'Leeds', 'tea', 15)\n(1, 'Oslo', 'tea', 12)\n(8, 'Leeds', 'cake', 9)\n(4, 'Austin', 'tea', 8)"
+ },
+ "none,none,name": {
+  "query": "SELECT id, city, product, amount FROM sales ORDER BY city, id",
+  "printed": "(4, 'Austin', 'tea', 8)\n(7, 'Austin', 'coffee', 40)\n(2, 'Leeds', 'coffee', 30)\n(5, 'Leeds', 'tea', 15)\n(8, 'Leeds', 'cake', 9)\n(1, 'Oslo', 'tea', 12)\n(3, 'Oslo', 'coffee', 25)\n(6, 'Oslo', 'cake', 20)"
+ },
+ "none,city,none": {
+  "query": "SELECT city, COUNT(*) AS orders, SUM(amount) AS total FROM sales GROUP BY city",
+  "printed": "('Austin', 2, 48)\n('Leeds', 3, 54)\n('Oslo', 3, 57)"
+ },
+ "none,city,big": {
+  "query": "SELECT city, COUNT(*) AS orders, SUM(amount) AS total FROM sales GROUP BY city ORDER BY total DESC, city",
+  "printed": "('Oslo', 3, 57)\n('Leeds', 3, 54)\n('Austin', 2, 48)"
+ },
+ "none,city,name": {
+  "query": "SELECT city, COUNT(*) AS orders, SUM(amount) AS total FROM sales GROUP BY city ORDER BY city",
+  "printed": "('Austin', 2, 48)\n('Leeds', 3, 54)\n('Oslo', 3, 57)"
+ },
+ "none,product,none": {
+  "query": "SELECT product, COUNT(*) AS orders, SUM(amount) AS total FROM sales GROUP BY product",
+  "printed": "('cake', 2, 29)\n('coffee', 3, 95)\n('tea', 3, 35)"
+ },
+ "none,product,big": {
+  "query": "SELECT product, COUNT(*) AS orders, SUM(amount) AS total FROM sales GROUP BY product ORDER BY total DESC, product",
+  "printed": "('coffee', 3, 95)\n('tea', 3, 35)\n('cake', 2, 29)"
+ },
+ "none,product,name": {
+  "query": "SELECT product, COUNT(*) AS orders, SUM(amount) AS total FROM sales GROUP BY product ORDER BY product",
+  "printed": "('cake', 2, 29)\n('coffee', 3, 95)\n('tea', 3, 35)"
+ },
+ "oslo,none,none": {
+  "query": "SELECT id, city, product, amount FROM sales WHERE city = 'Oslo'",
+  "printed": "(1, 'Oslo', 'tea', 12)\n(3, 'Oslo', 'coffee', 25)\n(6, 'Oslo', 'cake', 20)"
+ },
+ "oslo,none,big": {
+  "query": "SELECT id, city, product, amount FROM sales WHERE city = 'Oslo' ORDER BY amount DESC",
+  "printed": "(3, 'Oslo', 'coffee', 25)\n(6, 'Oslo', 'cake', 20)\n(1, 'Oslo', 'tea', 12)"
+ },
+ "oslo,none,name": {
+  "query": "SELECT id, city, product, amount FROM sales WHERE city = 'Oslo' ORDER BY city, id",
+  "printed": "(1, 'Oslo', 'tea', 12)\n(3, 'Oslo', 'coffee', 25)\n(6, 'Oslo', 'cake', 20)"
+ },
+ "oslo,city,none": {
+  "query": "SELECT city, COUNT(*) AS orders, SUM(amount) AS total FROM sales WHERE city = 'Oslo' GROUP BY city",
+  "printed": "('Oslo', 3, 57)"
+ },
+ "oslo,city,big": {
+  "query": "SELECT city, COUNT(*) AS orders, SUM(amount) AS total FROM sales WHERE city = 'Oslo' GROUP BY city ORDER BY total DESC, city",
+  "printed": "('Oslo', 3, 57)"
+ },
+ "oslo,city,name": {
+  "query": "SELECT city, COUNT(*) AS orders, SUM(amount) AS total FROM sales WHERE city = 'Oslo' GROUP BY city ORDER BY city",
+  "printed": "('Oslo', 3, 57)"
+ },
+ "oslo,product,none": {
+  "query": "SELECT product, COUNT(*) AS orders, SUM(amount) AS total FROM sales WHERE city = 'Oslo' GROUP BY product",
+  "printed": "('cake', 1, 20)\n('coffee', 1, 25)\n('tea', 1, 12)"
+ },
+ "oslo,product,big": {
+  "query": "SELECT product, COUNT(*) AS orders, SUM(amount) AS total FROM sales WHERE city = 'Oslo' GROUP BY product ORDER BY total DESC, product",
+  "printed": "('coffee', 1, 25)\n('cake', 1, 20)\n('tea', 1, 12)"
+ },
+ "oslo,product,name": {
+  "query": "SELECT product, COUNT(*) AS orders, SUM(amount) AS total FROM sales WHERE city = 'Oslo' GROUP BY product ORDER BY product",
+  "printed": "('cake', 1, 20)\n('coffee', 1, 25)\n('tea', 1, 12)"
+ },
+ "min15,none,none": {
+  "query": "SELECT id, city, product, amount FROM sales WHERE amount >= 15",
+  "printed": "(2, 'Leeds', 'coffee', 30)\n(3, 'Oslo', 'coffee', 25)\n(5, 'Leeds', 'tea', 15)\n(6, 'Oslo', 'cake', 20)\n(7, 'Austin', 'coffee', 40)"
+ },
+ "min15,none,big": {
+  "query": "SELECT id, city, product, amount FROM sales WHERE amount >= 15 ORDER BY amount DESC",
+  "printed": "(7, 'Austin', 'coffee', 40)\n(2, 'Leeds', 'coffee', 30)\n(3, 'Oslo', 'coffee', 25)\n(6, 'Oslo', 'cake', 20)\n(5, 'Leeds', 'tea', 15)"
+ },
+ "min15,none,name": {
+  "query": "SELECT id, city, product, amount FROM sales WHERE amount >= 15 ORDER BY city, id",
+  "printed": "(7, 'Austin', 'coffee', 40)\n(2, 'Leeds', 'coffee', 30)\n(5, 'Leeds', 'tea', 15)\n(3, 'Oslo', 'coffee', 25)\n(6, 'Oslo', 'cake', 20)"
+ },
+ "min15,city,none": {
+  "query": "SELECT city, COUNT(*) AS orders, SUM(amount) AS total FROM sales WHERE amount >= 15 GROUP BY city",
+  "printed": "('Austin', 1, 40)\n('Leeds', 2, 45)\n('Oslo', 2, 45)"
+ },
+ "min15,city,big": {
+  "query": "SELECT city, COUNT(*) AS orders, SUM(amount) AS total FROM sales WHERE amount >= 15 GROUP BY city ORDER BY total DESC, city",
+  "printed": "('Leeds', 2, 45)\n('Oslo', 2, 45)\n('Austin', 1, 40)"
+ },
+ "min15,city,name": {
+  "query": "SELECT city, COUNT(*) AS orders, SUM(amount) AS total FROM sales WHERE amount >= 15 GROUP BY city ORDER BY city",
+  "printed": "('Austin', 1, 40)\n('Leeds', 2, 45)\n('Oslo', 2, 45)"
+ },
+ "min15,product,none": {
+  "query": "SELECT product, COUNT(*) AS orders, SUM(amount) AS total FROM sales WHERE amount >= 15 GROUP BY product",
+  "printed": "('cake', 1, 20)\n('coffee', 3, 95)\n('tea', 1, 15)"
+ },
+ "min15,product,big": {
+  "query": "SELECT product, COUNT(*) AS orders, SUM(amount) AS total FROM sales WHERE amount >= 15 GROUP BY product ORDER BY total DESC, product",
+  "printed": "('coffee', 3, 95)\n('cake', 1, 20)\n('tea', 1, 15)"
+ },
+ "min15,product,name": {
+  "query": "SELECT product, COUNT(*) AS orders, SUM(amount) AS total FROM sales WHERE amount >= 15 GROUP BY product ORDER BY product",
+  "printed": "('cake', 1, 20)\n('coffee', 3, 95)\n('tea', 1, 15)"
+ },
+ "tea,none,none": {
+  "query": "SELECT id, city, product, amount FROM sales WHERE product = 'tea'",
+  "printed": "(1, 'Oslo', 'tea', 12)\n(4, 'Austin', 'tea', 8)\n(5, 'Leeds', 'tea', 15)"
+ },
+ "tea,none,big": {
+  "query": "SELECT id, city, product, amount FROM sales WHERE product = 'tea' ORDER BY amount DESC",
+  "printed": "(5, 'Leeds', 'tea', 15)\n(1, 'Oslo', 'tea', 12)\n(4, 'Austin', 'tea', 8)"
+ },
+ "tea,none,name": {
+  "query": "SELECT id, city, product, amount FROM sales WHERE product = 'tea' ORDER BY city, id",
+  "printed": "(4, 'Austin', 'tea', 8)\n(5, 'Leeds', 'tea', 15)\n(1, 'Oslo', 'tea', 12)"
+ },
+ "tea,city,none": {
+  "query": "SELECT city, COUNT(*) AS orders, SUM(amount) AS total FROM sales WHERE product = 'tea' GROUP BY city",
+  "printed": "('Austin', 1, 8)\n('Leeds', 1, 15)\n('Oslo', 1, 12)"
+ },
+ "tea,city,big": {
+  "query": "SELECT city, COUNT(*) AS orders, SUM(amount) AS total FROM sales WHERE product = 'tea' GROUP BY city ORDER BY total DESC, city",
+  "printed": "('Leeds', 1, 15)\n('Oslo', 1, 12)\n('Austin', 1, 8)"
+ },
+ "tea,city,name": {
+  "query": "SELECT city, COUNT(*) AS orders, SUM(amount) AS total FROM sales WHERE product = 'tea' GROUP BY city ORDER BY city",
+  "printed": "('Austin', 1, 8)\n('Leeds', 1, 15)\n('Oslo', 1, 12)"
+ },
+ "tea,product,none": {
+  "query": "SELECT product, COUNT(*) AS orders, SUM(amount) AS total FROM sales WHERE product = 'tea' GROUP BY product",
+  "printed": "('tea', 3, 35)"
+ },
+ "tea,product,big": {
+  "query": "SELECT product, COUNT(*) AS orders, SUM(amount) AS total FROM sales WHERE product = 'tea' GROUP BY product ORDER BY total DESC, product",
+  "printed": "('tea', 3, 35)"
+ },
+ "tea,product,name": {
+  "query": "SELECT product, COUNT(*) AS orders, SUM(amount) AS total FROM sales WHERE product = 'tea' GROUP BY product ORDER BY product",
+  "printed": "('tea', 3, 35)"
+ }
+}

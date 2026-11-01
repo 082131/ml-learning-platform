@@ -1,0 +1,178 @@
+import { deltaDemo, duckdbRun, lake, lakeSql, pruneRunner } from './code';
+import { pruneExercise, questions } from './quiz';
+
+<Section kind="intuition" title="A library, a warehouse full of boxes, and a catalog">
+
+Once data is ingested and cleaned, it has to live somewhere that reports and models can query. There are three
+common answers.
+
+A <Term id="data-warehouse">data warehouse</Term> is like a well-run library: every book is catalogued, shelved by
+rules and checked at the door. You ask the librarian (SQL) and get answers fast. The library owns the shelves, so
+you pay for its storage and its staff.
+
+A <Term id="data-lake">data lake</Term> is a storage unit full of labelled boxes: files in open formats, kept in
+cheap cloud storage. Anyone can bring their own tools to read them. Nothing stops someone from dropping in a box
+with the wrong label, and nobody keeps a record of what changed.
+
+A <Term id="lakehouse">lakehouse</Term> keeps the boxes in the cheap storage unit but adds a catalog that records
+exactly which boxes make up the collection today, and what it looked like yesterday. That catalog is a
+<Term id="table-format">table format</Term>.
+
+</Section>
+
+<Section kind="technical" title="What each one stores, enforces and charges for">
+
+| | Warehouse | Lake | Lakehouse |
+| --- | --- | --- | --- |
+| Data lives in | the warehouse's own storage | files (Parquet, JSON, CSV) in object storage | Parquet files in object storage, plus a table log |
+| Schema enforced | on write: bad rows are rejected | not at all: readers interpret files | on write, by the table format |
+| Updates, deletes, transactions | yes | no: files are rewritten by hand | yes, through the log |
+| Engines | the warehouse's own | any (Spark, DuckDB, Trino, pandas) | any that read the format |
+| Typical cost | storage plus compute, priced by the vendor | cheapest storage; you run the compute | cheap storage; you run more of the platform |
+| Examples | BigQuery, Snowflake, Redshift | an S3 or GCS bucket of Parquet | Delta Lake, Apache Iceberg, Apache Hudi |
+
+All three get their speed from the same two ideas.
+
+**Columnar storage.** <Term id="columnar-storage">Columnar</Term> formats store each column's values together. A
+query that needs `country` and `amount` reads only those two columns and skips the rest. The lesson's month of
+events has 60,000 rows and 7 columns; one of them, a random 40-character `payload`, is 2.6 MB of the 3.3 MB
+Parquet file, and a revenue query never touches it.
+
+**Partitioning.** <Term id="file-partitioning">Partitioning</Term> stores files in folders named by a column's
+value, such as `events/day=2026-10-24/part-0.parquet`. A filter on that column is answered from the folder names
+before any file is opened: that is partition pruning. A query over the last 7 days opens 7 of 30 files.
+
+For the default query (the last 7 days, `country` and `amount`) the three layouts read:
+
+| Layout | What is read | Bytes |
+| --- | --- | --- |
+| CSV, one file | every byte, every column, all 30 days | 4,691,927 |
+| Parquet, one file | 3 column chunks (`country`, `amount`, `day`) for all 30 days, plus the footer | 227,952 |
+| Parquet, partitioned by day | 2 column chunks in each of 7 files, plus 7 footers | 115,719 |
+
+<Callout kind="simplification">
+  The byte counts are the column chunks a query needs plus each file's footer, taken from the real files'
+  Parquet metadata. Real readers also issue extra requests and may read ahead, so measured traffic is somewhat
+  higher; the ratios between layouts are what matter. Larger Parquet files are also split into row groups whose
+  min/max statistics let a reader skip parts of a file even without partitions. This single file has one row
+  group, so it cannot.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Narrow the query, watch the bytes">
+
+Change how many days the query covers and whether it selects two columns or all of them. The bars compare the
+three layouts; the strip below shows which day partitions are opened.
+
+<Experiment def={lake} title="One month of events, stored three ways">
+  <LakeScan />
+  <Readout title="Bytes each layout reads" />
+</Experiment>
+
+Things to try:
+
+- Drag the days down to 1. The partitioned layout reads one file; the single Parquet file reads the same as for
+  30 days, because it cannot skip.
+- Switch to `SELECT *` with 30 days. The partitioned layout now reads 3.78 MB, more than the single file's
+  3.33 MB: 30 small files compress less well and each carries its own footer. Partitioning pays off only when
+  queries filter on the partition column.
+- Compare CSV with everything else. It never changes, because a CSV reader must parse every line.
+
+</Section>
+
+<Section kind="code" title="Querying files directly, and adding a table format">
+
+The query the visual measures, in DuckDB's SQL. The date and columns are filled from the controls.
+
+<Experiment def={lake} title="query.sql, linked to the experiment" controls={false}>
+  <Code example={lakeSql} title="query.sql" />
+</Experiment>
+
+Run from Python over the partitioned files, the default query gives the revenue per country for 24 to 30 October:
+
+<Code example={duckdbRun} title="query.py" />
+
+Partition pruning needs nothing more than the paths. This is the step an engine takes before opening any file:
+
+<PythonRunner example={pruneRunner} title="prune.py" />
+
+**A table format on top.** Plain Parquet files cannot be updated in place, and two writers can step on each other.
+Delta Lake adds a `_delta_log` folder with one JSON commit per version. The program below appends, deletes and
+then reads an old version; it ran with deltalake 1.6.6.
+
+<Code example={deltaDemo} title="delta_demo.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Lakes that turn into swamps">
+
+<CommonMistake
+  title="Partitioning by a column with too many values"
+  wrong={"ds.write_dataset(table, \"events\", format=\"parquet\", partitioning=[\"user_id\"], partitioning_flavor=\"hive\")"}
+  error="(no error: 5,000 folders of tiny files; every query that is not about one user opens thousands of files)"
+  cause="Each partition value gets its own folder and files. With high-cardinality columns the files are tiny, footers and file openings dominate, and listing the folders becomes slow."
+  fix={"# partition by what queries filter on, with tens to thousands of values (often a date)\nds.write_dataset(table, \"events\", format=\"parquet\", partitioning=[\"day\"], partitioning_flavor=\"hive\")"}
+/>
+
+<CommonMistake
+  title="Filtering on a transformed partition column"
+  wrong={"SELECT SUM(amount) FROM events WHERE strftime(day, '%Y-%m') = '2026-10'"}
+  error="(no error: the query is correct but may open every file)"
+  cause="Engines prune by comparing the filter with partition values. Wrapping the column in a function can stop the engine from seeing the filter as a simple range on day."
+  fix={"SELECT SUM(amount) FROM events WHERE day >= DATE '2026-10-01' AND day < DATE '2026-11-01'"}
+/>
+
+<CommonMistake
+  title="Overwriting files in a plain lake while someone reads them"
+  wrong={"df.to_parquet(\"s3://lake/orders/part-0.parquet\")  # a nightly job rewrites the file in place"}
+  error="(no error: a report running at the same time reads half old and half new data, or fails on a missing file)"
+  cause="Object storage has no transactions across files. Readers can see any mix of old and new files during the rewrite."
+  fix={"write_deltalake(\"s3://lake/orders\", df, mode=\"overwrite\")  # a new version becomes visible in one commit"}
+/>
+
+</Section>
+
+<Section kind="practice" title="Choosing">
+
+- **Start with a warehouse** when the data fits comfortably (up to a few terabytes), users mostly write SQL and
+  nobody wants to run infrastructure. It is the fastest path to correct dashboards.
+- **Use a lake** for raw landing data, files that are not tables (images, logs, model artifacts) and archives:
+  storage is cheap and any tool can read it.
+- **Use a lakehouse** when data is large, several engines need the same tables (Spark for pipelines, SQL for
+  analysts, Python for ML), or you need updates, deletes and history on open files.
+- **For ML,** time travel matters: a training set defined as "table version 41" can be rebuilt exactly, which is
+  what [dataset versioning](#/learn/ml/practice/versioning) asks for.
+
+Many companies run a combination: raw files in a lake, curated tables in a lakehouse or warehouse.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Prune partitions">
+
+<MiniExercise exercise={pruneExercise}>
+  Write `files_to_read(paths, column, low, high)`. Each path contains folders like `day=2026-10-03`; return the paths
+  whose value for `column` is between `low` and `high`, inclusive, in their original order.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Warehouses enforce schemas and run SQL fast on their own storage; lakes keep open files in cheap storage with no
+  guarantees; lakehouses add a table format for transactions, schemas and history.
+- Columnar files read only the columns a query names; partitioned folders let filters on the partition column skip
+  whole files.
+- Partition by a column most queries filter on, with a moderate number of values; too many small files is slower.
+- Delta Lake and Iceberg are a log over Parquet files: atomic commits, updates and deletes, time travel.
+
+Next: [orchestration, scheduling and retries](#/learn/data/orchestration/dags-retries) runs these loads on a
+schedule, in the right order.
+
+</Section>

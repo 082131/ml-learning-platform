@@ -1,0 +1,173 @@
+import { hashRunner, shuffle, shufflePython, sparkPlans } from './code';
+import { partitionExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Counting votes in many rooms">
+
+When the data no longer fits on one machine, or one machine is too slow, the work is split across many. Apache
+Spark is the most common engine for that. It splits a dataset into <Term id="spark-partition">partitions</Term>
+and gives each one to a task, so many cores on many machines work at once.
+
+Think of counting an election's votes. Each polling room counts its own ballots in parallel: no room needs
+another room's ballots. That is a <Term id="narrow-transformation">narrow</Term> step, and it is cheap. To get
+the total per candidate across the country, though, every room's tallies have to travel to one desk per
+candidate. Moving records between machines so that equal keys meet is a <Term id="shuffle">shuffle</Term>, and it
+is where distributed jobs spend most of their time.
+
+If one candidate gets most of the votes, their desk is swamped while the others sit idle, and the count is only
+finished when that desk is. That is <Term id="data-skew">data skew</Term>.
+
+</Section>
+
+<Section kind="technical" title="Partitions, stages and shuffles">
+
+**Partitions and tasks.** Spark reads a dataset as partitions, usually one per input file or block, and runs one
+task per partition on the executors' cores. The lesson's job reads 24 orders from 3 files: 3 partitions of 8
+records.
+
+**Narrow versus wide.** A filter or a computed column needs only the record in hand, so each task works on its own
+partition and Spark chains such steps into one stage. A group-by or a join needs all records with the same key in
+one place, so the job is cut in two: tasks write their records out by key, and a new stage of tasks reads one key
+range each. Each record goes to shuffle partition $\text{hash}(\text{key}) \bmod N$, where $N$ is
+`spark.sql.shuffle.partitions` (200 by default).
+
+**Cost.** A shuffle writes every record to disk, sends it over the network and reads it again. Two tricks avoid
+some of that:
+
+- **Partial aggregation.** A sum can be computed in pieces. Each task first adds up its own records per key, and
+  only the subtotals are shuffled. Each of the lesson's input partitions holds all 6 customers, so 3 × 6 = 18
+  subtotals move instead of 24 orders. On real data with millions of rows per key the saving is enormous.
+- **<Term id="broadcast-join">Broadcast join</Term>.** When one side of a join is small, Spark copies it to every
+  executor and joins each partition of the big side in place: no shuffle at all.
+
+**Stage time is set by the slowest task.** In the lesson's model each record costs one time unit and a stage ends
+when its last task does. With even keys and 4 shuffle partitions, a shuffle join's second stage reads 8, 4, 4 and 8
+records: 8 units. With skew (customer C1 has 14 of 24 orders) it reads 4, 2, 2 and 16: the stage takes twice as
+long while three tasks sit idle, and in real jobs the overloaded task may run out of memory.
+
+**Why more partitions do not fix skew.** All records with the same key hash to the same partition. Raising $N$
+spreads the other keys more thinly; C1's 14 orders still land in one task. Hash collisions also matter: with 6 keys
+and 6 partitions, two keys share a partition and two partitions are empty.
+
+<Callout kind="simplification">
+  The time model ignores real costs such as task start-up, network and disk speed, and serialization, and assumes
+  enough cores for every task at once. Spark's adaptive query execution (on by default) also changes plans while a
+  job runs: it can merge small shuffle partitions and split skewed ones in sort-merge joins. The model keeps the
+  part that holds on every cluster: shuffles add a stage, and a stage waits for its slowest task.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Watch records move">
+
+Choose an operation, the number of shuffle partitions and whether the keys are skewed. Each chip is an order,
+labeled by customer and amount (a "Σ" marks a partial sum).
+
+<Experiment def={shuffle} title="One job on 24 orders">
+  <SparkShuffle />
+</Experiment>
+
+Things to try:
+
+- **filter** and **broadcast join**: one stage, nothing moves, 8 units.
+- **shuffle join, even keys**: all 24 orders move. Change the partitions from 4 to 2: two tasks of 12 records.
+  Try 6: two partitions are empty, because two pairs of keys hash to the same partition.
+- **shuffle join, skewed**: one task gets 16 records. Raise the partitions: it never drops below 14.
+- **group-by sum, skewed**: only 13 subtotals move, because C1's 14 orders became one subtotal per input task.
+
+</Section>
+
+<Section kind="code" title="The model in Python, and real Spark plans">
+
+The model the visual runs, with `crc32` as the stable hash:
+
+<Experiment def={shuffle} title="shuffle.py, linked to the experiment" controls={false}>
+  <Code example={shufflePython} title="shuffle.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+How keys spread over partitions depends only on the hash and $N$. Change the keys or the partition counts:
+
+<PythonRunner example={hashRunner} title="hash_partitions.py" />
+
+**Real Spark.** The same orders in PySpark 4.3.0 (local mode, 4 threads, 4 shuffle partitions). `explain()`
+prints the physical plan; read it from the bottom up. Each `Exchange` is a shuffle:
+
+<Code example={sparkPlans} title="plans.py" />
+
+- **The group-by** reads the files, computes `partial_sum` inside each task, shuffles by `hashpartitioning(customer, 4)`,
+  then computes the final `sum`. That is the partial aggregation from the model.
+- **The shuffle join** (`SortMergeJoin`) has an `Exchange` on each side: both tables are shuffled by customer and
+  sorted, then matched.
+- **The broadcast join** (`BroadcastHashJoin`) has no `Exchange` on the orders side; only a `BroadcastExchange` that
+  copies the customers table to every executor.
+
+</Section>
+
+<Section kind="mistakes" title="Jobs that shuffle more than they need">
+
+<CommonMistake
+  title="Collecting a big DataFrame to the driver"
+  wrong={"rows = orders.collect()  # 500 million rows\ntotal = sum(r.amount for r in rows)"}
+  error="(the driver runs out of memory: typically a java.lang.OutOfMemoryError, or the process is killed)"
+  cause="collect() copies every row to the one driver process, undoing the distribution. The loop then runs on one core."
+  fix={"total = orders.agg(F.sum(\"amount\")).first()[0]  # summed by the executors; one row comes back"}
+/>
+
+<CommonMistake
+  title="Joining with a NULL-heavy key"
+  wrong={"events.join(users, \"user_id\", \"left\")  # 40% of events have user_id NULL (logged-out visitors)"}
+  error="(no error: one task runs for an hour while the other 199 finish in a minute)"
+  cause="Every NULL key hashes to the same partition, so the anonymous events form one giant skewed task, though NULL never matches anything."
+  fix={"known = events.filter(F.col(\"user_id\").isNotNull()).join(users, \"user_id\", \"left\")\nresult = known.unionByName(events.filter(F.col(\"user_id\").isNull()), allowMissingColumns=True)"}
+/>
+
+<CommonMistake
+  title="Calling a Python function row by row"
+  wrong={"to_eur = F.udf(lambda x: x * 0.92, \"double\")\norders.withColumn(\"eur\", to_eur(\"amount\"))"}
+  error="(no error: the job is many times slower than it needs to be)"
+  cause="A Python UDF sends every row from the JVM to a Python worker and back, and Spark's optimizer cannot see inside it."
+  fix={"orders.withColumn(\"eur\", F.col(\"amount\") * 0.92)  # a built-in expression, run inside the JVM"}
+/>
+
+</Section>
+
+<Section kind="practice" title="When to reach for Spark">
+
+- **Do you need it?** One machine with DuckDB or Polars handles tens to hundreds of gigabytes comfortably. Reach
+  for Spark when data or compute exceeds one machine, or when the platform already runs it (Databricks, EMR,
+  Dataproc).
+- **Read plans before tuning.** Count the `Exchange` lines, check that filters are pushed into the scan, and look
+  for `BroadcastHashJoin` where one side is small.
+- **Look at task times, not averages.** Spark's UI shows each stage's task durations. One task far slower than the
+  median is skew; fix the key, not the cluster size.
+- **For ML,** feature pipelines are full of joins (events with users, users with labels). A skewed join on a
+  popular item or a NULL key is the most common reason a feature job suddenly takes hours.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Partition sizes">
+
+<MiniExercise exercise={partitionExercise}>
+  Write `partition_sizes(keys, n, hash_fn)`. Each record goes to partition `hash_fn(key) % n`; return how many
+  records each of the `n` partitions receives.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Spark splits data into partitions and runs one task per partition in parallel; narrow steps stay in one stage.
+- Group-bys and joins shuffle records by $\text{hash}(\text{key}) \bmod N$; each shuffle is an `Exchange` in the plan
+  and starts a new stage.
+- Partial aggregation shrinks shuffles for sums and counts; broadcast joins remove them when one side is small.
+- A stage waits for its slowest task, so a hot key slows everything, and adding partitions cannot split one key.
+
+Next: [data quality, lineage and observability](#/learn/data/quality/observability-testing).
+
+</Section>

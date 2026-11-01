@@ -13,5 +13,28 @@ export default {
     'Document how to run, rerun and recover the pipeline',
   ],
   prerequisites: ['data/features/training-serving', 'data/orchestration/dags-retries'],
-  concepts: ['validation-rule', 'quarantine'],
+  concepts: [
+    'validation-rule',
+    'quarantine',
+    'idempotent',
+    'backfill',
+    'data-test',
+    'point-in-time-correctness',
+  ],
+  references: [
+    {
+      title: 'Python: sqlite3',
+      url: 'https://docs.python.org/3.13/library/sqlite3.html',
+      version: 'Python 3.13',
+    },
+    { title: 'SQLite: date and time functions', url: 'https://sqlite.org/lang_datefunc.html' },
+    {
+      title: 'Apache Airflow: DAG runs, backfills and the logical date',
+      url: 'https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/dag-run.html',
+    },
+    {
+      title: 'Feast: point-in-time joins',
+      url: 'https://docs.feast.dev/getting-started/concepts/point-in-time-joins',
+    },
+  ],
 } satisfies LessonMeta;

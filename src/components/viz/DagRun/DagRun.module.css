@@ -1,0 +1,56 @@
+.gantt {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+}
+.row {
+  display: grid;
+  grid-template-columns: minmax(7rem, 9.5rem) 1fr;
+  align-items: center;
+  gap: var(--s-2);
+}
+.track {
+  position: relative;
+  height: 20px;
+  border-bottom: 1px dashed var(--line);
+}
+.seg {
+  position: absolute;
+  top: 2px;
+  height: 16px;
+  border-radius: 3px;
+  font-size: 0.6875rem;
+  line-height: 16px;
+  text-align: center;
+  overflow: hidden;
+}
+.ok {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.fail {
+  background: var(--surface);
+  border: 2px solid var(--err);
+  color: var(--err);
+  line-height: 12px;
+}
+.wait {
+  top: 9px;
+  height: 0;
+  border-top: 2px dotted var(--ink-2);
+  border-radius: 0;
+}
+.skipped {
+  color: var(--ink-2);
+  font-style: italic;
+}
+.axis {
+  display: flex;
+  justify-content: space-between;
+  color: var(--ink-2);
+  font-size: 0.6875rem;
+}

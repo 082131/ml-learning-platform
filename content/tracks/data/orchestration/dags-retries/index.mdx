@@ -1,0 +1,185 @@
+import { airflowDag, backfillRunner, dag, schedulerPython } from './code';
+import { blockedExercise, questions } from './quiz';
+
+<Section kind="intuition" title="A kitchen during dinner service">
+
+A pipeline is rarely one script. It is several steps that depend on each other: extract orders and customers,
+validate them, transform, load the warehouse, then refresh a report and build ML features. Run them from a cron
+job at fixed times ("extract at 01:00, transform at 01:30") and the first slow night breaks everything: transform
+starts before extract has finished and processes half a file.
+
+An <Term id="orchestrator">orchestrator</Term> works like the head chef of a kitchen. It knows which dishes depend
+on which preparations, starts each one as soon as its ingredients are ready, sends a dish back to be redone when
+it fails, and does not plate a meal whose sauce burned. You describe the steps and their dependencies; it decides
+when each one runs.
+
+The steps and their dependencies form a <Term id="dag">DAG</Term>, a directed acyclic graph: arrows say "this must
+finish before that starts", and no chain of arrows loops back on itself, so there is always an order that works.
+
+</Section>
+
+<Section kind="technical" title="Dependencies, retries and what a failure blocks">
+
+The lesson's pipeline has eight tasks. Each one runs for a few minutes:
+
+| Task | Minutes | Waits for |
+| --- | --- | --- |
+| extract_orders | 2 | nothing |
+| extract_customers | 1 | nothing |
+| validate | 1 | both extracts |
+| transform | 3 | validate |
+| load_warehouse | 2 | transform |
+| report | 1 | load_warehouse |
+| features | 2 | load_warehouse |
+| notify | 1 | report and features, whatever their outcome |
+
+**Start times come from dependencies.** A task starts when its last upstream task ends. The two extracts start
+at minute 0; validate waits for the slower one and starts at 2. Following the chain, transform runs 3 to 6, the
+load 6 to 8, report and features start together at 8, and notify runs 10 to 11. Independent tasks run in parallel.
+
+**Retries.** When an attempt fails, the task is tried again up to `RETRIES` more times, waiting 1 minute, then
+2, then 4 (exponential backoff, as in [ingestion](#/learn/data/ingestion/apis-formats)). If transform fails twice
+and succeeds on the third attempt, with 2 retries:
+
+$$
+3 \xrightarrow{+3} 6\ (\text{fails}) \xrightarrow{+1} 7 \xrightarrow{+3} 10\ (\text{fails}) \xrightarrow{+2} 12 \xrightarrow{+3} 15\ (\text{succeeds})
+$$
+
+The rest of the pipeline shifts by 9 minutes and finishes at minute 20 instead of 11.
+
+**What a failure blocks.** When a task fails after its last retry, every task downstream of it is marked
+`upstream_failed` and not run: loading the warehouse from a failed transform would load wrong or partial data.
+Tasks on other branches still run. A task's <Term id="trigger-rule">trigger rule</Term> decides this; the
+default, `all_success`, needs every upstream task to succeed. `notify` uses `all_done` instead, so it runs once
+its upstream tasks have finished in any state, which is exactly when an alert is needed.
+
+**Retries need idempotent tasks.** An attempt can fail after writing half its output. If the task appends, the
+retry writes those rows again. Every task must replace its own output for its run (for example, overwrite the
+partition for its date), so that running it twice equals running it once: it must be
+<Term id="idempotent">idempotent</Term>.
+
+**Schedules and backfills.** A daily pipeline runs once per date, and each run processes the data for its own
+date (its logical date), not "everything up to now". That makes a <Term id="backfill">backfill</Term> possible:
+after fixing a bug, rerun the pipeline for the affected past dates. With idempotent tasks the rerun replaces those
+days; with appending tasks it double-counts them.
+
+</Section>
+
+<Section kind="visual" title="Make a task fail">
+
+Choose a task to fail, how often it fails and how many retries each task gets. The diagram shows each task's
+final state; the timeline below shows every attempt and every wait.
+
+<Experiment def={dag} title="Run the orders pipeline">
+  <DagRun />
+</Experiment>
+
+Things to try:
+
+- **transform fails twice, 1 retry** (the default). It fails, load_warehouse, report and features are not run,
+  and notify still runs. Raise retries to 2: everything succeeds and the run ends at minute 20.
+- **report fails every attempt.** features still succeeds, because it does not depend on report.
+- **extract_customers fails every attempt.** Only extract_orders and notify run. Each extra retry only makes the
+  run fail later.
+
+</Section>
+
+<Section kind="code" title="A scheduler in 30 lines, and the same DAG in Airflow">
+
+The scheduler the visual runs. It walks the tasks in dependency order, starts each one when its upstream tasks end,
+retries with backoff, and marks blocked tasks `upstream_failed`.
+
+<Experiment def={dag} title="scheduler.py, linked to the simulator" controls={false}>
+  <Code example={schedulerPython} title="scheduler.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+In a real project you describe the same DAG to an orchestrator. In Apache Airflow 3 with the TaskFlow API, each
+task is a Python function, and passing one task's result to another creates the dependency:
+
+<Code example={airflowDag} title="orders_pipeline.py" />
+
+**Backfills and idempotency.** Two versions of a daily job, both run for three days and then backfilled for the
+last two. Only the one that replaces its day's rows gives the right total:
+
+<PythonRunner example={backfillRunner} title="backfill.py" />
+
+<Callout kind="simplification">
+  The simulator runs tasks as soon as they are ready, with unlimited workers and exact durations. Real
+  orchestrators have worker pools and concurrency limits, a scheduler loop that adds a little delay, more task
+  states (queued, up_for_retry, skipped) and sometimes jitter in retry delays. The dependency and retry rules are
+  the same.
+</Callout>
+
+</Section>
+
+<Section kind="mistakes" title="Pipelines that run in the wrong order or twice">
+
+<CommonMistake
+  title="Scheduling by clock time instead of by dependency"
+  wrong={"0 1 * * *   python extract.py\n30 1 * * *  python transform.py   # assumes extract takes under 30 minutes"}
+  error="(no error: on a slow night transform reads a half-written file and loads partial data)"
+  cause="Cron knows times, not dependencies. Nothing stops transform from starting while extract is still writing."
+  fix={"# one DAG: transform starts when extract has succeeded, and never otherwise\ntransform(extract())"}
+/>
+
+<CommonMistake
+  title="Processing 'today' instead of the run's date"
+  wrong={"@task\ndef extract_orders():\n    day = date.today()  # a backfill for 2 October still extracts today"}
+  error="(no error: the backfill reprocesses today's data under every past date)"
+  cause="A run must process its own logical date. date.today() changes with the wall clock, so reruns and backfills get the wrong day."
+  fix={"@task\ndef extract_orders(ds=None):  # the run's logical date, filled in by Airflow\n    day = ds"}
+/>
+
+<CommonMistake
+  title="Retrying a task that appends"
+  wrong={"@task(retries=3)\ndef load_warehouse(rows):\n    conn.executemany(\"INSERT INTO daily_sales VALUES (?, ?)\", rows)"}
+  error="(no error: a timeout after half the rows, then a successful retry, leaves those rows in the table twice)"
+  cause="The failed attempt's partial output stays. A retry is a rerun, and appending is not safe to rerun."
+  fix={"conn.execute(\"DELETE FROM daily_sales WHERE day = ?\", (ds,))\nconn.executemany(\"INSERT INTO daily_sales VALUES (?, ?)\", rows)  # in one transaction"}
+/>
+
+</Section>
+
+<Section kind="practice" title="Orchestration in production">
+
+- **Airflow, Dagster and Prefect** are the common orchestrators; cloud providers sell managed versions. They add a
+  UI showing every run, logs per attempt, alerts, and a history you can audit.
+- **Keep tasks small and idempotent.** One task per step that can fail independently. Each writes its own output
+  for its own date, so retries and backfills are safe by construction.
+- **Alert on failures, not on retries.** A retry that succeeds is normal. A task that needed retries every day is a
+  signal worth a weekly look.
+- **For ML,** training and feature pipelines are DAGs too: a model should never train on features whose upstream
+  load failed, and the trigger rules make that automatic.
+
+[Spark: partitions and shuffles](#/learn/data/distributed/spark-concepts) looks at what happens inside one task
+when the data no longer fits on one machine.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Which tasks are blocked?">
+
+<MiniExercise exercise={blockedExercise}>
+  Write `blocked_by(tasks, failed)`. `tasks` maps each task to its upstream tasks, in dependency order. Return the
+  sorted names of every task that depends on `failed`, directly or through other tasks.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A pipeline is a DAG: tasks with explicit dependencies, run by an orchestrator as soon as their upstream tasks
+  succeed, in parallel where possible.
+- Retries with backoff absorb temporary failures; they cannot fix a bug that fails every time.
+- A failed task blocks everything downstream (`upstream_failed`); an `all_done` task such as an alert still runs.
+- Each run processes its logical date and replaces its own output, so retries and backfills never double-count.
+
+Next: [Spark: partitions and shuffles](#/learn/data/distributed/spark-concepts).
+
+</Section>

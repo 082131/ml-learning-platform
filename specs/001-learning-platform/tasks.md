@@ -111,6 +111,17 @@ Close each content thread with: content validation green, `check`, `e2e` and `bu
 - [x] D003 `data/processing/batch-vs-stream`: an event-time simulator (tumbling windows, watermark, late events), batch vs stream latency and completeness, computed.
 - [x] D004 Fill objectives and prerequisites for all 9 outline lessons in this track.
 
+## Thread 12: Data Engineering track (9 lessons)
+- [x] D101 `data/python-sql/formats-sql-intro`: SQL query builder linked to the SQL and the Python loop (checked against CPython for all 36 settings), sqlite3 runner, pandas, real CSV/JSONL/Parquet sizes.
+- [x] D102 `data/ingestion/apis-formats`: paginated ingestion simulator (rate limits, flaky pages, crashes; retries with backoff; append vs upsert), schema check runner.
+- [x] D103 `data/storage/warehouse-lake-lakehouse`: bytes read by three layouts, measured from real pyarrow files; DuckDB query, partition pruning runner, Delta Lake demo run with deltalake.
+- [x] D104 `data/orchestration/dags-retries`: DAG failure and retry simulator with a timeline, scheduler in Python, Airflow 3 TaskFlow DAG, backfill and idempotency runner.
+- [x] D105 `data/distributed/spark-concepts`: partition and shuffle model (crc32), skew and broadcast joins, real PySpark explain plans.
+- [x] D106 `data/quality/observability-testing`: six checks with severities, volume tolerance against a median, lineage diagram, pytest run, dbt tests.
+- [x] D107 `data/cloud/storage-permissions-cost`: month-12 cost estimate with example prices (Estimate badge), IAM evaluation runner and policy, configuration and secrets.
+- [x] D108 `data/features/training-serving`: point-in-time join visual (as-of, same-day, latest), pandas merge_asof run, shared feature definitions, PSI runner.
+- [x] D109 `data/capstone/ml-ready-pipeline`: brief, rubric, hints, a stdlib + SQLite reference pipeline run twice with identical output, self-assessment and exercise; e2e specs for all nine lessons.
+
 ## Thread 10: AI Engineer flagship (3 lessons)
 - [x] A001 `ai/representations/tokens-embeddings`: a tokenizer playground and similarity search over a bundled precomputed embedding table. Generate it offline with a named small open model, record the model and version, keep it ≤300 KB, and commit the generation script.
 - [x] A002 `ai/rag/rag-pipeline`: chunking controls (size and overlap), real cosine retrieval over the bundled embeddings, a reranking step, prompt assembly shown verbatim, and generation shown as a labeled simulated response.

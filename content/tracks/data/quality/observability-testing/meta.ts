@@ -13,5 +13,40 @@ export default {
     'Choose which failures should stop a pipeline and which should only alert',
   ],
   prerequisites: ['data/orchestration/dags-retries'],
-  concepts: ['validation-rule', 'quarantine'],
+  concepts: [
+    'data-test',
+    'data-freshness',
+    'data-observability',
+    'circuit-breaker',
+    'data-lineage',
+    'validation-rule',
+    'quarantine',
+  ],
+  references: [
+    {
+      title: 'dbt: data tests',
+      url: 'https://docs.getdbt.com/docs/build/data-tests',
+      version: 'dbt 1.8 and later',
+    },
+    {
+      title: 'dbt: source freshness',
+      url: 'https://docs.getdbt.com/reference/resource-properties/freshness',
+      version: 'dbt 1.8 and later',
+    },
+    {
+      title: 'pytest: how to write and report assertions',
+      url: 'https://docs.pytest.org/en/stable/how-to/assert.html',
+      version: 'pytest 9.2',
+    },
+    {
+      title: 'Python: statistics.median',
+      url: 'https://docs.python.org/3.13/library/statistics.html#statistics.median',
+      version: 'Python 3.13',
+    },
+    { title: 'OpenLineage: an open standard for lineage metadata', url: 'https://openlineage.io/docs/' },
+    {
+      title: 'Great Expectations: expectations',
+      url: 'https://docs.greatexpectations.io/docs/reference/learn/terms/expectation',
+    },
+  ],
 } satisfies LessonMeta;

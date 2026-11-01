@@ -1,0 +1,169 @@
+import { ingest, ingestPython, requestsClient, schemaRunner } from './code';
+import { questions, upsertExercise } from './quiz';
+
+<Section kind="intuition" title="Copying a library one shelf at a time">
+
+Ingestion is the first step of every pipeline: copying data from where it is produced into where you can use
+it. Often the source is someone else's system, a payment provider or a CRM, and the only way in is its
+<Term id="rest-api">REST API</Term>.
+
+An API will not hand over a million records at once. It gives you one page, say 100 records, and tells you where
+the next page starts: that is <Term id="pagination">pagination</Term>. Imagine copying a library through a small
+window, one shelf at a time. Sometimes the librarian says "slow down, come back in two seconds". Sometimes the
+window jams. Sometimes you trip and have to start over.
+
+A good ingestion job expects all three. It waits and retries when asked, gives up loudly when the window stays
+shut, and, most importantly, can start over without ending up with two copies of the first shelves.
+
+</Section>
+
+<Section kind="technical" title="Pages, retries and writes you can repeat">
+
+**Paging.** The job asks for page 1, writes its records, reads `next_page` from the response, and repeats until
+the API says there is none. The lesson's API holds 23 records, so with 5 per page there are 5 pages
+(5 + 5 + 5 + 5 + 3), and with 10 per page there are 3 (10 + 10 + 3).
+
+**Status codes say whether to retry.** Every HTTP response has a status code. 200 means success. 429 means "too
+many requests": the server is rate limiting you and often sends a `Retry-After` header with the seconds to wait.
+500, 502, 503 and 504 mean the server failed, usually briefly. These are worth retrying. A 400 (bad request),
+401 (not authorized) or 404 (not found) will fail the same way every time, so retrying only wastes time.
+
+**Exponential backoff.** Between retries the job waits $2^{\text{attempt}}$ seconds, counting attempts from 0:
+1 s, then 2 s, then 4 s. That is <Term id="exponential-backoff">exponential backoff</Term>. A page that fails
+twice and then succeeds costs 1 + 2 = 3 seconds. When the server says how long to wait, its answer wins. After
+the last allowed retry the job raises an error instead of trying forever.
+
+**Writes you can repeat.** Jobs get rerun: a worker crashes, a machine restarts, someone runs yesterday again.
+A write is <Term id="idempotent">idempotent</Term> when running it twice leaves the same table as running it
+once. Appending rows is not: a rerun after a crash that followed page 3 writes pages 1 to 3 again. An
+<Term id="upsert">upsert</Term> is: it inserts a row, or replaces the row with the same id if one exists.
+
+| Write | First run crashes after page 3, rerun completes (5 per page) |
+| --- | --- |
+| Append | 15 + 23 = 38 rows, ids 1 to 15 twice |
+| Upsert by id | 23 rows, each id once |
+
+**Formats for landing data.** Keep the raw responses as they came, then convert. JSON keeps nesting and basic
+types, so it is the natural landing format for API data (as JSON Lines, one record per line). CSV suits flat
+exports but stores no types. Parquet is where the data should end up for analysis: typed, compressed and
+columnar, as the [SQL and formats lesson](#/learn/data/python-sql/formats-sql-intro) measured.
+
+**Schema drift.** Sources change without telling you: a field is added, renamed or changes type. That is
+<Term id="schema-drift">schema drift</Term>. Check each batch against the schema you expect. A new field you do not
+use can load with an alert; a missing or retyped field you rely on should stop the load, or send the records to a
+[quarantine](#/learn/data/etl/etl-vs-elt).
+
+</Section>
+
+<Section kind="visual" title="Break the API and watch the table">
+
+Pick what goes wrong, how many retries each page gets and how rows are written. The log lists every request;
+the grid shows every record id with how many copies the destination table holds.
+
+<Experiment def={ingest} title="Ingest 23 records from a paginated API">
+  <IngestionLog />
+</Experiment>
+
+Things to try:
+
+- **Page 2 fails twice.** With 2 retries the job waits 1 s and 2 s and loads everything. Lower the retries to 1:
+  the job gives up after 2 attempts with only page 1 loaded.
+- **Rate limit.** The job waits the 2 seconds the server asked for, not its own backoff.
+- **Crash after page 3, append.** The rerun duplicates ids 1 to 15 (38 rows). Switch to upsert: 23 rows.
+
+</Section>
+
+<Section kind="code" title="The job in Python">
+
+The program below is what the visual runs. `get_page` stands in for the API so failures are repeatable; the four
+settings at the top are filled from the controls.
+
+<Experiment def={ingest} title="ingest.py, linked to the simulator" controls={false}>
+  <Code example={ingestPython} title="ingest.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+Against a real API, the same loop uses the `requests` library: a session, a timeout on every request, retries
+only for temporary statuses, and an incremental filter so each run fetches only what changed since the last one.
+
+<Code example={requestsClient} title="client.py" />
+
+**Checking the schema.** CSV has no types, so every value arrives as a string; JSON keeps numbers as numbers.
+This check compares each record with the expected columns and types, and reports new columns too.
+
+<PythonRunner example={schemaRunner} title="schema_check.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Jobs that hang, hammer or duplicate">
+
+<CommonMistake
+  title="No timeout on requests"
+  wrong={"resp = requests.get(URL, params=params)"}
+  error="(no error: the job hangs forever on a connection that never answers, and the next scheduled run piles up behind it)"
+  cause="requests has no timeout by default. A network problem that drops packets silently leaves the call waiting."
+  fix={"resp = requests.get(URL, params=params, timeout=10)  # then retry on requests.Timeout"}
+/>
+
+<CommonMistake
+  title="Retrying immediately, forever"
+  wrong={"while resp.status_code != 200:\n    resp = session.get(URL, params=params, timeout=10)"}
+  error="(no error: thousands of requests per minute against a server that is already struggling, then a ban for abuse)"
+  cause="No wait between tries and no limit on them. A 401 never becomes a 200, so this never ends."
+  fix={"for attempt in range(max_retries + 1):\n    ...\n    time.sleep(float(resp.headers.get(\"Retry-After\", 2 ** attempt)))"}
+/>
+
+<CommonMistake
+  title="Appending on rerun"
+  wrong={"for page in fetch_pages():\n    conn.executemany(\"INSERT INTO orders VALUES (?, ?)\", page)"}
+  error="(no error: after any rerun, some orders are counted twice in every report)"
+  cause="The job is not idempotent. A crash after some pages and a rerun from the start writes those pages again."
+  fix={"conn.executemany(\n    \"INSERT INTO orders VALUES (?, ?) ON CONFLICT (id) DO UPDATE SET amount = excluded.amount\", page)"}
+/>
+
+<Callout kind="simplification">
+  The simulator restarts from page 1 after a crash. Real jobs often save a checkpoint (the last page or cursor
+  written) and resume from it. That makes reruns faster, but the write must still be idempotent: the crash can
+  happen after a page was written and before its checkpoint was saved.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Ingestion in production">
+
+- **Managed connectors** (Fivetran, Airbyte, cloud vendors' transfer services) handle paging, retries, rate limits
+  and schema drift for common sources. Write your own job when there is no connector, and apply the same rules.
+- **Land raw, then transform.** Store each run's raw responses (JSON Lines in object storage, partitioned by
+  date), then load typed tables from them. A bad transform can then be fixed and rerun without calling the API.
+- **Incremental loads** ask for records updated since the last successful run, with a small overlap to catch
+  late updates. The overlap is safe only because the write is an upsert.
+- **For ML,** duplicated rows silently reweight training data, and dropped pages remove whole time periods.
+  Count rows and distinct keys after every load.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="An idempotent write">
+
+<MiniExercise exercise={upsertExercise}>
+  Write `upsert(table, rows)`. `table` is a dict from id to row. Insert rows with new ids, replace rows whose id is
+  already there, and return `(inserted, updated)`. Writing the same rows twice must not grow the table.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Follow the API's `next_page` pointer until it runs out; set a timeout on every request.
+- Retry only temporary failures (429, 5xx), with exponential backoff or the server's `Retry-After`, and a limit.
+- Make every write idempotent: upsert by key, so reruns after a crash do not duplicate rows.
+- Land raw JSON as received, convert to typed Parquet or tables, and check each batch for schema drift.
+
+Next: [ETL vs ELT](#/learn/data/etl/etl-vs-elt) cleans and validates the data you just landed.
+
+</Section>

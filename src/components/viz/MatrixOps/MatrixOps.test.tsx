@@ -5,7 +5,17 @@ import { matrixOpsExperiment } from '@/lib/linalg/matrixOps';
 import { Experiment } from '@/components/experiment/Experiment';
 import { MatrixOps } from './MatrixOps';
 
-const def = matrixOpsExperiment('ops-test', [[1, 2, 3], [4, 5, 6]], [[10, 0, -1], [2, 3, 4]]);
+const def = matrixOpsExperiment(
+  'ops-test',
+  [
+    [1, 2, 3],
+    [4, 5, 6],
+  ],
+  [
+    [10, 0, -1],
+    [2, 3, 4],
+  ],
+);
 
 describe('MatrixOps', () => {
   it('links an entry of A to its swapped position in Aᵀ, both ways', async () => {

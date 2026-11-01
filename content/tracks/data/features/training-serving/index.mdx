@@ -1,0 +1,192 @@
+import { asofPandas, point, pointPython, psiRunner, sharedFeatures } from './code';
+import { asOfExercise, questions } from './quiz';
+
+<Section kind="intuition" title="A model trained on tomorrow's newspaper">
+
+A model is only as good in production as its features are there. Two things go wrong between the training set and
+the live service, and both make offline metrics look better than reality.
+
+The first is time. Imagine training a stock-picking model with each day's prices and the next morning's newspaper
+lying on the table. It would score brilliantly in testing and fail on the first real day. Feature pipelines do this
+by accident all the time: a training row for 3 March gets the customer's order count as of today, or as of the end
+of 3 March, which includes what happened after the prediction was made. Building every training row only from data
+that existed at that moment is <Term id="point-in-time-correctness">point-in-time correctness</Term>.
+
+The second is two kitchens. If the training pipeline computes "average basket in euros" in SQL and the prediction
+service computes it again in Java, the two recipes drift apart: one excludes refunds, the other forgets to. That is
+<Term id="training-serving-skew">training-serving skew</Term>. The fix is one recipe, a
+<Term id="feature-pipeline">feature pipeline</Term> whose definitions feed both training and serving.
+
+</Section>
+
+<Section kind="technical" title="Snapshots, as-of joins and distribution checks">
+
+**Feature tables keep history.** A daily feature job writes, at the end of each day, one row per customer:
+`(customer, snapshot_day, orders_7d)`. Keeping every day's row, not only the latest, is what makes correct training
+sets possible: you can look up what any value was on any past day.
+
+**Training rows have a moment.** Each training example is a prediction made at a point in time, here the start of a
+day, with a label from the future (does the customer order in the next 7 days?). The feature must come from the
+latest snapshot written strictly before that moment. For a prediction at the start of day $t$:
+
+$$
+\text{feature}(t) = \text{snapshot}(t - 1) = \#\{\, d : t - 1 - W < d \le t - 1 \,\}
+$$
+
+where $W$ is the window in days. Customer A ordered on days 2, 5, 9, 12, 13 and 20, so with $W = 7$ the prediction at
+the start of day 14 gets the orders on days 9, 12 and 13: 3.
+
+This lookup is an **as-of join**: for each example, take the newest row at or before a time, per key. pandas calls it
+`merge_asof`, Spark and warehouses express it with a window function, and a
+<Term id="feature-store">feature store</Term> does it for you when it builds a training set.
+
+**Two ways to get it wrong:**
+
+- **Same-day join.** Join on `snapshot_day = day`. The snapshot was written at the end of the day, after the
+  prediction. Customer B ordered on day 15; the training row for day 15 gets `orders_7d = 1`, which also happens to
+  say "this customer orders soon", exactly the label.
+- **Latest join.** Join every example to the current value. Common when someone builds a training set from the
+  production feature table. Every old row gets today's value.
+
+Both are forms of [data leakage](#/learn/ml/classical/splits-leakage), and both are invisible in offline evaluation,
+because the test set is built the same leaky way.
+
+**Detecting skew.** Log the features the service actually used, then compare their distribution with the training
+set's. The <Term id="population-stability-index">population stability index</Term> does this for one feature: split
+the training values into bins, compute the share $e_i$ of training values and $a_i$ of serving values in each bin, and
+sum
+
+$$
+\text{PSI} = \sum_i (a_i - e_i)\,\ln\frac{a_i}{e_i}
+$$
+
+A common rule of thumb reads under 0.1 as stable, 0.1 to 0.25 as worth investigating, and above 0.25 as a major
+shift. It cannot tell a bug from a real change in customers, but it tells you where to look.
+
+**Batch or streaming features.** A nightly job is simple and fine for slow features (orders last year). Features
+whose value changes within minutes and matters at decision time (failed payments in the last 10 minutes, for fraud)
+need a [streaming pipeline](#/learn/data/processing/batch-vs-stream) writing to an online store. Many systems mix both.
+
+</Section>
+
+<Section kind="visual" title="Join the snapshots three ways">
+
+Six training examples for three customers. Choose which snapshot each row gets, and the feature's window.
+
+<Experiment def={point} title="Point-in-time join of a daily feature">
+  <PointInTimeJoin />
+</Experiment>
+
+Things to try:
+
+- **Latest value** (the default): 5 of 6 rows are wrong. Every row reads the snapshot from day 25, long after each
+  prediction.
+- **Same day:** B on day 15 gets 1 instead of 0, because B's order on day 15 is counted. With the 3-day window, B on
+  day 19 is wrong too: the window slid forward and dropped day 16.
+- **As of the day before:** no row leaks, for either window. This is the only join that matches production.
+
+</Section>
+
+<Section kind="code" title="The join in Python and pandas, one shared definition, a skew check">
+
+The model the visual runs. The join and window are filled from the controls:
+
+<Experiment def={point} title="features.py, linked to the experiment" controls={false}>
+  <Code example={pointPython} title="features.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+**The same join in pandas.** `merge_asof` with `by="customer"` and `allow_exact_matches=False` takes, for each
+example, the latest snapshot strictly before its day. The second join is the leaky one, for comparison:
+
+<Code example={asofPandas} title="asof.py" />
+
+**One definition for training and serving.** The feature is a function in one module, imported by the nightly
+training pipeline and by the prediction service. Feature stores formalize this: features are declared once and
+materialized into an offline store (history, for training) and an online store (latest value, for serving).
+
+<Code example={sharedFeatures} title="features.py, training_pipeline.py and serve.py" />
+
+**A skew check.** Compare a feature's training values with what serving computed. One serving version has the same
+code; one forgot to exclude refunds; one reports cents instead of euros:
+
+<PythonRunner example={psiRunner} title="psi.py" />
+
+<Callout kind="simplification">
+  The lesson uses whole days. Real systems use timestamps: a snapshot is valid from the moment it is written, and a
+  feature job that finishes at 02:00 makes yesterday's value available only from 02:00. Feature stores also apply a
+  time-to-live, so a value too old to trust is not served. The rule stays the same: only use what existed when the
+  prediction was made.
+</Callout>
+
+</Section>
+
+<Section kind="mistakes" title="Training sets that know too much">
+
+<CommonMistake
+  title="Joining the current feature table onto historical labels"
+  wrong={"train = labels.merge(features_latest, on=\"customer\")  # features as of today, labels from last year"}
+  error="(no error: offline AUC is excellent, production is much worse)"
+  cause="Every past row gets a value computed after its prediction moment, including the behaviour the label describes."
+  fix={"train = pd.merge_asof(labels.sort_values(\"ts\"), features.sort_values(\"ts\"), on=\"ts\", by=\"customer\",\n                      allow_exact_matches=False)"}
+/>
+
+<CommonMistake
+  title="Two implementations of one feature"
+  wrong={"-- training (SQL): AVG(amount) FILTER (WHERE NOT is_refund)\n// serving (Java): orders.stream().mapToDouble(o -> o.amount).average()"}
+  error="(no error: the serving value is lower for customers with refunds, and the model's scores drift)"
+  cause="Two codebases, two teams, two definitions. Each change has to be made twice, and eventually one is not."
+  fix="define the feature once (a shared library, or a feature store definition) and use it for both"
+/>
+
+<CommonMistake
+  title="Computing a window with the wall clock"
+  wrong={"def orders_7d(customer):\n    return count_orders(customer, since=datetime.now() - timedelta(days=7))"}
+  error="(no error: when the training job runs it computes every historical row as of today)"
+  cause="The function has no notion of the row's own time, so a backfill or training run silently uses the present."
+  fix={"def orders_7d(customer, as_of):\n    return count_orders(customer, since=as_of - timedelta(days=7), until=as_of)"}
+/>
+
+</Section>
+
+<Section kind="practice" title="Feature pipelines in production">
+
+- **Keep feature history.** Write features as append-only snapshots with a timestamp, never only the latest value.
+  Without history, a correct training set cannot be rebuilt.
+- **Every function takes "as of".** Feature code receives the time it computes for, so training, backfills and
+  serving call the same function with different times.
+- **Log what you served.** Store the exact feature values each prediction used. They are the best skew detector,
+  and they become point-in-time correct training data for the next model.
+- **Monitor distributions.** Track PSI or similar for every important feature, between training data and recent
+  serving logs, with the same alerting as the [data quality checks](#/learn/data/quality/observability-testing).
+- **Choose freshness per feature.** Batch first; add streaming only for features whose value changes faster than
+  decisions are made.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Look up a value as of a day">
+
+<MiniExercise exercise={asOfExercise}>
+  Write `as_of_value(snapshots, day)`. Each snapshot is `(snapshot_day, value)`, written at the end of its day. Return
+  the value as it was at the start of `day`, or `None` if nothing had been written yet.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Training rows must use only data that existed at their prediction moment: join each to the latest snapshot
+  strictly before it (an as-of join).
+- Same-day and latest-value joins leak the future; offline metrics cannot reveal it because the test set leaks too.
+- Training-serving skew comes from computing a feature twice; define it once and use it for both.
+- Compare training and serving feature distributions (for example with PSI) to catch skew early.
+
+Next: the [capstone](#/learn/data/capstone/ml-ready-pipeline) puts the track together in one ML-ready pipeline.
+
+</Section>

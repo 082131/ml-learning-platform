@@ -1,0 +1,349 @@
+{
+ "rows": 60000,
+ "csv": 4691927,
+ "single": {
+  "columns": {
+   "event_id": 358026,
+   "user_id": 117849,
+   "country": 22811,
+   "event_type": 15332,
+   "amount": 200846,
+   "payload": 2608074,
+   "day": 409
+  },
+  "file": 3327233,
+  "row_groups": 1
+ },
+ "partitioned": {
+  "2026-10-01": {
+   "columns": {
+    "event_id": 10864,
+    "user_id": 9411,
+    "country": 845,
+    "event_type": 607,
+    "amount": 11975,
+    "payload": 88361
+   },
+   "file": 125749
+  },
+  "2026-10-02": {
+   "columns": {
+    "event_id": 10866,
+    "user_id": 9487,
+    "country": 845,
+    "event_type": 608,
+    "amount": 11907,
+    "payload": 88374
+   },
+   "file": 125773
+  },
+  "2026-10-03": {
+   "columns": {
+    "event_id": 10866,
+    "user_id": 9350,
+    "country": 845,
+    "event_type": 607,
+    "amount": 11969,
+    "payload": 88362
+   },
+   "file": 125685
+  },
+  "2026-10-04": {
+   "columns": {
+    "event_id": 10866,
+    "user_id": 9431,
+    "country": 845,
+    "event_type": 607,
+    "amount": 11856,
+    "payload": 88326
+   },
+   "file": 125617
+  },
+  "2026-10-05": {
+   "columns": {
+    "event_id": 10868,
+    "user_id": 9400,
+    "country": 845,
+    "event_type": 607,
+    "amount": 12003,
+    "payload": 88355
+   },
+   "file": 125764
+  },
+  "2026-10-06": {
+   "columns": {
+    "event_id": 10866,
+    "user_id": 9574,
+    "country": 845,
+    "event_type": 608,
+    "amount": 12033,
+    "payload": 88322
+   },
+   "file": 125934
+  },
+  "2026-10-07": {
+   "columns": {
+    "event_id": 10866,
+    "user_id": 9525,
+    "country": 845,
+    "event_type": 606,
+    "amount": 12007,
+    "payload": 88366
+   },
+   "file": 125901
+  },
+  "2026-10-08": {
+   "columns": {
+    "event_id": 10866,
+    "user_id": 9429,
+    "country": 845,
+    "event_type": 607,
+    "amount": 11981,
+    "payload": 88320
+   },
+   "file": 125734
+  },
+  "2026-10-09": {
+   "columns": {
+    "event_id": 10866,
+    "user_id": 9544,
+    "country": 845,
+    "event_type": 607,
+    "amount": 12034,
+    "payload": 88526
+   },
+   "file": 126108
+  },
+  "2026-10-10": {
+   "columns": {
+    "event_id": 10866,
+    "user_id": 9512,
+    "country": 845,
+    "event_type": 608,
+    "amount": 12052,
+    "payload": 88344
+   },
+   "file": 125913
+  },
+  "2026-10-11": {
+   "columns": {
+    "event_id": 10866,
+    "user_id": 9361,
+    "country": 845,
+    "event_type": 607,
+    "amount": 11890,
+    "payload": 88389
+   },
+   "file": 125644
+  },
+  "2026-10-12": {
+   "columns": {
+    "event_id": 10866,
+    "user_id": 9485,
+    "country": 845,
+    "event_type": 606,
+    "amount": 12010,
+    "payload": 88373
+   },
+   "file": 125871
+  },
+  "2026-10-13": {
+   "columns": {
+    "event_id": 10866,
+    "user_id": 9594,
+    "country": 845,
+    "event_type": 607,
+    "amount": 11972,
+    "payload": 88315
+   },
+   "file": 125885
+  },
+  "2026-10-14": {
+   "columns": {
+    "event_id": 10870,
+    "user_id": 9362,
+    "country": 845,
+    "event_type": 607,
+    "amount": 12072,
+    "payload": 88337
+   },
+   "file": 125779
+  },
+  "2026-10-15": {
+   "columns": {
+    "event_id": 10868,
+    "user_id": 9613,
+    "country": 845,
+    "event_type": 608,
+    "amount": 11946,
+    "payload": 88343
+   },
+   "file": 125909
+  },
+  "2026-10-16": {
+   "columns": {
+    "event_id": 10866,
+    "user_id": 9483,
+    "country": 845,
+    "event_type": 607,
+    "amount": 11963,
+    "payload": 88348
+   },
+   "file": 125798
+  },
+  "2026-10-17": {
+   "columns": {
+    "event_id": 10886,
+    "user_id": 10072,
+    "country": 937,
+    "event_type": 709,
+    "amount": 12331,
+    "payload": 88391
+   },
+   "file": 127693
+  },
+  "2026-10-18": {
+   "columns": {
+    "event_id": 10866,
+    "user_id": 9398,
+    "country": 845,
+    "event_type": 607,
+    "amount": 12030,
+    "payload": 88350
+   },
+   "file": 125782
+  },
+  "2026-10-19": {
+   "columns": {
+    "event_id": 10871,
+    "user_id": 9396,
+    "country": 845,
+    "event_type": 608,
+    "amount": 11997,
+    "payload": 88357
+   },
+   "file": 125760
+  },
+  "2026-10-20": {
+   "columns": {
+    "event_id": 10866,
+    "user_id": 9464,
+    "country": 845,
+    "event_type": 607,
+    "amount": 12037,
+    "payload": 88389
+   },
+   "file": 125894
+  },
+  "2026-10-21": {
+   "columns": {
+    "event_id": 10867,
+    "user_id": 9470,
+    "country": 845,
+    "event_type": 608,
+    "amount": 11914,
+    "payload": 88337
+   },
+   "file": 125727
+  },
+  "2026-10-22": {
+   "columns": {
+    "event_id": 10866,
+    "user_id": 9453,
+    "country": 845,
+    "event_type": 608,
+    "amount": 12063,
+    "payload": 88350
+   },
+   "file": 125871
+  },
+  "2026-10-23": {
+   "columns": {
+    "event_id": 10866,
+    "user_id": 9440,
+    "country": 845,
+    "event_type": 606,
+    "amount": 12019,
+    "payload": 88405
+   },
+   "file": 125867
+  },
+  "2026-10-24": {
+   "columns": {
+    "event_id": 10869,
+    "user_id": 9464,
+    "country": 845,
+    "event_type": 608,
+    "amount": 11992,
+    "payload": 88376
+   },
+   "file": 125840
+  },
+  "2026-10-25": {
+   "columns": {
+    "event_id": 10866,
+    "user_id": 9577,
+    "country": 845,
+    "event_type": 607,
+    "amount": 11994,
+    "payload": 88373
+   },
+   "file": 125948
+  },
+  "2026-10-26": {
+   "columns": {
+    "event_id": 10866,
+    "user_id": 9523,
+    "country": 845,
+    "event_type": 608,
+    "amount": 12011,
+    "payload": 88273
+   },
+   "file": 125812
+  },
+  "2026-10-27": {
+   "columns": {
+    "event_id": 10866,
+    "user_id": 9442,
+    "country": 845,
+    "event_type": 606,
+    "amount": 11968,
+    "payload": 88327
+   },
+   "file": 125740
+  },
+  "2026-10-28": {
+   "columns": {
+    "event_id": 10866,
+    "user_id": 9419,
+    "country": 845,
+    "event_type": 608,
+    "amount": 12078,
+    "payload": 88380
+   },
+   "file": 125882
+  },
+  "2026-10-29": {
+   "columns": {
+    "event_id": 10870,
+    "user_id": 9451,
+    "country": 845,
+    "event_type": 606,
+    "amount": 11916,
+    "payload": 88340
+   },
+   "file": 125714
+  },
+  "2026-10-30": {
+   "columns": {
+    "event_id": 10866,
+    "user_id": 9399,
+    "country": 845,
+    "event_type": 608,
+    "amount": 12043,
+    "payload": 88332
+   },
+   "file": 125779
+  }
+ }
+}

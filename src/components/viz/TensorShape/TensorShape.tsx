@@ -25,7 +25,13 @@ export function TensorShape() {
   return (
     <VizFrame
       title="Tensor shapes"
-      table={<VizTable caption="Where every entry of x goes" columns={['Entry of x', 'Value', 'In y']} rows={rows} />}
+      table={
+        <VizTable
+          caption="Where every entry of x goes"
+          columns={['Entry of x', 'Value', 'In y']}
+          rows={rows}
+        />
+      }
       caption={`x has shape ${tuple(shape)} and y = ${OPS[op].code(shape)} has shape ${tuple(result.outShape)}. Both hold the same ${result.x.flat(2).length} numbers.`}
     >
       <div className={s.layout}>
@@ -72,7 +78,8 @@ export function TensorShape() {
         </div>
       </div>
       <p className={s.note} aria-live="polite" data-tensor-entry={focus.join(',')}>
-        x[{focus.join(', ')}] = {result.x[fi!]![fj!]![fk!]} lands at y[{result.dest.join(', ')}] (highlighted).
+        x[{focus.join(', ')}] = {result.x[fi!]![fj!]![fk!]} lands at y[{result.dest.join(', ')}]
+        (highlighted).
       </p>
     </VizFrame>
   );

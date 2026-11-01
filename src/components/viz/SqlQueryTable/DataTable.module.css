@@ -1,0 +1,102 @@
+/* Shared by the Data Engineering track's table-based visualizations. */
+.wrap {
+  display: grid;
+  gap: var(--s-4);
+  min-width: 0;
+}
+.two {
+  display: grid;
+  gap: var(--s-4);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  align-items: start;
+}
+.scroll {
+  overflow-x: auto;
+  min-width: 0;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  background: var(--surface);
+}
+.table caption {
+  padding-bottom: var(--s-1);
+  color: var(--ink-2);
+  text-align: left;
+  font-family: var(--font-sans);
+  font-size: var(--fs-13);
+}
+.table th,
+.table td {
+  padding: var(--s-1) var(--s-2);
+  border: 1px solid var(--line);
+  text-align: left;
+  white-space: nowrap;
+  font-weight: 400;
+}
+.table thead th {
+  color: var(--ink-2);
+}
+.num {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums;
+}
+.muted td,
+.muted th {
+  color: var(--ink-2);
+  text-decoration: line-through;
+}
+.hl {
+  background: var(--accent-soft);
+}
+.strong {
+  font-weight: 600 !important;
+}
+.ok {
+  color: var(--ok);
+  font-weight: 600;
+}
+.warn {
+  color: var(--warn);
+  font-weight: 600;
+}
+.err {
+  color: var(--err);
+  font-weight: 600;
+}
+.bar {
+  display: block;
+  height: 10px;
+  min-width: 1px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.barTrack {
+  display: block;
+  width: 100%;
+  min-width: 80px;
+  border-radius: 2px;
+  background: var(--line);
+}
+.sql {
+  margin: 0;
+  padding: var(--s-2) var(--s-3);
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-3);
+  margin: 0;
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}

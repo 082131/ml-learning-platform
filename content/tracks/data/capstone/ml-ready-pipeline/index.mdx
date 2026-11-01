@@ -1,0 +1,126 @@
+import { brief, pipelineCode, pipelineOutput, setupCode } from './code';
+import { loadDayExercise, questions } from './quiz';
+
+<Section kind="intuition" title="From scripts to a system someone can trust">
+
+Each lesson in this track solved one problem: getting data from an API, storing it in a sensible layout, running
+steps in order, catching bad data, building features that do not leak. A data scientist who receives your training
+set needs all of them at once, and needs them to keep working every night without you.
+
+In this capstone you build that pipeline. The data is ordinary (customers, orders, amounts) and the model at the
+end is simple. The work is in the guarantees: any day can be rerun without double-counting, bad rows are explained
+rather than lost, broken data stops before it reaches a model, and every training row uses only what was known at
+the time.
+
+</Section>
+
+<Section kind="technical" title="What you will build">
+
+A repository with a pipeline, its tests and a runbook. Each part comes from a lesson in this track:
+
+| Part | Does | From lesson |
+| --- | --- | --- |
+| extract | pages through a source with retries and lands each day's raw data unchanged | [APIs and file formats](#/learn/data/ingestion/apis-formats) |
+| validate | applies explicit rules, quarantines failing rows with a reason | [ETL vs ELT](#/learn/data/etl/etl-vs-elt) |
+| load | replaces the run's day in a warehouse or lakehouse table, in one transaction | [warehouses, lakes and lakehouses](#/learn/data/storage/warehouse-lake-lakehouse) |
+| orchestrate | runs the steps as a DAG with retries, a logical date and backfills | [orchestration](#/learn/data/orchestration/dags-retries) |
+| check | blocks on schema, uniqueness and range failures; warns on freshness and volume | [data quality](#/learn/data/quality/observability-testing) |
+| features | writes daily snapshots and builds a point-in-time correct training set | [training-serving consistency](#/learn/data/features/training-serving) |
+| runbook | how to run, rerun, backfill and recover; what it costs and may access | [cloud storage, permissions and cost](#/learn/data/cloud/storage-permissions-cost) |
+
+**Three properties to prove, not just claim.**
+
+1. **Idempotent.** For any day $d$, running the pipeline for $d$ twice leaves the same tables as running it once.
+   Test it by comparing row counts and a hash of the sorted rows.
+2. **Nothing lost silently.** Every raw row ends up either loaded or quarantined with a reason:
+   $\text{raw}(d) = \text{loaded}(d) + \text{quarantined}(d)$ for every day.
+3. **No future in training.** Every training row's features come from a snapshot written before its prediction
+   moment: $\text{snapshot\_day} < \text{prediction\_day}$ for every row.
+
+</Section>
+
+<Section kind="code" title="The reference pipeline">
+
+A complete, small version uses only Python's standard library, with SQLite as the warehouse. Start from it, then
+replace each part with the real thing. Set up a folder:
+
+<Code example={setupCode} title="terminal" />
+
+`pipeline.py` lands, validates, loads, checks and snapshots 14 days, reruns one of them, and builds a training set:
+
+<Code example={pipelineCode} title="pipeline.py" />
+
+Running it prints the following. Running it a second time, with `raw/` and `warehouse.db` already there, prints
+exactly the same lines:
+
+<Code example={pipelineOutput} title="terminal" />
+
+<Callout kind="simplification">
+  The reference pipeline runs its steps in a loop with no retries, its checks are asserts, and the source is a
+  seeded generator. The milestones replace each of these with the real thing: a source that fails sometimes, an
+  orchestrator, and checks with severities and alerts.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="The brief">
+
+Tick each milestone when it is done; your progress is saved in this browser.
+
+<Project brief={brief} />
+
+</Section>
+
+<Section kind="mistakes" title="Where pipelines like this go wrong">
+
+<CommonMistake
+  title="Appending on every run"
+  wrong={"con.executemany(\"INSERT INTO orders VALUES (?, ?, ?, ?)\", rows)  # no delete first"}
+  error="sqlite3.IntegrityError: UNIQUE constraint failed: orders.order_id (or, without a key, silently doubled revenue)"
+  cause="A rerun or a retry inserts the same day again. A primary key turns the silent bug into an error; replacing the day removes it."
+  fix={"with con:\n    con.execute(\"DELETE FROM orders WHERE day = ?\", (day,))\n    con.executemany(\"INSERT INTO orders VALUES (?, ?, ?, ?)\", rows)"}
+/>
+
+<CommonMistake
+  title="Features from the current table"
+  wrong={"SELECT customer, COUNT(*) FROM orders WHERE day > date('now', '-7 days') GROUP BY customer"}
+  error="(no error: every historical training row gets this week's counts, and offline metrics are too good)"
+  cause="The query uses the wall clock instead of each row's snapshot day, and keeps no history."
+  fix={"-- one snapshot per day, written by the run for that day\nINSERT INTO features SELECT customer, :day, COUNT(*), SUM(amount) FROM orders\nWHERE day > date(:day, '-7 days') AND day <= :day GROUP BY customer"}
+/>
+
+<CommonMistake
+  title="Dropping bad rows without a trace"
+  wrong={"rows = [r for r in rows if r[\"customer\"] and r[\"amount\"] >= 0]"}
+  error="(no error: revenue is quietly lower than the source system's, and nobody can say why)"
+  cause="Filtered rows disappear. Nobody can count them, explain them or fix the source."
+  fix={"good, bad = validate(rows)  # bad rows go to a quarantine table with the rule they broke"}
+/>
+
+</Section>
+
+<Section kind="check" title="Self-assessment">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Make a load idempotent">
+
+<MiniExercise exercise={loadDayExercise}>
+  Write `load_day(table, day, rows)` in plain Python. Loading the same day twice must leave the table exactly as
+  loading it once.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A reliable pipeline is a chain of guarantees: raw data is kept, bad rows are explained, loads are idempotent,
+  checks stop wrong data, and features respect time.
+- Prove each guarantee with a test: rerun a day and compare, count raw against loaded plus quarantined, check every
+  training row's snapshot day.
+- Orchestrate with logical dates and retries, so backfills and failures are routine.
+- Write the runbook while you still remember why each check exists.
+
+</Section>

@@ -13,5 +13,42 @@ export default {
     'Make an ingestion job safe to rerun without creating duplicate rows',
   ],
   prerequisites: ['data/relational/joins-indexes'],
-  concepts: [],
+  concepts: [
+    'rest-api',
+    'pagination',
+    'exponential-backoff',
+    'idempotent',
+    'upsert',
+    'schema-drift',
+    'parquet',
+  ],
+  references: [
+    {
+      title: 'Requests: timeouts, sessions and Response.raise_for_status',
+      url: 'https://requests.readthedocs.io/en/latest/user/advanced/',
+      version: 'requests 2.32',
+    },
+    {
+      title: 'RFC 9110: HTTP semantics (status codes, Retry-After)',
+      url: 'https://www.rfc-editor.org/rfc/rfc9110#name-retry-after',
+    },
+    {
+      title: 'RFC 6585: 429 Too Many Requests',
+      url: 'https://www.rfc-editor.org/rfc/rfc6585#section-4',
+    },
+    {
+      title: 'Python: csv module (every value is read as a string)',
+      url: 'https://docs.python.org/3.13/library/csv.html',
+      version: 'Python 3.13',
+    },
+    {
+      title: 'PostgreSQL: INSERT ... ON CONFLICT (upsert)',
+      url: 'https://www.postgresql.org/docs/current/sql-insert.html#SQL-ON-CONFLICT',
+      version: 'PostgreSQL 17 and later',
+    },
+    {
+      title: 'AWS Architecture Blog: exponential backoff and jitter',
+      url: 'https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/',
+    },
+  ],
 } satisfies LessonMeta;
