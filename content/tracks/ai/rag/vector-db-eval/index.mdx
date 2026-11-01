@@ -1,0 +1,169 @@
+import { faissCode, ivf, pgvectorCode, recallRunner, retrievalEval } from './code';
+import { questions, recallExercise } from './quiz';
+
+<Section kind="intuition" title="A library index, and a test you grade yourself">
+
+A library doesn't find a book by walking past every shelf. It sends you to the right section, and you look there. You
+might miss a book shelved in the wrong section, but you save hours. An
+<Term id="ann-index">approximate nearest-neighbor index</Term> does the same for embeddings: it searches the few
+regions most likely to hold the nearest vectors and accepts that it will occasionally miss one.
+
+That raises a question the [RAG lesson](#/learn/ai/rag/rag-pipeline) left open: how do you know whether retrieval is
+good enough, and whether a change made it better? You write a test. Collect questions, note which passage answers each,
+and count how often that passage comes back. Every retrieval decision in this lesson, from index settings to rerankers,
+is judged with that count.
+
+</Section>
+
+<Section kind="technical" title="Indexes, metadata and retrieval metrics">
+
+**Exact search** compares the query with every stored vector: $n$ dot products of $d$ numbers each. A million
+384-dimensional vectors means $3.84 \times 10^8$ multiply-adds per query, too slow for many applications.
+
+**IVF.** An <Term id="ivf-index">IVF index</Term> runs k-means once to split the vectors into `nlist` clusters. A
+query first compares itself with the `nlist` cluster centers, then scans only the vectors in the `nprobe` closest
+clusters. With 32 clusters and `nprobe = 4`, it scans about 4/32 of the vectors. Neighbors that sit just across a
+cluster boundary are missed; raising `nprobe` finds them and costs time.
+
+**HNSW.** An <Term id="hnsw">HNSW</Term> index links each vector to a few near neighbors, in layers that get sparser
+toward the top. A search starts at the top, walks greedily toward the query, and drops down a layer whenever it can't
+get closer, keeping `ef_search` candidates. It reaches high recall with few comparisons, uses extra memory for the links
+and needs no training. It is the default index in many <Term id="vector-database">vector databases</Term>.
+
+**What to store with each vector:** the chunk text, the document it came from, any field you will filter on, and the
+name and version of the embedding model. A <Term id="metadata-filter">metadata filter</Term> restricts a search to
+what a user may see or what the question is about.
+
+**Measuring retrieval.** For each evaluation question, find the rank of the passage that answers it.
+
+- <Term id="recall-at-k">Recall@k</Term> is the share of questions whose answer is in the top $k$. Only the top $k$
+  reach the model, so this is the number that matters for RAG.
+- <Term id="mean-reciprocal-rank">MRR</Term> averages $1/\text{rank}$, counting a miss as 0. It rewards putting the
+  answer first.
+
+Ranks 1, 2 and a miss give recall@1 $= 1/3$, recall@3 $= 2/3$ and MRR $= (1 + 1/2 + 0)/3 = 0.5$.
+
+The same word has a second use: for an ANN index, recall@k is the share of the exact top $k$ that the index also
+returned. The first experiment uses that meaning, the second the RAG meaning.
+
+<Callout kind="simplification">
+  The index experiment uses 3,000 synthetic unit vectors in 16 dimensions, grouped around 40 random topic directions,
+  and 60 queries near stored vectors, all generated from a fixed seed. Real embeddings have hundreds of dimensions and
+  millions of rows, where the speed-up matters far more. The evaluation set has six Lumen questions: enough to show the
+  method, far too few to trust. Real evaluation sets start at 50 to 100 questions.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Trade recall for speed">
+
+Choose how many clusters the index has and how many each query searches. Recall is measured against exact search on the
+same vectors, in your browser.
+
+<Experiment def={ivf} title="An IVF index over 3,000 vectors">
+  <IvfTradeoff />
+  <Readout title="This setting" />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The same ideas in a real database and library">
+
+In PostgreSQL with the pgvector extension: a table that keeps the model name with each vector, an HNSW index, and a
+query with a metadata filter (not run on this page).
+
+<Code example={pgvectorCode} title="chunks.sql" />
+
+The IVF index from the experiment, in Faiss (not run on this page):
+
+<Code example={faissCode} title="ivf.py" />
+
+Recall@k and MRR need no library:
+
+<PythonRunner example={recallRunner} title="retrieval_metrics.py" />
+
+</Section>
+
+<Section kind="experiment" title="Evaluate retrieval, then change one thing">
+
+The Lumen questions from the RAG lesson that have an answer in the help center, run through the real retrieval
+pipeline. The handwriting question is left out: with no answer passage, it tests the generator, not retrieval.
+
+<Experiment def={retrievalEval} title="Retrieval evaluation">
+  <RetrievalEvalTable />
+  <Readout title="Metrics" />
+</Experiment>
+
+Things to try:
+
+- Start with 40-word chunks, 10 words of overlap and the keyword weight at 0: recall@1 is 0.83 (5 of 6) and MRR 0.92.
+  The miss is E-402, at rank 2.
+- Raise the keyword weight to 0.5. Recall@1 becomes 1.00: <Term id="hybrid-search">hybrid search</Term> fixed the
+  exact-code question without hurting the others. That is a measured reason to keep it.
+- Back at weight 0, switch to 20-word chunks. Recall@1 drops to 0.67 and the offline-conflict answer falls to rank 4,
+  outside a top 3: small chunks cut the explanation apart.
+- In the index experiment, keep `nlist = 32` and move `nprobe` from 1 to 4: recall@10 climbs from 0.73 to 0.96 while the
+  share of vectors scanned grows from 3.4% to 13.1%. At 8 it is 0.99 for 25.9%.
+- Compare `nlist = 64` with `nprobe = 4` (0.90 recall, 6.3% scanned) and `nlist = 16` with `nprobe = 4` (0.96, 25.7%).
+  More, smaller clusters scan less per probe but need more probes for the same recall.
+
+</Section>
+
+<Section kind="mistakes" title="Mixing models and trusting a small sample">
+
+<CommonMistake
+  title="Querying old vectors with a new embedding model"
+  wrong={'# documents were embedded with model A last year\nquery_vec = model_b.encode(question)\nresults = db.search(query_vec, k=5)'}
+  error="(no error: results look random, and retrieval quality collapses)"
+  cause="Each embedding model has its own vector space. The cosine between a model-B query and model-A documents carries no meaning."
+  fix={'results = db.search(query_vec, k=5, filter={"model": "model-b"})\n# and re-embed all documents with model B before switching over'}
+/>
+
+<CommonMistake
+  title="Declaring a winner on a handful of questions"
+  wrong={'# reranker: recall@3 0.83 -> 1.00 on 6 questions. Ship it!'}
+  error="(no error: on real traffic the difference disappears, and every request is 300 ms slower)"
+  cause="With 6 questions, one question moves recall by 0.17. The result is real for those 6 and says little about the rest."
+  fix={'# Grow the set to 50-100 real questions, then compare\n# and look at which questions changed, not only the average'}
+/>
+
+</Section>
+
+<Section kind="practice" title="Building a retrieval evaluation set">
+
+1. Collect real questions: search logs, support tickets, or questions written by people who know the content. Avoid
+   only writing questions while looking at the passage; they end up sharing its exact words.
+2. For each, record the passage (or document) that answers it, and mark questions with no answer.
+3. Report recall@k at the k you actually use, and MRR. Break results down by question type (codes, how-to, policy).
+4. Re-run it for every change to chunking, the embedding model, the index settings, hybrid weights or the reranker, and
+   record latency next to quality.
+
+A reranker or hybrid search earns its place when it lifts recall@k at your k by more than the noise of your set, at a
+latency your users accept. Then measure the end result, the answers, in the [evaluation
+lesson](#/learn/ai/reliability/evals-guardrails).
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Recall at k">
+
+<MiniExercise exercise={recallExercise}>
+  Write `recall_at_k(ranked, gold, k)`. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Exact search compares every vector; ANN indexes (IVF, HNSW) compare a fraction and miss a few neighbors.
+- IVF's `nprobe` and HNSW's `ef_search` move along the recall-speed trade-off at query time.
+- Store each vector with its text, metadata and embedding model; never mix vectors from different models.
+- Measure retrieval with recall@k and MRR on questions with known answer passages.
+- Keep a reranker or hybrid search only when it beats the noise of your evaluation set at an acceptable latency.
+
+</Section>

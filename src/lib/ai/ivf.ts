@@ -211,7 +211,7 @@ export function ivfExperiment(
         label: 'Vectors compared per query',
         value: `${Math.round(r.current.scannedShare * N_VECTORS)} of ${N_VECTORS} (${(r.current.scannedShare * 100).toFixed(1)}%)`,
       },
-      { label: 'Plus centers compared', value: String(s.nlist) },
+      { label: 'Cluster centers compared first', value: String(s.nlist) },
     ],
   };
 }
