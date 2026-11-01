@@ -1,0 +1,190 @@
+import { estimateCode, experiment, requestEdges, requestNodes, stepDemo, torchServe } from './code';
+import { flopsExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Studying for an exam vs sitting it">
+
+Training a model is like studying: you try a problem, check the answer, work out what you got wrong and adjust.
+Studying needs scrap paper for every step of every problem, because you go back over your working. Sitting the
+exam is different. You use what you already know, write one answer, and move on. Nothing you know changes during
+the exam.
+
+<Term id="inference">Inference</Term> is the exam. A trained model receives an input, runs its
+<Term id="forward-propagation">forward pass</Term> with fixed weights, and returns an output. There is no loss to
+compute, no backward pass and no weight update. That sounds like less work, and per call it is, but a served model
+does it millions of times, for people who are waiting, on hardware someone pays for by the hour. Making that fast
+and cheap is the job of an inference engineer.
+
+</Section>
+
+<Section kind="technical" title="What changes when training stops">
+
+A <Term id="training">training</Term> step does four things: a forward pass, a loss, a backward pass that computes
+one <Term id="gradient">gradient</Term> per weight, and an optimizer update. To make the backward pass possible, it
+keeps every layer's intermediate values (the activations) until the gradients are computed. An optimizer such as
+<Term id="adam">Adam</Term> also keeps <Term id="optimizer-state">optimizer state</Term>: two extra numbers per
+weight.
+
+An inference call keeps only the first step. That removes three costs:
+
+| Cost | Training step | Inference call |
+| --- | --- | --- |
+| Weights (float32) | 4 bytes per parameter | 4 bytes per parameter |
+| Gradients | 4 bytes per parameter | none |
+| Adam state | 8 bytes per parameter | none |
+| Activations | every layer, kept for backward | about one layer at a time |
+| Arithmetic per example | about 6 FLOPs per weight | 2 FLOPs per weight |
+
+For the running example, a dense network 784 → 512 → 512 → 10 (669,706 parameters) with a batch of 64: training
+with Adam needs 10.91 MiB, inference 2.87 MiB. The arithmetic is $2 \cdot 668{,}672 \cdot 64 = 85{,}590{,}016$
+FLOPs for inference (668,672 is the number of weights without the biases) and three times that for a training step.
+
+**Fixed weights change everything downstream.** Because nothing is updated, a served model can be converted to
+lower precision, compiled for one GPU, exported to another runtime, copied to many machines and shared by every
+request. Each later lesson in this track uses that freedom.
+
+**Three ways to serve.** <Term id="online-inference">Online inference</Term> answers each request while someone
+waits: a fraud check during a payment. <Term id="batch-inference">Batch inference</Term> scores a large stored
+dataset on a schedule: churn scores for every customer overnight.
+<Term id="streaming-inference">Streaming inference</Term> sends an answer piece by piece while it is generated: the
+tokens of a chat reply.
+
+**Four goals.** A serving system is judged on <Term id="latency-percentile">latency</Term> (how long one request
+takes, usually as a percentile such as p95), <Term id="throughput">throughput</Term> (requests or tokens per
+second), cost (per million predictions) and accuracy (the same answers the trained model gave). Most of this track
+is about trading these against each other.
+
+<Callout kind="simplification">
+  The memory counts here are the arrays the math needs. A real framework adds its own working memory and, on a
+  GPU, a CUDA context of a few hundred MiB. The 6-FLOPs rule ignores biases, activation functions and the loss;
+  for dense layers they are a small fraction.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="The same model, two jobs">
+
+Both bars are computed from the layer widths in the code below. Training pays for gradients, optimizer state and
+every layer's activations; inference pays for the weights and one layer's input and output.
+
+<Experiment def={experiment} title="Training step vs inference call" controls={false}>
+  <TrainVsInfer />
+</Experiment>
+
+One online request from the server's point of view. Only the middle box is the model; the boxes around it are
+part of the latency the user sees too.
+
+<FlowDiagram title="One online request" nodes={requestNodes} edges={requestEdges} caption="The client's input is checked and turned into a tensor of shape (1, 784), the model runs with fixed weights and no gradient tracking, and the (1, 10) scores become a label in the JSON response." />
+
+</Section>
+
+<Section kind="code" title="Counting both jobs, then running them">
+
+The counts in plain Python, with the current settings filled in. Select a part of the code to see what it does.
+
+<Experiment def={experiment} title="train_vs_infer.py, linked to the charts" controls={false}>
+  <Code example={estimateCode} title="train_vs_infer.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+Here both jobs run for real in NumPy, on a smaller network (784 → 128 → 10) with random weights. `predict` is
+inference; the lines after it are one training step. Run it in your browser:
+
+<PythonRunner example={stepDemo} title="step.py" />
+
+The gradients take exactly as many bytes as the weights, 407,080 each, and the step keeps 134,400 bytes of
+activations alive for the backward pass. `predict` keeps none after it returns.
+
+In PyTorch the serving side looks like this. `eval()` switches layers such as dropout to inference behavior, and
+`inference_mode()` stops autograd from recording anything:
+
+<Code example={torchServe} title="serve.py" />
+
+</Section>
+
+<Section kind="experiment" title="Make the gap grow">
+
+<Experiment def={experiment} title="Training vs inference estimator">
+  <TrainVsInfer />
+  <Readout />
+</Experiment>
+
+Things to try:
+
+- Switch the optimizer to SGD. Training memory drops from 10.91 to 5.80 MiB; inference does not change, because it
+  never had optimizer state.
+- Set the batch size to 1. Inference needs 2.56 MiB, almost all of it weights. Then try 1,024: activations grow to
+  5.06 MiB for inference and 11.10 MiB for training, so batch size matters more for training.
+- Set 8 hidden layers of width 4,096 (120,725,514 parameters). Training with Adam needs 1,858.32 MiB, inference
+  462.53 MiB: the 16 versus 4 bytes per parameter dominate.
+
+</Section>
+
+<Section kind="mistakes" title="Training habits that break inference">
+
+<CommonMistake
+  title="Serving in training mode"
+  wrong={'model = Net()\nmodel.load_state_dict(torch.load("net.pt", weights_only=True))\nprint(model(x).argmax(1), model(x).argmax(1))'}
+  error="No error. Two calls on the same input can disagree, because dropout zeroes different values each time."
+  cause="A new nn.Module starts in training mode. Dropout and batch norm behave differently in that mode."
+  fix={'model.eval()\nwith torch.inference_mode():\n    print(model(x).argmax(1))'}
+/>
+
+<CommonMistake
+  title="Tracking gradients while serving"
+  wrong={'for batch in requests:\n    outputs.append(model(batch))   # autograd records every operation'}
+  error="No error at first. Memory grows with every batch until the GPU runs out (CUDA out of memory)."
+  cause="Each output keeps a reference to the graph autograd recorded, and with it the activations of the forward pass. Keeping the outputs keeps all of that alive."
+  fix={'with torch.inference_mode():\n    for batch in requests:\n        outputs.append(model(batch))'}
+/>
+
+<Callout kind="warning">
+  Preprocessing must match training exactly. If the model was trained on pixels divided by 255, a server that
+  sends raw 0–255 pixels gets confident, wrong answers and no error. The next lesson shows how to check shapes and
+  dtypes at the boundary.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Which kind of inference is it?">
+
+| Use case | Mode | Judged on | Typical batch |
+| --- | --- | --- | --- |
+| Card fraud check during payment | online | p99 latency under ~100 ms | 1 to a few, grouped by a batcher |
+| Product recommendations recomputed nightly | batch | cost per million predictions | as large as memory allows |
+| Chat assistant reply | streaming | time to first token, then tokens per second | many conversations decoded together |
+| Photo tagging after upload | asynchronous queue | throughput, minutes of delay are fine | medium |
+
+The mode decides the hardware and the software. Batch jobs can run on cheap spare capacity and use huge batches.
+Online services must keep replicas warm and sized for peak traffic. Streaming services spend most of their memory
+on the KV cache, which the [memory lesson](#/learn/inference/memory/memory-estimation) estimates.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Count the work">
+
+<MiniExercise exercise={flopsExercise}>
+  Write `count_params(widths)` and `forward_flops(widths, batch)` for a stack of dense layers, for example
+  `[784, 512, 512, 10]`. Count 2 FLOPs per weight per example and ignore biases for the FLOPs. Run the tests to
+  check them.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Inference is the forward pass with fixed weights: no loss, no gradients, no optimizer state.
+- It needs about a quarter of the memory per parameter of Adam training, and a third of the arithmetic per example.
+- Fixed weights make compression, compilation and sharing possible.
+- Online, batch and streaming inference are judged on latency, throughput and cost in different proportions.
+- In PyTorch, serve with `model.eval()` and `torch.inference_mode()`.
+
+Next: [inputs, outputs, tensors, batches and computational graphs](#/learn/inference/basics/tensors-graphs)
+looks at what goes into and comes out of the forward pass.
+
+</Section>
