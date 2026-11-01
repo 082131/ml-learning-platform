@@ -1,0 +1,169 @@
+import { evals, graderRunner, guard, judgeCode } from './code';
+import { graderExercise, questions } from './quiz';
+
+<Section kind="intuition" title="A driving test, not a test drive">
+
+Trying a prompt on three questions and liking the answers is a test drive: it tells you the car starts. A driving test
+has a fixed route with the hard parts on purpose (the parallel parking, the unmarked junction), an examiner with a
+checklist, and a result you can compare between candidates. An <Term id="eval-set">evaluation set</Term> is that
+driving test for an AI feature.
+
+Language models fail in ways that look like success: fluent, confident, well formatted, and wrong. The only way to know
+how often that happens, and whether your last change helped, is to count it on a fixed set of cases. The same counting
+tells you whether a <Term id="guardrail">guardrail</Term> is worth what it blocks.
+
+</Section>
+
+<Section kind="technical" title="Cases, graders, failure categories, guardrails">
+
+**An evaluation case** is an input plus the expected behavior, not necessarily an exact expected text. For the Lumen
+assistant: the question, the sources sent with it, and either a phrase a correct answer must contain or a mark that the
+sources don't answer it (so the right behavior is to say so). Start with 30 to 100 cases from real traffic, add every
+production failure you find, and keep a share of questions with no answer.
+
+**Graders, from cheapest to most flexible:**
+
+| Grader | Good for | Limits |
+| --- | --- | --- |
+| Code checks (exact match, contains, regex, JSON valid, citation numbers exist) | facts, formats, numbers, references | can't judge wording, tone or completeness |
+| Rubric graded by a model (<Term id="llm-as-judge">LLM-as-judge</Term>) | groundedness in words, completeness, tone | costs a model call per case; biased toward long answers and its own style; must be checked against people |
+| People | the final word, building the rubric | slow and expensive; use on samples |
+
+**Hallucination analysis.** "The answer was wrong" is not actionable. Categorize each failure:
+
+- *Unsupported claim*: a number, code or statement that no cited source contains (a
+  <Term id="hallucination">hallucination</Term> despite <Term id="grounding">grounding</Term>).
+- *Bad citation*: a reference to a source that wasn't sent.
+- *Wrong fact*: supported by something, but not the answer to this question.
+- *Answered without a source*: answered a question the sources don't cover.
+- *Missed answer*: refused although the sources had the answer.
+
+Counts per category point at the fix: unsupported claims call for stricter instructions or a claim check; missed answers
+mean the instructions are too strict or retrieval is failing.
+
+**Guardrails** are checks around the model call. An input guardrail might block
+<Term id="prompt-injection">prompt injection</Term> attempts or card numbers; an output guardrail might block answers with
+unsupported numbers. Every guardrail makes two kinds of mistakes, and both need measuring on labeled examples:
+missed harmful inputs (recall) and blocked harmless ones (precision of a block).
+
+$$
+\text{recall} = \frac{\text{caught}}{\text{caught} + \text{missed}} \qquad
+\text{precision} = \frac{\text{caught}}{\text{caught} + \text{wrongly blocked}}
+$$
+
+<Callout kind="simplification">
+  The two prompt versions' answers are scripted to show typical failures; the graders, categories and totals run for
+  real. The claim check only looks at numbers and codes, so a false claim in words would pass it. The guardrail is a
+  set of regular expressions to make the trade-off visible; production input filters are often trained classifiers,
+  measured the same way.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Grade two prompt versions on the same cases">
+
+Ten cases from the Lumen help center, two of them unanswerable. v1 asks the model to answer using the context; v2 adds
+"use only the context, cite it, and say if the answer isn't there".
+
+<Experiment def={evals} title="Evaluation run">
+  <EvalScoreboard />
+  <Readout title="Totals" />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="A code grader and a model grader">
+
+The code checks behind the F, C and S columns, in plain Python:
+
+<PythonRunner example={graderRunner} title="grade.py" />
+
+For criteria code can't check, a rubric for a model grader (a template, not run on this page):
+
+<Code example={judgeCode} title="judge.py" />
+
+</Section>
+
+<Section kind="experiment" title="Tune a guardrail and count both mistakes">
+
+Sixteen labeled inputs: eight normal questions, six injection attempts and two messages with card numbers. Each
+strictness level adds rules.
+
+<Experiment def={guard} title="Input guardrail">
+  <GuardrailTable />
+  <Readout title="Counts" />
+</Experiment>
+
+Things to try:
+
+- In the evaluation run, compare v1 and v2. v1 passes 4 of 10: it invents a rate limit of 100 (the source says 60),
+  cites a source [3] that was never sent, and answers both unanswerable questions. v2 passes 9 of 10.
+- Look at v2's one failure, the monthly refund: it says the context doesn't say, though source [1] does. The stricter
+  prompt traded hallucinations for a missed answer. Without a set that tests both, you would only see the improvement.
+- Set the guardrail to Lenient: it catches 1 of 8 harmful inputs. Standard catches 5 and blocks no normal question.
+- Set it to Strict: it catches 7 of 8, and blocks 4 normal questions, including "I forgot my password". Users who get
+  blocked for asking about passwords leave.
+- At every level, the injection written in Spanish gets through. Filters fail on rephrasing; the [security
+  lesson](#/learn/ai/ops/latency-cost-security) limits what a missed injection can do.
+
+</Section>
+
+<Section kind="mistakes" title="Evals that can't fail">
+
+<CommonMistake
+  title="Only testing questions the system answers"
+  wrong={'eval_set = [q for q in questions if q.answer_in_docs]'}
+  error="(no error: 95% pass rate, and in production the assistant invents answers to everything it doesn't know)"
+  cause="Without unanswerable cases, a model that never admits ignorance looks perfect."
+  fix={'# Keep a share of questions with no answer in the documents\neval_set = answerable + unanswerable  # e.g. 80% / 20%, expected: a refusal'}
+/>
+
+<CommonMistake
+  title="Trusting an LLM judge you never checked"
+  wrong={'score = judge(answer)  # used as the release gate, never compared with people'}
+  error="(no error: the judge prefers longer answers, so a wordier prompt 'wins' and users get padding)"
+  cause="Model graders have systematic biases. Their agreement with human judgment must be measured, like any classifier's accuracy."
+  fix={'# Grade 50 cases by hand, compare with the judge, and fix the rubric where they disagree\nagreement = mean(judge(c) == human[c] for c in sample)'}
+/>
+
+</Section>
+
+<Section kind="practice" title="Evals in the development loop">
+
+1. **Before changing anything**, run the set and save the results. That is the baseline.
+2. **Change one thing** (prompt, model, retrieval setting) and run again. Compare per case, not only the total: which
+   cases flipped from pass to fail?
+3. **Gate releases** on the set: no new failures in critical categories (unsupported claims, answering without a source).
+4. **Feed production back**: every reported bad answer becomes a new case, with its expected behavior.
+5. **Measure guardrails** on labeled traffic, and review blocked requests regularly; wrongly blocked users rarely
+   complain, they leave.
+
+[Deploying and monitoring](#/learn/ai/ops/deploy-monitor) uses this set before every release and the same graders on live
+traffic.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Grade both directions">
+
+<MiniExercise exercise={graderExercise}>
+  Write `grade(answer, expected)` that passes correct answers and correct refusals. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- An evaluation set is fixed inputs with expected behavior, including unanswerable questions and past failures.
+- Use code checks where possible, rubric-based model grading where needed, and people to keep both honest.
+- Categorize failures (unsupported claim, bad citation, wrong fact, answered without a source, missed answer) so each
+  count points at a fix.
+- Every guardrail misses some harmful inputs and blocks some harmless ones; measure both.
+- Compare versions per case: a change can fix one category and break another.
+
+</Section>

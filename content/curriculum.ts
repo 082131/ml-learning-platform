@@ -257,7 +257,7 @@ export const tracks: Track[] = [
         id: 'reliability',
         title: 'Reliability',
         level: 'advanced',
-        lessons: [{ id: 'ai/reliability/evals-guardrails', status: 'outline' }],
+        lessons: [{ id: 'ai/reliability/evals-guardrails', status: 'written' }],
       },
       {
         id: 'ops',
