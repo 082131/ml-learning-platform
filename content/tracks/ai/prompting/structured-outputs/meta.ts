@@ -13,5 +13,21 @@ export default {
     'Compare two prompt variants on a small labeled set instead of a single example',
   ],
   prerequisites: ['ai/usage/pretrained-apis'],
-  concepts: [],
+  concepts: ['system-prompt', 'few-shot-prompting', 'structured-output', 'json-schema'],
+  references: [
+    { title: 'JSON Schema: Understanding JSON Schema', url: 'https://json-schema.org/understanding-json-schema' },
+    {
+      title: 'Anthropic: Structured outputs',
+      url: 'https://docs.anthropic.com/en/docs/build-with-claude/structured-outputs',
+    },
+    {
+      title: 'Anthropic: Prompt engineering overview',
+      url: 'https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/overview',
+    },
+    {
+      title: 'Pydantic: JSON Schema and model validation',
+      url: 'https://docs.pydantic.dev/latest/concepts/json_schema/',
+      version: '2.x',
+    },
+  ],
 } satisfies LessonMeta;

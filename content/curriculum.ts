@@ -230,7 +230,7 @@ export const tracks: Track[] = [
         id: 'prompting',
         title: 'Prompting',
         level: 'intermediate',
-        lessons: [{ id: 'ai/prompting/structured-outputs', status: 'outline' }],
+        lessons: [{ id: 'ai/prompting/structured-outputs', status: 'written' }],
       },
       {
         id: 'rag',

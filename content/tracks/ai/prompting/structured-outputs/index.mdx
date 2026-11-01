@@ -1,0 +1,166 @@
+import { compare, promptCode, sdkCode, triage, validateRunner } from './code';
+import { parseExercise, questions } from './quiz';
+
+<Section kind="intuition" title="A form, not a letter">
+
+If you ask a new colleague to "sort these support emails", you get back a letter: helpful, readable, and different
+every time. If you hand them a form with four boxes, a list of allowed categories and one filled-in example, you get
+back something you can put in a spreadsheet.
+
+Prompts work the same way. A prompt is the whole briefing: who the model is working for, what the rules are, what the
+answer must look like, and an example. When code consumes the answer, ask for a
+<Term id="structured-output">structured output</Term>, check it like you would check any untrusted input, and have a
+plan for when it is wrong.
+
+</Section>
+
+<Section kind="technical" title="Prompt parts, schemas and validation">
+
+**A prompt has parts.** The <Term id="system-prompt">system prompt</Term> holds what stays the same: the role, the
+definitions, the rules and the output format. The user message holds what changes: here, the ticket. Adding a worked
+example is <Term id="few-shot-prompting">few-shot prompting</Term>; it is often the quickest fix for a format or a
+borderline case, and it costs input tokens on every request.
+
+**A schema says what valid means.** A <Term id="json-schema">JSON Schema</Term> lists the types, the required keys,
+the allowed values and the limits. For a Lumen ticket:
+
+| Key | Type | Rule |
+| --- | --- | --- |
+| `category` | string | one of billing, sync, account, api, other |
+| `urgency` | integer | 1, 2 or 3 |
+| `summary` | string | at most 80 characters |
+| `needs_human` | boolean | required |
+
+No other keys are allowed.
+
+**Getting JSON back.** Some APIs can constrain generation to a schema, so the reply is always well-formed JSON of that
+shape. Otherwise you ask for JSON in the prompt and the model usually, not always, complies. Either way the reply can be
+cut off by `max_tokens`, and a schema can't express every business rule.
+
+**Validate, then use, retry or fall back.**
+
+1. Parse with a strict JSON parser. Unwrap a known wrapper (a ```` ```json ```` fence) if you choose to, but never
+   guess where JSON starts inside prose.
+2. Validate against the schema. Collect every error with its path, such as `$.urgency: expected integer, got string`.
+3. On failure, send the errors back once and ask for corrected JSON. If that fails too, fall back: a default, a human
+   queue, or a clear error.
+
+**Compare prompts on a set, not an example.** One ticket tells you almost nothing. Score each prompt variant on a few
+dozen labeled examples and count the outcomes: correct, wrong value, invalid.
+
+<Callout kind="simplification">
+  The model replies on this page are scripted to show the failure kinds you meet in practice; they are labeled. The
+  parser, the validator, the retry message and the scoring run for real in your browser. The validator supports the
+  subset of JSON Schema used here (type, properties, required, additionalProperties, enum, minimum, maximum, maxLength,
+  items); in Python you would use the jsonschema package or Pydantic.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Validate a model reply">
+
+The ticket: "I was charged twice for March and the app now says error B-409. I need this sorted before my card statement
+closes on Friday." Choose one of the replies a model might send.
+
+<Experiment def={triage} title="Parse and validate">
+  <SchemaCheck />
+  <Readout title="Decision" />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The prompt, the API call and the checks">
+
+The system prompt behind these replies. Select the underlined lines to see what each part does.
+
+<Code example={promptCode} title="prompt.py" />
+
+With an API that supports schema-constrained output, the schema goes into the request. This sample uses the Anthropic
+Python SDK and is not run on this page.
+
+<Code example={sdkCode} title="triage.py" />
+
+Without a validation library, the core checks are a few lines of plain Python:
+
+<PythonRunner example={validateRunner} title="check_ticket.py" />
+
+</Section>
+
+<Section kind="experiment" title="Score two prompts on labeled tickets">
+
+Prompt A is the instructions and output format only. Prompt B adds the category definitions and the worked example from
+the Code section. Both were "run" on the same ten labeled tickets (scripted replies); the scoring is real.
+
+<Experiment def={compare} title="Prompt A against prompt B">
+  <PromptScoreboard />
+  <Readout title="Scores" />
+</Experiment>
+
+Things to try:
+
+- In the Visual section, choose "Wrapped in a ```json fence" and switch the unwrapping on and off. The same content goes
+  from "not JSON" to valid.
+- Choose "With a sentence before the JSON". Unwrapping doesn't help: the retry message asks for only the object.
+- Choose "An extra field and a long summary". The JSON parses, but two schema rules fail, each reported with its path.
+- Here, turn fence unwrapping off. Prompt A drops from 6 to 5 because ticket t6 came back fenced.
+- Look at t9: both prompts call an expired API token an account problem. Better wording cannot be found by staring at
+  one example; it is found by counting failures like this one across a set.
+
+</Section>
+
+<Section kind="mistakes" title="Trusting the shape">
+
+<CommonMistake
+  title="Parsing with a regular expression"
+  wrong={'match = re.search(r"\\{.*\\}", reply, re.S)\nticket = json.loads(match.group())'}
+  error="(works in testing; in production a reply with a brace in its prose, or two objects, parses into the wrong data)"
+  cause="Guessing where JSON starts and ends hides format errors instead of reporting them."
+  fix={'ticket = parse_ticket(reply)  # strict parse + schema check\nif ticket is None:\n    reply = retry_with_errors(reply)'}
+/>
+
+<CommonMistake
+  title="Using the object without checking stop_reason"
+  wrong={'ticket = json.loads(response.content[0].text)'}
+  error={'json.decoder.JSONDecodeError: Unterminated string starting at: line 1 column 50 (char 49)'}
+  cause="The model hit max_tokens in the middle of the JSON. Even schema-constrained output is incomplete when generation stops early."
+  fix={'if response.stop_reason == "max_tokens":\n    raise ValueError("reply was cut off; raise max_tokens or shorten the output")'}
+/>
+
+</Section>
+
+<Section kind="practice" title="Prompts as code">
+
+Treat prompts like code: keep them in version control, give each a version name, and log which version produced each
+output. Keep a labeled set of real inputs (start with 30 to 50) and re-score it whenever the prompt or the model changes.
+When a prompt fails, add the failing input to the set before fixing it, so it stays fixed.
+
+The [evaluation lesson](#/learn/ai/reliability/evals-guardrails) grows this into a full evaluation set with graders,
+and [RAG](#/learn/ai/rag/rag-pipeline) uses the same prompt structure with retrieved documents as the context.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="A strict parser">
+
+<MiniExercise exercise={parseExercise}>
+  Write `parse_ticket(raw)` that returns the ticket only if it is fully valid. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A prompt is a briefing: role, definitions, rules, output format and an example.
+- Ask for structured output when code consumes the answer, and describe it with a JSON Schema.
+- Parse strictly, validate against the schema, retry once with the errors, then fall back.
+- Even schema-constrained output can be cut off and can hold wrong values.
+- Compare prompts by scoring them on a labeled set, never on one example.
+
+Next: [Retrieval-augmented generation](#/learn/ai/rag/rag-pipeline) puts your documents into the prompt.
+
+</Section>
