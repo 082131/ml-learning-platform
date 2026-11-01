@@ -1,0 +1,160 @@
+import { nextToken, samplingRunner } from './code';
+import { questions, softmaxExercise } from './quiz';
+
+<Section kind="intuition" title="Autocomplete, repeated">
+
+Your phone's keyboard suggests the next word from the words you just typed. A
+<Term id="language-model">language model</Term> does the same thing with far more context and far better
+statistics: given all the text so far, it assigns a probability to every possible next
+<Term id="token">token</Term>. To write a paragraph, it picks one token, appends it, and asks again. There is no plan
+for the whole answer and no step where facts are looked up and checked.
+
+That one idea explains most of what you need to know to use these models well: why output length drives latency and
+cost, why the same prompt can give different answers, why the model can only use what fits in its context, and why a
+fluent answer can be false.
+
+</Section>
+
+<Section kind="technical" title="From logits to a sampled token">
+
+**The model.** A large language model is a decoder-only <Term id="transformer">transformer</Term>, as in
+[the deep learning chapter](#/learn/ml/deep/transformers). Its input is the token IDs so far; its output, at each
+position, is one <Term id="logit">logit</Term> per vocabulary token: a raw score for "this token comes next". It was
+trained to make the real next token's probability high across a very large amount of text.
+
+**Softmax with temperature.** The logits $z_i$ become probabilities with <Term id="softmax">softmax</Term>, after
+dividing by a <Term id="temperature">temperature</Term> $T$:
+
+$$
+p_i = \frac{e^{z_i / T}}{\sum_j e^{z_j / T}}
+$$
+
+With logits $\ln 3$ and $\ln 1$, $T = 1$ gives $3/4$ and $1/4$. $T = 0.5$ doubles both logits to $\ln 9$ and $0$, giving
+$9/10$ and $1/10$: the leader gets stronger. $T = 2$ halves them, giving $\sqrt 3 / (\sqrt 3 + 1) \approx 0.63$: flatter.
+$T \to 0$ is <Term id="greedy-decoding">greedy decoding</Term>, always the top token.
+
+**Top-p.** <Term id="top-p-sampling">Top-p sampling</Term> sorts the tokens by probability, keeps the smallest set
+whose probabilities add up to at least $p$, rescales those to sum to 1, and samples from them. It removes the long tail
+of odd choices while keeping variety among plausible ones.
+
+**The context window.** The model only sees tokens inside its <Term id="context-window">context window</Term>:
+instructions, conversation history, retrieved documents and the output written so far, all together. Self-attention
+compares every token with every other token, so a context of $n$ tokens needs $n^2$ attention scores per head and
+layer: $1{,}000^2 = 10^6$, $8{,}000^2 = 6.4 \times 10^7$, and $128{,}000^2 \approx 1.6 \times 10^{10}$. Production
+systems use tricks (cached keys and values, efficient attention kernels) to make this affordable, but a long prompt
+still costs more time and money than a short one.
+
+**Fluent is not true.** The training objective rewards likely text. Nothing in it checks a claim against a source,
+so a model can produce a confident, well-formed sentence that is false: a
+<Term id="hallucination">hallucination</Term>.
+
+<Callout kind="simplification">
+  The model on this page is a bigram model: it predicts the next word from only the previous word, using counts from the
+  seven Lumen help articles (about 770 words). A transformer conditions on the whole context with billions of learned
+  parameters and uses subword tokens. The sampling step after the logits (temperature, top-p, a random draw) is the same.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Sample the next word yourself">
+
+Every number here is computed in your browser from word counts in the help center. The logit of a word is
+$\ln(\text{count})$, so at $T = 1$ its probability is its share of the counts.
+
+<Experiment def={nextToken} title="A bigram language model trained on the Lumen help center">
+  <NextTokenBars />
+  <GeneratedText />
+  <Readout title="This sample" />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="Temperature and top-p in Python">
+
+The same two functions, in plain Python, on a toy distribution of four words seen 3, 2, 1 and 1 times. Run it and
+compare the output with the numbers in the Technical section.
+
+<PythonRunner example={samplingRunner} title="sampling.py" />
+
+</Section>
+
+<Section kind="experiment" title="Make it repeat, wander and make things up">
+
+Use the controls in the Visual section. Start from "error" with temperature 1, top-p 1 and seed 1.
+
+- The sample reads "error e-402 means your storage quota is lost. if you were not charged twice". Every pair of
+  neighboring words appears in the help center, and the sentence is false: the help center says E-402 means the quota
+  is **full**. That is a hallucination in miniature: locally likely, globally unchecked.
+- Change only the seed. With seed 3 the sample says "error e-409 means your bank", mixing a sync error with the payment
+  article. Same model, same settings, different random draws.
+- Set the temperature to 0. Every seed now gives the same text, because the top word always wins. Choose "the" as the
+  first word: greedy decoding loops on "the end of the end of", a known weakness of greedy decoding in long text.
+- Set top-p to 0.5 with "the" as the first word. Only 11 of the 29 words that follow "the" can be sampled; the
+  dashed bars show what was cut.
+- Raise the temperature to 2 and watch the bars flatten toward equal heights.
+
+</Section>
+
+<Section kind="mistakes" title="Trusting settings to fix facts">
+
+<CommonMistake
+  title="Using temperature 0 to make answers correct"
+  wrong={'response = llm(prompt, temperature=0)\n# "now it is deterministic, so it is reliable"'}
+  error="(no error: the same wrong answer comes back every time)"
+  cause="Temperature controls randomness, not truth. Greedy decoding returns the single most likely continuation, which can be false."
+  fix={'# Ground the answer in sources and check it\nresponse = llm(prompt_with_retrieved_sources, temperature=0)\nassert citations_are_valid(response)'}
+/>
+
+<CommonMistake
+  title="Overfilling the context"
+  wrong={'prompt = SYSTEM + "\\n".join(all_200_documents) + question'}
+  error="400 Bad Request: prompt is too long (or, below the limit: slow, expensive answers that miss the relevant part)"
+  cause="Everything counts against the context window, and attention work grows with the square of its length. Models also use information in a long context less reliably than in a short one."
+  fix={'chunks = retrieve(question, all_200_documents, k=5)\nprompt = SYSTEM + "\\n".join(chunks) + question'}
+/>
+
+</Section>
+
+<Section kind="practice" title="Settings in real applications">
+
+| Task | Temperature | Top-p | Why |
+| --- | --- | --- | --- |
+| Extraction, classification, structured output | 0 to 0.2 | 1 | The same input should give the same answer |
+| Question answering from sources | low | 1 | Stay close to the sources |
+| Drafting, rewriting, brainstorming | 0.7 to 1 | 0.9 to 1 | Variety is useful |
+
+Adjust temperature or top-p, usually not both at once. Not every API lets you set them: some providers fix sampling
+for their newest models, so check the API reference for the model you use (the Anthropic versioning page in the
+references is one example). And measure on your own examples rather than trusting a table like this one.
+
+Three habits follow from how generation works: keep prompts as short as the task allows (cost and latency), put the
+facts the model needs into the context instead of hoping it knows them ([RAG](#/learn/ai/rag/rag-pipeline)), and check
+outputs in code wherever you can ([structured outputs](#/learn/ai/prompting/structured-outputs)).
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Softmax with a temperature">
+
+<MiniExercise exercise={softmaxExercise}>
+  Write `softmax_t(logits, t)`. Handle `t == 0` as greedy choice. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A language model scores every possible next token; generation repeats score, sample, append.
+- Temperature divides the logits before softmax: low is sharp and repeatable, high is flat and varied. Top-p cuts the
+  unlikely tail.
+- The context window holds everything the model sees; attention work grows with the square of its length.
+- Models produce likely text, not checked facts. Ground answers in sources and verify them in code.
+
+Next: [Using pretrained models through libraries and APIs](#/learn/ai/usage/pretrained-apis).
+
+</Section>

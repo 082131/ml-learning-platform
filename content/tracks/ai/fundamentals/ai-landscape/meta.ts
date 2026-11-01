@@ -13,5 +13,28 @@ export default {
     'Explain what each choice costs in data, compute, money and control, and what it leaves you responsible for',
   ],
   prerequisites: ['ml/foundations/what-is-ml'],
-  concepts: [],
+  concepts: [
+    'artificial-intelligence',
+    'machine-learning',
+    'deep-learning',
+    'natural-language-processing',
+    'generative-ai',
+    'pretrained-model',
+    'fine-tuning',
+    'model-api',
+  ],
+  references: [
+    {
+      title: 'Hugging Face: Fine-tuning a pretrained model (Transformers docs)',
+      url: 'https://huggingface.co/docs/transformers/training',
+    },
+    {
+      title: 'Anthropic: Choosing the right model and API pricing',
+      url: 'https://docs.anthropic.com/en/docs/about-claude/pricing',
+    },
+    {
+      title: 'Google: Rules of Machine Learning, rule #1 (don’t be afraid to launch without ML)',
+      url: 'https://developers.google.com/machine-learning/guides/rules-of-ml',
+    },
+  ],
 } satisfies LessonMeta;

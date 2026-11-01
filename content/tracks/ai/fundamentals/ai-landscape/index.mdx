@@ -1,0 +1,165 @@
+import { approach, breakEvenRunner } from './code';
+import { chooseExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Cooking, buying ready meals, or ordering in">
+
+Think of getting a working model like getting dinner. You can grow and cook everything yourself (train a model from
+scratch), buy a ready meal and season it to taste (fine-tune a pretrained model), heat up a ready meal as it is (run a
+pretrained model yourself), or order delivery (call a hosted API). Each step down the list needs less skill and time
+from you, costs more per meal, and gives you less control over what is in it.
+
+Most AI applications today start with delivery or a ready meal. Knowing when that stops being the right choice is one
+of the main judgments of an AI engineer, and it is different from the judgment of an ML engineer, whose daily work is
+training and improving models on their own data.
+
+</Section>
+
+<Section kind="technical" title="The fields, and the four ways to get a model">
+
+**The fields nest and overlap.**
+
+- <Term id="artificial-intelligence">Artificial intelligence</Term> is the goal: systems that do tasks we associate
+  with intelligence. A hand-written chess engine is AI without learning.
+- <Term id="machine-learning">Machine learning</Term> learns behavior from data instead of rules. A spam filter
+  trained on labeled emails is ML.
+- <Term id="deep-learning">Deep learning</Term> is ML with neural networks of many layers. It powers image
+  recognition, speech recognition and language models.
+- <Term id="natural-language-processing">Natural language processing (NLP)</Term> is the application area of
+  human language. It uses ML and, today, mostly deep learning.
+- <Term id="generative-ai">Generative AI</Term> produces new content. A large language model is deep learning,
+  NLP and generative at once. A spam filter is NLP but not generative.
+
+**Four ways to get a model**, from most to least work:
+
+| Approach | What you do | You need | You are responsible for |
+| --- | --- | --- | --- |
+| Train from scratch | Design a model and train it on your data | Labeled data, compute, ML skills | Everything |
+| <Term id="fine-tuning">Fine-tune</Term> | Continue training a <Term id="pretrained-model">pretrained model</Term> on your examples | Hundreds to thousands of labeled examples, GPUs | Training pipeline, evaluation, model versions, serving |
+| Run a pretrained model | Download a model and serve it | GPUs or a capable CPU, serving skills | Servers, scaling, updates |
+| Call a <Term id="model-api">hosted API</Term> | Send requests over HTTP | An API key and a budget | Prompts, evaluation, cost limits, the data you send |
+
+Training from scratch is normal for tabular problems (predicting from rows and columns), where models are small and
+your data is the only data that matters. For language and images it rarely is: pretraining a language model needs
+billions of words and large GPU budgets, and pretrained models already exist.
+
+**Cost has two shapes.** An API charges per use: tokens in plus tokens out, every request. A server you run costs the
+same each hour whether it is busy or not. With example prices of \$1 per million input tokens and \$5 per million output
+tokens, a request with 1,500 tokens in and 300 out costs
+
+$$
+1500 \cdot \frac{1}{10^6} + 300 \cdot \frac{5}{10^6} = 0.0015 + 0.0015 = \$0.003
+$$
+
+and one GPU server at an example \$1.50 per hour costs \$1.50 · 24 · 30 = \$1,080 a month, busy or idle. They cost the
+same at 1080 / (30 · 0.003) = 12,000 requests a day.
+
+<Callout kind="simplification">
+  The comparison assumes one server can serve your whole load and that a smaller model you run gives the same quality
+  as the hosted one. Neither is automatic: production needs at least two servers for availability, and quality must
+  be measured on your own examples. Money is also not the only cost: someone has to run the servers.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Choose an approach for a use case">
+
+Pick a use case and answer the questions. The table and the chart below are computed from the same answers.
+
+<Experiment def={approach} title="Which approach fits?">
+  <ApproachTable />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The cost comparison in Python">
+
+The same formula as the chart, in plain Python. Run it, then change the GPU price or the token counts.
+
+<PythonRunner example={breakEvenRunner} title="break_even.py" />
+
+</Section>
+
+<Section kind="experiment" title="Move the volume and the price">
+
+<Experiment def={approach} title="Monthly cost against volume" controls={false}>
+  <BreakEvenChart />
+  <Readout title="This choice" />
+</Experiment>
+
+Things to try, using the controls at the top of the Visual section:
+
+- Start at 1,000 requests a day: the API costs about \$90 a month, a twelfth of one server. Running your own model only
+  makes sense here if the data can't leave.
+- Move the volume to 20,000 or more. Now one server is cheaper than the API, and the pretrained-model row changes from
+  "possible" to "fits".
+- Set "Can the data go to an outside provider?" to "No". The API row becomes a poor fit whatever the price.
+- Choose the contracts task with 10,000 labeled examples and data that must stay in house. Fine-tuning becomes a fit:
+  you have the examples to teach a house format.
+- Choose the cancellation task. Language model APIs become a poor fit and training your own model is the suggestion:
+  this is ML engineering, not AI application engineering.
+
+</Section>
+
+<Section kind="mistakes" title="Picking the hardest option first">
+
+<CommonMistake
+  title="Fine-tuning to add knowledge"
+  wrong={'# Fine-tune every week so the model knows the latest help articles\nfine_tune(model, help_articles_as_qa_pairs)'}
+  error="(no error: answers about last week's changes are wrong until the next training run, and old facts linger)"
+  cause="Fine-tuning is good at teaching a format, a style or a domain's vocabulary. It is a poor way to store facts that change, and you can't easily see which facts the model absorbed."
+  fix={'# Keep facts in documents and retrieve them at question time (RAG)\ncontext = retrieve(question, help_articles)\nanswer = llm(prompt(context, question))'}
+/>
+
+<CommonMistake
+  title="Choosing by price per request alone"
+  wrong={'# The small self-hosted model is 5x cheaper per request, ship it\nmodel = "small-local-model"'}
+  error="(no error: a third of answers are worse, and nobody measured it)"
+  cause="Cost per request ignores quality, latency and the work of running servers. A cheaper model that fails more often can cost more in support time."
+  fix={'# Compare candidates on the same evaluation set, then on cost\nfor m in candidates:\n    print(m, accuracy(m, eval_set), cost_per_request(m))'}
+/>
+
+</Section>
+
+<Section kind="practice" title="How teams decide in practice">
+
+A common path for an AI feature:
+
+1. Prototype with the most capable hosted model you can use, to learn whether the task is possible at all.
+2. Write an evaluation set of real examples with expected answers. Every later decision is measured on it.
+3. Make the prompt and retrieval good. Most quality problems are fixed here, not by training.
+4. Only then consider a smaller or self-hosted model (for cost, latency or privacy) or fine-tuning (for a format the
+   model can't follow), and keep it only if it wins on the evaluation set.
+
+The rest of this track follows that path: [how language models work](#/learn/ai/llm/transformers-llms), then [calling
+pretrained models](#/learn/ai/usage/pretrained-apis), [prompts and structured outputs](#/learn/ai/prompting/structured-outputs),
+retrieval, tools, evaluation and operations.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Encode the decision">
+
+<MiniExercise exercise={chooseExercise}>
+  Write `choose(task, labels, data_may_leave)` with the rules from this lesson. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- AI is the goal, ML learns from data, deep learning uses many-layer networks; NLP is about language and generative AI
+  produces content. Large language models are all of the last three.
+- Four ways to get a model: train from scratch, fine-tune, run a pretrained model, or call a hosted API. Each step
+  toward the API means less work and less control.
+- Tabular prediction usually means training your own model; language tasks usually start with a pretrained model or an
+  API.
+- APIs cost per request, servers cost per hour. Compare them with the break-even volume, then check quality on your own
+  examples.
+- Fine-tune for format and style, retrieve for facts that change.
+
+</Section>

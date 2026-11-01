@@ -206,7 +206,7 @@ export const tracks: Track[] = [
         id: 'fundamentals',
         title: 'AI fundamentals',
         level: 'beginner',
-        lessons: [{ id: 'ai/fundamentals/ai-landscape', status: 'outline' }],
+        lessons: [{ id: 'ai/fundamentals/ai-landscape', status: 'written' }],
       },
       {
         id: 'representations',
@@ -218,7 +218,7 @@ export const tracks: Track[] = [
         id: 'llm',
         title: 'Large language models',
         level: 'intermediate',
-        lessons: [{ id: 'ai/llm/transformers-llms', status: 'outline' }],
+        lessons: [{ id: 'ai/llm/transformers-llms', status: 'written' }],
       },
       {
         id: 'usage',

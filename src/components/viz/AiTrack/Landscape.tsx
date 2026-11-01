@@ -24,7 +24,7 @@ export function ApproachTable() {
     <VizFrame
       title="Four ways to get a model"
       badge={<Badge tone="ok">Computed from your answers</Badge>}
-      caption={`Suggested start: ${result.rows.find((r) => r.id === result.recommended)!.name.toLowerCase()}. Monthly costs are estimates at example prices.`}
+      caption={`Suggested start: ${result.rows.find((r) => r.id === result.recommended)!.name}. Monthly costs are estimates at example prices.`}
     >
       <table className={s.table}>
         <caption className="visually-hidden">Approaches with verdict, reasons and estimated cost</caption>

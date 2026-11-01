@@ -13,5 +13,34 @@ export default {
     'Explain why a model produces fluent text that can still be wrong, and what that implies for using it',
   ],
   prerequisites: ['ai/representations/tokens-embeddings', 'ml/deep/transformers'],
-  concepts: [],
+  concepts: [
+    'language-model',
+    'logit',
+    'softmax',
+    'temperature',
+    'top-p-sampling',
+    'greedy-decoding',
+    'context-window',
+    'hallucination',
+    'transformer',
+    'attention',
+  ],
+  references: [
+    {
+      title: 'Holtzman et al., The Curious Case of Neural Text Degeneration (nucleus sampling)',
+      url: 'https://arxiv.org/abs/1904.09751',
+    },
+    {
+      title: 'Vaswani et al., Attention Is All You Need',
+      url: 'https://arxiv.org/abs/1706.03762',
+    },
+    {
+      title: 'Hugging Face Transformers: generation strategies (temperature, top_p, do_sample)',
+      url: 'https://huggingface.co/docs/transformers/generation_strategies',
+    },
+    {
+      title: 'Anthropic API: versions (which request parameters each API version accepts)',
+      url: 'https://docs.anthropic.com/en/api/versioning',
+    },
+  ],
 } satisfies LessonMeta;
