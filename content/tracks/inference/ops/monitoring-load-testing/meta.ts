@@ -13,5 +13,26 @@ export default {
     'Debug a production slowdown from metrics and traces',
   ],
   prerequisites: ['inference/serving/apis-containers', 'inference/perf/profiling'],
-  concepts: [],
+  concepts: ['saturation-point', 'slo', 'error-budget', 'distributed-trace'],
+  references: [
+    {
+      title: 'Google SRE workbook: alerting on SLOs (multi-window, multi-burn-rate alerts)',
+      url: 'https://sre.google/workbook/alerting-on-slos/',
+    },
+    {
+      title: 'Google SRE book: monitoring distributed systems (the four golden signals)',
+      url: 'https://sre.google/sre-book/monitoring-distributed-systems/',
+    },
+    {
+      title: 'Prometheus: histograms and summaries',
+      url: 'https://prometheus.io/docs/practices/histograms/',
+      version: 'read 2026-11-01',
+    },
+    {
+      title: 'OpenTelemetry documentation',
+      url: 'https://opentelemetry.io/docs/',
+      version: 'read 2026-11-01',
+    },
+    { title: 'HTTPX async client', url: 'https://www.python-httpx.org/async/', version: 'HTTPX 0.28' },
+  ],
 } satisfies LessonMeta;

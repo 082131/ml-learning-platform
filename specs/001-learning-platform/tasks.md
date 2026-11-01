@@ -145,6 +145,11 @@ Close each content thread with: content validation green, `check`, `e2e` and `bu
 - [x] I001 `inference/memory/memory-estimation`: an estimator for parameters × bytes(precision) + KV cache (layers × 2 × heads × head_dim × seq × batch × bytes) + an activation estimate. Every term is explained, model presets come with cited configs, and the results are labeled estimates.
 - [x] I002 `inference/precision/precision-quantization`: a bit-layout explorer (FP32, FP16, BF16, INT8) and real quantize/dequantize of a weight vector with an error histogram (computed, symmetric and asymmetric, per-tensor vs per-channel).
 - [x] I003 `inference/throughput/batching-throughput`: a discrete-event queueing simulator (seeded) for arrival rate, max batch and max wait, giving p50/p95 latency and throughput. The service-time model is stated explicitly and labeled as a model.
+
+## Thread 13: Inference Engineer remaining lessons (11)
+- [x] I101 `inference/basics/what-is-inference` · I102 `inference/basics/tensors-graphs` · I103 `inference/hardware/cpu-vs-gpu` · I104 `inference/runtime/loading-serialization`
+- [x] I105 `inference/compression/quantize-prune-distill` · I106 `inference/runtimes/onnx-serving` · I107 `inference/perf/profiling` · I108 `inference/perf/gpu-bottlenecks`
+- [x] I109 `inference/serving/apis-containers` · I110 `inference/ops/monitoring-load-testing` · I111 `inference/capstone/deploy-benchmark`
 - [x] I004 Fill objectives and prerequisites for all 11 outline lessons.
 
 ## Thread 12: Verification and polish

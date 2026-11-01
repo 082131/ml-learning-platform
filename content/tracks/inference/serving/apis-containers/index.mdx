@@ -1,0 +1,216 @@
+import { appCode, canaryCode, containerOutput, demoOutput, dockerCode, experiment, loadOutput, simOutput } from './code';
+import { questions, validateExercise } from './quiz';
+
+<Section kind="intuition" title="From a function to a service">
+
+So far the model has been a function you call from Python. Users cannot call your Python. They send requests
+over a network, from programs you did not write, at times you do not choose, sometimes with broken input, and
+they expect an answer within a time limit even while you replace the model with a new version.
+
+A model service wraps the function in four kinds of protection: a contract (what a valid request looks like, and
+what comes back), limits (how big, how long, how many at once), signals (am I running, am I ready, which version
+answered), and a package that runs the same everywhere (a container). Then it needs a way to change versions
+without betting all users on the new one: a canary.
+
+</Section>
+
+<Section kind="technical" title="The parts of a model service">
+
+**The API.** An HTTP endpoint (REST with JSON here; gRPC is common between services) that:
+
+- **validates** each request against a schema and rejects bad input with HTTP 422 and a message saying what is
+  wrong, before it reaches the model;
+- **bounds** work: a maximum batch size per request, a <Term id="load-shedding">bounded queue</Term> that answers
+  503 when full, and a **timeout** that answers 504 instead of hanging;
+- **reports its version** in every response, so logs and metrics can tell versions apart.
+
+**Health checks.** <Term id="readiness-probe">Liveness</Term> (`/healthz`: the process is up; restart it if not)
+and readiness (`/readyz`: the model is loaded and warm; send traffic only now). Loading a large model can take
+minutes, so the two must be separate.
+
+**Concurrency.** A server handles several requests at once with threads, processes or async I/O, and may group
+them into batches for the model (the [batching lesson](#/learn/inference/throughput/batching-throughput)). Set the
+model's threads so that workers do not fight over cores: here, one ONNX Runtime thread per request.
+
+**The container.** A <Term id="container-image">container image</Term> holds the Python version, the pinned
+libraries, the code and often the model. The same image runs on a laptop, in CI and in production. An orchestrator
+(Kubernetes, ECS, Cloud Run) runs several copies (*replicas*) behind a load balancer, restarts failed ones, and adds
+or removes replicas with load.
+
+**Sizing.** Measure one replica's throughput at your latency target, keep headroom (often 60 to 70% of the
+saturation throughput), then divide. For our container, which saturated at about 680 requests per second:
+
+$$
+\text{replicas} = \left\lceil \frac{\text{peak rate}}{0.65 \times 680} \right\rceil + 1 = \left\lceil \frac{2{,}000}{442} \right\rceil + 1 = 6
+$$
+
+where the extra replica covers a failure or a rollout.
+
+**Rollouts.** A new model version goes out gradually:
+
+| Strategy | How | Good for |
+| --- | --- | --- |
+| Shadow | the new version gets a copy of live traffic; its answers are logged, not returned | comparing outputs and latency with zero user risk |
+| <Term id="canary-release">Canary</Term> | a small share of users gets the new version; widen if metrics hold | catching regressions with limited exposure |
+| Blue-green | a full second environment; switch all traffic at once, switch back to roll back | fast, simple rollback |
+
+<Callout kind="simplification">
+  This lesson's server is real and was measured; its numbers are from one shared 4-core VM with the load generator
+  on the same machine, so treat them as an example, not a benchmark of FastAPI. The canary experiment is a
+  statistical model, checked by simulation in the Code section.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="How big should a canary be?">
+
+The new version fails 1% of requests; the current one 0.5%. Telling them apart takes a fixed number of canary
+requests, so the failures while the test collects evidence do not depend on the share (dashed). The failures during
+the rollback do (solid). Both are computed for the current settings; change them in the Experiment section.
+
+<Experiment def={experiment} title="Canary size and its cost" controls={false}>
+  <CanaryCost />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="A working model server">
+
+The whole API, in `server/app.py` in this lesson's folder in the repository:
+
+<Code example={appCode} title="app.py" />
+
+`demo.py` sends good and bad requests to it in-process with FastAPI's test client. This is what came back:
+
+<Code example={demoOutput} title="terminal" />
+
+Each bad request was rejected before reaching the model, with the location of the problem. The last one shows the
+timeout: the client got a 504 after half a second.
+
+The image:
+
+<Code example={dockerCode} title="Dockerfile" />
+
+Building and running it (in the build environment, pip also had to trust the sandbox's proxy certificate, an
+extra build secret not shown here):
+
+<Code example={containerOutput} title="terminal" />
+
+Of the 406 MB image, the model is 5 KB. The runtime libraries are the bulk, which is typical for small models;
+for large ones, the weights dominate and are usually kept out of the image.
+
+Then a load test from outside the container:
+
+<Code example={loadOutput} title="terminal" />
+
+One client gets about 400 requests per second at a 2 ms median. Four clients reach the capacity of this one
+process (about 680 per second), and sixteen only add waiting: the median grows to 19.5 ms while throughput stays
+flat, as [Little's law](#/learn/inference/throughput/batching-throughput) predicts. A repeat run gave 762 per second
+at 16 clients: on a shared VM, run several times.
+
+The last line is the first version of the image, which started Uvicorn with two worker processes: every request
+on a kept-alive connection took about 47 ms instead of 2.5. With one worker on the host the delay disappeared, and
+with two workers on the host it came back, so it was the multi-worker setup, not the container. The 40-odd
+milliseconds match the classic interaction between Nagle's algorithm and delayed TCP acknowledgements, though we
+did not confirm the cause. Only a test against the image you ship finds problems like this.
+
+The canary calculation behind the experiment, with the slots following its controls:
+
+<Code example={canaryCode} title="canary.py" />
+
+The formula uses a normal approximation. Simulating 200,000 canaries per setting shows how close it is:
+
+<Code example={simOutput} title="terminal" />
+
+Close to the intended 80% and 5% for the first and last rows. With rarer errors and smaller samples (the middle
+row, only 244 requests) the counts are too coarse for the approximation, and the test catches the regression only
+72% of the time. Simulate your own alarm rule before trusting it.
+
+</Section>
+
+<Section kind="experiment" title="Plan a canary">
+
+<Experiment def={experiment} title="Canary rollout">
+  <CanaryCost />
+  <Readout />
+</Experiment>
+
+Things to try:
+
+- At the defaults (200 requests/s, 5% share, 0.5% against 1.0% errors, 2-minute rollback) the alarm comes after
+  2.7 minutes, traffic is back after 4.7, and the new version caused 14 extra failures.
+- Lower the share to 1%. Detection takes 13.3 minutes, but there are only 9 extra failures. Raise it to 50%:
+  detected in 0.3 minutes, 68 extra failures, almost all during the rollback.
+- Set the rollback to 0 minutes (automatic). Now the share only changes how fast you learn: 8 extra failures at
+  any share.
+- Set the new version's error rate to 2%. A large regression is caught after 244 requests. Set it to 0.6%: a small
+  one needs 32,767 requests, 54.6 minutes at 5%.
+
+</Section>
+
+<Section kind="mistakes" title="Serving mistakes">
+
+<CommonMistake
+  title="Reporting ready before the model is loaded"
+  wrong={'@app.get("/readyz")\ndef readyz():\n    return {"status": "ok"}   # the model loads in the background'}
+  error="No error at startup. The first requests to each new replica fail or take seconds, and every deploy causes a burst of errors."
+  cause="The load balancer starts sending traffic as soon as readiness passes."
+  fix={'@app.get("/readyz")\ndef readyz():\n    if "session" not in state:\n        raise HTTPException(status_code=503, detail="model not loaded")\n    return {"status": "ready"}'}
+/>
+
+<CommonMistake
+  title="Unpinned dependencies"
+  wrong={'# requirements.txt\nfastapi\nonnxruntime\nnumpy'}
+  error="No error today. Next month a rebuild installs newer versions, and the model's outputs or the API's behavior change with no code change."
+  cause="pip installs the newest versions available at build time."
+  fix={'# requirements.txt\nfastapi==0.162.0\nuvicorn==0.54.0\nonnxruntime==1.29.0\nnumpy==2.5.3'}
+/>
+
+<Callout kind="warning">
+  A timeout frees the client, not the server. The model call keeps running in its thread after the 504. Under a
+  flood of slow requests, also cap the number of requests in progress and reject the rest with 503.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="A deployment checklist">
+
+1. **Contract**: a schema with limits on size and values; errors that say what is wrong; the model version in
+   every response; an OpenAPI page (FastAPI generates one at `/docs`).
+2. **Startup**: load and warm the model before readiness passes; give liveness a generous start-up delay.
+3. **Limits**: a timeout below the client's, a bound on requests in progress, and fast 503s beyond it.
+4. **Image**: pinned base image and dependencies, dependencies in an early layer, a non-root user, no secrets.
+5. **Capacity**: load test the real image, size replicas with headroom, and autoscale on a signal that leads
+   latency (requests in progress or queue length) rather than CPU alone.
+6. **Rollout**: shadow first for risky changes, then a canary with a stated alarm rule, automatic rollback, and
+   the previous image kept ready.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Validate a request">
+
+<MiniExercise exercise={validateExercise}>
+  Write `validate(images)` returning an error message for a bad request body and None for a good one. Run the tests
+  to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Validate requests at the edge, bound their size and duration, and say which model version answered.
+- Separate liveness from readiness, and become ready only after the model is loaded and warm.
+- Package the server in a container with pinned dependencies; scale by running more replicas.
+- Load test the image you ship: our two-worker configuration added 45 ms to every request.
+- A canary's size sets how fast you learn and how much harm happens during the rollback; automate the rollback.
+
+Next: [monitoring, scaling and load testing](#/learn/inference/ops/monitoring-load-testing) keeps the service
+healthy after launch.
+
+</Section>

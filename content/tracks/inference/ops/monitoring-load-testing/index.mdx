@@ -1,0 +1,188 @@
+import { experiment, metricsCode, rampCode, rampOutput, sloCode } from './code';
+import { burnExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Knowing before your users tell you">
+
+A model service that passed every test can still fail in production: traffic doubles after a launch, a dependency
+slows down, a new model version returns errors for one kind of input, a memory leak grows for a week. Users notice
+within minutes. The goal of monitoring is to notice first, and the goal of load testing is to know in advance how
+much the service can take and what happens beyond that.
+
+Both need the same discipline as the profiling lesson: measure what users experience (percentiles and errors,
+not averages), and decide in advance what "too bad" means, so that an alert means "act now" and not "something
+twitched".
+
+</Section>
+
+<Section kind="technical" title="Load tests, golden signals and SLOs">
+
+**Load testing.** Offer the service a known rate of requests with an *open-loop* generator (requests leave on a
+schedule, not after the previous reply) and raise the rate step by step. Record served throughput, latency
+percentiles and errors at each step. The <Term id="saturation-point">saturation point</Term> is where served
+throughput stops following the offered rate: beyond it a queue builds, latency climbs until requests time out, and
+errors appear. Run soak tests too (hours at expected load) to find leaks.
+
+**What to monitor.** The four golden signals, per model version:
+
+| Signal | For a model server | Typical metric |
+| --- | --- | --- |
+| Latency | p50, p95, p99 of request time, successful and failed separately | a histogram |
+| Traffic | requests per second, items per second | a counter |
+| Errors | share of 5xx responses, timeouts, validation failures | a counter by status |
+| Saturation | requests in flight, queue length, CPU, GPU utilization and memory | gauges |
+
+Add model-specific signals: batch sizes actually formed, input statistics (for drift), the distribution of
+predicted classes or confidence, and the share of requests hitting a fallback.
+
+**Objectives and alerts.** A <Term id="slo">service-level objective</Term> states what users can expect, for
+example "99.9% of requests succeed within 300 ms over 30 days". Its complement is the
+<Term id="error-budget">error budget</Term> (0.1% of requests), and the *burn rate* says how fast it is being
+spent: at burn rate 1 the budget lasts exactly 30 days, at 14.4 it lasts 50 hours. Alerting on burn rate over two
+windows, a long one so the alert means something and a short one so it stops once the problem is fixed, pages for
+incidents that threaten the objective and stays quiet for blips.
+
+**Debugging a slowdown.** Start from the symptom on the dashboard (which percentile, since when, which version,
+which replicas), then narrow down with <Term id="distributed-trace">traces</Term>: one slow request broken into
+spans (parse, queue, model, serialize) shows where the time went. Typical causes: a traffic increase past
+saturation, a noisy neighbor or throttled CPU, a larger input size, a new model version, garbage collection or
+memory pressure, and a slow dependency.
+
+<Callout kind="simplification">
+  The load test in the Code section is real and was run against the serving lesson's container, with the load
+  generator on the same 4-core VM, so the client competes with the server for CPU. The alerting experiment is a
+  simulated day with constant traffic and one incident.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="When each alert fires">
+
+The line is the error rate over one simulated day; the dashed line is the error rate the SLO allows. Red markers
+show when each alert rule fires. All three are computed for the current incident; change it in the Experiment
+section.
+
+<Experiment def={experiment} title="An incident against an SLO" controls={false}>
+  <SloChart />
+</Experiment>
+
+A 5% outage for 30 minutes against a 99.9% SLO burns the budget 50 times too fast and uses 3.5% of a month's
+budget. The plain 1% threshold pages after 1 minute; the fast burn-rate rule after 18, once the hour's error rate
+shows that real budget is at stake.
+
+</Section>
+
+<Section kind="code" title="A load test, metrics and an alert">
+
+An open-loop ramp against the serving lesson's container:
+
+<Code example={rampCode} title="ramp.py" />
+
+<Code example={rampOutput} title="terminal" />
+
+Up to 450 requests per second the service keeps up: every request is served, the median stays near 4 ms and p99
+under 30 ms. At 500 the p99 jumps to between 261 ms and 1.2 s in two runs: the server is at its limit and short
+queues form. At 600 it is past saturation. Requests arrive faster than they finish, the queue grows for the whole
+ten seconds, and most requests end up more than 2 seconds late (59% and 95% in the two runs). Throughput does not
+degrade gently; latency explodes.
+
+The saturation point here, about 500 requests per second, is lower than the 680 the serving lesson reached with
+16 threads, because this generator runs on the same four cores and needs more CPU per request. Load generators
+belong on separate machines, and the result belongs to the whole setup, not to the server alone.
+
+Metrics for the serving lesson's API with the Prometheus client, and the queries a dashboard would use. (Not run
+while writing the lesson: no Prometheus server in the build environment.)
+
+<Code example={metricsCode} title="metrics.py" />
+
+The alerting model behind the experiment, with the slots following its controls:
+
+<Code example={sloCode} title="alerts.py" />
+
+</Section>
+
+<Section kind="experiment" title="Design an alert">
+
+<Experiment def={experiment} title="Alert rules against an incident">
+  <SloChart />
+  <Readout />
+</Experiment>
+
+Things to try:
+
+- Set a 20% spike for 2 minutes. The 1% threshold pages, but the spike used only 0.9% of the month's budget and
+  was over before anyone could act. Neither burn-rate rule fires.
+- Set 0.8% for 600 minutes. The threshold never fires, because 0.8% is below 1%, but ten hours of it use 11.1% of
+  the budget. The slow burn-rate rule pages after 268 minutes.
+- Set 0.5% for 600 minutes. No rule fires, yet the incident uses 6.9% of the budget. Real setups add a third,
+  slower rule (burn rate 1 over 3 days) that opens a ticket instead of paging.
+- Keep 5% for 30 minutes and switch the SLO to 99%. The budget is ten times larger, the incident uses 0.3% of it,
+  and only the plain threshold fires.
+
+</Section>
+
+<Section kind="mistakes" title="Monitoring mistakes">
+
+<CommonMistake
+  title="Averaging percentiles across replicas"
+  wrong={'avg(predict_latency_p99)   # each replica reports its own p99'}
+  error="No error. The fleet's p99 is wrong, usually too low, because one slow replica's tail is diluted by the fast ones."
+  cause="Percentiles do not average. The p99 of the whole fleet needs the whole distribution."
+  fix={'histogram_quantile(0.99, sum by (le) (rate(predict_latency_seconds_bucket[5m])))'}
+/>
+
+<CommonMistake
+  title="Load testing with a closed-loop client and calling it capacity"
+  wrong={'# 16 threads, each sends the next request when the previous reply arrives\n# "The server handles 700 req/s at p99 50 ms"'}
+  error="No error. The client slows down with the server, so overload never shows; real users would see far worse latency at that rate."
+  cause="Coordinated omission: the load generator stops sending exactly when the server struggles."
+  fix={'# Open loop: send on a fixed schedule and measure from the due time.\n# Report the offered rate, the served rate and the percentiles at each step.'}
+/>
+
+<Callout kind="warning">
+  Do not alert on CPU or GPU utilization alone. High utilization with good latency is efficiency, not an incident;
+  page on what users feel (errors and latency against the SLO) and use saturation signals for scaling and for
+  diagnosis.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Before and after launch">
+
+1. **Before launch**: run an open-loop ramp on the production image and hardware; record the saturation point
+   and the p99 at your expected and peak rates. Run a soak test for hours at expected load.
+2. **Capacity**: plan for peak traffic at no more than 60 to 70% of saturation per replica, plus spare replicas.
+3. **Dashboards**: the four golden signals per model version, plus batch sizes, input statistics and prediction
+   distribution.
+4. **Alerts**: SLO burn-rate pages for errors and latency; tickets for slow burns, disk, certificates and drift.
+5. **Runbooks**: for each alert, what it means, the first three things to check, and how to roll back.
+6. **After an incident**: a blameless review with a timeline from the metrics, and one change that would have
+   caught it sooner.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="A burn-rate alert">
+
+<MiniExercise exercise={burnExercise}>
+  Write `burn_alert(errors, requests, target, threshold, long_w, short_w)` for minute-by-minute counts. Run the tests
+  to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Load test open-loop with rising rates; the saturation point is where served throughput stops following the
+  offered rate and latency climbs.
+- Monitor latency percentiles, traffic, errors and saturation per model version, from histograms, not averages.
+- Alert on error-budget burn rate over two windows, so pages mean a real threat to the objective.
+- Debug from the symptom down: which percentile, since when, which version, then traces of slow requests.
+
+Next: the [capstone](#/learn/inference/capstone/deploy-benchmark) puts the whole track together.
+
+</Section>

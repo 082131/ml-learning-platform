@@ -1,0 +1,134 @@
+import { benchmarkCode, benchmarkOutput, brief, reportTemplate } from './code';
+import { compareExercise, questions } from './quiz';
+
+<Section kind="intuition" title="From a model to a measured service">
+
+Every lesson in this track answered one question: where the time goes, what the memory holds, what a smaller
+number format costs, how a runtime rewrites a graph, how requests become batches, how a GPU waits, how a service
+fails gracefully and how you notice when it does. A team that asks "can we serve this model, how fast, and on what
+hardware?" needs all of those answers at once, backed by numbers someone else can reproduce.
+
+In this capstone you take one model all the way: serve it, load test it, make it faster in at least two ways,
+check that it still gives the right answers, and write a report a colleague could act on.
+
+</Section>
+
+<Section kind="technical" title="What you will build">
+
+A repository with a model server, its container, a benchmark harness, a load test, metrics and a report. Each part
+comes from a lesson in this track:
+
+| Part | Does | From lesson |
+| --- | --- | --- |
+| model | exported to ONNX (or served by an LLM runtime), with a parity test against the original | [ONNX and runtimes](#/learn/inference/runtimes/onnx-serving) |
+| server | validation, timeout, health checks, model version in each response | [serving and containers](#/learn/inference/serving/apis-containers) |
+| benchmark | warm-up, percentiles, fixed conditions, peak memory | [profiling](#/learn/inference/perf/profiling) |
+| optimization A | for example INT8 weights or another runtime, with an accuracy check | [precision](#/learn/inference/precision/precision-quantization), [compression](#/learn/inference/compression/quantize-prune-distill) |
+| optimization B | for example batching, more replicas or a GPU | [batching](#/learn/inference/throughput/batching-throughput), [GPU bottlenecks](#/learn/inference/perf/gpu-bottlenecks) |
+| load test | open-loop ramp to saturation | [monitoring and load testing](#/learn/inference/ops/monitoring-load-testing) |
+| metrics | golden signals per version, an SLO with a burn-rate alert | [monitoring and load testing](#/learn/inference/ops/monitoring-load-testing) |
+
+**Three rules for the results.**
+
+1. **One change at a time.** Every variant is measured against the same baseline on the same machine, alone and
+   then combined.
+2. **Accuracy is part of the result.** State a tolerance before measuring (for example "at most 0.5 percentage
+   points lower on the held-out set") and report every variant against it.
+3. **Every number is reproducible.** Hardware, versions, threads, batch sizes, sample counts, seeds and the spread
+   across repeated runs go in the report.
+
+</Section>
+
+<Section kind="code" title="The reference benchmark">
+
+`benchmark.py` (in this lesson's folder in the repository) trains a larger digits classifier, exports it to ONNX,
+quantizes its weights to INT8, and measures both versions at batch 1 and batch 32:
+
+<Code example={benchmarkCode} title="benchmark.py" />
+
+<Code example={benchmarkOutput} title="terminal" />
+
+What the three runs say, and how far to trust it:
+
+- **INT8 weights** cut the file from 4.30 to 1.08 MiB (a quarter) with the same 98.06% accuracy on the 360 test
+  images. At batch 1 the median fell from about 0.19 ms to between 0.032 and 0.077 ms: 2.6 to 6 times faster,
+  with a spread so wide that a report should give the range, not one number. On one core, reading 4.3 MB of
+  float32 weights per call is the cost INT8 cuts.
+- **Batching** raised fp32 throughput from about 5,200 to between 37,000 and 56,000 images per second, because the
+  weights are read once per 32 images. Combined with INT8 it reached 170,000 to 252,000.
+- **Not measured here**: the service around the model. At these speeds, JSON parsing and HTTP (milliseconds, the
+  serving lesson) dwarf the model, so the service would barely notice either optimization. That is what the
+  milestones ask you to show.
+
+A report built from it would start like this:
+
+<Code example={reportTemplate} title="report.md" />
+
+<Callout kind="simplification">
+  The reference model is small enough to train in seconds and run on one CPU core. The milestones ask you to serve
+  it, load test it and add a second optimization on your own hardware; a larger model (an image classifier or a
+  small language model) makes the trade-offs sharper.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="The brief">
+
+Tick each milestone when it is done; your progress is saved in this browser.
+
+<Project brief={brief} />
+
+</Section>
+
+<Section kind="mistakes" title="Where benchmarks like this go wrong">
+
+<CommonMistake
+  title="Comparing variants on different thread counts"
+  wrong={'fp32 = ort.InferenceSession("fp32.onnx")          # default: all cores\nint8 = ort.InferenceSession("int8.onnx", so)      # so.intra_op_num_threads = 1'}
+  error="No error. The comparison measures the thread count as much as the quantization."
+  cause="Every setting that is not the optimization under test must be the same for all variants."
+  fix={'so = ort.SessionOptions()\nso.intra_op_num_threads = 1\nfp32 = ort.InferenceSession("fp32.onnx", so)\nint8 = ort.InferenceSession("int8.onnx", so)'}
+/>
+
+<CommonMistake
+  title="Benchmarking the model and reporting it as the service"
+  wrong={'# benchmark.py: p50 0.3 ms per image\n# Report: "the service answers in 0.3 ms"'}
+  error="No error. Users see parsing, the network, queueing and serialization too, often far more than the model."
+  cause="The model benchmark measures one stage of a request."
+  fix={'# Report both: the model alone (benchmark.py) and the service under load (ramp.py),\n# and show where the difference goes (the stage breakdown from the profiling lesson).'}
+/>
+
+<CommonMistake
+  title="Checking accuracy on a handful of examples"
+  wrong={'assert model_int8.predict(x[:5]).tolist() == model_fp32.predict(x[:5]).tolist()'}
+  error="No error. Five matching predictions say little about the thousands that might change."
+  cause="Optimizations change predictions near decision boundaries, which a few examples rarely hit."
+  fix={'acc_fp32, acc_int8 = accuracy(fp32, X_test, y_test), accuracy(int8, X_test, y_test)\nchanged = (pred_fp32 != pred_int8).sum()   # report how many predictions changed, too'}
+/>
+
+</Section>
+
+<Section kind="check" title="Self-assessment">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Decide what to ship">
+
+<MiniExercise exercise={compareExercise}>
+  Write `compare(base, variant, max_drop)` that computes the p99 speed-up and the accuracy drop, and decides whether
+  the variant can ship. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Serve, load test and optimize one model end to end, with every number reproducible.
+- Change one thing at a time; measure each optimization alone and combined against the same baseline.
+- Treat accuracy as part of the result, with a tolerance stated before measuring.
+- Report the service under load, not only the model, and explain each result in terms of compute, memory traffic,
+  overhead and queueing.
+
+</Section>
