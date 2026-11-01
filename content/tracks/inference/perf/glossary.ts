@@ -45,4 +45,13 @@ export default [
     introducedIn: 'inference/perf/gpu-bottlenecks',
     aliases: ['operational intensity', 'FLOPs per byte'],
   },
+  {
+    id: 'cuda-graph',
+    term: 'CUDA graph',
+    short:
+      'A recorded sequence of GPU kernels that can be replayed with one launch instead of one launch per kernel.',
+    long: 'Capturing a model step once and replaying it removes most per-kernel launch cost, which matters when kernels are tiny, as in LLM decoding at small batch. Shapes must stay fixed between replays, so servers capture one graph per batch size.',
+    introducedIn: 'inference/perf/gpu-bottlenecks',
+    aliases: ['torch.cuda.CUDAGraph', 'graph capture'],
+  },
 ] satisfies GlossaryTerm[];

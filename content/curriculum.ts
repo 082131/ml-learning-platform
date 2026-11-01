@@ -341,7 +341,7 @@ export const tracks: Track[] = [
         level: 'advanced',
         lessons: [
           { id: 'inference/perf/profiling', status: 'written' },
-          { id: 'inference/perf/gpu-bottlenecks', status: 'outline' },
+          { id: 'inference/perf/gpu-bottlenecks', status: 'written' },
         ],
       },
       {

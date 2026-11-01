@@ -1,0 +1,217 @@
+import { cpuCode, cpuOutput, experiment, gpuTools, prefetchCode, rooflineCode, stall } from './code';
+import { bottleneckExercise, questions } from './quiz';
+
+<Section kind="intuition" title="A busy kitchen that serves slowly">
+
+A restaurant kitchen can be slow for different reasons. The cooks may be overwhelmed (too much to cook), the
+ingredients may arrive slowly from the store room (they wait with idle hands), or each order may be so small that
+walking to the stove takes longer than cooking. From the dining room all three look the same: the kitchen is
+busy and the food is late. Hiring more cooks only helps in the first case.
+
+A GPU has the same three bottlenecks: arithmetic (compute), moving data to and from its memory (memory), and
+the fixed cost of starting each piece of work (launch). Its headline utilization number, like "the kitchen is
+busy", cannot tell them apart. This lesson gives you a way to tell which one you have, so you can pick the
+optimization that helps.
+
+</Section>
+
+<Section kind="technical" title="Arithmetic intensity and the roofline">
+
+Every kernel does some FLOPs and moves some bytes between GPU memory and the chip. Their ratio is its
+<Term id="arithmetic-intensity">arithmetic intensity</Term>, in FLOPs per byte. The
+<Term id="roofline-model">roofline model</Term> (first met in the batching lesson) bounds a kernel's speed:
+
+$$
+\text{attainable FLOP/s} = \min(\text{peak FLOP/s},\ \text{intensity} \times \text{bandwidth})
+$$
+
+The two limits meet at the **ridge point**, peak ÷ bandwidth. For dense FP16 on tensor cores:
+
+| GPU | Peak FP16 (dense) | Bandwidth | Ridge (FLOP/byte) |
+| --- | --- | --- | --- |
+| T4 | 65 TFLOP/s | 320 GB/s | 203 |
+| L4 | 121 TFLOP/s | 300 GB/s | 403 |
+| A100 80GB PCIe | 312 TFLOP/s | 1,935 GB/s | 161 |
+| H100 SXM | 989 TFLOP/s | 3,350 GB/s | 295 |
+
+Typical inference kernels, with a hidden size of 4,096:
+
+- **A linear layer** at batch $B$ does $2 B d^2$ FLOPs and reads $2 d^2$ bytes of FP16 weights, so its intensity is
+  about $B$. At batch 1 it is memory-bound everywhere; past the ridge it becomes compute-bound.
+- **Attention while generating** reads each sequence's own KV cache: about 1 FLOP per byte *at any batch*, because
+  more sequences bring proportionally more cache to read.
+- **Softmax, layer norm, activations and residual adds** do a few FLOPs per element: memory-bound, and when the
+  tensors are small, launch-bound, since starting a kernel costs a few microseconds.
+
+**What utilization means.** nvidia-smi's <Term id="gpu-utilization">GPU utilization</Term> is the percentage of
+time at least one kernel was running. It finds a GPU that sits idle, waiting for the CPU or for data, but a kernel
+that uses 0.5% of the arithmetic units still counts as 100%. To see how well the GPU is used, compare achieved
+FLOP/s and bytes/s with the roofs, using hardware counters (DCGM) or a profiler (Nsight Compute).
+
+**Gaps on the timeline** are the other bottleneck: the GPU waiting for the CPU to preprocess the next batch, for a
+host-to-device copy, or for Python to launch the next kernel. They show up as utilization below 100% and as gaps
+in an Nsight Systems or PyTorch profiler timeline.
+
+<Callout kind="simplification">
+  The roofline experiment is an estimate: each kernel takes the larger of FLOPs ÷ peak and bytes ÷ bandwidth, plus
+  5 µs to launch. Real kernels reach perhaps 60 to 90% of either roof, and caches can serve some bytes faster than
+  memory. The Code section measures a real roofline, on a CPU.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Where each operation sits">
+
+The black line is the roof of the selected GPU: slanted where memory limits, flat where compute does, meeting at
+the dashed ridge. Each dot is one operation at the current batch, placed at its intensity and the FLOP/s the model
+gives it. Change the operation, batch and GPU in the Experiment section.
+
+<Experiment def={experiment} title="Roofline of one GPU" controls={false}>
+  <RooflineChart />
+</Experiment>
+
+At batch 1 every operation sits far to the left of the A100's ridge at 161. The linear layer reaches 1.5 of 312
+TFLOP/s; softmax and add are far below even the memory roof, because launching them takes longer than running them.
+
+</Section>
+
+<Section kind="code" title="The model, a measurement, and the tools">
+
+The estimate behind the experiment. The slots follow the controls:
+
+<Code example={rooflineCode} title="roofline.py" />
+
+A roofline is easy to measure on a CPU, where we can time things in the build environment. This script multiplies
+by a 256 MiB weight matrix at growing batch sizes and adds two large arrays:
+
+<Code example={cpuCode} title="roofline_cpu.py" />
+
+<Code example={cpuOutput} title="terminal" />
+
+Read it against the two roofs:
+
+- **Compute roof.** At batch 512 the multiplication reaches 511 GFLOP/s. Four cores at 2.1 GHz, each doing 64
+  FP32 FLOPs per cycle (two AVX-512 fused multiply-add units), would peak at about 538 GFLOP/s; the VM does not
+  report turbo clocks or the number of FMA units, so treat that peak as approximate.
+- **Memory roof.** At batch 1 the multiplication does 28 GFLOP/s while moving 56 GB/s: memory-bound, as its
+  intensity of 0.5 predicts. (The VM reports a 260 MiB L3 cache shared with other tenants, so some of the weights may
+  come from cache.)
+- **Below both roofs.** Batch 2 is *slower* than batch 1 (15.16 ms against 4.76) and batch 8 is no faster.
+  OpenBLAS most likely uses a matrix-vector routine for one row and a general routine for more, which first copies
+  W into blocks: for a few rows, that copy costs more than it saves. The roofline is a ceiling, not a prediction; a
+  measurement far below it points at the kernel.
+- **The add** reaches 0.7 GFLOP/s at 8.5 GB/s. NumPy runs it on one core, so it is limited by one core's bandwidth,
+  far below the arithmetic it could do.
+
+On a GPU, these are the tools to use, from cheapest to most detailed. (Not run while writing the lesson: no GPU in
+the build environment.)
+
+<Code example={gpuTools} title="terminal" />
+
+And when the timeline shows the GPU waiting for preprocessing, overlap the two:
+
+<Code example={prefetchCode} title="loader.py" />
+
+</Section>
+
+<Section kind="experiment" title="Find the bottleneck">
+
+<Experiment def={experiment} title="Operations on the roofline">
+  <RooflineChart />
+  <Readout />
+</Experiment>
+
+Things to try:
+
+- With the linear layer on the A100, raise the batch from 1 to 128. Time goes from 22.3 µs to only 23.4 µs while
+  the work grows 128 times: the weights are read once either way. At 256 it crosses the ridge and becomes
+  compute-bound (32.5 µs, 84.6% of peak).
+- Switch to the L4 at batch 256. Its ridge is at 403, so the same layer is still memory-bound there, at 54.3% of
+  peak.
+- Select attention and move the batch. The dot does not move right: intensity stays at 1.00, and time grows with
+  every sequence (39.7 µs at batch 1, 1,114.8 µs at 32).
+- Select softmax or add at small batches. They are launch-bound: fusing them into the neighboring kernel, or
+  replaying the whole step as a <Term id="cuda-graph">CUDA graph</Term>, removes the launches.
+
+Now a GPU that waits. A worker prepares each batch of 32 images on the CPU, then the GPU runs it.
+
+<Experiment def={stall} title="A GPU waiting for the CPU">
+  <StallTimeline />
+  <Readout />
+</Experiment>
+
+- At the defaults (8 ms of CPU, 5 ms of GPU, one after the other) the GPU is busy 38.5% of the time: 2,462 images/s.
+  A GPU twice as fast would only reach 3,048.
+- Turn on the background loader. Batches now finish every 8 ms: 4,000 images/s and 62.5% utilization, with the
+  same GPU.
+- With the loader on, lower the CPU time below the GPU time. Now the GPU is the limit and utilization reaches
+  100%: from here, the roofline tells you what to do next.
+
+</Section>
+
+<Section kind="mistakes" title="Bottleneck mistakes">
+
+<CommonMistake
+  title="Reading 100% utilization as 'the GPU is saturated'"
+  wrong={'# nvidia-smi: utilization.gpu 100 %\n# "We need a bigger GPU."'}
+  error="No error. A memory-bound batch-1 workload shows 100% while using a fraction of a percent of the arithmetic."
+  cause="utilization.gpu counts time during which any kernel runs, not how much of the GPU the kernel uses."
+  fix={'# Check achieved throughput against the roofs first:\n# DCGM_FI_PROF_PIPE_TENSOR_ACTIVE, DCGM_FI_PROF_DRAM_ACTIVE, or ncu --set roofline\n# A memory-bound layer often gets far more throughput from a larger batch than from a larger GPU.'}
+/>
+
+<CommonMistake
+  title="Optimizing arithmetic in a memory-bound model"
+  wrong={'# Switch an A100 decode server from FP16 to FP8 compute to "double FLOP/s"'}
+  error="No error, and little speed-up: the step was limited by reading weights and the KV cache, not by FLOPs."
+  cause="Faster arithmetic raises the flat roof; a memory-bound kernel sits under the slanted one."
+  fix={'# Reduce bytes instead: weight-only quantization (8 or 4 bits per weight),\n# a quantized KV cache, larger batches for the weight reads, fused kernels.'}
+/>
+
+<Callout kind="warning">
+  Do not judge a model by its total FLOPs. Two models with the same FLOPs can differ several times in speed if
+  one is made of large matrix multiplications and the other of many small elementwise operations.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="A bottleneck checklist">
+
+1. **Is the GPU idle?** Look at utilization and an Nsight Systems or PyTorch profiler timeline. Gaps mean the CPU,
+   data loading, copies or Python launches are the bottleneck: add loader workers, pin memory, overlap copies,
+   batch requests, or capture CUDA graphs.
+2. **Which kernels take the time?** Sort the profiler table by GPU time. Usually a few kernels dominate.
+3. **Where do they sit on the roofline?** Compute their intensity from shapes, or let Nsight Compute measure it.
+4. **Memory-bound?** Move fewer bytes: batch requests that share weights, fuse neighboring kernels, quantize
+   weights or the KV cache.
+5. **Compute-bound?** Use tensor cores in a lower precision, a better kernel, or more GPUs.
+6. **Launch-bound?** Fuse, compile (`torch.compile`, TensorRT), or replay a CUDA graph.
+7. **Measure again** after each change. Fixing one bottleneck exposes the next.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Name the bottleneck">
+
+<MiniExercise exercise={bottleneckExercise}>
+  Write `bottleneck(flops, bytes_moved, peak, bandwidth, launch=5e-6)` that returns the estimated time and whether
+  launch, memory or compute sets it. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Arithmetic intensity (FLOPs per byte) against the GPU's ridge point tells memory-bound from compute-bound.
+- Batching raises the intensity of operations that share weights, not of attention over per-sequence KV caches.
+- Small elementwise kernels are often launch-bound: fuse them or replay a CUDA graph.
+- nvidia-smi utilization shows whether a kernel runs, not how well it uses the GPU; use counters or a profiler.
+- A GPU waiting for the CPU needs overlap and more loader workers, not a faster GPU.
+
+Next: [APIs, containers and deployment](#/learn/inference/serving/apis-containers) wraps the model in a service.
+
+</Section>

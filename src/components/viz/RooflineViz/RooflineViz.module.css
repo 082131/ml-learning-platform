@@ -1,0 +1,48 @@
+.chart {
+  width: 100%;
+}
+.timeline {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--s-2) var(--s-2);
+  align-items: center;
+}
+.rowLabel {
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}
+.track {
+  position: relative;
+  height: 28px;
+  border-bottom: 1px solid var(--line);
+}
+.cpuBlock,
+.gpuBlock {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  overflow: hidden;
+  border: 1px solid var(--ink);
+}
+.cpuBlock {
+  background: var(--accent-soft);
+  border-style: dashed;
+  color: var(--ink);
+}
+.gpuBlock {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.scale {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-2);
+}
