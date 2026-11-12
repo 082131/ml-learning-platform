@@ -5,7 +5,7 @@
 // must pass its tests and every starter must fail them, and every recorded-experiment fixture must match
 // a fresh run of its script.
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -77,9 +77,12 @@ describe.skipIf(!hasPython)('Python course examples', () => {
 
   const fixtureDir = path.resolve('src/lib/pycourse/fixtures');
   const scripts = readdirSync(fixtureDir).filter((f) => f.endsWith('.py') && !f.startsWith('_'));
-  for (const script of scripts)
-    it(`fixture ${script} matches a fresh run`, () => {
-      const out = execFileSync('python3', [path.join(fixtureDir, script), '--check'], { encoding: 'utf8' });
+  for (const script of scripts) {
+    const file = path.join(fixtureDir, script);
+    const torch = uses(readFileSync(file, 'utf8'), 'torch');
+    it.skipIf(torch && !TORCH_PYTHON)(`fixture ${script} matches a fresh run`, () => {
+      const out = execFileSync(torch ? TORCH_PYTHON! : 'python3', [file, '--check'], { encoding: 'utf8' });
       expect(out.trim()).toBe('ok');
     });
+  }
 });

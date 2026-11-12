@@ -9,13 +9,20 @@ interface StateCardsProps {
   labelHeading?: string;
   /** Heading of the note column in the table view. */
   noteHeading?: string;
+  /** Where the values came from, shown as a badge. */
+  source?: string;
 }
 
 /**
  * The state after a recorded run (recordedExperiment): one card per name, parameter or object with its
  * repr() and a note, plus the exception if the run raised one. Values come from CPython, not from here.
  */
-export function StateCards({ title, labelHeading = 'Name', noteHeading = 'Note' }: StateCardsProps) {
+export function StateCards({
+  title,
+  labelHeading = 'Name',
+  noteHeading = 'Note',
+  source = 'Recorded in CPython',
+}: StateCardsProps) {
   const { result } = useExperimentContext<VariantState, RecordedVariant>('StateCards');
   const cards = result.cards ?? [];
   const parts = cards.map((c) => `${c.label} is ${c.value}`);
@@ -24,7 +31,7 @@ export function StateCards({ title, labelHeading = 'Name', noteHeading = 'Note' 
   return (
     <VizFrame
       title={title}
-      badge={<span className={s.badge}>Recorded in CPython</span>}
+      badge={<span className={s.badge}>{source}</span>}
       caption={`${result.label}: ${summary}`}
       table={
         <VizTable

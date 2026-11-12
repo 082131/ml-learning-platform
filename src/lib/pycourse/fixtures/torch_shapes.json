@@ -1,0 +1,340 @@
+{
+ "python": "3.13.18",
+ "template": "import torch\n\nx = torch.arange(6, dtype=torch.float32).reshape(2, 3)   # shape (2, 3)\nw = torch.ones(3, 4)                                      # shape (3, 4)\ny = {{op}}\nprint(tuple(y.shape), y.dtype)",
+ "variants": [
+  {
+   "id": "matmul",
+   "label": "x @ w  (matrix product)",
+   "slots": {
+    "op": "x @ w"
+   },
+   "stdout": "(2, 4) torch.float32\n",
+   "error": null,
+   "cards": [
+    {
+     "label": "y.shape",
+     "value": "(2, 4)",
+     "note": "2 dimensions, 8 elements"
+    },
+    {
+     "label": "y values (flattened)",
+     "value": "3, 3, 3, 3, 12, 12, 12, 12",
+     "note": "dtype float32"
+    },
+    {
+     "label": "contiguous",
+     "value": "True",
+     "note": "False means a strided view; .view() needs contiguous memory"
+    }
+   ]
+  },
+  {
+   "id": "row-bcast",
+   "label": "x * torch.tensor([1.0, 10.0, 100.0])  (broadcast a (3,) row)",
+   "slots": {
+    "op": "x * torch.tensor([1.0, 10.0, 100.0])"
+   },
+   "stdout": "(2, 3) torch.float32\n",
+   "error": null,
+   "cards": [
+    {
+     "label": "y.shape",
+     "value": "(2, 3)",
+     "note": "2 dimensions, 6 elements"
+    },
+    {
+     "label": "y values (flattened)",
+     "value": "0, 10, 200, 3, 40, 500",
+     "note": "dtype float32"
+    },
+    {
+     "label": "contiguous",
+     "value": "True",
+     "note": "False means a strided view; .view() needs contiguous memory"
+    }
+   ]
+  },
+  {
+   "id": "col-bcast",
+   "label": "x * torch.tensor([1.0, 10.0])  (broadcast a (2,) vector)",
+   "slots": {
+    "op": "x * torch.tensor([1.0, 10.0])"
+   },
+   "stdout": "",
+   "error": "RuntimeError: The size of tensor a (3) must match the size of tensor b (2) at non-singleton dimension 1",
+   "cards": [
+    {
+     "label": "x.shape",
+     "value": "(2, 3)",
+     "note": "rows, columns"
+    }
+   ]
+  },
+  {
+   "id": "col-bcast-ok",
+   "label": "x * torch.tensor([[1.0], [10.0]])  (broadcast a (2, 1) column)",
+   "slots": {
+    "op": "x * torch.tensor([[1.0], [10.0]])"
+   },
+   "stdout": "(2, 3) torch.float32\n",
+   "error": null,
+   "cards": [
+    {
+     "label": "y.shape",
+     "value": "(2, 3)",
+     "note": "2 dimensions, 6 elements"
+    },
+    {
+     "label": "y values (flattened)",
+     "value": "0, 1, 2, 30, 40, 50",
+     "note": "dtype float32"
+    },
+    {
+     "label": "contiguous",
+     "value": "True",
+     "note": "False means a strided view; .view() needs contiguous memory"
+    }
+   ]
+  },
+  {
+   "id": "sum0",
+   "label": "x.sum(dim=0)  (sum over dim 0)",
+   "slots": {
+    "op": "x.sum(dim=0)"
+   },
+   "stdout": "(3,) torch.float32\n",
+   "error": null,
+   "cards": [
+    {
+     "label": "y.shape",
+     "value": "(3,)",
+     "note": "1 dimensions, 3 elements"
+    },
+    {
+     "label": "y values (flattened)",
+     "value": "3, 5, 7",
+     "note": "dtype float32"
+    },
+    {
+     "label": "contiguous",
+     "value": "True",
+     "note": "False means a strided view; .view() needs contiguous memory"
+    }
+   ]
+  },
+  {
+   "id": "mean-keep",
+   "label": "x.mean(dim=1, keepdim=True)  (mean over dim 1, keepdim)",
+   "slots": {
+    "op": "x.mean(dim=1, keepdim=True)"
+   },
+   "stdout": "(2, 1) torch.float32\n",
+   "error": null,
+   "cards": [
+    {
+     "label": "y.shape",
+     "value": "(2, 1)",
+     "note": "2 dimensions, 2 elements"
+    },
+    {
+     "label": "y values (flattened)",
+     "value": "1, 4",
+     "note": "dtype float32"
+    },
+    {
+     "label": "contiguous",
+     "value": "True",
+     "note": "False means a strided view; .view() needs contiguous memory"
+    }
+   ]
+  },
+  {
+   "id": "view",
+   "label": "x.view(3, 2)  (view as (3, 2))",
+   "slots": {
+    "op": "x.view(3, 2)"
+   },
+   "stdout": "(3, 2) torch.float32\n",
+   "error": null,
+   "cards": [
+    {
+     "label": "y.shape",
+     "value": "(3, 2)",
+     "note": "2 dimensions, 6 elements"
+    },
+    {
+     "label": "y values (flattened)",
+     "value": "0, 1, 2, 3, 4, 5",
+     "note": "dtype float32"
+    },
+    {
+     "label": "contiguous",
+     "value": "True",
+     "note": "False means a strided view; .view() needs contiguous memory"
+    }
+   ]
+  },
+  {
+   "id": "t-view",
+   "label": "x.T.view(6)  (view of a transpose)",
+   "slots": {
+    "op": "x.T.view(6)"
+   },
+   "stdout": "",
+   "error": "RuntimeError: view size is not compatible with input tensor's size and stride (at least one dimension spans across two contiguous subspaces). Use .reshape(...) instead.",
+   "cards": [
+    {
+     "label": "x.shape",
+     "value": "(2, 3)",
+     "note": "rows, columns"
+    }
+   ]
+  },
+  {
+   "id": "t-reshape",
+   "label": "x.T.reshape(6)  (reshape of a transpose)",
+   "slots": {
+    "op": "x.T.reshape(6)"
+   },
+   "stdout": "(6,) torch.float32\n",
+   "error": null,
+   "cards": [
+    {
+     "label": "y.shape",
+     "value": "(6,)",
+     "note": "1 dimensions, 6 elements"
+    },
+    {
+     "label": "y values (flattened)",
+     "value": "0, 3, 1, 4, 2, 5",
+     "note": "dtype float32"
+    },
+    {
+     "label": "contiguous",
+     "value": "True",
+     "note": "False means a strided view; .view() needs contiguous memory"
+    }
+   ]
+  },
+  {
+   "id": "unsqueeze",
+   "label": "x.unsqueeze(0)  (add a batch dim)",
+   "slots": {
+    "op": "x.unsqueeze(0)"
+   },
+   "stdout": "(1, 2, 3) torch.float32\n",
+   "error": null,
+   "cards": [
+    {
+     "label": "y.shape",
+     "value": "(1, 2, 3)",
+     "note": "3 dimensions, 6 elements"
+    },
+    {
+     "label": "y values (flattened)",
+     "value": "0, 1, 2, 3, 4, 5",
+     "note": "dtype float32"
+    },
+    {
+     "label": "contiguous",
+     "value": "True",
+     "note": "False means a strided view; .view() needs contiguous memory"
+    }
+   ]
+  },
+  {
+   "id": "stack",
+   "label": "torch.stack([x, x])  (stack two)",
+   "slots": {
+    "op": "torch.stack([x, x])"
+   },
+   "stdout": "(2, 2, 3) torch.float32\n",
+   "error": null,
+   "cards": [
+    {
+     "label": "y.shape",
+     "value": "(2, 2, 3)",
+     "note": "3 dimensions, 12 elements"
+    },
+    {
+     "label": "y values (flattened)",
+     "value": "0, 1, 2, 3, 4, 5, 0, 1 …",
+     "note": "dtype float32"
+    },
+    {
+     "label": "contiguous",
+     "value": "True",
+     "note": "False means a strided view; .view() needs contiguous memory"
+    }
+   ]
+  },
+  {
+   "id": "cat",
+   "label": "torch.cat([x, x], dim=1)  (concatenate on dim 1)",
+   "slots": {
+    "op": "torch.cat([x, x], dim=1)"
+   },
+   "stdout": "(2, 6) torch.float32\n",
+   "error": null,
+   "cards": [
+    {
+     "label": "y.shape",
+     "value": "(2, 6)",
+     "note": "2 dimensions, 12 elements"
+    },
+    {
+     "label": "y values (flattened)",
+     "value": "0, 1, 2, 0, 1, 2, 3, 4 …",
+     "note": "dtype float32"
+    },
+    {
+     "label": "contiguous",
+     "value": "True",
+     "note": "False means a strided view; .view() needs contiguous memory"
+    }
+   ]
+  },
+  {
+   "id": "int-mix",
+   "label": "torch.arange(3) * 0.5  (int64 tensor times a float)",
+   "slots": {
+    "op": "torch.arange(3) * 0.5"
+   },
+   "stdout": "(3,) torch.float32\n",
+   "error": null,
+   "cards": [
+    {
+     "label": "y.shape",
+     "value": "(3,)",
+     "note": "1 dimensions, 3 elements"
+    },
+    {
+     "label": "y values (flattened)",
+     "value": "0, 0.5, 1",
+     "note": "dtype float32"
+    },
+    {
+     "label": "contiguous",
+     "value": "True",
+     "note": "False means a strided view; .view() needs contiguous memory"
+    }
+   ]
+  },
+  {
+   "id": "matmul-bad",
+   "label": "w @ x  (matmul, wrong order)",
+   "slots": {
+    "op": "w @ x"
+   },
+   "stdout": "",
+   "error": "RuntimeError: mat1 and mat2 shapes cannot be multiplied (3x4 and 2x3)",
+   "cards": [
+    {
+     "label": "x.shape",
+     "value": "(2, 3)",
+     "note": "rows, columns"
+    }
+   ]
+  }
+ ]
+}

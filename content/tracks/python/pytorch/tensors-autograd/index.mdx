@@ -1,0 +1,156 @@
+import { autogradCode, experiment, interopCode, recordedNote, shapesCode } from './code';
+import { gradExercise, questions } from './quiz';
+
+<Section kind="intuition" title="NumPy arrays that remember how they were made">
+
+A PyTorch <Term id="tensor">tensor</Term> is, at first sight, a NumPy array with a different name: shapes,
+dtypes, indexing and broadcasting all work the way you learned in the NumPy chapter. It adds two things that make
+deep learning possible. A tensor can live on a GPU, and a tensor can **record the operations** that produced it.
+
+That record is a <Term id="computation-graph">computation graph</Term>. Call `backward()` on a loss and PyTorch
+walks the graph in reverse, applying the chain rule, and leaves the <Term id="gradient">gradient</Term> of the
+loss in `.grad` of every parameter: <Term id="autograd">autograd</Term>. Everything a training loop does is
+built on those two ideas.
+
+PyTorch does not run in your browser, so in this chapter the code runs on a computer instead: every output shown
+was recorded from PyTorch 2.14.1 on a CPU, and the examples run unchanged on yours.
+
+</Section>
+
+<Section kind="technical" title="Tensors, shapes, dtypes, devices and autograd">
+
+**Creating.** `torch.tensor(data, dtype=torch.float32)` copies data into a new tensor;
+`torch.from_numpy(arr)` shares the NumPy array’s memory. `torch.zeros`, `ones`, `arange`, `randn` and
+`rand` work like their NumPy counterparts. Default dtypes differ: NumPy floats are `float64`, PyTorch floats
+`float32`, and integers are `int64` in both. Models expect `float32` inputs (class labels for
+`CrossEntropyLoss` are `int64`).
+
+**Shapes.** `x.shape` is a `torch.Size`; `dim=` plays the role of NumPy’s `axis=`. `@` is matrix
+multiplication and needs matching inner sizes; broadcasting aligns shapes from the right.
+`unsqueeze(0)` adds a dimension of size 1 (often a batch dimension) and `squeeze` removes them.
+`torch.stack` joins tensors along a **new** dimension, `torch.cat` along an existing one. `view` reinterprets
+memory without copying and fails on non-contiguous tensors such as a transpose; `reshape` copies when needed.
+`permute` reorders dimensions, for example images from `(H, W, C)` to `(C, H, W)`.
+
+**Devices.** `x.to("cuda")` moves a tensor to a GPU (`"mps"` on Apple silicon). Every tensor in an operation must
+be on the same device, so code picks one at the start:
+`device = "cuda" if torch.cuda.is_available() else "cpu"`.
+
+**Autograd.** A tensor created with `requires_grad=True` (every model parameter is) records each operation
+applied to it. `loss.backward()` computes $\partial \text{loss} / \partial w$ for every such tensor and **adds** it
+to `w.grad`. Because gradients accumulate, training loops clear them every step with `optimizer.zero_grad()`.
+Code inside `with torch.no_grad():` is not recorded: use it for evaluation and manual updates. `t.detach()`
+returns a tensor cut off from the graph, and `t.item()` turns a one-element tensor into a Python number.
+
+</Section>
+
+<Section kind="visual" title="Predict the shape">
+
+`x` is `(2, 3)` and `w` is `(3, 4)`. Pick an operation and see the shape, the values and whether the result is
+contiguous, or the exact error PyTorch raises.
+
+<Experiment def={experiment} title="Tensor shape explorer">
+  <StateCards title="The result y" labelHeading="Property" noteHeading="Detail" source="Recorded in PyTorch 2.14" />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The program">
+
+<Experiment def={experiment} title="shapes.py, linked to the explorer" controls={false}>
+  <Code example={shapesCode} title="shapes.py" />
+  <Readout title="What PyTorch printed or raised" />
+</Experiment>
+
+Autograd on a model with one weight and one bias. The prediction is $2 \times 3 + 0.5 = 6.5$ and the loss
+$(6.5 - 10)^2 = 12.25$. {recordedNote}
+
+<Code example={autogradCode} title="autograd.py" />
+
+</Section>
+
+<Section kind="experiment" title="Things to try">
+
+In the explorer:
+
+- Compare broadcasting a `(2,)` vector with a `(2, 1)` column. Shapes align from the right, so `(2,)` is matched
+  against the 3 columns and fails; `(2, 1)` scales each row: row 1 becomes $3 \times 10, 4 \times 10, 5 \times
+  10 = 30, 40, 50$.
+- Compare `x.T.view(6)` with `x.T.reshape(6)`. Same request; only `reshape` is allowed to copy, giving
+  `0, 3, 1, 4, 2, 5` (the columns of `x`, read one after the other).
+- Pick `w @ x`. $(3, 4) @ (2, 3)$ has inner sizes 4 and 2, which do not match.
+
+Moving between NumPy and PyTorch, and choosing a device. This run had no GPU, so the device is `cpu`.
+{recordedNote}
+
+<Code example={interopCode} title="interop.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Shape, dtype and gradient bugs">
+
+<CommonMistake
+  title="Feeding float64 into a model"
+  wrong={'X = torch.from_numpy(df.to_numpy())\nmodel(X)'}
+  error="RuntimeError: mat1 and mat2 must have the same dtype, but got Double and Float"
+  cause="NumPy gives float64 (Double); model weights are float32 (Float)."
+  fix={'X = torch.tensor(df.to_numpy(), dtype=torch.float32)'}
+/>
+
+<CommonMistake
+  title="Tensors on different devices"
+  wrong={'model.to("cuda")\nmodel(x)   # x is still on the CPU'}
+  error="RuntimeError: Expected all tensors to be on the same device (the rest of the message names the two devices; no GPU was available to record it here)"
+  cause="Moving the model does not move its inputs."
+  fix={'x = x.to(device)\nmodel(x)'}
+/>
+
+<CommonMistake
+  title="Accumulating a graph in a running total"
+  wrong={'total_loss += loss   # inside the training loop'}
+  error="No error at first: memory grows every step, because each loss keeps its whole graph alive."
+  cause="loss is a tensor attached to the graph."
+  fix={'total_loss += loss.item()'}
+/>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+| In ML code | What it does |
+|---|---|
+| `X = torch.tensor(X_np, dtype=torch.float32)` | Features into the dtype models use |
+| `images.permute(0, 3, 1, 2)` | `(N, H, W, C)` to the `(N, C, H, W)` that convolutions expect |
+| `x.unsqueeze(0)` | Turn one example into a batch of one |
+| `logits.argmax(dim=1)` | Predicted class for each row of a batch |
+| `with torch.no_grad(): preds = model(X_val)` | Evaluation without building a graph |
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="The gradient autograd computes">
+
+<MiniExercise exercise={gradExercise}>
+  This exercise runs in your browser with NumPy. Write `grads(w, b, x, y)` returning $\partial L / \partial w$
+  and $\partial L / \partial b$ for $L = \mathrm{mean}((w x + b - y)^2)$: the same numbers `loss.backward()`
+  would put in `w.grad` and `b.grad`. The tests check them against finite differences.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Tensors follow NumPy’s shape and broadcasting rules; `dim=` is `axis=`. Use `float32` for model inputs.
+- `view` never copies and needs contiguous memory; `reshape` copies when it must; `stack` adds a dimension,
+  `cat` does not.
+- Keep every tensor in an operation on one device.
+- `backward()` adds gradients into `.grad`; zero them each step, and use `torch.no_grad()` for evaluation.
+
+Next: [Datasets, DataLoaders and nn.Module](#/learn/python/pytorch/datasets-modules).
+
+</Section>
