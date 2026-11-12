@@ -8,6 +8,16 @@ export interface StateCard {
 }
 
 /** One choice of a recorded experiment, run under CPython by a script in ./fixtures. */
+/** A histogram computed by np.histogram in the fixture, with labeled vertical markers (mean, median, …). */
+export interface RecordedHistogram {
+  edges: number[];
+  counts: number[];
+  xLabel: string;
+  markers: { label: string; value: number }[];
+  /** Bins whose left edge is at or beyond this value are drawn in the accent tone (a tail). */
+  tailFrom?: number;
+}
+
 export interface RecordedVariant {
   id: string;
   label: string;
@@ -15,6 +25,7 @@ export interface RecordedVariant {
   stdout: string;
   error: string | null;
   cards?: StateCard[];
+  hist?: RecordedHistogram;
 }
 
 export interface RecordedFixture {

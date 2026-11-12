@@ -1,0 +1,227 @@
+{
+  "python": "3.13.18",
+  "template": "import numpy as np\n\nrng = np.random.default_rng(0)\nvalues = {{dist}}\nq1, q3 = np.percentile(values, [25, 75])\nprint(f\"mean {values.mean():.1f}, median {np.median(values):.1f}\")\nprint(f\"std {values.std(ddof=1):.1f}, IQR {q3 - q1:.1f}\")",
+  "variants": [
+    {
+      "id": "normal",
+      "label": "symmetric (normal)",
+      "slots": {
+        "dist": "rng.normal(50, 10, size=500)"
+      },
+      "stdout": "mean 49.7, median 49.5\nstd 10.1, IQR 13.9\n",
+      "error": null,
+      "hist": {
+        "edges": [
+          11.0058, 14.4885, 17.9712, 21.454, 24.9367, 28.4194, 31.9022, 35.3849, 38.8676, 42.3503, 45.8331,
+          49.3158, 52.7985, 56.2813, 59.764, 63.2467, 66.7295, 70.2122, 73.6949, 77.1776, 80.6604
+        ],
+        "counts": [2, 0, 3, 0, 6, 6, 12, 37, 47, 65, 70, 61, 55, 49, 41, 25, 13, 5, 1, 2],
+        "xLabel": "value",
+        "markers": [
+          {
+            "label": "mean",
+            "value": 49.73
+          },
+          {
+            "label": "median",
+            "value": 49.5
+          }
+        ]
+      },
+      "cards": [
+        {
+          "label": "mean − median",
+          "value": "0.23",
+          "note": "far from 0 when the shape is lopsided or has extremes"
+        },
+        {
+          "label": "skewness",
+          "value": "-0.16",
+          "note": "0 for symmetric data; positive for a long right tail"
+        },
+        {
+          "label": "min and max",
+          "value": "11.0 and 80.7",
+          "note": "500 values"
+        }
+      ]
+    },
+    {
+      "id": "skewed",
+      "label": "right-skewed (lognormal)",
+      "slots": {
+        "dist": "rng.lognormal(3.8, 0.6, size=500)"
+      },
+      "stdout": "mean 52.7, median 43.4\nstd 34.0, IQR 38.2\n",
+      "error": null,
+      "hist": {
+        "edges": [
+          4.3075, 18.1599, 32.0123, 45.8648, 59.7172, 73.5697, 87.4221, 101.2746, 115.127, 128.9795, 142.8319,
+          156.6844, 170.5368, 184.3892, 198.2417, 212.0941, 225.9466, 239.799, 253.6515, 267.5039, 281.3564
+        ],
+        "counts": [22, 130, 113, 80, 50, 40, 23, 16, 10, 3, 6, 2, 2, 0, 1, 0, 1, 0, 0, 1],
+        "xLabel": "value",
+        "markers": [
+          {
+            "label": "mean",
+            "value": 52.69
+          },
+          {
+            "label": "median",
+            "value": 43.37
+          }
+        ]
+      },
+      "cards": [
+        {
+          "label": "mean − median",
+          "value": "9.32",
+          "note": "far from 0 when the shape is lopsided or has extremes"
+        },
+        {
+          "label": "skewness",
+          "value": "1.96",
+          "note": "0 for symmetric data; positive for a long right tail"
+        },
+        {
+          "label": "min and max",
+          "value": "4.3 and 281.4",
+          "note": "500 values"
+        }
+      ]
+    },
+    {
+      "id": "outlier",
+      "label": "normal plus one outlier",
+      "slots": {
+        "dist": "np.append(rng.normal(50, 10, size=499), 400)"
+      },
+      "stdout": "mean 50.4, median 49.5\nstd 18.7, IQR 14.0\n",
+      "error": null,
+      "hist": {
+        "edges": [
+          11.0058, 30.4555, 49.9052, 69.3549, 88.8046, 108.2543, 127.704, 147.1538, 166.6035, 186.0532,
+          205.5029, 224.9526, 244.4023, 263.852, 283.3017, 302.7514, 322.2012, 341.6509, 361.1006, 380.5503,
+          400.0
+        ],
+        "counts": [12, 247, 227, 13, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+        "xLabel": "value",
+        "markers": [
+          {
+            "label": "mean",
+            "value": 50.42
+          },
+          {
+            "label": "median",
+            "value": 49.5
+          }
+        ]
+      },
+      "cards": [
+        {
+          "label": "mean − median",
+          "value": "0.93",
+          "note": "far from 0 when the shape is lopsided or has extremes"
+        },
+        {
+          "label": "skewness",
+          "value": "13.12",
+          "note": "0 for symmetric data; positive for a long right tail"
+        },
+        {
+          "label": "min and max",
+          "value": "11.0 and 400.0",
+          "note": "500 values"
+        }
+      ]
+    },
+    {
+      "id": "bimodal",
+      "label": "two groups (bimodal)",
+      "slots": {
+        "dist": "np.concatenate([rng.normal(35, 5, size=250), rng.normal(65, 5, size=250)])"
+      },
+      "stdout": "mean 49.9, median 47.2\nstd 15.7, IQR 29.7\n",
+      "error": null,
+      "hist": {
+        "edges": [
+          19.4683, 22.4339, 25.3994, 28.3649, 31.3305, 34.296, 37.2615, 40.2271, 43.1926, 46.1581, 49.1237,
+          52.0892, 55.0547, 58.0203, 60.9858, 63.9514, 66.9169, 69.8824, 72.848, 75.8135, 78.779
+        ],
+        "counts": [1, 8, 11, 36, 59, 55, 41, 26, 12, 2, 3, 1, 12, 40, 56, 56, 40, 30, 9, 2],
+        "xLabel": "value",
+        "markers": [
+          {
+            "label": "mean",
+            "value": 49.87
+          },
+          {
+            "label": "median",
+            "value": 47.16
+          }
+        ]
+      },
+      "cards": [
+        {
+          "label": "mean − median",
+          "value": "2.71",
+          "note": "far from 0 when the shape is lopsided or has extremes"
+        },
+        {
+          "label": "skewness",
+          "value": "-0.01",
+          "note": "0 for symmetric data; positive for a long right tail"
+        },
+        {
+          "label": "min and max",
+          "value": "19.5 and 78.8",
+          "note": "500 values"
+        }
+      ]
+    },
+    {
+      "id": "uniform",
+      "label": "flat (uniform)",
+      "slots": {
+        "dist": "rng.uniform(0, 100, size=500)"
+      },
+      "stdout": "mean 53.1, median 55.8\nstd 28.8, IQR 49.4\n",
+      "error": null,
+      "hist": {
+        "edges": [
+          0.0301, 5.0146, 9.9992, 14.9837, 19.9683, 24.9528, 29.9373, 34.9219, 39.9064, 44.891, 49.8755,
+          54.8601, 59.8446, 64.8292, 69.8137, 74.7983, 79.7828, 84.7674, 89.7519, 94.7364, 99.721
+        ],
+        "counts": [20, 27, 18, 31, 16, 16, 20, 30, 22, 21, 24, 38, 24, 24, 26, 25, 33, 26, 27, 32],
+        "xLabel": "value",
+        "markers": [
+          {
+            "label": "mean",
+            "value": 53.08
+          },
+          {
+            "label": "median",
+            "value": 55.8
+          }
+        ]
+      },
+      "cards": [
+        {
+          "label": "mean − median",
+          "value": "-2.73",
+          "note": "far from 0 when the shape is lopsided or has extremes"
+        },
+        {
+          "label": "skewness",
+          "value": "-0.14",
+          "note": "0 for symmetric data; positive for a long right tail"
+        },
+        {
+          "label": "min and max",
+          "value": "0.0 and 99.7",
+          "note": "500 values"
+        }
+      ]
+    }
+  ]
+}

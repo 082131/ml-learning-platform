@@ -417,8 +417,8 @@ export const tracks: Track[] = [
         title: 'Data science and analysis',
         level: 'intermediate',
         lessons: [
-          { id: 'python/analysis/eda-visualization', status: 'outline' },
-          { id: 'python/analysis/statistical-inference', status: 'outline' },
+          { id: 'python/analysis/eda-visualization', status: 'written' },
+          { id: 'python/analysis/statistical-inference', status: 'written' },
         ],
       },
       {

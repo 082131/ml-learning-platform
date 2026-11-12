@@ -1,0 +1,26 @@
+.chart {
+  width: 100%;
+  min-width: 0;
+}
+.chart svg {
+  display: block;
+}
+.bar {
+  fill: var(--accent-soft);
+  stroke: var(--accent);
+  stroke-width: 1;
+}
+.tail {
+  fill: var(--accent);
+  stroke: var(--accent);
+  stroke-width: 1;
+}
+.marker {
+  stroke: var(--ink);
+  stroke-width: 1.5;
+}
+.badge {
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}

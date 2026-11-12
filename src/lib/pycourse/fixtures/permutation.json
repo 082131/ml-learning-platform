@@ -1,0 +1,447 @@
+{
+  "python": "3.13.18",
+  "template": "import numpy as np\n\nrng = np.random.default_rng(1)\nn = {{n}}\na = rng.normal(10.0, 3.0, size=n)             # control: minutes per visit\nb = rng.normal(10.0 + {{effect}}, 3.0, size=n)  # variant\nobserved = b.mean() - a.mean()\n\npooled = np.concatenate([a, b])\ndiffs = np.empty(2000)\nfor i in range(2000):\n    rng.shuffle(pooled)                       # labels no longer matter\n    diffs[i] = pooled[n:].mean() - pooled[:n].mean()\np = np.mean(np.abs(diffs) >= abs(observed))\n\nboot = np.empty(2000)\nfor i in range(2000):\n    boot[i] = rng.choice(b, n).mean() - rng.choice(a, n).mean()\nlo, hi = np.percentile(boot, [2.5, 97.5])\nprint(f\"observed {observed:.2f}, p = {p:.3f}\")\nprint(f\"95% CI [{lo:.2f}, {hi:.2f}]\")",
+  "variants": [
+    {
+      "id": "n20-e00",
+      "label": "n = 20 per group, true effect 0.0 min",
+      "slots": {
+        "n": "20",
+        "effect": "0.0"
+      },
+      "stdout": "observed -0.21, p = 0.816\n95% CI [-1.94, 1.53]\n",
+      "error": null,
+      "hist": {
+        "edges": [
+          -2.7008, -2.5082, -2.3155, -2.1229, -1.9302, -1.7375, -1.5449, -1.3522, -1.1595, -0.9669, -0.7742,
+          -0.5815, -0.3889, -0.1962, -0.0035, 0.1891, 0.3818, 0.5744, 0.7671, 0.9598, 1.1524, 1.3451, 1.5378,
+          1.7304, 1.9231, 2.1158, 2.3084, 2.5011, 2.6937, 2.8864, 3.0791
+        ],
+        "counts": [
+          4, 4, 8, 7, 19, 28, 63, 60, 84, 93, 131, 147, 153, 170, 177, 147, 148, 130, 105, 117, 68, 45, 37,
+          20, 19, 8, 2, 3, 1, 2
+        ],
+        "xLabel": "difference in means under shuffling (minutes)",
+        "markers": [
+          {
+            "label": "observed",
+            "value": -0.208
+          },
+          {
+            "label": "−observed",
+            "value": 0.208
+          }
+        ]
+      },
+      "cards": [
+        {
+          "label": "observed difference",
+          "value": "-0.21 min",
+          "note": "the true effect is 0.0 min"
+        },
+        {
+          "label": "p-value",
+          "value": "0.816",
+          "note": "share of shuffles at least as extreme as observed"
+        },
+        {
+          "label": "95% bootstrap CI",
+          "value": "[-1.94, 1.53]",
+          "note": "contains the true effect; width 3.47"
+        }
+      ]
+    },
+    {
+      "id": "n100-e00",
+      "label": "n = 100 per group, true effect 0.0 min",
+      "slots": {
+        "n": "100",
+        "effect": "0.0"
+      },
+      "stdout": "observed -0.00, p = 1.000\n95% CI [-0.78, 0.80]\n",
+      "error": null,
+      "hist": {
+        "edges": [
+          -1.2849, -1.1998, -1.1147, -1.0296, -0.9445, -0.8594, -0.7744, -0.6893, -0.6042, -0.5191, -0.434,
+          -0.3489, -0.2638, -0.1787, -0.0936, -0.0086, 0.0765, 0.1616, 0.2467, 0.3318, 0.4169, 0.502, 0.5871,
+          0.6721, 0.7572, 0.8423, 0.9274, 1.0125, 1.0976, 1.1827, 1.2678
+        ],
+        "counts": [
+          3, 3, 4, 5, 10, 27, 42, 34, 67, 86, 112, 104, 155, 142, 178, 160, 170, 153, 132, 114, 97, 56, 55,
+          33, 24, 17, 8, 4, 3, 2
+        ],
+        "xLabel": "difference in means under shuffling (minutes)",
+        "markers": [
+          {
+            "label": "observed",
+            "value": -0.0
+          },
+          {
+            "label": "−observed",
+            "value": 0.0
+          }
+        ]
+      },
+      "cards": [
+        {
+          "label": "observed difference",
+          "value": "-0.00 min",
+          "note": "the true effect is 0.0 min"
+        },
+        {
+          "label": "p-value",
+          "value": "1.000",
+          "note": "share of shuffles at least as extreme as observed"
+        },
+        {
+          "label": "95% bootstrap CI",
+          "value": "[-0.78, 0.80]",
+          "note": "contains the true effect; width 1.58"
+        }
+      ]
+    },
+    {
+      "id": "n500-e00",
+      "label": "n = 500 per group, true effect 0.0 min",
+      "slots": {
+        "n": "500",
+        "effect": "0.0"
+      },
+      "stdout": "observed -0.11, p = 0.550\n95% CI [-0.46, 0.24]\n",
+      "error": null,
+      "hist": {
+        "edges": [
+          -0.5735, -0.5325, -0.4914, -0.4504, -0.4094, -0.3684, -0.3274, -0.2864, -0.2454, -0.2044, -0.1634,
+          -0.1224, -0.0814, -0.0404, 0.0006, 0.0416, 0.0827, 0.1237, 0.1647, 0.2057, 0.2467, 0.2877, 0.3287,
+          0.3697, 0.4107, 0.4517, 0.4927, 0.5337, 0.5747, 0.6157, 0.6568
+        ],
+        "counts": [
+          3, 4, 6, 14, 22, 34, 51, 53, 97, 109, 125, 125, 162, 191, 189, 156, 155, 148, 94, 85, 64, 36, 33,
+          17, 10, 7, 3, 5, 1, 1
+        ],
+        "xLabel": "difference in means under shuffling (minutes)",
+        "markers": [
+          {
+            "label": "observed",
+            "value": -0.111
+          },
+          {
+            "label": "−observed",
+            "value": 0.111
+          }
+        ]
+      },
+      "cards": [
+        {
+          "label": "observed difference",
+          "value": "-0.11 min",
+          "note": "the true effect is 0.0 min"
+        },
+        {
+          "label": "p-value",
+          "value": "0.550",
+          "note": "share of shuffles at least as extreme as observed"
+        },
+        {
+          "label": "95% bootstrap CI",
+          "value": "[-0.46, 0.24]",
+          "note": "contains the true effect; width 0.70"
+        }
+      ]
+    },
+    {
+      "id": "n20-e05",
+      "label": "n = 20 per group, true effect 0.5 min",
+      "slots": {
+        "n": "20",
+        "effect": "0.5"
+      },
+      "stdout": "observed 0.29, p = 0.749\n95% CI [-1.44, 2.03]\n",
+      "error": null,
+      "hist": {
+        "edges": [
+          -2.7008, -2.5098, -2.3188, -2.1279, -1.9369, -1.7459, -1.5549, -1.3639, -1.1729, -0.9819, -0.7909,
+          -0.5999, -0.4089, -0.2179, -0.0269, 0.1641, 0.3551, 0.5461, 0.7371, 0.9281, 1.1191, 1.3101, 1.5011,
+          1.6921, 1.8831, 2.0741, 2.2651, 2.4561, 2.6471, 2.8381, 3.0291
+        ],
+        "counts": [
+          4, 5, 6, 8, 16, 35, 49, 69, 77, 104, 122, 135, 158, 165, 162, 161, 142, 132, 122, 99, 71, 58, 42,
+          22, 13, 16, 1, 1, 3, 2
+        ],
+        "xLabel": "difference in means under shuffling (minutes)",
+        "markers": [
+          {
+            "label": "observed",
+            "value": 0.292
+          },
+          {
+            "label": "−observed",
+            "value": -0.292
+          }
+        ]
+      },
+      "cards": [
+        {
+          "label": "observed difference",
+          "value": "0.29 min",
+          "note": "the true effect is 0.5 min"
+        },
+        {
+          "label": "p-value",
+          "value": "0.749",
+          "note": "share of shuffles at least as extreme as observed"
+        },
+        {
+          "label": "95% bootstrap CI",
+          "value": "[-1.44, 2.03]",
+          "note": "contains the true effect; width 3.47"
+        }
+      ]
+    },
+    {
+      "id": "n100-e05",
+      "label": "n = 100 per group, true effect 0.5 min",
+      "slots": {
+        "n": "100",
+        "effect": "0.5"
+      },
+      "stdout": "observed 0.50, p = 0.209\n95% CI [-0.28, 1.30]\n",
+      "error": null,
+      "hist": {
+        "edges": [
+          -1.3049, -1.2181, -1.1314, -1.0446, -0.9579, -0.8711, -0.7844, -0.6976, -0.6108, -0.5241, -0.4373,
+          -0.3506, -0.2638, -0.1771, -0.0903, -0.0036, 0.0832, 0.1699, 0.2567, 0.3435, 0.4302, 0.517, 0.6037,
+          0.6905, 0.7772, 0.864, 0.9507, 1.0375, 1.1243, 1.211, 1.2978
+        ],
+        "counts": [
+          3, 2, 4, 6, 15, 22, 31, 41, 67, 88, 104, 124, 147, 160, 163, 175, 156, 155, 144, 107, 92, 67, 44,
+          36, 20, 10, 9, 5, 1, 2
+        ],
+        "xLabel": "difference in means under shuffling (minutes)",
+        "markers": [
+          {
+            "label": "observed",
+            "value": 0.5
+          },
+          {
+            "label": "−observed",
+            "value": -0.5
+          }
+        ]
+      },
+      "cards": [
+        {
+          "label": "observed difference",
+          "value": "0.50 min",
+          "note": "the true effect is 0.5 min"
+        },
+        {
+          "label": "p-value",
+          "value": "0.209",
+          "note": "share of shuffles at least as extreme as observed"
+        },
+        {
+          "label": "95% bootstrap CI",
+          "value": "[-0.28, 1.30]",
+          "note": "contains the true effect; width 1.58"
+        }
+      ]
+    },
+    {
+      "id": "n500-e05",
+      "label": "n = 500 per group, true effect 0.5 min",
+      "slots": {
+        "n": "500",
+        "effect": "0.5"
+      },
+      "stdout": "observed 0.39, p = 0.036\n95% CI [0.04, 0.74]\n",
+      "error": null,
+      "hist": {
+        "edges": [
+          -0.5675, -0.5267, -0.4858, -0.445, -0.4042, -0.3634, -0.3226, -0.2818, -0.241, -0.2002, -0.1594,
+          -0.1186, -0.0778, -0.037, 0.0038, 0.0446, 0.0855, 0.1263, 0.1671, 0.2079, 0.2487, 0.2895, 0.3303,
+          0.3711, 0.4119, 0.4527, 0.4935, 0.5343, 0.5751, 0.6159, 0.6568
+        ],
+        "counts": [
+          4, 7, 6, 11, 26, 34, 55, 57, 99, 105, 132, 122, 168, 193, 175, 169, 144, 143, 96, 83, 57, 36, 34,
+          19, 9, 7, 4, 2, 2, 1
+        ],
+        "xLabel": "difference in means under shuffling (minutes)",
+        "markers": [
+          {
+            "label": "observed",
+            "value": 0.389
+          },
+          {
+            "label": "−observed",
+            "value": -0.389
+          }
+        ]
+      },
+      "cards": [
+        {
+          "label": "observed difference",
+          "value": "0.39 min",
+          "note": "the true effect is 0.5 min"
+        },
+        {
+          "label": "p-value",
+          "value": "0.036",
+          "note": "share of shuffles at least as extreme as observed (below 0.05)"
+        },
+        {
+          "label": "95% bootstrap CI",
+          "value": "[0.04, 0.74]",
+          "note": "contains the true effect; width 0.70"
+        }
+      ]
+    },
+    {
+      "id": "n20-e10",
+      "label": "n = 20 per group, true effect 1.0 min",
+      "slots": {
+        "n": "20",
+        "effect": "1.0"
+      },
+      "stdout": "observed 0.79, p = 0.400\n95% CI [-0.94, 2.53]\n",
+      "error": null,
+      "hist": {
+        "edges": [
+          -2.7439, -2.5532, -2.3624, -2.1716, -1.9809, -1.7901, -1.5993, -1.4086, -1.2178, -1.027, -0.8363,
+          -0.6455, -0.4547, -0.264, -0.0732, 0.1176, 0.3083, 0.4991, 0.6899, 0.8806, 1.0714, 1.2622, 1.4529,
+          1.6437, 1.8345, 2.0252, 2.216, 2.4068, 2.5975, 2.7883, 2.9791
+        ],
+        "counts": [
+          4, 5, 3, 9, 17, 25, 42, 70, 78, 89, 134, 121, 155, 169, 157, 151, 159, 128, 128, 96, 79, 63, 47, 28,
+          17, 14, 5, 2, 2, 3
+        ],
+        "xLabel": "difference in means under shuffling (minutes)",
+        "markers": [
+          {
+            "label": "observed",
+            "value": 0.792
+          },
+          {
+            "label": "−observed",
+            "value": -0.792
+          }
+        ]
+      },
+      "cards": [
+        {
+          "label": "observed difference",
+          "value": "0.79 min",
+          "note": "the true effect is 1.0 min"
+        },
+        {
+          "label": "p-value",
+          "value": "0.400",
+          "note": "share of shuffles at least as extreme as observed"
+        },
+        {
+          "label": "95% bootstrap CI",
+          "value": "[-0.94, 2.53]",
+          "note": "contains the true effect; width 3.47"
+        }
+      ]
+    },
+    {
+      "id": "n100-e10",
+      "label": "n = 100 per group, true effect 1.0 min",
+      "slots": {
+        "n": "100",
+        "effect": "1.0"
+      },
+      "stdout": "observed 1.00, p = 0.011\n95% CI [0.22, 1.80]\n",
+      "error": null,
+      "hist": {
+        "edges": [
+          -1.3249, -1.2365, -1.148, -1.0596, -0.9712, -0.8828, -0.7944, -0.7059, -0.6175, -0.5291, -0.4407,
+          -0.3522, -0.2638, -0.1754, -0.087, 0.0014, 0.0899, 0.1783, 0.2667, 0.3551, 0.4435, 0.532, 0.6204,
+          0.7088, 0.7972, 0.8857, 0.9741, 1.0625, 1.1509, 1.2393, 1.3278
+        ],
+        "counts": [
+          3, 2, 3, 7, 15, 20, 35, 45, 62, 87, 103, 124, 160, 154, 163, 177, 160, 159, 140, 98, 92, 73, 44, 28,
+          21, 9, 9, 3, 3, 1
+        ],
+        "xLabel": "difference in means under shuffling (minutes)",
+        "markers": [
+          {
+            "label": "observed",
+            "value": 1.0
+          },
+          {
+            "label": "−observed",
+            "value": -1.0
+          }
+        ]
+      },
+      "cards": [
+        {
+          "label": "observed difference",
+          "value": "1.00 min",
+          "note": "the true effect is 1.0 min"
+        },
+        {
+          "label": "p-value",
+          "value": "0.011",
+          "note": "share of shuffles at least as extreme as observed (below 0.05)"
+        },
+        {
+          "label": "95% bootstrap CI",
+          "value": "[0.22, 1.80]",
+          "note": "contains the true effect; width 1.58"
+        }
+      ]
+    },
+    {
+      "id": "n500-e10",
+      "label": "n = 500 per group, true effect 1.0 min",
+      "slots": {
+        "n": "500",
+        "effect": "1.0"
+      },
+      "stdout": "observed 0.89, p = 0.000\n95% CI [0.54, 1.24]\n",
+      "error": null,
+      "hist": {
+        "edges": [
+          -0.5776, -0.5365, -0.4954, -0.4542, -0.4131, -0.3719, -0.3308, -0.2896, -0.2485, -0.2073, -0.1662,
+          -0.125, -0.0839, -0.0427, -0.0016, 0.0396, 0.0807, 0.1218, 0.163, 0.2041, 0.2453, 0.2864, 0.3276,
+          0.3687, 0.4099, 0.451, 0.4922, 0.5333, 0.5745, 0.6156, 0.6568
+        ],
+        "counts": [
+          4, 7, 7, 9, 20, 37, 50, 60, 91, 108, 118, 125, 185, 169, 174, 180, 147, 135, 102, 89, 66, 36, 33,
+          18, 14, 7, 4, 1, 2, 2
+        ],
+        "xLabel": "difference in means under shuffling (minutes)",
+        "markers": [
+          {
+            "label": "observed",
+            "value": 0.889
+          },
+          {
+            "label": "−observed",
+            "value": -0.889
+          }
+        ]
+      },
+      "cards": [
+        {
+          "label": "observed difference",
+          "value": "0.89 min",
+          "note": "the true effect is 1.0 min"
+        },
+        {
+          "label": "p-value",
+          "value": "0.000",
+          "note": "share of shuffles at least as extreme as observed (below 0.05)"
+        },
+        {
+          "label": "95% bootstrap CI",
+          "value": "[0.54, 1.24]",
+          "note": "contains the true effect; width 0.70"
+        }
+      ]
+    }
+  ]
+}

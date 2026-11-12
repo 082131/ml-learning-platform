@@ -31,7 +31,9 @@ def run_fixture(path, template, variants, cards=None):
                 error = traceback.format_exception_only(type(e), e)[-1].strip()
         rec = {"id": v["id"], "label": v["label"], "slots": v["slots"], "stdout": buf.getvalue(), "error": error}
         if cards:
-            rec["cards"] = cards(ns, error, v)
+            extra = cards(ns, error, v)
+            # cards() may return a list of cards, or a dict of extra fields such as "cards" and "hist".
+            rec.update(extra if isinstance(extra, dict) else {"cards": extra})
         records.append(rec)
     data = {
         "python": platform.python_version(),

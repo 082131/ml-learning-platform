@@ -1,0 +1,155 @@
+import { corrRunner, edaRunner, experiment, shapesCode } from './code';
+import { questions, summaryExercise } from './quiz';
+
+<Section kind="intuition" title="Look before you summarize">
+
+<Term id="exploratory-data-analysis">Exploratory data analysis</Term> (EDA) is the step between a clean table
+and a conclusion. Its job is to find out what the data actually looks like, so that the numbers you later report
+mean what you think they mean.
+
+A single number such as "the average session is 52.7 minutes" can describe a typical user, or be dragged up by
+a few people who left a tab open all day, or sit in the gap between two very different groups. Only the shape of
+the data tells you which. So EDA always pairs a statistic with a picture, and every chart starts from a
+question.
+
+</Section>
+
+<Section kind="technical" title="Statistics that fit the shape, charts that fit the question">
+
+**Center and spread.** The mean is the balance point; the <Term id="median">median</Term> is the middle value.
+For symmetric data they agree. When a long tail pulls them apart
+(<Term id="skewness">skewness</Term>), report the median, and the IQR (width of the middle 50%) instead of the
+standard deviation, which squares distances and is dominated by extremes. pandas’ `describe()` gives count, mean,
+std, min, quartiles and max in one call; `std()` in pandas uses $n - 1$ (`ddof=1`), NumPy’s uses $n$ unless you
+pass `ddof=1`.
+
+**One chart per question.**
+
+| Question | Chart | Matplotlib / pandas |
+|---|---|---|
+| How is one variable distributed? | Histogram, box plot | `ax.hist(x, bins=30)`, `df.boxplot(column)` |
+| How do groups compare? | Box plots or histograms per group on one axis; bars for one number per group | `df.boxplot(column, by="group")`, `ax.bar` |
+| How do two numeric variables relate? | Scatter plot | `ax.scatter(x, y, alpha=0.5)` |
+| How does something change over time? | Line chart | `ax.plot(dates, values)` |
+
+Label axes with units, start bar charts at zero, and use a log scale for strongly right-skewed data. Bins change
+how a histogram looks: try a few.
+
+**Relationships.** `df.corr()` gives Pearson <Term id="correlation">correlation</Term> $r$ between numeric
+columns: $+1$ and $-1$ are perfect straight lines, 0 is no **linear** trend. Correlation misses curves, can be
+created or destroyed by one extreme point, and never says which variable causes the other. Spearman correlation
+(the correlation of ranks) is less swayed by extremes. Look at the scatter plot every time.
+
+**Write it down.** Each EDA step is a question, the chart or statistic that answers it, and one sentence of
+finding with numbers, such as "pro users spend a median of 51.9 minutes a month, about twice free users’ 24.8".
+
+</Section>
+
+<Section kind="visual" title="Same statistics, different shapes">
+
+Pick a shape. The histogram shows 500 values with the mean and the median marked; the cards show how far apart
+they are, the skewness and the range. Every number and bar was recorded with NumPy.
+
+<Experiment def={experiment} title="Distribution shape explorer">
+  <RecordedHist title="500 values" />
+  <StateCards title="Shape statistics" labelHeading="Statistic" noteHeading="Reading it" />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The program">
+
+<Experiment def={experiment} title="shapes.py, linked to the explorer" controls={false}>
+  <Code example={shapesCode} title="shapes.py" />
+  <Readout title="What NumPy printed" />
+</Experiment>
+
+A short EDA of a simulated usage table: summary statistics, a grouped median, a correlation matrix, and one chart
+per question. Run it to draw the charts.
+
+<PythonRunner example={edaRunner} title="eda.py" />
+
+</Section>
+
+<Section kind="experiment" title="Things to try">
+
+In the explorer:
+
+- Compare the symmetric shape with the right-skewed one. The gap between mean and median grows from 0.23 to 9.32,
+  and the skewness from about 0 to 1.96.
+- Pick "normal plus one outlier". One value of 400 nearly doubles the standard deviation (10.1 to 18.7) while
+  the IQR stays at 14.0, and the histogram’s 20 bins now stretch to 400, squeezing all the real data into a few
+  bars.
+- Pick "two groups". The median, 47.2, lies in the gap between the groups: almost no value is near it.
+
+What a correlation coefficient can and cannot see:
+
+<PythonRunner example={corrRunner} title="correlation.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Misleading summaries and charts">
+
+<CommonMistake
+  title="Reporting the mean of skewed data"
+  wrong={'print("typical income:", df["income"].mean())'}
+  error="No error: the number is real but describes almost nobody."
+  cause="A few large values pull the mean far above the typical value."
+  fix={'print("median income:", df["income"].median(), "| mean:", df["income"].mean())'}
+/>
+
+<CommonMistake
+  title="A bar chart that does not start at zero"
+  wrong={'ax.bar(groups, means)\nax.set_ylim(48, 52)'}
+  error="No error: a 2% difference looks like a fourfold one."
+  cause="Bar length encodes the value, so a cut axis exaggerates differences."
+  fix={'ax.bar(groups, means)   # keep the zero baseline\n# or show the points with error bars instead'}
+/>
+
+<CommonMistake
+  title="Trusting r without a plot"
+  wrong={'if abs(df["x"].corr(df["y"])) < 0.1:\n    print("x does not matter")'}
+  error="No error: a strong curved relationship has r close to 0."
+  cause="Pearson r only measures straight-line association."
+  fix={'df.plot.scatter(x="x", y="y")   # look first, then decide'}
+/>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+| In data and ML code | What it tells you |
+|---|---|
+| `df.describe()` and `df.isna().mean()` | First overview of every column |
+| `df["target"].value_counts(normalize=True)` | Class balance before training |
+| `df.hist(bins=30, figsize=(12, 8))` | A histogram for every numeric column at once |
+| `df.corr(numeric_only=True)` | Candidate features and redundant pairs |
+| Box plot of the target per category | Which categories differ |
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="A robust summary">
+
+<MiniExercise exercise={summaryExercise}>
+  Write `robust_summary(s)` returning a dict with the `median`, the `iqr` (Q3 − Q1 with pandas’ `quantile`) and
+  `share_outliers`, the fraction of values outside the IQR fences with $k = 1.5$. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Match the statistic to the shape: median and IQR for skewed data or data with extremes.
+- Choose the chart from the question: distribution, comparison, relationship or trend.
+- Correlation measures only linear association, is swayed by single points, and never shows causation.
+- Record each finding as a question, a chart or number, and one sentence.
+
+Next: [confidence intervals, permutation tests and A/B tests](#/learn/python/analysis/statistical-inference).
+
+</Section>

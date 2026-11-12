@@ -1,0 +1,162 @@
+import { abRunner, experiment, multipleRunner, permCode, seRunner } from './code';
+import { bootstrapExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Is the difference real, or just this sample?">
+
+The variant’s visits averaged 0.5 minutes longer. Should you ship it? Run the same experiment again with
+different users and the gap would be different: maybe 0.8, maybe −0.1. Every number computed from a sample
+carries that wobble.
+
+Statistical inference measures the wobble. A **confidence interval** says how far the true value could
+plausibly be from your estimate. A **p-value** says how often chance alone would produce a gap as large as yours.
+This lesson computes both by simulation, shuffling and resampling with NumPy, so you can see where they come
+from instead of trusting a formula, and then turns them into the rules of a sound A/B test.
+
+</Section>
+
+<Section kind="technical" title="Standard error, intervals, tests and A/B design">
+
+**Sampling variability.** A statistic computed from a random sample (a mean, a conversion rate) varies from
+sample to sample. Its standard deviation across samples is the <Term id="standard-error">standard error</Term>.
+For a mean, $\mathrm{SE} = \sigma / \sqrt{n}$: four times the data halves the uncertainty.
+
+**Bootstrap confidence interval.** Resample your data **with replacement** many times, recompute the statistic
+each time, and take the 2.5th and 97.5th percentiles of the results. That gives a 95%
+<Term id="confidence-interval">confidence interval</Term>. The 95% describes the method: across many samples,
+95% of intervals built this way contain the true value. It works for medians and other statistics without a
+formula.
+
+**Permutation test.** The null hypothesis says the label (control or variant) does not matter. So shuffle the
+labels many times and record the difference each shuffle produces: that is the distribution of differences
+under "no effect". The <Term id="p-value">p-value</Term> is the share of shuffled differences at least as extreme
+as the one observed (<Term id="permutation-test">permutation test</Term>). A small p-value means the data would
+be surprising if there were no effect. It is **not** the probability that there is no effect, and it says
+nothing about how big the effect is: always report the estimate and its interval too.
+
+**A/B tests.** An <Term id="ab-test">A/B test</Term> randomly assigns users to versions and compares one primary
+metric chosen in advance. Before starting, fix the significance level (usually 5%), the smallest lift worth
+detecting, and the sample size that gives enough **power** (usually 80%) to detect it. Then avoid three traps:
+**peeking** (stopping the first time p dips below 0.05 inflates false positives), **many metrics** (test 20 and
+about one will look significant by chance; correct with Bonferroni, dividing 0.05 by the number of tests), and
+**unequal groups** (check that assignment really was 50/50).
+
+</Section>
+
+<Section kind="visual" title="Shuffle the labels 2,000 times">
+
+Two groups of visits, a control and a variant whose true effect you choose. The histogram shows the differences
+produced by 2,000 shuffles of the labels, which is what "no effect" looks like, with the observed difference
+marked on both sides. The cards give the p-value and a bootstrap interval. Every number was recorded with NumPy.
+
+<Experiment def={experiment} title="Permutation test explorer">
+  <RecordedHist title="Differences under shuffling" yLabel="Shuffles" />
+  <StateCards title="Test results" labelHeading="Result" noteHeading="Reading it" />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The program">
+
+<Experiment def={experiment} title="permutation.py, linked to the explorer" controls={false}>
+  <Code example={permCode} title="permutation.py" />
+  <Readout title="What NumPy printed" />
+</Experiment>
+
+The standard error, measured: draw 3,000 samples of each size from a skewed population and see how much their
+means vary. The measured spread matches $\sigma / \sqrt{n}$: $19.91 / \sqrt{100} = 1.99$.
+
+<PythonRunner example={seRunner} title="standard_error.py" />
+
+</Section>
+
+<Section kind="experiment" title="Things to try">
+
+In the explorer:
+
+- Keep the true effect at 0.5 minutes and change the sample size. With 20 per group, p is 0.749 and the
+  interval runs from −1.44 to 2.03; with 500 per group, p is 0.036 and the interval [0.04, 0.74] excludes 0.
+  The effect did not change; the test’s ability to see it did.
+- Set the true effect to 0. The observed differences are small and p stays large at every sample size: the
+  test correctly finds nothing.
+- With 500 per group and an effect of 1.0, no shuffle out of 2,000 came close, so p prints as 0.000: below
+  1/2,000, not exactly zero.
+
+An A/B test on conversion rates with a two-proportion z-test, and the sample size needed per group to detect a
+lift from 5% to 6% (and to 5.5%):
+
+<PythonRunner example={abRunner} title="ab_test.py" />
+
+Two hundred A/A comparisons, where both groups come from the same distribution. About 5% look significant by
+chance, and Bonferroni removes them:
+
+<PythonRunner example={multipleRunner} title="many_metrics.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Reading tests wrongly">
+
+<CommonMistake
+  title="“p = 0.03, so 97% sure it works”"
+  wrong={'print(f"{1 - p:.0%} chance the variant is better")'}
+  error="No error: the sentence is simply false."
+  cause="A p-value is computed assuming no effect; it is not the probability of an effect."
+  fix={'print(f"lift {lift:.3f}, 95% CI [{lo:.3f}, {hi:.3f}], p = {p:.3f}")'}
+/>
+
+<CommonMistake
+  title="Stopping when it looks significant"
+  wrong={'for day in days:\n    if test(day).p < 0.05:\n        ship()\n        break'}
+  error="No error: the false-positive rate is far above 5%."
+  cause="Every look is another chance for noise to cross the threshold."
+  fix={'n = n_per_group(p_base, min_lift)   # decide first\n# run until n per group, then test once'}
+/>
+
+<CommonMistake
+  title="“Not significant” as proof of no effect"
+  wrong={'if p > 0.05:\n    print("the feature has no effect")'}
+  error="No error: with 20 users per group a real 0.5-minute effect gave p = 0.749."
+  cause="A large p-value can mean too little data to see an effect."
+  fix={'print(f"inconclusive: effect between {lo:.2f} and {hi:.2f}")'}
+/>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+| In data and ML work | What it answers |
+|---|---|
+| Bootstrap interval of a model’s accuracy on the test set | Is 0.91 vs 0.90 a real difference? |
+| Permutation test on two model variants’ scores | Could the gain be noise? |
+| A/B test of a new ranking model | Does it move the business metric? |
+| Sample-size calculation before launch | How long must the test run? |
+| Bonferroni across many slices | Which slice differences survive? |
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="A bootstrap interval for the median">
+
+<MiniExercise exercise={bootstrapExercise}>
+  Write `bootstrap_ci(values, rng, rounds=2000)`. Resample `values` with replacement `rounds` times using the
+  given `rng`, take each resample’s median, and return the 2.5th and 97.5th percentiles of those medians. Run the
+  tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Estimates wobble from sample to sample; the standard error ($\sigma / \sqrt{n}$ for a mean) measures it.
+- A bootstrap interval resamples the data; a permutation test shuffles the labels. Both need only NumPy.
+- A p-value is the chance of data this extreme if there were no effect: not the chance of no effect, and not a
+  size. Report the estimate with its interval.
+- Plan A/B tests in advance: one primary metric, a fixed sample size, no peeking, corrections for many metrics.
+
+Next chapter: [PyTorch tensors and autograd](#/learn/python/pytorch/tensors-autograd).
+
+</Section>
