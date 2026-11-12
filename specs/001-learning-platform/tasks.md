@@ -159,6 +159,11 @@ Close each content thread with: content validation green, `check`, `e2e` and `bu
 - [x] D010 `dataops/capstone/data-ops-pipeline`: brief, gated reference pipeline, self-assessment and exercise.
 - [x] D011 e2e specs for all nine entries (interaction linked across visual, code and printout; axe in both themes; no horizontal scroll).
 
+## Thread 14: Model Deployment and Optimization track (`deploy`, 9 entries)
+- [x] P001 `deploy/foundations/deployment-map` · P002 `deploy/pipelines/data-model-pipelines` · P003 `deploy/kubernetes/k8s-for-models` · P004 `deploy/kubernetes/autoscaling-rollouts`
+- [x] P005 `deploy/quantization/llm-quantization` · P006 `deploy/formats/onnx-gguf` · P007 `deploy/local/llama-cpp-ollama` · P008 `deploy/llm-serving/vllm-kserve` · P009 `deploy/capstone/quantize-and-ship`
+- [x] P010 e2e (`tests/e2e/deploy-track.spec.ts`) and CPython checks of every exercise (`content/tracks/deploy/python-outputs.test.ts`).
+
 ## Thread 12: Verification and polish
 **Reads**: spec.md (Success Criteria, Edge Cases), constitution, tasks.md.
 - [ ] Q001 Run the full crawl, axe and e2e at 360, 390, 768, 1280 and 1600px, then fix what fails.

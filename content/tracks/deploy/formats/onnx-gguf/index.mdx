@@ -1,0 +1,177 @@
+import { convertCommands, experiment, loaderLog, makeDemo, makeTiny, readerCode } from './code';
+import { headerExercise, questions } from './quiz';
+
+<Section kind="intuition" title="A recipe, a parts list, or a boxed kit">
+
+You can hand someone a model in three ways. A **parts list** names every weight and its numbers, but you need
+the original Python code to know how to wire them together: that is a PyTorch
+<Term id="checkpoint">checkpoint</Term> or a <Term id="safetensors">safetensors</Term> file. A **recipe** writes
+down every step of the computation as well, so any kitchen can cook it without the original cook: that is an
+<Term id="onnx">ONNX</Term> file. A **boxed kit** puts the parts, the assembly settings and even the
+dictionary for reading the input into one sealed box, ready for one particular machine: that is a
+<Term id="gguf">GGUF</Term> file for llama.cpp.
+
+At work you met ONNX and llama.cpp side by side. This lesson explains what each file actually holds, opens a
+GGUF file byte by byte, and shows the commands that turn a Hugging Face model into a quantized GGUF.
+
+</Section>
+
+<Section kind="technical" title="What each format stores">
+
+| Format | Contains | Needs to run it | Typical runtime |
+| ------ | -------- | --------------- | --------------- |
+| PyTorch `.pt` / `.bin` | Weights, pickled (can execute code when loaded) | The model's Python code | PyTorch |
+| safetensors | Named tensors and a JSON header, nothing executable | The model's code and config | PyTorch, Transformers, vLLM |
+| ONNX `.onnx` | The graph of operators (opset versioned) and the weights | Any ONNX runtime | ONNX Runtime, TensorRT, Triton |
+| GGUF `.gguf` | Metadata (architecture, hyperparameters, tokenizer, chat template) and tensors, often quantized | llama.cpp's implementation of that architecture | llama.cpp, Ollama, LM Studio |
+
+**ONNX** describes a model as a graph: nodes are operators such as `MatMul` or `Softmax` from a versioned
+*opset*, edges are tensors. A runtime can optimize and run the graph on CPUs, GPUs or other accelerators without
+Python. It suits vision, tabular and encoder models best; the
+[ONNX lesson](#/learn/inference/runtimes/onnx-serving) exports one and applies its graph optimizations.
+Generating text with a large decoder model through ONNX is possible but needs extra machinery for the KV cache,
+which is why LLM serving mostly uses dedicated engines.
+
+**GGUF** works the other way round: it does *not* store the graph. llama.cpp has its own C++ implementation of
+each supported architecture (llama, qwen2, gemma, phi3, …) and reads only the settings and tensors. A GGUF file
+is laid out as:
+
+1. **Header**: the magic bytes `GGUF`, the version (3), the number of tensors and of metadata pairs.
+2. **Metadata**: key-value pairs, each a string key, a type code and a value: `general.architecture`, the layer
+   count, head counts, the full tokenizer vocabulary, the chat template.
+3. **Tensor infos**: for each tensor its name, its dimensions, its type (F32, Q8_0, Q4_K, …) and its offset.
+4. **Padding** to the <Term id="tensor-alignment">alignment</Term> (32 bytes unless `general.alignment` says
+   otherwise), then the **tensor data**, each tensor aligned too.
+
+All numbers are little-endian. Because the data is aligned and stored as the runtime uses it, llama.cpp can
+memory-map the file and start without copying the weights.
+
+<Callout kind="simplification">
+  The reader below handles the value types the demo file uses (strings, uint32 and uint64) and two tensor types.
+  The specification also has signed integers, floats, booleans and arrays (the tokenizer is an array of
+  strings), and dozens of quantization types, each with its own block size in bytes.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Open a GGUF file">
+
+These are all 352 bytes of `demo.gguf`, a real file written by the `gguf` package with three metadata keys and
+two tensors: four F32 values and one Q8_0 block of 32 weights. Pick a part of the file to highlight its bytes
+and see the value they decode to.
+
+<Experiment def={experiment} title="GGUF explorer">
+  <GgufHex />
+  <Readout />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="Writing and reading GGUF">
+
+This is the script that wrote `demo.gguf`:
+
+<Code example={makeDemo} title="make_demo_gguf.py" />
+
+And this reader, using only Python's `struct` module, walks the same bytes. Its printout is the last item of the
+readout above, and its offsets match what `gguf.GGUFReader` reports for the file.
+
+<Experiment def={experiment} title="read_gguf.py, linked to the experiment" controls={false}>
+  <Code example={readerCode} title="read_gguf.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+The quantization lesson used a bigger file: a Llama-architecture model with random weights, written the same
+way. Everything llama.cpp needs is in its metadata:
+
+<Code example={makeTiny} title="make_tiny.py" />
+
+When llama.cpp loads that file, it prints the metadata it found:
+
+<Code example={loaderLog} title="llama.cpp loader log, recorded" />
+
+For a real model, the conversion takes three commands. We could not run them here, because the build container
+cannot download models or the llama.cpp repository, so treat them as a recipe to try on your own machine:
+
+<Code example={convertCommands} title="Hugging Face to GGUF" />
+
+</Section>
+
+<Section kind="experiment" title="Read the file yourself">
+
+- Select **kv general.architecture**. Its 44 bytes are an 8-byte key length (20), the 20 bytes of
+  `general.architecture`, the type code 8 (string), an 8-byte value length (4) and `demo`.
+- Select **tensor_info proj.weight**. The dims read `[32, 1]`: ggml lists the innermost dimension first, the
+  reverse of NumPy's shape `(1, 32)`. Type 8 is Q8_0. Offset 32 means 32 bytes after the start of the data section.
+- Select **padding**: the header ends at byte 235, so 21 zero bytes bring the data section to 256.
+- Select **data proj.weight**: 34 bytes at 288. The first two (`29 15`) are the float16 scale, 0.0012598; the
+  next 32 are the signed 8-bit integers, starting with `81` (−127).
+
+</Section>
+
+<Section kind="mistakes" title="Format mistakes">
+
+<CommonMistake
+  title="Loading a PyTorch checkpoint with llama.cpp"
+  wrong={'llama-cli -m pytorch_model.bin -p "Hello"'}
+  error="gguf_init_from_file_impl: invalid magic characters: 'PK', expected 'GGUF'"
+  cause="A .bin or .pt file is a zip archive of pickled tensors (its first bytes are PK). llama.cpp only reads GGUF."
+  fix={'python convert_hf_to_gguf.py ./model-folder --outtype bf16 --outfile model.gguf\nllama-cli -m model.gguf -p "Hello"'}
+/>
+
+<CommonMistake
+  title="Converting a model llama.cpp does not support"
+  wrong={'python convert_hf_to_gguf.py ./my-custom-architecture'}
+  error="NotImplementedError: Architecture 'MyCustomForCausalLM' not supported!"
+  cause="GGUF has no graph: llama.cpp must already implement the architecture in C++. The converter refuses architectures it does not know."
+  fix={'# Check the supported list in llama.cpp first, or export to ONNX and use ONNX Runtime,\n# or serve the safetensors with vLLM or Transformers.'}
+/>
+
+<Callout kind="warning">
+  These two messages follow llama.cpp's source and are shown as you would see them; they were not recorded here
+  because the llama.cpp command line tools are not installed in our build container.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Choosing an export format">
+
+- **LLM on laptops, desktops, Apple Silicon or CPU servers**: GGUF, quantized (Q4_K_M or Q8_0), with llama.cpp
+  or Ollama.
+- **LLM on GPU servers**: keep safetensors (BF16, or AWQ/GPTQ/FP8 quantized) and serve with vLLM, SGLang or
+  TensorRT-LLM.
+- **Vision, tabular, speech, embedding models**: ONNX, run with ONNX Runtime (CPU or GPU) or Triton; check the
+  opset your runtime supports.
+- **Anywhere**: never load pickle files from sources you do not trust; prefer safetensors or GGUF.
+- Record the source model, converter version and quantization type next to the file (a model registry entry or
+  the GGUF metadata), so you can rebuild it.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Read a GGUF header">
+
+<MiniExercise exercise={headerExercise}>
+  Write `header(data)`: check the magic bytes and return the version, tensor count and metadata count. Run the
+  tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- safetensors stores tensors; ONNX stores the graph and the tensors; GGUF stores settings, tokenizer and
+  (quantized) tensors for llama.cpp, which implements the graph itself.
+- A GGUF file is a header, typed key-value metadata, tensor descriptions, padding to 32 bytes and aligned data,
+  all little-endian, so it can be memory-mapped.
+- Hugging Face to GGUF: `convert_hf_to_gguf.py` to BF16, then `llama-quantize` to the type you chose.
+
+Next: [Running LLMs with llama.cpp and Ollama](#/learn/deploy/local/llama-cpp-ollama) loads a GGUF file, serves
+it over HTTP and decides how many layers go to the GPU.
+
+</Section>

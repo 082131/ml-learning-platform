@@ -20,8 +20,13 @@ describe('content validation', () => {
 
   it('encodes every lesson from curriculum.md', () => {
     const count = (id: string) => tracks.find((t) => t.id === id)!.chapters.flatMap((c) => c.lessons).length;
-    expect([count('ml'), count('data'), count('ai'), count('inference'), count('dataops')]).toEqual([
-      55, 12, 13, 14, 9,
-    ]);
+    expect([
+      count('ml'),
+      count('data'),
+      count('ai'),
+      count('inference'),
+      count('dataops'),
+      count('deploy'),
+    ]).toEqual([55, 12, 13, 14, 9, 9]);
   });
 });

@@ -493,4 +493,65 @@ export const tracks: Track[] = [
       },
     ],
   },
+  {
+    id: 'deploy',
+    title: 'Model Deployment and Optimization',
+    code: 'T.07',
+    summary:
+      'Shipping models to real hardware: data and model pipelines, Kubernetes, LLM quantization, ONNX and GGUF, llama.cpp, and serving at scale.',
+    chapters: [
+      {
+        id: 'foundations',
+        title: 'The deployment map',
+        level: 'beginner',
+        lessons: [{ id: 'deploy/foundations/deployment-map', status: 'written' }],
+      },
+      {
+        id: 'pipelines',
+        title: 'Data and model pipelines',
+        level: 'intermediate',
+        lessons: [{ id: 'deploy/pipelines/data-model-pipelines', status: 'written' }],
+      },
+      {
+        id: 'kubernetes',
+        title: 'Kubernetes',
+        level: 'intermediate',
+        lessons: [
+          { id: 'deploy/kubernetes/k8s-for-models', status: 'written' },
+          { id: 'deploy/kubernetes/autoscaling-rollouts', status: 'written' },
+        ],
+      },
+      {
+        id: 'quantization',
+        title: 'LLM quantization',
+        level: 'advanced',
+        lessons: [{ id: 'deploy/quantization/llm-quantization', status: 'written' }],
+      },
+      {
+        id: 'formats',
+        title: 'Model formats',
+        level: 'advanced',
+        lessons: [{ id: 'deploy/formats/onnx-gguf', status: 'written' }],
+      },
+      {
+        id: 'local',
+        title: 'Local LLM runtimes',
+        level: 'advanced',
+        lessons: [{ id: 'deploy/local/llama-cpp-ollama', status: 'written' }],
+      },
+      {
+        id: 'llm-serving',
+        title: 'Serving LLMs at scale',
+        level: 'advanced',
+        lessons: [{ id: 'deploy/llm-serving/vllm-kserve', status: 'written' }],
+      },
+      {
+        id: 'capstone',
+        title: 'Capstone',
+        level: 'advanced',
+        project: 'deploy/capstone/quantize-and-ship',
+        lessons: [{ id: 'deploy/capstone/quantize-and-ship', status: 'written' }],
+      },
+    ],
+  },
 ];

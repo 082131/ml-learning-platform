@@ -26,9 +26,15 @@ export function useOverflowFocus(ref: RefObject<HTMLElement | null>, selector?: 
       }
     };
     update();
-    if (typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(update);
-    observer.observe(root);
-    return () => observer.disconnect();
+    // Re-check when the box resizes, and when content changes inside it (for example code that is
+    // highlighted after a lazily loaded grammar arrives), which widens it without resizing it.
+    const resize = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(update);
+    resize?.observe(root);
+    const mutation = typeof MutationObserver === 'undefined' ? undefined : new MutationObserver(update);
+    mutation?.observe(root, { childList: true, subtree: true, characterData: true });
+    return () => {
+      resize?.disconnect();
+      mutation?.disconnect();
+    };
   }, [ref, selector]);
 }

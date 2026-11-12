@@ -1,0 +1,184 @@
+import { experiment, hpaCode, hpaManifest, rollout } from './code';
+import { hpaExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Opening checkout lanes before the queue grows">
+
+A supermarket opens more checkout lanes when queues get long and closes them when the store empties. Two things
+make that hard: you only notice the queue once it exists, and a new cashier needs a few minutes to arrive and
+log in. Open lanes too late and customers wait; keep every lane open all day and you pay for idle cashiers.
+
+Model servers have the same problem, with a much slower cashier. A new pod must pull its image, start, and load
+gigabytes of weights before it can answer a single request: a <Term id="cold-start">cold start</Term> of
+seconds for the digits model and minutes for an LLM. The
+<Term id="horizontal-pod-autoscaler">Horizontal Pod Autoscaler</Term> (HPA) opens and closes lanes for you.
+This lesson shows its exact rule, why it lags behind traffic, and how to ship a new model version without
+closing any lanes at all.
+
+</Section>
+
+<Section kind="technical" title="The HPA rule, and rolling updates">
+
+Every 15 seconds the HPA reads a metric, by default the average CPU utilization of the ready pods, measured as
+a percentage of each pod's CPU **request**. It then computes, as the Kubernetes documentation states:
+
+$$
+\text{desired} = \left\lceil \text{current replicas} \times \frac{\text{current metric}}{\text{target}} \right\rceil
+$$
+
+Worked example: 5 pods at 100% with a 70% target give $\lceil 5 \times 100 / 70 \rceil = \lceil 7.14 \rceil = 8$.
+Three rules shape the result:
+
+1. **Tolerance.** If $|\text{metric} / \text{target} - 1| \le 0.1$, nothing changes. At 75% against 70%,
+   $75/70 - 1 = 0.071$, so the HPA waits.
+2. **Scale-up limit.** By default it adds at most 100% of the current pods or 4 pods, whichever is more, per 15 s.
+3. **Scale-down <Term id="stabilization-window">stabilization window</Term>.** Before removing pods, it uses the
+   *highest* recommendation of the last 300 s, so a brief dip does not throw away pods you will need again.
+
+The result is clamped between `minReplicas` and `maxReplicas`.
+
+**Why it lags.** A pod can never report more than 100% CPU. When traffic jumps past what the ready pods can
+handle, the HPA sees "100%" whether demand is 1.5 or 10 times capacity, so it grows by at most
+$100/\text{target}$ per decision and then waits for the new pods to become ready before it can measure again.
+Each round costs one cold start.
+
+**Rolling updates.** Changing the pod template (a new image, say `digits-api:2`) makes the Deployment replace
+pods gradually. Two numbers control a <Term id="rolling-update">rolling update</Term>:
+
+- `maxSurge`: how many pods *above* the replica count may exist during the update.
+- `maxUnavailable`: how many pods *below* the replica count may be missing or not ready.
+
+With 3 replicas, `maxSurge: 1` and `maxUnavailable: 0`, the controller creates one new pod (4 in total), waits
+for its <Term id="readiness-probe">readiness probe</Term> to pass, deletes one old pod (3), and repeats three
+times. Capacity never drops below 3, at the cost of room for one extra pod. A
+<Term id="canary-release">canary release</Term> goes further: a small share of traffic goes to the new version
+first, and you compare its metrics before continuing.
+
+<Callout kind="simplification">
+  The model below treats pods that are still starting as absent, which is close to what the real HPA does
+  for CPU (it assumes conservative values for pods that are not ready). It ignores the metrics pipeline's own
+  delay (metrics-server samples about every 15 s) and the time to add nodes: if the cluster has no room, new
+  pods stay Pending until a cluster autoscaler adds a node, which for GPU nodes often takes several minutes more.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Autoscaling a model server through a traffic spike">
+
+Traffic sits at 60 requests/s, ramps to the peak between minutes 5 and 10, holds until minute 25 and falls back
+by minute 30. Each pod serves 50 requests/s at 100% CPU. The solid line is demand, the dashed line what the
+ready pods can serve. Wherever demand is above the dashed line, requests queue, slow down or fail.
+
+<Experiment def={experiment} title="HPA simulator">
+  <HpaCharts />
+  <Readout />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The HPA manifest, and the model in Python">
+
+This HPA scales the Deployment from the previous lesson. It was accepted by a Kubernetes v1.33 API server.
+
+<Code example={hpaManifest} title="hpa.yaml" />
+
+The simulator above is this Python, linked to the controls. Its printout is the readout of the experiment:
+
+<Experiment def={experiment} title="hpa_sim.py, linked to the experiment" controls={false}>
+  <Code example={hpaCode} title="hpa_sim.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+The rolling update settings that keep capacity during a release go in the Deployment:
+
+<Code example={rollout} title="model-server.yaml (excerpt)" />
+
+</Section>
+
+<Section kind="experiment" title="Find the settings that keep up">
+
+Start from the defaults: peak 400 requests/s, cold start 120 s, target 70%, minimum 2, window 300 s. The
+printout shows 8.4% of requests arriving beyond capacity during the ramp, and a peak of 12 replicas.
+
+- **Cold start.** Set it to 15 s: nothing is over capacity (0.0%), with 11 replicas. Set it to 300 s: 31.2% of
+  requests are beyond capacity, for 15.25 minutes, because each round of scaling waits five minutes for pods
+  that then report 100% again. Loading time is the main lever.
+- **Target.** Back at 120 s, lower the target to 50%: the over-capacity share falls to 1.5%, but the peak is
+  16 replicas and pod-minutes rise from 307 to 436.5. Headroom costs money all the time.
+- **Minimum replicas.** Set it to 4 (target 70%): 2.8%, at 342.75 pod-minutes. Extra baseline pods absorb the
+  start of the ramp.
+- **Window.** Set the window to 0. Pod-minutes drop from 307 to 260 because pods are removed as soon as traffic
+  falls, and a second spike a few minutes later would hit a cold fleet again.
+
+</Section>
+
+<Section kind="mistakes" title="Autoscaling mistakes with model servers">
+
+<CommonMistake
+  title="No CPU request, so no utilization"
+  wrong={'resources:\n  limits:\n    memory: "2Gi"        # no requests.cpu'}
+  error={'Warning  FailedGetResourceMetric  horizontal-pod-autoscaler  failed to get cpu utilization: missing request for cpu in container server of Pod digits-api-...'}
+  cause="Utilization is a percentage of the request. Without a CPU request there is nothing to divide by, and the HPA does not scale."
+  fix={'resources:\n  requests:\n    cpu: "1500m"\n    memory: "2Gi"'}
+/>
+
+<CommonMistake
+  title="Scaling GPU LLM servers on CPU"
+  wrong={'metrics:\n  - type: Resource\n    resource: {name: cpu, target: {type: Utilization, averageUtilization: 70}}'}
+  error="No error. CPU stays at 15% while requests queue for the GPU and latency climbs, so the HPA never adds pods."
+  cause="An LLM server’s bottleneck is the GPU and its KV-cache memory, not the CPU. CPU utilization does not reflect its load."
+  fix={'# Scale on a serving metric exposed by the server, through a metrics adapter or KEDA:\n# e.g. requests waiting in the queue per pod, or tokens per second per pod'}
+/>
+
+<Callout kind="warning">
+  These two messages describe what you will see; they were not recorded here, because our recording cluster
+  has no metrics server and its containers could not start. The first is the event text the HPA controller
+  emits for a missing request.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="A checklist for scaling model servers">
+
+| Decision | Good default for model servers | Why |
+| -------- | ------------------------------ | --- |
+| Metric | Requests in flight or queue length per pod; CPU only for CPU-bound models | Saturated CPU hides real demand; GPU servers are not CPU-bound |
+| Target | Leave 30–40% headroom (CPU target 60–70%) | Absorbs traffic while new pods load |
+| `minReplicas` | At least 2, or the known baseline peak | Survives a failure; avoids cold starts for normal traffic |
+| Scale-down window | 300 s or more | Pods are expensive to bring back |
+| Cold start | Measure it; cache weights on the node; use safetensors and memory mapping | Every scale-up waits this long |
+| Rollout | `maxSurge: 1`, `maxUnavailable: 0`, a readiness probe that waits for the model | No capacity drop, no traffic to unloaded pods |
+| Predictable peaks | Scale up on a schedule beforehand | Reactive scaling is always one cold start late |
+
+Scale to zero (KServe and KEDA can do it) saves the most money for rarely used models, at the price of a full
+cold start for the first request.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Implement the HPA decision">
+
+<MiniExercise exercise={hpaExercise}>
+  Write `desired_replicas(current, util, target, min_r, max_r)`: the formula, the 10% tolerance, and the
+  limits. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- The HPA asks for $\lceil \text{current} \times \text{metric} / \text{target} \rceil$ replicas every 15 s,
+  ignores changes within 10%, and scales down only to the highest recommendation of the last 300 s.
+- Saturated pods report 100%, so the HPA grows by at most 100/target per round and waits a cold start each round.
+- Shorter model loading, more headroom and higher minimums all reduce requests beyond capacity; the last two cost
+  pod-minutes. Scale LLM servers on queue or request metrics, not CPU.
+- A rolling update with `maxSurge: 1` and `maxUnavailable: 0` replaces pods one at a time without losing capacity.
+
+Next: [Quantizing LLMs](#/learn/deploy/quantization/llm-quantization) shrinks the model itself, which cuts both
+the memory per pod and the load time.
+
+</Section>

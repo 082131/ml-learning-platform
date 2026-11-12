@@ -1,0 +1,103 @@
+import { experiment, journey } from './code';
+import { questions } from './quiz';
+
+<Section kind="intuition" title="From a test kitchen to a chain of restaurants">
+
+A chef perfects a dish in a test kitchen. Serving it in a hundred restaurants is a different job: the recipe is
+written in a standard form, ingredients are packed so they survive transport, each kitchen gets the right
+equipment, and someone watches whether diners still like it. The dish did not change; everything around it did.
+
+A trained model is the dish. This track is about everything around it: the pipelines that produce and register
+it, the file formats it is shipped in (ONNX, GGUF), how it is made smaller (quantization), the programs that run it
+(llama.cpp, Ollama, vLLM, Triton), and the platform that keeps it running for many users (Kubernetes, KServe).
+These are the tools you met at work, often all at once. This lesson puts each one on a single map.
+
+</Section>
+
+<Section kind="technical" title="Six stages and the tools at each">
+
+| Stage | Question it answers | Tools you will meet |
+| ----- | ------------------- | ------------------- |
+| 1. Pipeline | Which model, trained on what, and is it better? | Kubeflow Pipelines, Argo, Airflow, MLflow registry |
+| 2. Format | What file does the runtime read? | safetensors, <Term id="onnx">ONNX</Term>, <Term id="gguf">GGUF</Term> |
+| 3. Runtime | What program executes the model fast? | ONNX Runtime, llama.cpp, Ollama, vLLM, TensorRT-LLM |
+| 4. Package | How does it reach the machine? | Container images, app bundles |
+| 5. Scale | How many copies, on which machines? | <Term id="kubernetes">Kubernetes</Term>, HPA, KServe, Triton |
+| 6. Operate | Is it fast, correct and recoverable? | Metrics, logs, canaries, rollbacks |
+
+The <Term id="model-artifact">model artifact</Term> passes from stage to stage and the
+<Term id="deployment-target">deployment target</Term> decides most choices. The first check is always memory.
+The weights take about
+
+$$
+\text{bytes} = \text{parameters} \times \frac{\text{bits per weight}}{8}
+$$
+
+An 8-billion-parameter model is $8.03 \times 10^9 \times 16 / 8 = 16.1$ GB in BF16 and
+$8.03 \times 10^9 \times 4.85 / 8 = 4.87$ GB in the common 4-bit GGUF type Q4_K_M. The first fits only a GPU
+server; the second fits a laptop. LLMs need more memory on top of this for the KV cache, which grows with the
+conversation.
+
+A <Term id="model-server">model server</Term> is the long-running program that keeps the model loaded and
+answers requests; with LLMs it is often also the runtime (llama-server, vLLM).
+
+<Callout kind="simplification">
+  The planner below encodes common choices, not the only right ones. Many teams run vLLM on laptops with GPUs,
+  llama.cpp on servers, or ONNX models on phones through other runtimes. Memory sizes and bits per weight are
+  stated assumptions, and real deployments also need memory for the runtime and, for LLMs, the KV cache.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Plan a deployment">
+
+Choose a model and where it should run. The map fills in the format, runtime, packaging and scaling commonly
+chosen for that combination, with the reason for each, and checks that the weights fit.
+
+<Experiment def={experiment} title="Deployment planner">
+  <StackMap />
+  <Readout />
+</Experiment>
+
+Try the 70B chat model on a laptop: even at 4.85 bits per weight its weights are 42.77 GB, more than 16 GB.
+On one 80 GB GPU it needs 4-bit weights (37.48 GB) instead of BF16 (141 GB). The image classifier fits
+everywhere: the hard part there is batching and latency, not memory.
+
+</Section>
+
+<Section kind="code" title="The whole journey in commands">
+
+Each line is covered by a later lesson, where it is run or explained in full:
+
+<Code example={journey} title="the deployment journey" />
+
+</Section>
+
+<Section kind="practice" title="Questions to ask before choosing tools">
+
+1. **Who calls the model, and how many at once?** One user on a laptop and 1,000 users of an API need different runtimes.
+2. **What hardware is available?** CPU only, Apple Silicon, one GPU or a GPU cluster.
+3. **Does it fit?** Parameters × bits per weight / 8, plus the KV cache for LLMs, plus overhead.
+4. **What latency and cost are acceptable?** These set the batch sizes, the quantization and the number of replicas.
+5. **How will you know it works, and how do you go back?** Metrics, an evaluation set and a rollback path come
+   before the first release, not after it.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="summary">
+
+- Shipping a model has six stages: pipeline, format, runtime, package, scale, operate.
+- The target decides most choices; the first check is memory: parameters × bits per weight / 8.
+- GGUF + llama.cpp or Ollama for local LLMs; safetensors + vLLM for LLMs on GPU servers; ONNX + ONNX Runtime or
+  Triton for other models; Kubernetes and KServe to run any of them at scale.
+
+Next: [Data and model pipelines](#/learn/deploy/pipelines/data-model-pipelines) builds stage 1: steps,
+artifacts, caching and a model registry.
+
+</Section>

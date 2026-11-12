@@ -27,6 +27,7 @@ const GRAMMARS = {
   bash: () => import('shiki/langs/bash.mjs'),
   json: () => import('shiki/langs/json.mjs'),
   typescript: () => import('shiki/langs/typescript.mjs'),
+  yaml: () => import('shiki/langs/yaml.mjs'),
 } satisfies Record<CodeLanguage, () => Promise<{ default: LanguageRegistration[] }>>;
 
 let highlighter: Promise<HighlighterCore> | undefined;

@@ -1,6 +1,6 @@
 // Content types shared by every thread. Change only additively (see data-model.md).
 
-export type TrackId = 'ml' | 'data' | 'ai' | 'inference' | 'python' | 'dataops';
+export type TrackId = 'ml' | 'data' | 'ai' | 'inference' | 'python' | 'dataops' | 'deploy';
 export type Level = 'beginner' | 'intermediate' | 'advanced';
 export type LessonStatus = 'written' | 'outline';
 
@@ -59,7 +59,7 @@ export interface Annotation {
 
 export interface CodeExample {
   id: string;
-  language: 'python' | 'sql' | 'bash' | 'json' | 'typescript';
+  language: 'python' | 'sql' | 'bash' | 'json' | 'typescript' | 'yaml';
   source: string;
   slots?: Record<string, (state: unknown) => string>;
   annotations: Annotation[];

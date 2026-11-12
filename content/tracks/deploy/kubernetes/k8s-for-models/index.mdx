@@ -1,0 +1,207 @@
+import { experiment, gpuEvents, getPods, manifest, schedCode } from './code';
+import { questions, quantityExercise } from './quiz';
+
+<Section kind="intuition" title="A building manager for containers">
+
+In the serving lesson you packed the digits model server into a <Term id="container-image">container image</Term>
+and ran it on one machine with `docker run`. That works until the machine reboots, traffic doubles, or you
+ship version 2. Someone has to start more copies, put them on machines with room, restart the ones that crash
+and send traffic only to the healthy ones.
+
+<Term id="kubernetes">Kubernetes</Term> is that someone. Think of a building manager with a floor plan. You
+hand over a written order: "keep three copies of this server running, each needs 1.5 CPUs and 2 GiB of memory".
+The manager finds rooms with enough free space, moves in the tenants, checks on them every few seconds and
+replaces any that leave. You never say *which* machine; you say *what* you want, and Kubernetes keeps changing
+the cluster until it matches.
+
+This is the system you used at work for model pipelines and serving. This lesson builds its core vocabulary
+around one question that matters most for models: **will my pods fit, and where?**
+
+</Section>
+
+<Section kind="technical" title="Pods, nodes, Deployments and Services">
+
+Four objects cover most of model serving:
+
+| Object | What it is | For a model server |
+| ------ | ---------- | ------------------ |
+| <Term id="k8s-node">Node</Term> | A machine (VM or physical) that runs pods | CPU nodes for APIs, GPU nodes for big models |
+| <Term id="pod">Pod</Term> | One or more containers scheduled together, with one IP address | One running copy of the model server |
+| <Term id="k8s-deployment">Deployment</Term> | Keeps N identical pods (replicas) running and rolls out changes | "Run 3 replicas of digits-api:1" |
+| <Term id="k8s-service">Service</Term> | A stable name that load-balances over the ready pods | `http://digits-api` inside the cluster |
+
+You describe them in YAML manifests and send them with `kubectl apply -f file.yaml`. The API server stores
+them; controllers react. The Deployment controller creates pods, and the
+<Term id="kube-scheduler">scheduler</Term> chooses a node for each pod in two phases:
+
+1. **Filter.** Drop every node that cannot take the pod: its free allocatable CPU, memory or GPUs are less
+   than the pod's <Term id="resource-request">requests</Term>, or it has a taint the pod does not tolerate.
+2. **Score.** Rank the remaining nodes. The main resource score, *LeastAllocated*, prefers nodes with more
+   room left after placing the pod:
+
+$$
+\text{score} = \frac{1}{2}\left(\frac{(\text{cpu}_{\text{alloc}} - \text{cpu}_{\text{reserved}} - \text{cpu}_{\text{req}}) \cdot 100}{\text{cpu}_{\text{alloc}}} + \frac{(\text{mem}_{\text{alloc}} - \text{mem}_{\text{reserved}} - \text{mem}_{\text{req}}) \cdot 100}{\text{mem}_{\text{alloc}}}\right)
+$$
+
+with integer division at each step. For a 1500m, 2 GiB pod on an empty 4-CPU, 16 GiB node:
+$\lfloor 2500 \cdot 100 / 4000 \rfloor = 62$ and $\lfloor 14 \cdot 100 / 16 \rfloor = 87$, so the score is
+$\lfloor (62 + 87) / 2 \rfloor = 74$. After one such pod, the same node scores
+$\lfloor (25 + 75) / 2 \rfloor = 50$ for the next, so the next pod goes to an emptier node.
+
+If no node passes the filter, the pod stays **Pending** and the scheduler records a `FailedScheduling` event
+that counts the reasons over all nodes.
+
+**Requests are reservations, not usage.** The scheduler adds up requests. A pod that requests 1500m but
+idles at 300m still blocks 1500m. **Limits** cap what a running container may use: above its memory limit it
+is killed (`OOMKilled`), above a CPU limit it is slowed down.
+
+**GPUs** are an <Term id="extended-resource">extended resource</Term>. NVIDIA's device plugin advertises
+`nvidia.com/gpu: 1` (or 8) on each GPU node, and pods request whole GPUs. GPU nodes are usually *tainted*
+(`nvidia.com/gpu=present:NoSchedule`) so that only pods with a matching *toleration* land there.
+
+<Callout kind="simplification">
+  The real kube-scheduler runs more scoring plugins than LeastAllocated, such as balanced allocation and
+  spreading the replicas of one Deployment across nodes and zones, and it picks randomly among nodes with
+  equal scores. The model here keeps the filter exact and uses only the resource score, so it can place pods
+  differently from a real cluster on ties.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Watch the scheduler place your replicas">
+
+Three nodes: two CPU nodes with 4 CPUs and 16 GiB each, and one GPU node with 8 CPUs, 32 GiB and one GPU,
+tainted for GPU pods. Change the replicas and the requests, and see where each pod lands and why the rest stay
+Pending. The manifest further down changes with these controls.
+
+<Experiment def={experiment} title="Scheduler">
+  <SchedulerNodes />
+  <Readout />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The manifest, and the scheduler in Python">
+
+This is the Deployment and Service for the digits model server. It is linked to the experiment above: the
+replicas, requests and tolerations change as you move the controls. Both the CPU version and the GPU version
+were accepted by a Kubernetes v1.33 API server (`kubectl apply --dry-run=server`). Select a part to see what it does.
+
+<Experiment def={experiment} title="model-server.yaml, linked to the experiment" controls={false}>
+  <Code example={manifest} title="model-server.yaml" />
+</Experiment>
+
+Here is the scheduling model itself in plain Python. Its output is the printout in the experiment's readout:
+
+<Experiment def={experiment} title="schedule.py, linked to the experiment" controls={false}>
+  <Code example={schedCode} title="schedule.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+And here is what a real cluster said. We applied the manifest with 3 replicas of 1500m to a single-node
+K3s cluster (K3s is a small Kubernetes distribution) with 4 CPUs. The DNS pod already reserved 100m, so two
+pods fit (3100m reserved) and the third stayed Pending:
+
+<Code example={getPods} title="kubectl, recorded on K3s v1.33.5" />
+
+<Callout kind="note">
+  In the container we recorded this in, nested containers cannot start, so the two scheduled pods stay in
+  `ContainerCreating` instead of reaching `Running`. Scheduling happens before that, so the placements and the
+  `FailedScheduling` message are exactly what Kubernetes decided. The extra "preemption" sentence says no
+  lower-priority pod could be evicted to make room.
+</Callout>
+
+</Section>
+
+<Section kind="experiment" title="Make it fail on purpose">
+
+Use the controls in the visual section and predict the result before you look.
+
+- Raise the replicas to 5 at 1500m CPU. pod-4 is Pending with
+  `1 node(s) had untolerated taint {nvidia.com/gpu: present}, 2 Insufficient cpu`: both CPU nodes have 3000m
+  reserved, and the GPU node refuses CPU pods.
+- Now switch the taint off. All five fit, because pod-4 lands on the GPU node. Then set 1 GPU per pod and 2
+  replicas: the first GPU pod still fits, but think about what a real cluster full of CPU pods on its GPU nodes
+  would do to your GPU workloads.
+- Set GPUs per pod to 1, 2 replicas, 2000m CPU and 8 GiB. pod-0 takes the only GPU, and pod-1 gets
+  `3 Insufficient nvidia.com/gpu`: every node, including the CPU nodes, lacks a free GPU.
+- Set memory to 20 GiB. No CPU node can hold it (16 GiB), so only the GPU node can, and only if the pod
+  tolerates the taint.
+
+These are the messages a real cluster printed for the same situations:
+
+<Code example={gpuEvents} title="FailedScheduling events, recorded on K3s v1.33.5" />
+
+</Section>
+
+<Section kind="mistakes" title="Mistakes that keep model pods from running">
+
+<CommonMistake
+  title="Writing CPU like a sentence"
+  wrong={'resources:\n  requests:\n    cpu: "1.5 cores"'}
+  error={`Error from server (BadRequest): error when creating "STDIN": Deployment in version "v1" cannot be handled as a Deployment: quantities must match the regular expression '^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$'`}
+  cause="Kubernetes quantities have a fixed syntax: a number and an optional suffix. The API server rejects the whole manifest."
+  fix={'cpu: "1500m"     # or "1.5"\nmemory: "2Gi"    # Gi = 2^30 bytes; G = 10^9 bytes'}
+/>
+
+<CommonMistake
+  title="Pointing the liveness probe at model loading"
+  wrong={'livenessProbe:\n  httpGet: {path: /readyz, port: 8000}\n  initialDelaySeconds: 10\n  failureThreshold: 3'}
+  error="Warning  Unhealthy  ...  Liveness probe failed: HTTP probe failed with statuscode: 503   (then: Back-off restarting failed container)"
+  cause="The model takes longer to load than 10 s plus 3 failed checks, so Kubernetes kills the container before it is ever ready, again and again."
+  fix={'readinessProbe:  {httpGet: {path: /readyz, port: 8000}}    # gates traffic\nlivenessProbe:   {httpGet: {path: /healthz, port: 8000}}   # process alive?\nstartupProbe:    {httpGet: {path: /healthz, port: 8000}, failureThreshold: 60, periodSeconds: 5}'}
+/>
+
+<Callout kind="warning">
+  The second error message shows the pattern Kubernetes reports; it was not recorded here, because containers
+  could not start in our recording environment. A `startupProbe` holds off the liveness checks until the first
+  success, which is exactly what slow-loading model servers need.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Sizing requests for a model server">
+
+1. **Measure first.** Run one replica under realistic load and read its CPU and memory (`kubectl top pod`,
+   which needs the metrics server, or your monitoring). Memory for a model server is roughly weights plus
+   runtime buffers plus per-request working memory, and it peaks while loading.
+2. **Memory: request = limit = measured peak plus a margin** (10–20%). Being killed is worse than wasting a
+   little memory.
+3. **CPU: request about the steady usage at your target load**, and often no CPU limit, so the server can use
+   idle CPU during bursts.
+4. **GPU pods: one model server per GPU** is the simple default. Give GPU nodes a taint and GPU pods a
+   toleration, and request enough CPU and memory too: a GPU pod still needs CPU to tokenize and to move data.
+5. **Read Pending pods from the event.** `kubectl describe pod <name>` tells you which resource is short on
+   how many nodes. "Insufficient nvidia.com/gpu" on every node means you need another GPU node (or a cluster
+   autoscaler), not a different manifest.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Parse quantities and check a fit">
+
+<MiniExercise exercise={quantityExercise}>
+  Write `to_millicores(q)` for CPU quantities and `fits(free, req)`, the scheduler's filter for one node. Run
+  the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A Deployment keeps N pods running; a Service gives them one stable address and sends traffic only to ready pods.
+- The scheduler filters nodes by **requests** (not usage) and taints, then scores the rest; LeastAllocated
+  prefers emptier nodes. When nothing fits, the pod is Pending and the event lists the reasons per node.
+- Memory over the limit kills the container; CPU over the limit slows it. Set memory request = limit = peak.
+- GPUs are whole units (`nvidia.com/gpu`). Taint GPU nodes so only GPU pods use them.
+- Readiness gates traffic; liveness restarts; slow model loads need a startup probe.
+
+Next: [Autoscaling and rollouts for model servers](#/learn/deploy/kubernetes/autoscaling-rollouts) changes the
+replica count automatically as traffic moves, and ships new model versions without dropping requests.
+
+</Section>

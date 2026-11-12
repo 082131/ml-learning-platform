@@ -1,0 +1,133 @@
+import { brief, dryRun, manifestCode, reportTemplate } from './code';
+import { chooseExercise, questions } from './quiz';
+
+<Section kind="intuition" title="One model, all the way to a cluster">
+
+Each lesson in this track took one piece: how a pipeline caches and gates, how Kubernetes places and scales pods,
+what a quantized block stores, what a GGUF file holds, how llama.cpp splits layers between CPU and GPU, how vLLM
+packs the KV cache. Real deployments need all of them at once, and the decisions are linked: the quantization you
+pick sets the file size, which sets the memory limit, which sets how many pods fit on a node.
+
+In this capstone you take a small open model from its Hugging Face files to a quantized GGUF served on a local
+Kubernetes cluster, choose the quantization from your own measurements, and roll out a new version without
+dropping a request.
+
+</Section>
+
+<Section kind="technical" title="What you will build">
+
+| Part | Does | From lesson |
+| --- | --- | --- |
+| conversion | Hugging Face files to BF16 GGUF, then Q8_0, Q4_K_M and Q4_0 | [model formats](#/learn/deploy/formats/onnx-gguf), [quantization](#/learn/deploy/quantization/llm-quantization) |
+| measurements | size, perplexity and tokens per second for each variant, repeated | [quantization](#/learn/deploy/quantization/llm-quantization), [llama.cpp](#/learn/deploy/local/llama-cpp-ollama) |
+| pipeline | the conversion as cached steps with a quality gate | [pipelines](#/learn/deploy/pipelines/data-model-pipelines) |
+| server | llama-server in a container with /health, /metrics and the OpenAI-compatible API | [llama.cpp](#/learn/deploy/local/llama-cpp-ollama) |
+| cluster | Deployment, Service, probes, requests and limits | [Kubernetes](#/learn/deploy/kubernetes/k8s-for-models) |
+| scaling and rollout | an autoscaler and a rolling update that keeps capacity | [autoscaling and rollouts](#/learn/deploy/kubernetes/autoscaling-rollouts) |
+
+**Three rules for the results.**
+
+1. **Tolerance first.** Write down how much quality you will give up (for example perplexity at most 5% above
+   BF16) before you see any numbers.
+2. **Same conditions.** Every variant is measured on the same machine, text, context length and thread count,
+   at least three times.
+3. **Evidence for the rollout.** "It worked" is a load test across the rollout with zero failed requests, not a
+   pod list.
+
+For scale, these are the measurements from the [quantization lesson](#/learn/deploy/quantization/llm-quantization),
+made on a tiny Llama-architecture model with random weights. Sizes and bits per weight carry over to real models;
+the speeds are for that toy model on a shared CPU, and random weights say nothing about quality, which is what
+your perplexity runs add:
+
+| Variant | Size (MiB) | Bits per weight | tokens/s, two sessions |
+| --- | --- | --- | --- |
+| F32 | 97.08 | 32 | 396, 334 |
+| Q8_0 | 25.81 | 8.51 | 612, 620 |
+| Q4_K_M | 14.62 | 4.82 | 822, 648 |
+| Q4_0 | 13.71 | 4.52 | 795, 710 |
+
+The two sessions for Q4_K_M differ by more than Q4_K_M and Q4_0 differ from each other: that is why the brief asks
+for three runs and a range.
+
+</Section>
+
+<Section kind="code" title="The reference manifests">
+
+A starting point for the cluster milestones: llama-server with startup, readiness and liveness probes, a rolling
+update that never drops below the current replica count, and a CPU autoscaler.
+
+<Code example={manifestCode} title="llama-server.yaml" />
+
+<Code example={dryRun} title="Validated against a K3s v1.33.5 API server" />
+
+<Callout kind="warning">
+  The API server accepted these manifests, but we could not start the pods in our build container, so the
+  resource sizes are starting values to replace with your measurements. MODEL_URL is a placeholder.
+</Callout>
+
+A report built from the brief would start like this:
+
+<Code example={reportTemplate} title="report.md" />
+
+</Section>
+
+<Section kind="practice" title="The brief">
+
+Tick each milestone when it is done; your progress is saved in this browser.
+
+<Project brief={brief} />
+
+</Section>
+
+<Section kind="mistakes" title="Where projects like this go wrong">
+
+<CommonMistake
+  title="Quantizing from an already quantized file"
+  wrong={'llama-quantize model-Q8_0.gguf model-Q4_K_M.gguf Q4_K_M'}
+  error="llama_model_quantize: failed to quantize: requantizing from type q8_0 is disabled"
+  cause="llama.cpp refuses by default, because each quantization rounds the weights and re-quantizing stacks a second rounding on the first. --allow-requantize makes it run, and the result is worse than quantizing from BF16."
+  fix={'llama-quantize model-bf16.gguf model-Q4_K_M.gguf Q4_K_M'}
+/>
+
+<CommonMistake
+  title="Measuring speed and quality on different settings"
+  wrong={'llama-bench -m q4.gguf -t 8\nllama-bench -m q8.gguf          # default threads\nllama-perplexity -m q4.gguf -f text.txt -c 2048\nllama-perplexity -m bf16.gguf -f text.txt -c 512'}
+  error="No error. The table compares thread counts and context lengths as much as quantizations."
+  cause="Every setting other than the quantization must be the same for all variants."
+  fix={'for q in bf16 q8_0 q4_k_m q4_0; do\n  llama-bench -m model-$q.gguf -t 8 -r 3\n  llama-perplexity -m model-$q.gguf -f text.txt -c 512 -t 8\ndone'}
+/>
+
+<CommonMistake
+  title="Rolling out with maxUnavailable above zero"
+  wrong={'rollingUpdate: { maxSurge: 0, maxUnavailable: 1 }'}
+  error="No error. During the rollout one replica is missing for as long as a new pod takes to load the model."
+  cause="LLM pods take minutes to become Ready, so a gap in capacity lasts minutes, not seconds."
+  fix={'rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }   # plus a startup probe and a grace period'}
+/>
+
+</Section>
+
+<Section kind="check" title="Self-assessment">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Choose a quantization">
+
+<MiniExercise exercise={chooseExercise}>
+  Write `choose(variants, base_ppl, max_increase)` that returns the smallest variant inside the tolerance. Run the
+  tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Convert once to BF16 GGUF, quantize every variant from it, and measure size, perplexity and speed under the same
+  conditions.
+- Fix the quality tolerance first, then ship the cheapest variant that passes; automate that as a gated pipeline.
+- On Kubernetes, size memory from the file, give loading a startup probe, keep maxUnavailable at 0 and prove the
+  rollout with a load test.
+
+</Section>

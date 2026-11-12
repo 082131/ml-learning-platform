@@ -1,0 +1,190 @@
+import { cacheCode, experiment, kfpCode, kfpLog, kfpYaml, metricsCode, mlflowCode, mlflowOutput } from './code';
+import { questions, rerunExercise } from './quiz';
+
+<Section kind="intuition" title="An assembly line with a receipt for every part">
+
+Training a model once in a notebook is a craft. Doing it every week, for a team, with new data each time, needs
+an assembly line: an <Term id="ml-workflow-pipeline">ML pipeline</Term>. Each station (a *step*) takes parts from
+the station before, does one job, and puts its output on the shelf with a label. Those labelled outputs are
+<Term id="pipeline-artifact">artifacts</Term>: a dataset snapshot, a feature table, a model file, a metrics
+report.
+
+Two things make the line worth building. If you change one station, the stations before it do not need to
+work again: their parts are still on the shelf. That is the <Term id="step-cache">step cache</Term>. And every
+model leaving the line carries a receipt saying which data, code and settings made it. That receipt is
+<Term id="data-lineage">lineage</Term>, and the shop window where finished models wait is the
+<Term id="model-registry">model registry</Term>.
+
+At work you met these as Kubeflow, Argo and MLflow. This lesson builds the idea from scratch, then runs the same
+pipeline in Kubeflow Pipelines and registers its models in MLflow.
+
+</Section>
+
+<Section kind="technical" title="Steps, artifacts, cache keys and gates">
+
+A typical training pipeline has these steps:
+
+| Step | Reads | Writes |
+| ---- | ----- | ------ |
+| ingest | a data source and a version or date | a raw dataset snapshot |
+| validate | the snapshot | the same rows, or a failure if the schema or ranges are wrong |
+| features | validated rows and the feature code | a feature table |
+| train | the feature table and hyperparameters | a model file |
+| evaluate | the model and a fixed test set | metrics |
+| register | the model and its metrics | a new registry version, if the gate passes |
+
+Each step runs in its own container and passes only artifacts and small parameters to the next. The
+orchestrator (Kubeflow Pipelines, Argo Workflows, Airflow, Vertex AI Pipelines, SageMaker Pipelines) reads the
+graph, starts containers in order, stores every artifact and records what fed what. The
+[orchestration lesson](#/learn/data/orchestration/dags-retries) covers the scheduling side: DAGs, retries,
+backfills.
+
+**Caching.** Before running a step, the orchestrator computes a *cache key*: a hash of everything that could
+change the step’s output. That means the step’s code or image, its parameters, and the keys (or
+<Term id="content-hash">content hashes</Term>) of its input artifacts. If an earlier run stored an output under the
+same key, the step is skipped and that output reused. Because each key includes its inputs’ keys, a change
+re-runs that step and everything downstream, and nothing upstream.
+
+**The gate.** The last step decides whether the new model may replace the one in production. A
+<Term id="release-gate">release gate</Term> agreed in advance is usually two checks: an absolute floor (accuracy
+at least 0.95, latency under a budget) and a comparison with the current production model on the same test set.
+
+**The registry** keeps every registered version with a link to the run that made it: parameters, data version,
+metrics, code commit. Serving loads a name such as `models:/digits@production`, so promoting or rolling back is
+moving that alias, not copying files.
+
+<Callout kind="simplification">
+  Our cache keys use FNV-1a, a 32-bit hash short enough to read; orchestrators use SHA-256. Real gates often add
+  per-slice checks (accuracy on each class or customer group), not just one overall number.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Change something and watch what runs">
+
+The previous run, which made the production model, used data v1, features f1 and C = 1. Change the settings
+below: each step shows whether its key matches the cache (cached) or not (ran), and the gate decides whether the
+new model is promoted. Accuracies are real test results on scikit-learn’s 8×8 digits, one for each combination.
+
+<Experiment def={experiment} title="Pipeline cache and gate">
+  <PipelineSteps />
+  <Readout />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="From a toy to Kubeflow and MLflow">
+
+The cache model above, in Python. Its printout is the first item of the readout:
+
+<Experiment def={experiment} title="pipeline_cache.py, linked to the experiment" controls={false}>
+  <Code example={cacheCode} title="pipeline_cache.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+The accuracies came from this script, which trains every combination on the same held-out test set:
+
+<Code example={metricsCode} title="generate_metrics.py" />
+
+Here is the same pipeline (without the separate validate and features steps) as Kubeflow Pipelines v2
+components. Each decorated function becomes a container; `dsl.If` makes the gate part of the pipeline:
+
+<Code example={kfpCode} title="kfp_pipeline.py" />
+
+The compiler turns it into the YAML a Kubeflow cluster runs. Note the condition and the caching option:
+
+<Code example={kfpYaml} title="digits_pipeline.yaml (excerpt)" />
+
+We ran it with KFP’s local runner, which executes each component as a subprocess instead of a pod. With v2 data
+the model passes 0.95 and `register` runs; with v1 data and a 0.97 threshold, `register` is skipped. The
+accuracies match the table the experiment uses:
+
+<Code example={kfpLog} title="Local runs, recorded" />
+
+<Callout kind="note">
+  The local runner does not cache, so both runs executed every step. On a Kubeflow cluster a second identical run
+  would show ingest, fit and evaluate as cached.
+</Callout>
+
+Finally, the registry. This script logs each run to MLflow, then registers the model only if it passes the
+threshold and beats the current `production` alias:
+
+<Code example={mlflowCode} title="register_mlflow.py" />
+
+<Code example={mlflowOutput} title="Output, recorded with MLflow 3.18.0" />
+
+</Section>
+
+<Section kind="experiment" title="Things to try">
+
+- Set **Regularization C** to 10, keeping v1 and f1. ingest, validate and features stay cached; train and
+  evaluate run. The model scores 0.9611, below production’s 0.9639, so the gate blocks it.
+- Switch **Data version** to v2. All five steps run, because every key is chained to ingest’s.
+- With v2, f1, C = 10 (0.9694), drag the **minimum accuracy** to 0.97. Now the threshold blocks a model that
+  does beat production.
+- Try v1 with f2. The row and column sums add nothing here: accuracy is 0.9639, the same as without them, so the
+  gate blocks it. Extra features are not free improvements.
+
+</Section>
+
+<Section kind="mistakes" title="Pipeline mistakes">
+
+<CommonMistake
+  title="Reading “latest” data in a cached step"
+  wrong={'@dsl.component\ndef ingest(data: Output[Dataset]):\n    urllib.request.urlretrieve("https://example.com/sales/latest.csv", data.path)'}
+  error="(no error) the run succeeds with yesterday’s data, because ingest’s cache key did not change"
+  cause="The cache key covers the step’s spec and inputs, not what a URL returns. With no parameters, every day looks identical."
+  fix={'@dsl.component\ndef ingest(day: str, data: Output[Dataset]):\n    urllib.request.urlretrieve(f"https://example.com/sales/{day}.csv", data.path)'}
+/>
+
+<CommonMistake
+  title="Comparing with production on a different test set"
+  wrong={'acc = model.score(X_test_new, y_test_new)   # new split this run\nif acc > production_accuracy_from_last_month: promote()'}
+  error="(no error) a model can look better only because this month’s test set is easier"
+  cause="Two accuracies are only comparable on the same data. A fresh random split changes the score by a point or more on small sets."
+  fix={'# Keep a fixed, versioned test set, and re-score production on it in the same run\nacc_new, acc_prod = new.score(X_fix, y_fix), prod.score(X_fix, y_fix)'}
+/>
+
+</Section>
+
+<Section kind="practice" title="Pipelines in practice">
+
+- **Version inputs explicitly**: pass a data version, date or content hash as a parameter so caching and lineage
+  both work.
+- **Pin images and packages** (`scikit-learn==1.9.1`): a new library version changes the output, and should
+  change the cache key.
+- **Make the gate code, not a meeting**: thresholds in the pipeline, reviewed like any other change.
+- **Keep every version** in the registry and serve through an alias; rollbacks become a one-line change.
+- **Choosing tools**: Kubeflow Pipelines if you already run Kubernetes and want ML artifacts and caching built in;
+  Argo Workflows for general container DAGs (KFP runs on top of it); Airflow or Dagster when the team already
+  uses them for data; MLflow for tracking and the registry alongside any of these.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Which steps re-run">
+
+<MiniExercise exercise={rerunExercise}>
+  Write `to_rerun(parents, changed)` for any pipeline graph, not just a straight line. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A pipeline is steps in containers passing versioned artifacts; the orchestrator runs the graph and records
+  lineage.
+- A step’s cache key hashes its code, parameters and inputs’ keys, so a change re-runs that step and everything
+  downstream, and nothing upstream.
+- A release gate checks an absolute floor and beats production on the same test set; the registry versions models
+  and serving follows an alias.
+
+Next: [Kubernetes for model serving](#/learn/deploy/kubernetes/k8s-for-models) runs the model these pipelines
+produce.
+
+</Section>

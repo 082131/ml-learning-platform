@@ -1,0 +1,203 @@
+import { experiment, quantCode, quantizeAll, quantizeLog } from './code';
+import { q8Exercise, questions } from './quiz';
+
+<Section kind="intuition" title="Rulers that fit each neighbourhood">
+
+The precision lesson quantized a whole row of weights with one scale: one ruler for everything. That works
+when all values are similar in size. Large language models break it. Their weights are mostly tiny, around
+±0.02, with a few much larger values scattered through every matrix. One scale stretched to fit the largest
+value leaves almost no marks for the tiny ones.
+
+The fix used by every popular LLM format is to cut each row into small **blocks** and give each block its own
+ruler. A large weight then spoils only its own neighbourhood of 32 weights. This lesson takes the exact formats
+llama.cpp writes into GGUF files (Q8_0, Q4_0, and the K-quants such as Q4_K_M), quantizes a block by hand, and
+then quantizes a real file with llama.cpp to see the sizes and speeds. It closes with GPTQ and AWQ, the methods
+behind most 4-bit models you download for GPU servers.
+
+</Section>
+
+<Section kind="technical" title="Q8_0, Q4_0 and K-quants">
+
+<Term id="block-quantization">Block quantization</Term> splits the weights into blocks of 32 consecutive
+values and stores, for each block, one scale $d$ (as a 16-bit float) plus 32 small integers.
+
+**Q8_0** (8 bits): $d = \max |x| / 127$ and $q = \text{round}(x / d)$, halves rounded away from zero. The
+weight is read back as $q \cdot d$.
+
+**Q4_0** (4 bits): let $m$ be the weight with the largest magnitude, **keeping its sign**. Then
+
+$$
+d = \frac{m}{-8}, \qquad q = \min\big(15,\ \lfloor x / d + 8.5 \rfloor\big), \qquad \hat{x} = (q - 8)\, d
+$$
+
+so $q$ is stored in 0..15 (4 bits) and stands for $q - 8$ in −8..7. The extreme weight lands exactly on −8.
+
+Worked example with the block $[0.25, -0.8, 0.0, 0.7]$: $m = -0.8$, so $d = -0.8 / -8 = 0.1$.
+$0.25 / 0.1 + 8.5 = 11$, so $q = 11$ (stands for 3, read back as 0.3); $-0.8 / 0.1 + 8.5 = 0.5$, so $q = 0$
+(−8, read back as −0.8 exactly); $0.0$ gives $q = 8$; $0.7 / 0.1 + 8.5 = 15.5$, so $q = 15$ (7, read back as 0.7).
+
+**<Term id="bits-per-weight">Bits per weight</Term>** include the scales. Q4_0 stores 32 × 4 bits of data plus
+16 bits of scale per block: $(128 + 16) / 32 = 4.5$. Q8_0 is $(256 + 16) / 32 = 8.5$. A file's size is about
+$\text{parameters} \times \text{BPW} / 8$ bytes. For Llama 3.1 8B (8,030,261,248 parameters):
+
+| Type | BPW | Size of the weights |
+| ---- | --- | ------------------- |
+| F16 | 16 | 16.06 GB (14.96 GiB) |
+| Q8_0 | 8.5 | 8.53 GB (7.95 GiB) |
+| Q4_K_M | about 4.8 to 4.9 (a mix; see below) | about 4.9 GB (estimate) |
+| Q4_0 | 4.5 | 4.52 GB (4.21 GiB) |
+
+**<Term id="k-quants">K-quants</Term>** (Q2_K to Q6_K) group 8 blocks of 32 into a super-block of 256 weights.
+Each block gets a small 6-bit scale (and, for some types, a minimum), and the super-block has one 16-bit scale
+for those scales. Q4_K comes to 4.5 BPW, like Q4_0, but follows the weights more closely. The suffixes S, M and
+L are *mixes*: Q4_K_M stores most tensors as Q4_K but keeps sensitive ones (the output layer and some of the
+attention value and FFN down projections) as Q6_K, which is why it lands a little above 4.5 BPW.
+
+**GPTQ and AWQ.** Q4_0 and the K-quants round each weight to the nearest level on its own
+(*round-to-nearest*). Two widely used methods round more cleverly, using a few hundred example inputs
+(*calibration data*):
+
+- <Term id="gptq">GPTQ</Term> quantizes a layer's weights one column at a time. After each column, it updates
+  the columns not yet quantized so that the layer's outputs on the calibration inputs change as little as
+  possible: later weights absorb earlier rounding errors.
+- <Term id="awq">AWQ</Term> observes that a small share of input channels carry much larger activations, so
+  errors in their weights matter more. It scales those weights up before quantizing (and the inputs down to
+  compensate), giving them finer steps.
+
+Both produce weight-only 4-bit models, usually with one scale per group of 128 weights, that GPU servers such
+as vLLM load directly. llama.cpp gets a similar benefit from an *importance matrix* (`llama-imatrix`), computed
+from calibration text and passed to the quantizer.
+
+<Callout kind="simplification">
+  Real GGUF files pack two 4-bit values into each byte and store the K-quant scales in a packed 6-bit layout.
+  The code below keeps the integers in Python lists, which is easier to read and gives the same dequantized
+  values. Quality is measured on real text with perplexity (`llama-perplexity`) or on a task benchmark; the
+  weight errors here only show where precision is lost.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="One outlier, two blocks">
+
+Here are 64 weights drawn from a normal distribution with standard deviation 0.02, split into two blocks of
+32. Switch the outlier on to replace weight 37 with 0.31, then compare Q4_0 (a scale per block) with one
+scale for all 64 weights.
+
+<Experiment def={experiment} title="Block quantization lab">
+  <QuantLab />
+  <Readout />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The quantizer, then llama.cpp on a real file">
+
+This is the code that produced the readout above, linked to the experiment. On these weights, read as float32
+as a model stores them, it returns exactly the values of the reference quantizers in the `gguf` Python package
+(`quant_check.py` in the lesson folder checks this). Select a part to see what it does.
+
+<Experiment def={experiment} title="block_quant.py, linked to the experiment" controls={false}>
+  <Code example={quantCode} title="block_quant.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+Next, a whole model. There is no Llama download in our build container, so we wrote a small model with the
+Llama architecture and *random* weights (8 layers, hidden size 512, 25.4 million parameters; the next lesson
+shows how), saved it as an F32 GGUF file, and quantized it with llama.cpp's own quantizer:
+
+<Code example={quantizeAll} title="quantize_all.py" />
+
+<Code example={quantizeLog} title="Output, recorded" />
+
+Three things to read from it:
+
+- **Sizes follow the bits per weight.** 97.08 MiB at 32 BPW, 25.81 MiB at 8.51, 14.62 at 4.82 and 13.71 at
+  4.52. The values are a little above 8.5 and 4.5 because the norm weights stay in F32.
+- **Q4_K_M is a mix.** The log shows `output.weight`, `attn_v` and `ffn_down` written as q6_K and the rest as q4_K.
+- **Fewer bytes, more tokens per second.** Generating a token reads every weight once, so on a CPU the speed
+  rises as the file shrinks: about 1.5 to 1.9 times faster for Q8_0 than F32, and around 2 times for 4-bit.
+  The two sessions differ by up to 20%, so treat single runs with suspicion. The text this model generates is
+  meaningless: its weights are random, and only the timing and sizes carry over to real models.
+
+</Section>
+
+<Section kind="experiment" title="What to look for in the lab">
+
+- **Q4_0, outlier off.** Block 0's scale is 0.0062866 (its extreme weight is −0.0503, and −0.0503 / −8 =
+  0.0062875, rounded to float16) and its largest error 0.003100, about half a step. RMSE 0.001597.
+- **Q4_0, outlier on.** Block 1's scale jumps to −0.0387573 (0.31 / −8) and its largest error to 0.019157;
+  most of its small weights now read back as 0. Block 0 is unchanged. RMSE rises to 0.007794.
+- **One scale for all 64, outlier on.** Now both blocks suffer: RMSE 0.010290. With the outlier off, one scale
+  costs little (0.001747 against 0.001597), because the two blocks happen to have similar ranges.
+- **Q8_0, outlier on.** 8 bits absorbs it far better: largest error 0.001148, RMSE 0.000514. This is why 8-bit
+  is close to lossless for most models, and 4-bit needs blocks, mixes and smarter rounding.
+
+</Section>
+
+<Section kind="mistakes" title="Quantization mistakes">
+
+<CommonMistake
+  title="Comparing quantizations by file size alone"
+  wrong={'llama-quantize model-f16.gguf model-Q2_K.gguf Q2_K   # smallest file, ship it'}
+  error="No error. The model loads and answers, but its perplexity is far higher and it fails tasks the Q4_K_M version solved."
+  cause="Below about 4 bits per weight, quality usually drops quickly, especially for small models. Size says nothing about quality."
+  fix={'llama-perplexity -m model-Q4_K_M.gguf -f wiki.test.raw\nllama-perplexity -m model-Q2_K.gguf  -f wiki.test.raw\n# and run your own task evaluation on both'}
+/>
+
+<CommonMistake
+  title="Rounding with Python's round()"
+  wrong={'q = [round(x / d) for x in block]   # Q8_0'}
+  error="No error, but some bytes differ from llama.cpp: round(2.5) == 2 and round(-0.5) == 0, where C's roundf gives 3 and -1."
+  cause="Python rounds halves to even; ggml rounds them away from zero. The values are equally good, but the file is not what llama.cpp would write."
+  fix={'q = [math.floor(v + 0.5) if v >= 0 else -math.floor(-v + 0.5) for v in (x / d for x in block)]'}
+/>
+
+<Callout kind="warning">
+  Quantizing an already quantized file (Q4_K_M to Q4_0, say) stacks two rounding errors. Always quantize from
+  the F16, BF16 or F32 original; llama-quantize needs `--allow-requantize` to do otherwise.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Choosing a quantization">
+
+| Situation | Typical choice | Why |
+| --------- | -------------- | --- |
+| Laptop or desktop with llama.cpp or Ollama | Q4_K_M (Q5_K_M if memory allows) | The usual balance of size and quality; most published GGUFs default to it |
+| Quality-critical, memory is fine | Q8_0 | Very close to the original at half the size of F16 |
+| GPU server with vLLM | AWQ or GPTQ 4-bit, or FP8 on recent GPUs | Fast GPU kernels exist for these; GGUF is mainly for llama.cpp |
+| Very tight memory | Q3_K_M with an importance matrix | Quality drops noticeably below 4 bits; measure it |
+| Small models (1–3B) | Q5 to Q8 | Small models lose more from each removed bit |
+
+Whatever you choose: measure perplexity and a task metric against the F16 original, and measure speed on the
+target hardware, as the capstone does.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Write a Q8_0 quantizer">
+
+<MiniExercise exercise={q8Exercise}>
+  Write `q8_0(block)` returning `(d, q)` with ggml's rounding, and `dequant(d, q)`. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- GGUF formats quantize blocks of 32 weights with one float16 scale each: Q8_0 at 8.5 bits per weight,
+  Q4_0 at 4.5. An outlier spoils only its own block.
+- K-quants use super-blocks of 256 with small packed scales; mixes like Q4_K_M keep sensitive tensors at 6 bits.
+- File size ≈ parameters × BPW / 8. On a CPU, fewer bytes means more tokens per second.
+- GPTQ and AWQ use calibration data to round with less error; they are the usual 4-bit formats for GPU servers.
+- Choose by measured quality and speed, not file size.
+
+Next: [Model formats: ONNX graphs and GGUF files](#/learn/deploy/formats/onnx-gguf) opens a GGUF file byte by
+byte and compares it with ONNX.
+
+</Section>

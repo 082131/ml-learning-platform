@@ -1,0 +1,173 @@
+import { experiment, kserve, pagedCode, triton, vllmServe } from './code';
+import { pagedExercise, questions } from './quiz';
+
+<Section kind="intuition" title="A restaurant that seats parties by the table, not by the floor">
+
+Picture a restaurant that, for every party walking in, closes off a whole floor because the party *might* grow to
+200 people. Three parties and the restaurant is "full", though it is nearly empty. A sensible restaurant hands out
+tables as people arrive and adds a table when a party grows.
+
+LLM servers had exactly this problem. Each conversation needs a <Term id="kv-cache">KV cache</Term> that grows
+with every token, and nobody knows in advance how long an answer will be. Reserving the maximum for every
+request wastes most of the GPU's memory. <Term id="vllm">vLLM</Term> fixed this with
+<Term id="paged-attention">PagedAttention</Term>: the KV cache is handed out in small blocks, like tables, as
+each conversation grows. Combined with <Term id="continuous-batching">continuous batching</Term>, it lets one GPU
+serve many users at once. This lesson measures how much that matters, then deploys an LLM on Kubernetes with
+<Term id="kserve">KServe</Term>.
+
+</Section>
+
+<Section kind="technical" title="Paged KV cache, continuous batching, and the serving stack">
+
+**Contiguous allocation.** A simple server reserves `max_model_len` tokens of KV cache per sequence when it starts.
+For Llama 3.1 8B in F16, one token costs $2 \times 32 \times 8 \times 128 \times 2 = 131{,}072$ bytes (128 KiB),
+so a reservation of 8,192 tokens is 1 GiB. With 16 GiB for the KV cache, 16 sequences fit, even if each of them
+only ever uses a few hundred tokens. The unused part of each reservation is
+<Term id="internal-fragmentation">internal fragmentation</Term>.
+
+**Paging.** vLLM splits KV memory into blocks of `block_size` tokens (16 by default). Each sequence has a *block
+table* listing its blocks, which need not be next to each other; the attention kernel follows the table. A
+sequence of $n$ tokens holds $\lceil n / 16 \rceil$ blocks, so it wastes less than one block. The same 16 GiB is
+8,192 blocks, enough for far more sequences. Blocks can also be shared: requests with the same system prompt can
+point to the same prefix blocks (*prefix caching*).
+
+**Continuous batching.** The scheduler runs one generation step for every active sequence, then removes the
+finished ones and admits waiting ones whose first blocks fit. Short answers no longer wait for long ones. If
+memory runs out mid-generation, it *preempts* a sequence (frees its blocks and recomputes them later).
+
+**How vLLM sizes the pool.** At start-up it takes `--gpu-memory-utilization` (0.9 by default) of the GPU's memory,
+loads the weights, measures the peak working memory of a forward pass, and turns everything left into KV blocks.
+Its log reports the result as the number of blocks and the maximum concurrency for `--max-model-len`.
+
+**The serving stack.** Three layers, each replaceable:
+
+| Layer | Examples | Job |
+| ----- | -------- | --- |
+| Engine | vLLM, SGLang, TensorRT-LLM, llama.cpp | Runs the model: KV cache, batching, kernels, quantized weights |
+| Model server | vLLM's OpenAI server, <Term id="triton-inference-server">Triton</Term>, KServe runtimes | HTTP/gRPC API, metrics, health checks |
+| Platform | Kubernetes with KServe, or plain Deployments | Replicas, GPUs, autoscaling, rollouts, routing |
+
+Models too large for one GPU are split with <Term id="tensor-parallelism">tensor parallelism</Term>
+(`--tensor-parallel-size`), which needs fast links between GPUs because they exchange results in every layer.
+
+<Callout kind="simplification">
+  The experiment admits requests in order and lets none of them finish, which isolates the memory question. A
+  real server also frees blocks as answers complete, keeps a waiting queue, and must leave room for sequences to
+  grow; the number of sequences it actually runs depends on that policy and on compute, not only on memory.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="How many conversations fit?">
+
+256 requests arrive, each between 200 and 2,000 tokens long in total. Change the memory left for the KV cache, the
+maximum model length and the block size, and compare contiguous allocation with paging.
+
+<Experiment def={experiment} title="Paged KV-cache simulator">
+  <PagedKvView />
+  <Readout />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The allocator in Python, and vLLM, KServe and Triton">
+
+The simulator above, linked to its controls:
+
+<Experiment def={experiment} title="paged_kv.py, linked to the experiment" controls={false}>
+  <Code example={pagedCode} title="paged_kv.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+Starting vLLM. None of the following could run in our build container, which has no GPU and no KServe; they are the
+commands and manifests from the vLLM and KServe documentation, ready to try on a GPU machine:
+
+<Code example={vllmServe} title="vLLM" />
+
+The same model on Kubernetes, as one KServe object. It builds on everything from the Kubernetes lessons:
+
+<Code example={kserve} title="llama-8b.yaml" />
+
+For non-LLM models, Triton Inference Server batches single requests on the server, configured per model:
+
+<Code example={triton} title="config.pbtxt" />
+
+</Section>
+
+<Section kind="experiment" title="What the numbers say">
+
+- **Defaults (16 GiB, 8,192, block 16).** Contiguous: 16 sequences, with only 14.3% of the reserved memory
+  holding tokens. Paged: 117 sequences, 99.3% used. More than 7 times as many conversations on the same GPU.
+- **max_model_len 32,768.** Contiguous drops to 4 sequences (2.5% used); paging is unchanged at 117, because it
+  never reserves the maximum. Long context limits stop costing concurrency.
+- **max_model_len 2,048.** Contiguous rises to 64 (52.8% used), but every request longer than 2,048 would be refused.
+- **block_size 32.** Paged falls only slightly, to 115 (98.7% used): bigger blocks waste a little more per sequence.
+- **60 GiB.** All 256 sequences fit with paging; contiguous allocation fits 60.
+
+</Section>
+
+<Section kind="mistakes" title="Serving mistakes">
+
+<CommonMistake
+  title="A context window larger than the KV memory"
+  wrong={'vllm serve meta-llama/Llama-3.1-8B-Instruct   # on a 24 GB GPU; max_model_len defaults to 131072'}
+  error="ValueError: ... max seq len (131072) is larger than the maximum number of tokens that can be stored in KV cache (...). Try increasing `gpu_memory_utilization` or decreasing `max_model_len` when initializing the engine."
+  cause="90% of 24 GB is about 20 GiB. The BF16 weights take about 15 GiB, leaving roughly 5 GiB of KV blocks, but one sequence of 131,072 tokens needs 16 GiB."
+  fix={'vllm serve meta-llama/Llama-3.1-8B-Instruct --max-model-len 16384   # 2 GiB per full-length sequence'}
+/>
+
+<CommonMistake
+  title="Two model servers on one GPU"
+  wrong={'# Two vLLM pods, each requesting nvidia.com/gpu: 1, on a node with one GPU'}
+  error="0/1 nodes are available: 1 Insufficient nvidia.com/gpu."
+  cause="Each vLLM process assumes it may take --gpu-memory-utilization of the whole GPU, and Kubernetes gives whole GPUs to one pod. The second pod waits."
+  fix={'# One engine per GPU, serving many requests at once with continuous batching.\n# Scale with replicas on more GPUs, or use MIG partitions for small models.'}
+/>
+
+<Callout kind="warning">
+  The first error is shortened from vLLM's message for this situation (the exact wording changes between versions);
+  it was not recorded here. The second is the scheduler message the Kubernetes lesson recorded.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Choosing how to serve">
+
+| Need | Choice |
+| ---- | ------ |
+| Many concurrent users of an LLM on NVIDIA or AMD GPUs | vLLM (or SGLang, TensorRT-LLM) behind an OpenAI-compatible API |
+| An LLM for one user or a small team, any hardware | llama.cpp or Ollama with a GGUF file |
+| Vision, tabular, speech or embedding models, several frameworks | Triton or ONNX Runtime with dynamic batching |
+| Standard deployment, autoscaling and canaries on Kubernetes | KServe InferenceService around any of the above |
+
+Monitor what matters for LLMs: time to first token, tokens per second per request, KV-cache usage and the number
+of waiting requests. vLLM exposes these on its `/metrics` endpoint, and they are better autoscaling signals than CPU.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Admit sequences into a block pool">
+
+<MiniExercise exercise={pagedExercise}>
+  Write `paged_fit(lengths, total_blocks, block)`: how many sequences fit, in order, into a pool of blocks. Run the
+  tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Contiguous KV allocation reserves `max_model_len` per sequence and wastes most of it; paging allocates 16-token
+  blocks as sequences grow and wastes less than one block each.
+- Continuous batching refills finished slots after every step; together with paging it multiplies concurrency.
+- vLLM sizes its block pool from `--gpu-memory-utilization` after loading the weights; `--max-model-len` must fit.
+- KServe wraps engines such as vLLM or Triton in one Kubernetes object with autoscaling and rollouts.
+
+Next: [The capstone](#/learn/deploy/capstone/quantize-and-ship) puts the whole track together on your own machine.
+
+</Section>

@@ -2,7 +2,7 @@ import type { Annotation, CodeExample, Trace } from '../types';
 import { assertInBounds, chars, rangeCols, splitLines } from './segments';
 import { findSlots } from './slots';
 
-const LANGUAGES = ['python', 'sql', 'bash', 'json', 'typescript'];
+const LANGUAGES = ['python', 'sql', 'bash', 'json', 'typescript', 'yaml'];
 const KINDS = ['syntax', 'variable', 'function', 'parameter', 'math', 'framework'];
 
 function lineLengths(source: string): number[] {

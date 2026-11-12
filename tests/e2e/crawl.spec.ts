@@ -25,5 +25,5 @@ test('every curriculum route renders without console errors', async ({ page }) =
     expect(overflow, `horizontal scroll on ${route}`).toBeLessThanOrEqual(0);
   }
   expect(errors).toEqual([]);
-  expect(routes.length).toBe(4 + 1 + 6 + 121);
+  expect(routes.length).toBe(4 + 1 + 7 + 130);
 });

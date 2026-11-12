@@ -1,0 +1,183 @@
+import { client, experiment, modelfile, offloadCode, runLocal, runLocalOutput, serverRun } from './code';
+import { nglExercise, questions } from './quiz';
+
+<Section kind="intuition" title="One book, two desks">
+
+Imagine reading a 500-page book to answer every single question, where half the pages sit on your desk and the
+other half in a library across town. However fast you read at your desk, every answer waits for the trip to
+the library. Generating a token with an LLM is like that: every token reads every weight once. Weights in GPU
+memory are on the desk; weights in system RAM are across town.
+
+<Term id="llama-cpp">llama.cpp</Term> lets you choose how many layers sit on the desk with one number,
+`-ngl`. <Term id="ollama">Ollama</Term> wraps llama.cpp in a one-command tool for downloading and serving
+models. This lesson runs a GGUF model from Python and over HTTP, then works out how many layers fit on a GPU
+and what speed to expect.
+
+</Section>
+
+<Section kind="technical" title="What llama.cpp does with your settings">
+
+When llama.cpp loads a GGUF file it:
+
+1. **Memory-maps the file** and assigns each layer to a device. The first `-ngl` layers go to the GPU (CUDA,
+   Metal, Vulkan, …), the rest stay on the CPU. All of them offloaded also moves the output layer.
+2. **Allocates the <Term id="kv-cache">KV cache</Term>** for the context size `-c`: for every layer, keys and
+   values for every token, by default in F16:
+
+$$
+\text{KV bytes} = 2 \times \text{layers} \times \text{kv\_heads} \times \text{head\_dim} \times \text{context} \times 2
+$$
+
+   For the tiny model from the last two lessons (8 layers, 4 KV heads, head dimension 64) at 512 tokens:
+   $2 \times 8 \times 4 \times 64 \times 512 \times 2 = 4{,}194{,}304$ bytes = 4 MiB, which is exactly what its
+   load log reports below. For Llama 3.1 8B at 8,192 tokens it is 1 GiB.
+3. **Generates**: the prompt is processed in batches (*prefill*), then one token at a time. Each new token
+   passes through every layer, so it reads every weight once.
+
+That last point gives a simple ceiling on speed. If reading the weights dominates,
+
+$$
+\text{time per token} \approx \frac{\text{bytes on GPU}}{\text{GPU bandwidth}} + \frac{\text{bytes in RAM}}{\text{RAM bandwidth}}
+$$
+
+The two terms add up because layers run one after another. A GPU reads memory 5 to 15 times faster than a
+desktop CPU, so even a few layers left in RAM can dominate. This is <Term id="gpu-offload">GPU layer offloading</Term>.
+
+Both llama.cpp's `llama-server` and Ollama expose an <Term id="openai-compatible-api">OpenAI-compatible API</Term>,
+so the same client code works against either, or against vLLM in the next lesson.
+
+<Callout kind="simplification">
+  The estimate treats every token as a pure weight read: it ignores prompt processing, reading the KV cache (which
+  grows with the conversation), compute limits and the CPU's own threads. Real speeds are lower, often 50 to 80% of
+  this ceiling. Q4_K_M's 4.85 bits per weight is an average assumed here; the exact value depends on the model's
+  tensor shapes (the tiny model came out at 4.82).
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="How many layers fit, and how fast is it?">
+
+Pick a model, a GGUF type, a GPU and a context size. The estimator finds the largest `-ngl` that fits and
+estimates tokens per second from the bandwidths.
+
+<Experiment def={experiment} title="GPU offload estimator">
+  <OffloadView />
+  <Readout />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="Running a GGUF model: Python, a server, a client">
+
+The estimator above, linked to the controls:
+
+<Experiment def={experiment} title="offload.py, linked to the experiment" controls={false}>
+  <Code example={offloadCode} title="offload.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+Loading and running a GGUF model from Python with llama-cpp-python, community bindings that ship llama.cpp
+inside a Python package. The model is the random-weight tiny Llama from the quantization lesson, so the
+text is meaningless; the calls, settings and memory numbers are what matter:
+
+<Code example={runLocal} title="run_local.py" />
+
+<Code example={runLocalOutput} title="Output, recorded" />
+
+The same model served over HTTP and called with curl:
+
+<Code example={serverRun} title="Server and curl, recorded" />
+
+And with the OpenAI Python client, unchanged except for the base URL. It printed
+`'OOOOOOOOOOOOOOOOOOOO' length`, the same as curl:
+
+<Code example={client} title="client.py" />
+
+Ollama packages the same steps. A Modelfile names a GGUF file and sets defaults:
+
+<Code example={modelfile} title="Ollama" />
+
+</Section>
+
+<Section kind="experiment" title="Scenarios to try">
+
+- **Llama 3.1 8B, Q4_K_M, 12 GB, 8192 tokens.** All 32 layers and the output fit: about 79 tokens/s as a ceiling.
+- **Same, no GPU.** 4.24 GiB read from RAM per token at 60 GB/s: about 13 tokens/s. Usable for one person.
+- **8 GB GPU.** Everything still fits at 8,192 tokens (about 60 tokens/s). Raise the context to 32,768: the KV
+  cache grows to 4 GiB, only 30 layers fit, and the estimate drops to 41 tokens/s.
+- **Q8_0 on 8 GB.** 30 layers fit; 0.95 GiB per token from RAM takes longer than 6.47 GiB from the GPU. The
+  estimate is 23.5 tokens/s, against 59.8 for Q4_K_M: here the smaller file is worth far more than its size suggests.
+- **Llama 3.1 70B, Q4_K_M, 24 GB.** 45 of 80 layers fit; 17.5 GiB per token comes from RAM: about 3 tokens/s.
+  A 70B model needs about 40 GiB of fast memory, such as two 24 GB GPUs or a machine with unified memory.
+- **131,072 tokens on 12 GB.** The KV cache alone is 16 GiB, so only 18 layers fit. Long contexts cost GPU memory
+  that would otherwise hold weights; llama.cpp can quantize the KV cache (`--cache-type-k q8_0`) to halve it.
+
+</Section>
+
+<Section kind="mistakes" title="llama.cpp mistakes">
+
+<CommonMistake
+  title="Asking for more layers than fit"
+  wrong={'llama-server -m llama-8b-Q8_0.gguf -c 32768 -ngl 99    # on an 8 GB GPU'}
+  error="ggml_backend_cuda_buffer_type_alloc_buffer: allocating <size> MiB on device 0: cudaMalloc failed: out of memory"
+  cause="-ngl 99 asks for every layer plus the KV cache for 32,768 tokens on the GPU: about 12 GiB on an 8 GB card."
+  fix={'llama-server -m llama-8b-Q8_0.gguf -c 8192 -ngl 30      # or a Q4_K_M file with -ngl 99'}
+/>
+
+<CommonMistake
+  title="Leaving the context at the model's maximum"
+  wrong={`llm = Llama(model_path="llama-3.1-8b-Q4_K_M.gguf", n_ctx=0)   # 0 = use the model's 131,072`}
+  error="No error on a big machine, but 16 GiB of KV cache is allocated up front, and on a smaller one loading fails or swaps."
+  cause="The KV cache is allocated for the whole context when the model loads, whether or not conversations ever get that long."
+  fix={'llm = Llama(model_path="llama-3.1-8b-Q4_K_M.gguf", n_ctx=8192)'}
+/>
+
+<Callout kind="warning">
+  The out-of-memory message is shown in the form llama.cpp's CUDA backend prints it; it was not recorded here,
+  because our build container has no GPU.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="Settings that matter">
+
+| Setting | llama-server / llama-cli | llama-cpp-python | Ollama | Rule of thumb |
+| ------- | ------------------------ | ---------------- | ------ | ------------- |
+| GPU layers | `-ngl` | `n_gpu_layers` | automatic (`num_gpu`) | All if they fit; otherwise as many as fit |
+| Context | `-c` | `n_ctx` | `num_ctx` | What your prompts need, not the model's maximum |
+| Threads | `-t` | `n_threads` | automatic | Physical performance cores |
+| Parallel requests | `-np` (slots) | n/a | `OLLAMA_NUM_PARALLEL` | Each slot shares the context; raise `-c` accordingly |
+| KV cache type | `--cache-type-k/v` | `type_k`, `type_v` | `OLLAMA_KV_CACHE_TYPE` | q8_0 halves KV memory with little loss |
+
+llama.cpp is ideal for one user or a few, on any hardware. For many concurrent users on GPUs, the next lesson's
+servers batch far more efficiently.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Pick -ngl">
+
+<MiniExercise exercise={nglExercise}>
+  Write `max_ngl(...)`: the largest number of layers whose weights and KV cache fit on the GPU. Run the tests to
+  check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- llama.cpp memory-maps a GGUF file, puts the first `-ngl` layers on the GPU and allocates the KV cache for `-c` tokens.
+- Each token reads every weight once, so time per token ≈ GPU bytes / GPU bandwidth + RAM bytes / RAM bandwidth.
+  A few layers in RAM can halve the speed.
+- Longer contexts take GPU memory away from layers; a smaller quantization or a quantized KV cache gives it back.
+- llama-server, llama-cpp-python's server and Ollama speak the OpenAI API, so clients only change the base URL.
+
+Next: [Serving LLMs at scale](#/learn/deploy/llm-serving/vllm-kserve) serves many users at once with vLLM's
+paged KV cache, and puts it on Kubernetes with KServe.
+
+</Section>

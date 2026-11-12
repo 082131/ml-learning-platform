@@ -36,6 +36,7 @@ test('visits every track from the navigation', async ({ page }) => {
     [/^(Inference|Inference Engineer)$/, 'Inference Engineer'],
     [/^(Python|Python for Data & ML)$/, 'Python for Data & ML'],
     [/^(DataOps|ML Data Operations)$/, 'ML Data Operations'],
+    [/^(Deploy|Model Deployment and Optimization)$/, 'Model Deployment and Optimization'],
   ] as const) {
     await openNav(page, chip);
     await expect(page.getByRole('heading', { level: 1 })).toContainText(title);
