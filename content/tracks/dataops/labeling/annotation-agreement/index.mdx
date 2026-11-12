@@ -1,0 +1,182 @@
+import { ag, consolidateRunner, guidelineV2, kappaPython } from './code';
+import { kappaExercise, questions } from './quiz';
+
+<Section kind="intuition" title="If two people disagree, which one taught the model?">
+
+Every supervised model learns from people's decisions. When annotators label a comment "toxic" or "fine", they
+apply a definition that lives in their heads unless someone writes it down. If two annotators hold different
+definitions, the dataset holds both, and the model learns a blur of the two.
+
+You cannot check labels against the truth for every item; if you could, you would not need annotators. What you can
+check cheaply is whether independent annotators agree. Low agreement means the task is unclear, the annotators are
+careless, or the task is genuinely ambiguous. All three must be fixed or accounted for before the labels are worth
+training on.
+
+</Section>
+
+<Section kind="technical" title="Guidelines, agreement and chance">
+
+**Guidelines.** <Term id="annotation-guidelines">Annotation guidelines</Term> define each label with examples, and add
+a rule for each edge case that came up. They are versioned: labels made under v1 and v2 can mean different things.
+
+**Agreement.** <Term id="inter-annotator-agreement">Inter-annotator agreement</Term> is measured on items that two or
+more people label independently. Write the counts in a 2 × 2 matrix: rows are annotator A's label, columns are B's.
+The diagonal holds agreements. Observed agreement is
+
+$$
+p_o = \frac{\text{both toxic} + \text{both fine}}{n}
+$$
+
+**Chance agreement.** If A calls a share $p_A$ of comments toxic and B a share $p_B$, two people labeling at random at
+those rates would still agree on
+
+$$
+p_e = p_A\,p_B + (1 - p_A)(1 - p_B)
+$$
+
+When toxic comments are rare, both $p_A$ and $p_B$ are small and $p_e$ is close to 1: agreeing on "fine" is nearly
+free.
+
+**Cohen's kappa** measures agreement beyond chance, as a share of the improvement that was possible:
+
+$$
+\kappa = \frac{p_o - p_e}{1 - p_e}
+$$
+
+<Term id="cohens-kappa">Cohen's kappa</Term> is 1 for perfect agreement, 0 for chance level and negative for worse
+than chance. A common reading (Landis and Koch, 1977) calls 0.2 to 0.4 fair, 0.4 to 0.6 moderate, 0.6 to 0.8
+substantial and above 0.8 almost perfect. These bands are a convention; what is acceptable depends on the task.
+
+**Worked example** (the default setting below): A says toxic on 11 of 20 comments, B on 9; they agree on 12.
+$p_o = 12/20 = 0.60$, $p_e = 0.55 \cdot 0.45 + 0.45 \cdot 0.55 = 0.495$, so
+$\kappa = (0.60 - 0.495)/(1 - 0.495) = 0.105/0.505 = 0.21$.
+
+**Quality controls in a labeling job.** <Term id="gold-standard">Gold questions</Term> with known answers are mixed into
+the work to measure each annotator's accuracy. Each item is labeled by several people, unanimous items take the
+shared label, and split items go to <Term id="adjudication">adjudication</Term> by an expert. Managed services such as
+SageMaker Ground Truth and tools such as Label Studio implement these steps.
+
+</Section>
+
+<Section kind="visual" title="Change the guidelines, the sample and the annotator">
+
+<Experiment def={ag} title="Agreement between two annotators">
+  <AgreementView />
+  <Readout title="What the experiment computed" />
+</Experiment>
+
+Things to try:
+
+- **v1 on the balanced sample** (default): 8 disagreements, all on the three unclear kinds. $\kappa = 0.21$.
+- **Switch to v2.** The three edge-case rules remove all but one disagreement: $p_o = 0.95$, $\kappa = 0.90$. The fix
+  was in the instructions, not the people.
+- **Live stream with v1.** Toxic comments are rare. Observed agreement rises to 0.85, yet $\kappa$ is only 0.32,
+  because $p_e = 0.78$.
+- **Now make B lazy** (always "not toxic"). Observed agreement stays at 0.85 and $\kappa$ drops to exactly 0. Raw
+  agreement cannot tell a careful annotator from one who never read a comment.
+
+</Section>
+
+<Section kind="code" title="Kappa in Python, consolidation with gold questions">
+
+The computation behind the readout. The label lists are filled from the visual:
+
+<Experiment def={ag} title="kappa.py, linked to the experiment" controls={false}>
+  <Code example={kappaPython} title="kappa.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+In a project you would call `sklearn.metrics.cohen_kappa_score(A, B)`, which returns the same number.
+
+**Consolidating three annotators.** Twelve comments, three annotators, four gold questions. Score each annotator on
+the gold items, drop the ones below 75%, and keep a label only where the trusted annotators agree:
+
+<PythonRunner example={consolidateRunner} title="consolidate.py" />
+
+Chen's labels look plausible one by one, but gold accuracy is 0.50 and kappa with either colleague is 0.17. With Chen
+included, a 2-of-3 majority vote would have outvoted Ana or Ben on items 6 and 8. Without Chen, those two items go to
+an adjudicator instead.
+
+**Guidelines as a versioned file.** v2 of the toxicity task, with the three rules the disagreements produced:
+
+<Code example={guidelineV2} title="guidelines-v2.json" />
+
+<Callout kind="simplification">
+  The annotators in the visual are scripted: each follows a fixed private rule, so the effect of the guidelines is
+  clean. Real annotators are inconsistent with themselves too, drift over a long job, and learn from feedback. Agreement
+  measures consistency, not correctness: two annotators who share the same wrong rule agree perfectly. Gold questions
+  and expert review check correctness.
+</Callout>
+
+</Section>
+
+<Section kind="mistakes" title="Agreement numbers that mislead">
+
+<CommonMistake
+  title="Reporting raw percent agreement on imbalanced labels"
+  wrong={"agreement = sum(a == b for a, b in zip(A, B)) / len(A)   # 0.85, looks great"}
+  error="(no error: an annotator who always answers the majority class scores the same 0.85)"
+  cause="When one label dominates, agreeing on it is nearly automatic, so raw agreement mostly measures the class balance."
+  fix={"from sklearn.metrics import cohen_kappa_score\nkappa = cohen_kappa_score(A, B)   # 0.00 for the constant annotator"}
+/>
+
+<CommonMistake
+  title="Measuring agreement only on a balanced pilot sample"
+  wrong={"pilot = sample_balanced(comments, per_class=10)   # kappa 0.90, ship it"}
+  error="(no error: on the real stream, where toxic is rare, agreement on the toxic class is much worse than the pilot suggests)"
+  cause="Agreement depends on the label distribution. A balanced pilot hides how annotators behave on the distribution they will actually label."
+  fix="measure on a random sample of the real stream as well, and report per-class agreement next to kappa"
+/>
+
+<CommonMistake
+  title="Resolving every split by majority vote"
+  wrong={"final = [Counter(votes).most_common(1)[0][0] for votes in item_votes]"}
+  error="(no error: a careless annotator who clicks one label decides every split where the other two disagree)"
+  cause="A vote counts every annotator equally, whatever their accuracy."
+  fix="weight or filter annotators by gold accuracy, and send splits to adjudication instead of voting them away"
+/>
+
+</Section>
+
+<Section kind="practice" title="Running a labeling project">
+
+- **Pilot first.** Label 100 to 200 items with two or three annotators, compute kappa, read every disagreement, and
+  update the guidelines. Repeat until agreement is stable.
+- **Version the guidelines** and store the version with each label, along with the annotator ID and timestamp.
+- **Keep overlap in production.** Have a share of items (often 5 to 10%) labeled twice for the whole job, so agreement
+  is monitored rather than measured once.
+- **Mix in gold questions** and track each annotator's accuracy over time; retrain or remove people who fall below
+  the bar.
+- **Adjudicate and feed back.** Every adjudicated case is a candidate example for the next guideline version.
+- **Accept real ambiguity.** If experts also disagree on a kind of item, record it (a soft label, or an "unsure"
+  class) instead of forcing a label.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Write Cohen's kappa">
+
+<MiniExercise exercise={kappaExercise}>
+  Write `cohen_kappa(a, b)` for two lists of 0/1 labels on the same items. Return
+  $(p_o - p_e) / (1 - p_e)$.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Guidelines define what labels mean; version them and grow them from disagreements.
+- Observed agreement $p_o$ is inflated when one class dominates. Cohen's kappa subtracts chance agreement $p_e$.
+- In the experiment, three edge-case rules raised kappa from 0.21 to 0.90; a lazy annotator matched a careful one on
+  raw agreement (0.85) but scored kappa 0.
+- Gold questions measure accuracy, overlap measures consistency, and adjudication resolves splits.
+
+Next: [weak supervision and active learning](#/learn/dataops/labeling/programmatic-labeling), for when labeling
+everything by hand is too slow.
+
+</Section>

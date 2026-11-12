@@ -1,0 +1,167 @@
+import { activeRunner, labelPython, lf, snorkelSketch } from './code';
+import { questions, weakLabelExercise } from './quiz';
+
+<Section kind="intuition" title="Write the rules down, then let people handle the rest">
+
+A support team wants a model that spots refund requests among thousands of tickets a day. Labeling 50,000 old
+tickets by hand would take weeks. But the team already knows a lot: tickets that say "refund" or "charged twice" are
+usually refund requests, thank-you notes are not, how-to questions rarely are.
+
+Weak supervision turns that knowledge into labels: write each hunch as a small function, let the functions vote, and
+accept that the result is noisy. Active learning handles the other end: when a person must label, let the model pick
+the tickets where a human answer teaches it the most. Together they make expert time go much further than labeling
+a random pile.
+
+</Section>
+
+<Section kind="technical" title="Labeling functions, coverage and uncertainty">
+
+**Labeling functions.** In <Term id="weak-supervision">weak supervision</Term> each source of labels is a
+<Term id="labeling-function">labeling function</Term>: a function that returns a label, or abstains when its rule does
+not apply. Applying $m$ functions to $n$ examples gives an $n \times m$ **label matrix** of votes.
+
+**Four numbers per function**, measured against a small gold set:
+
+- <Term id="label-coverage">Coverage</Term>: the share of examples where it votes.
+- Overlap: the share where it votes together with another function.
+- Conflict: the share where another function votes differently.
+- Accuracy: of its votes on gold examples, the share that are right.
+
+**Combining votes.** The simplest combiner is a majority vote over the non-abstaining functions; a tie or no vote
+leaves the example unlabeled. A **label model** (as in Snorkel) goes further: it estimates each function's accuracy
+from the pattern of agreements and conflicts and outputs a probability per label. Either way, the weak labels then
+train an ordinary classifier, which can generalize to examples no rule covers.
+
+**Active learning.** <Term id="active-learning">Active learning</Term> is a loop: train on the labels you have, score
+the unlabeled pool, ask a person to label the most useful examples, retrain. The most common strategy is
+<Term id="uncertainty-sampling">uncertainty sampling</Term>: pick the examples whose predicted probability is closest
+to 0.5, where the model is least sure. In one dimension this is binary search for the decision boundary: each label
+halves the interval where the boundary can be.
+
+**Other ways to save labeling time.** Model-assisted pre-labeling (annotators correct a model's guess instead of
+starting from scratch), and managed "automated labeling" services that label confident items with a model and send
+the rest to people. They all trade some label quality for speed, so all of them need a gold set to measure the cost.
+
+</Section>
+
+<Section kind="visual" title="Switch labeling functions on and off">
+
+<Experiment def={lf} title="Weak labels for refund requests">
+  <LfMatrix />
+  <Readout title="What the experiment computed" />
+</Experiment>
+
+Things to try:
+
+- **refund_word alone** (default): 6 tickets labeled, 0.67 accurate. It wrongly calls "Thanks, the refund arrived
+  today" and "What is your refund policy?" refund requests.
+- **Add thanks.** The thank-you note now ties (yes against no) and drops out. Accuracy on labeled tickets rises to 0.83.
+- **Add money_back.** 10 tickets labeled at 0.90: high coverage from a precise rule.
+- **Add how_question.** 11 tickets at 0.91. It labels two how-to questions correctly, but it also votes "no" on "How
+  do I get my money back?". With money_back voting "yes", that ticket ties and drops out.
+- **Add cancel.** 12 tickets, but accuracy drops to 0.83: its only new ticket is "Cancel my subscription please",
+  which it gets wrong. More coverage is not always better.
+
+</Section>
+
+<Section kind="code" title="The label matrix in Python, active learning against random sampling">
+
+The program behind the visual. The list of active functions is filled from the controls:
+
+<Experiment def={lf} title="label.py, linked to the experiment" controls={false}>
+  <Code example={labelPython} title="label.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+**Uncertainty sampling against random sampling.** An unknown threshold separates positives from negatives on a score
+between 0 and 1. With a budget of 8 labels, which items should a person label? The experiment repeats on 20 random
+pools of 1,000 items:
+
+<PythonRunner example={activeRunner} title="active.py" />
+
+Random labels land anywhere, so after 8 of them the threshold is known to about ±0.06. Uncertainty sampling always asks
+about the item closest to its current guess, halving the interval each time: about 1,000 items fit in
+$2^{10}$, so 8 halvings narrow it to a handful of items.
+
+**The same with a library.** Snorkel computes the label matrix, the per-function summary and a label model:
+
+<Code example={snorkelSketch} title="snorkel_lf.py" />
+
+<Callout kind="simplification">
+  The tickets are few and the rules are keyword matches, so each function's accuracy is measured on all 16 gold
+  labels; in practice the gold set is a small sample and the estimates are uncertain. active.py has noise-free labels
+  and a one-dimensional boundary, the case where uncertainty sampling shines. With ambiguous examples and many
+  features, gains are smaller and depend on the model, so teams usually mix uncertainty sampling with random samples.
+</Callout>
+
+</Section>
+
+<Section kind="mistakes" title="Weak labels, strong mistakes">
+
+<CommonMistake
+  title="Judging labeling functions by coverage alone"
+  wrong={"lfs = sorted(lfs, key=coverage, reverse=True)[:5]   # the five broadest rules"}
+  error="(no error: the weak labels cover most tickets and are wrong on many of them)"
+  cause="Broad rules fire often because they are vague. Coverage says how often a function speaks, not whether it is right."
+  fix="report coverage and accuracy on a gold set together; keep precise narrow rules, fix or drop broad inaccurate ones"
+/>
+
+<CommonMistake
+  title="Evaluating the final model on weak labels"
+  wrong={"test = weak_labeled.sample(frac=0.2)\nprint(model.score(test.text, test.weak_label))   # 0.97"}
+  error="(no error: the model learned to imitate the rules, and the test set rewards imitation)"
+  cause="The weak labels carry the rules' systematic mistakes into the test set, so the score measures agreement with the rules."
+  fix="evaluate on a hand-labeled gold test set that the labeling functions were not tuned on"
+/>
+
+<CommonMistake
+  title="Treating abstain as a negative vote"
+  wrong={"def refund_word(t):\n    return 1 if \"refund\" in t else 0   # 0 means \"no opinion\" here"}
+  error="(no error: every ticket without the word \"refund\" gets a confident \"not a refund\" vote)"
+  cause="The function has no evidence about tickets it does not match, but the vote counts as evidence against."
+  fix="return a separate ABSTAIN value (None, or -1 in Snorkel) and exclude it from votes"
+/>
+
+</Section>
+
+<Section kind="practice" title="Programmatic labeling in production">
+
+- **Start from errors.** Read 100 unlabeled examples, write functions for patterns you see, then measure them on a
+  gold set of a few hundred.
+- **Version the functions** with the dataset: the weak labels are a build product of code plus data, and must be
+  reproducible.
+- **Keep a human queue.** Unlabeled and conflicting examples go to annotators, ordered by the model's uncertainty.
+- **Watch the boundary.** Uncertainty sampling concentrates labels on hard cases; check annotator agreement on them,
+  and mix in random samples so the labeled set still represents the data.
+- **Retire rules.** When the trained classifier beats a rule on the gold set, the rule has done its job.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Combine votes with abstentions">
+
+<MiniExercise exercise={weakLabelExercise}>
+  Write `weak_label(votes)`. Each vote is `1`, `0` or `None` (abstain). Return the majority label among the real
+  votes, or `None` when nobody voted or the votes tie.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Labeling functions encode heuristics; each votes or abstains, and the votes form a label matrix.
+- Judge every function on coverage and accuracy together; a broad rule can add coverage and lower accuracy, as cancel
+  did.
+- A label model weighs functions by estimated accuracy; a classifier trained on the weak labels generalizes past the
+  rules.
+- Active learning spends human labels where the model is least sure; in active.py it found the boundary about 50
+  times more precisely than random sampling with the same 8 labels.
+
+Next: [finding label errors](#/learn/dataops/labeling/label-errors) in a dataset that is already labeled.
+
+</Section>

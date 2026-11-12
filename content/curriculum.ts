@@ -385,8 +385,8 @@ export const tracks: Track[] = [
         title: 'Labeling and label quality',
         level: 'intermediate',
         lessons: [
-          { id: 'dataops/labeling/annotation-agreement', status: 'outline' },
-          { id: 'dataops/labeling/programmatic-labeling', status: 'outline' },
+          { id: 'dataops/labeling/annotation-agreement', status: 'written' },
+          { id: 'dataops/labeling/programmatic-labeling', status: 'written' },
           { id: 'dataops/labeling/label-errors', status: 'outline' },
         ],
       },

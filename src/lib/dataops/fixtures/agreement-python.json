@@ -1,0 +1,10 @@
+{
+ "v1,balanced,careful": "items: 20, disagreements: 8\nobserved agreement p_o = 0.60\nchance agreement   p_e = 0.495\nCohen's kappa = 0.21",
+ "v1,balanced,lazy": "items: 20, disagreements: 11\nobserved agreement p_o = 0.45\nchance agreement   p_e = 0.450\nCohen's kappa = 0.00",
+ "v1,rare,careful": "items: 20, disagreements: 3\nobserved agreement p_o = 0.85\nchance agreement   p_e = 0.780\nCohen's kappa = 0.32",
+ "v1,rare,lazy": "items: 20, disagreements: 3\nobserved agreement p_o = 0.85\nchance agreement   p_e = 0.850\nCohen's kappa = 0.00",
+ "v2,balanced,careful": "items: 20, disagreements: 1\nobserved agreement p_o = 0.95\nchance agreement   p_e = 0.500\nCohen's kappa = 0.90",
+ "v2,balanced,lazy": "items: 20, disagreements: 10\nobserved agreement p_o = 0.50\nchance agreement   p_e = 0.500\nCohen's kappa = 0.00",
+ "v2,rare,careful": "items: 20, disagreements: 1\nobserved agreement p_o = 0.95\nchance agreement   p_e = 0.780\nCohen's kappa = 0.77",
+ "v2,rare,lazy": "items: 20, disagreements: 3\nobserved agreement p_o = 0.85\nchance agreement   p_e = 0.850\nCohen's kappa = 0.00"
+}
