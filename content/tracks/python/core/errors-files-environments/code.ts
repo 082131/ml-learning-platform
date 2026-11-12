@@ -152,3 +152,17 @@ python -m venv .venv && source .venv/bin/activate
 python -m pip install -r requirements.txt`,
   annotations: [],
 };
+
+/** A real traceback (from a CPython 3.13 run of the script described in the lesson), shown as printed. */
+export const tracebackExample: CodeExample = {
+  id: 'py-traceback-keyerror',
+  language: 'python',
+  source: `Traceback (most recent call last):
+  File "train.py", line 8, in <module>
+    print(total_price(rows))
+  File "train.py", line 5, in <genexpr>
+    return sum(float(r["price"]) for r in rows)
+                     ~^^^^^^^^^
+KeyError: 'price'`,
+  annotations: [],
+};

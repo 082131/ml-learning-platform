@@ -27,8 +27,8 @@ known (remove thousands separators), and treat impossible values (age 230, a neg
 `where`.
 
 **Duplicates.** `drop_duplicates()` removes rows identical in every column. When a key should be unique,
-decide which row wins: usually the latest, with
-`sort_values("updated").drop_duplicates(subset="user_id", keep="last")`.
+decide which row wins: usually the latest, by sorting with `sort_values("updated")` and then calling
+`drop_duplicates(subset="user_id", keep="last")`.
 
 **Missing values.** Ask why a value is missing before choosing (<Term id="missing-value">missing value</Term>).
 Dropping rows is simple but discards their other columns and can bias the sample. Filling
@@ -72,7 +72,7 @@ A first audit of a messy export. Every problem below is found without changing t
 In the explorer:
 
 - Compare the mean fill with the median fill. The mean of the five known incomes is
-  $(52{,}000 + 61{,}000 + 1{,}200{,}000 + 48{,}000 + 55{,}000) / 5 = 283{,}200$, far above every typical value; the
+  283,200 (the sum 52,000 + 61,000 + 1,200,000 + 48,000 + 55,000, divided by 5), far above every typical value; the
   median is 55,000.
 - Choose dropping. Two users disappear, and with them two valid ages (29 and 41): dropping one column’s gaps
   costs every other column’s data in those rows.

@@ -1,4 +1,4 @@
-import { exceptionsRunner, experiment, filesRunner, parseCode, venvCommands } from './code';
+import { tracebackExample, exceptionsRunner, experiment, filesRunner, parseCode, venvCommands } from './code';
 import { loadExercise, questions } from './quiz';
 
 <Section kind="intuition" title="Fail loudly, read carefully, run the same everywhere">
@@ -19,15 +19,7 @@ library versions on every machine.
 the outermost call down to the failing line, then the error type and message. Read it **from the bottom up**.
 A real one, from a script whose second row has a `cost` column instead of `price`:
 
-```
-Traceback (most recent call last):
-  File "train.py", line 8, in <module>
-    print(total_price(rows))
-  File "train.py", line 5, in <genexpr>
-    return sum(float(r["price"]) for r in rows)
-                     ~^^^^^^^^^
-KeyError: 'price'
-```
+<Code example={tracebackExample} title="what Python printed" />
 
 (Shortened: Python 3.13 also lists the `total_price` frame between those two.) The last line says what (a
 missing key, `'price'`), the line above says where, and the carets point at the exact expression.
