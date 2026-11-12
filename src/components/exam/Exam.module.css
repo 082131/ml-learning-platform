@@ -48,7 +48,7 @@
 .vendor {
   font-family: var(--font-mono);
   font-size: var(--fs-13);
-  color: var(--ink-3);
+  color: var(--ink-2);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
