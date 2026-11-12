@@ -36,15 +36,6 @@ export default [
     aliases: ['CI', 'bootstrap interval'],
   },
   {
-    id: 'p-value',
-    term: 'p-value',
-    short:
-      'The probability of seeing a result at least as extreme as the observed one if the null hypothesis (no effect) were true.',
-    long: 'A small p-value says the data would be surprising under no effect. It is not the probability that the null hypothesis is true, and it says nothing about the size of the effect.',
-    introducedIn: 'python/analysis/statistical-inference',
-    aliases: ['statistical significance'],
-  },
-  {
     id: 'permutation-test',
     term: 'Permutation test',
     short:

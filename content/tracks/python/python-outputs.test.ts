@@ -25,6 +25,8 @@ const exercises = Object.values(quizModules)
 
 const uses = (code: string, name: string) => new RegExp(`^\\s*(import|from)\\s+${name}\\b`, 'm').test(code);
 const TORCH_PYTHON = process.env.TORCH_PYTHON;
+/** Importing PyTorch and training a few epochs can take several seconds on a busy machine. */
+const TORCH_TIMEOUT = 60_000;
 
 /**
  * Known differences between CPython on a 64-bit computer and Pyodide, applied to CPython's output before
@@ -56,13 +58,17 @@ describe.skipIf(!hasPython)('Python course examples', () => {
   for (const ex of examples) {
     const torch = uses(ex.source, 'torch');
     const skip = torch ? !TORCH_PYTHON : !canRunHere(ex.source);
-    it.skipIf(skip)(`${ex.id} prints its expectedOutput`, () => {
-      if (!torch) expect(ex.run, `${ex.id} should run in the browser`).toBe('pyodide');
-      const r = run(torch ? TORCH_PYTHON! : 'python3', ex.source);
-      expect(r.ok, r.out).toBe(true);
-      const out = (CPYTHON_DIFFERENCES[ex.id] ?? ((o: string) => o))(r.out);
-      expect(out.replace(/\n$/, '')).toBe(ex.expectedOutput);
-    });
+    it.skipIf(skip)(
+      `${ex.id} prints its expectedOutput`,
+      () => {
+        if (!torch) expect(ex.run, `${ex.id} should run in the browser`).toBe('pyodide');
+        const r = run(torch ? TORCH_PYTHON! : 'python3', ex.source);
+        expect(r.ok, r.out).toBe(true);
+        const out = (CPYTHON_DIFFERENCES[ex.id] ?? ((o: string) => o))(r.out);
+        expect(out.replace(/\n$/, '')).toBe(ex.expectedOutput);
+      },
+      TORCH_TIMEOUT,
+    );
   }
 
   for (const ex of exercises)
@@ -80,9 +86,13 @@ describe.skipIf(!hasPython)('Python course examples', () => {
   for (const script of scripts) {
     const file = path.join(fixtureDir, script);
     const torch = uses(readFileSync(file, 'utf8'), 'torch');
-    it.skipIf(torch && !TORCH_PYTHON)(`fixture ${script} matches a fresh run`, () => {
-      const out = execFileSync(torch ? TORCH_PYTHON! : 'python3', [file, '--check'], { encoding: 'utf8' });
-      expect(out.trim()).toBe('ok');
-    });
+    it.skipIf(torch && !TORCH_PYTHON)(
+      `fixture ${script} matches a fresh run`,
+      () => {
+        const out = execFileSync(torch ? TORCH_PYTHON! : 'python3', [file, '--check'], { encoding: 'utf8' });
+        expect(out.trim()).toBe('ok');
+      },
+      TORCH_TIMEOUT,
+    );
   }
 });

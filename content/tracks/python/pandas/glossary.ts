@@ -11,8 +11,8 @@ export default [
     aliases: ['alignment'],
   },
   {
-    id: 'copy-on-write',
-    term: 'Copy-on-write',
+    id: 'pandas-copy-on-write',
+    term: 'Copy-on-write (pandas)',
     short:
       'The pandas 3 rule that every selection behaves like a copy: changing it never changes the original DataFrame. Data is copied only when one side is actually modified.',
     introducedIn: 'python/pandas/indexing-dtypes',

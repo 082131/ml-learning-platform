@@ -13,7 +13,7 @@ export default {
     'Choose dtypes (category, string, nullable Int64, datetime) and see the memory difference',
   ],
   prerequisites: ['ml/foundations/pandas-dataframes', 'python/numpy/dtypes-random'],
-  concepts: ['dataframe', 'index-alignment', 'copy-on-write', 'categorical-dtype'],
+  concepts: ['dataframe', 'index-alignment', 'pandas-copy-on-write', 'categorical-dtype'],
   references: [
     {
       title: 'pandas: indexing and selecting data',

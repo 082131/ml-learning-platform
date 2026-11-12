@@ -26,7 +26,7 @@ union of labels, and puts NaN where one side has no value (<Term id="index-align
 DataFrame’s index, so labels the DataFrame lacks are dropped.
 
 **Copy-on-write.** In pandas 3, every selection behaves like a copy
-(<Term id="copy-on-write">copy-on-write</Term>): pandas shares memory until one side is modified, and then copies.
+(<Term id="pandas-copy-on-write">copy-on-write</Term>): pandas shares memory until one side is modified, and then copies.
 So the rule is simple. To change `df`, assign in **one step on df itself**: `df.loc[mask, "col"] = value` or
 `df["col"] = ...`. A chained assignment such as `df[mask]["col"] = value` changes a temporary object, leaves
 `df` alone, and pandas warns. A filtered subset you keep (`hot = df[mask]`) can be changed freely without
