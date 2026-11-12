@@ -1,0 +1,177 @@
+{
+  "python": "3.13.18",
+  "template": "import numpy as np\n\nx = np.array([100, 120], dtype=np.{{dtype}})\ny = x + {{add}}\nprint(y, y.dtype)",
+  "variants": [
+    {
+      "id": "int8-10",
+      "label": "int8 + 10",
+      "slots": {
+        "dtype": "int8",
+        "add": "10"
+      },
+      "stdout": "[ 110 -126] int8\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "dtype of x",
+          "value": "int8",
+          "note": "integers from -128 to 127"
+        },
+        {
+          "label": "y",
+          "value": "[ 110 -126]",
+          "note": "dtype int8"
+        }
+      ]
+    },
+    {
+      "id": "int16-10",
+      "label": "int16 + 10",
+      "slots": {
+        "dtype": "int16",
+        "add": "10"
+      },
+      "stdout": "[110 130] int16\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "dtype of x",
+          "value": "int16",
+          "note": "integers from -32768 to 32767"
+        },
+        {
+          "label": "y",
+          "value": "[110 130]",
+          "note": "dtype int16"
+        }
+      ]
+    },
+    {
+      "id": "uint8-200",
+      "label": "uint8 + 200",
+      "slots": {
+        "dtype": "uint8",
+        "add": "200"
+      },
+      "stdout": "[44 64] uint8\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "dtype of x",
+          "value": "uint8",
+          "note": "integers from 0 to 255"
+        },
+        {
+          "label": "y",
+          "value": "[44 64]",
+          "note": "dtype uint8"
+        }
+      ]
+    },
+    {
+      "id": "int8-300",
+      "label": "int8 + 300",
+      "slots": {
+        "dtype": "int8",
+        "add": "300"
+      },
+      "stdout": "",
+      "error": "OverflowError: Python integer 300 out of bounds for int8",
+      "cards": [
+        {
+          "label": "dtype of x",
+          "value": "int8",
+          "note": "integers from -128 to 127"
+        }
+      ]
+    },
+    {
+      "id": "int8-float",
+      "label": "int8 + 0.5",
+      "slots": {
+        "dtype": "int8",
+        "add": "0.5"
+      },
+      "stdout": "[100.5 120.5] float64\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "dtype of x",
+          "value": "int8",
+          "note": "integers from -128 to 127"
+        },
+        {
+          "label": "y",
+          "value": "[100.5 120.5]",
+          "note": "dtype float64"
+        }
+      ]
+    },
+    {
+      "id": "float16-small",
+      "label": "float16 + 0.001",
+      "slots": {
+        "dtype": "float16",
+        "add": "0.001"
+      },
+      "stdout": "[100. 120.] float16\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "dtype of x",
+          "value": "float16",
+          "note": "about 3 significant decimal digits"
+        },
+        {
+          "label": "y",
+          "value": "[100. 120.]",
+          "note": "dtype float16"
+        }
+      ]
+    },
+    {
+      "id": "float32-small",
+      "label": "float32 + 0.001",
+      "slots": {
+        "dtype": "float32",
+        "add": "0.001"
+      },
+      "stdout": "[100.001 120.001] float32\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "dtype of x",
+          "value": "float32",
+          "note": "about 6 significant decimal digits"
+        },
+        {
+          "label": "y",
+          "value": "[100.001 120.001]",
+          "note": "dtype float32"
+        }
+      ]
+    },
+    {
+      "id": "float64-small",
+      "label": "float64 + 0.001",
+      "slots": {
+        "dtype": "float64",
+        "add": "0.001"
+      },
+      "stdout": "[100.001 120.001] float64\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "dtype of x",
+          "value": "float64",
+          "note": "about 15 significant decimal digits"
+        },
+        {
+          "label": "y",
+          "value": "[100.001 120.001]",
+          "note": "dtype float64"
+        }
+      ]
+    }
+  ]
+}

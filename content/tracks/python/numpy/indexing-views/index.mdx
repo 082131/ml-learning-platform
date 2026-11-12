@@ -1,0 +1,149 @@
+import { axisRunner, experiment, masksRunner, viewsCode } from './code';
+import { questions, standardizeExercise } from './quiz';
+
+<Section kind="intuition" title="One block of memory, many windows">
+
+A NumPy array is a block of numbers in memory plus a small description: shape, dtype and *strides* (how many
+bytes to jump to reach the next row or column). Many operations change only the description and keep the same
+block. `a[1]`, `a[:, 1]`, `a.T` and `a.reshape(4, 3)` are new windows onto the same numbers: free to make, and
+any write through them lands in `a`.
+
+Other operations must gather scattered elements into a new block: a list of positions, a boolean mask,
+`flatten()`. Those are copies. Knowing which is which explains both speed (views cost nothing) and some nasty
+bugs (writing into what you thought was a copy).
+
+</Section>
+
+<Section kind="technical" title="Indexing, views, copies and axes">
+
+**Basic indexing** uses integers, slices (`start:stop:step`), `...` and `None`. It always returns an
+<Term id="array-view">array view</Term>. Each integer index removes an axis: `a[1]` of a `(3, 4)` array has shape
+`(4,)`, while the slice `a[1:2]` keeps it, `(1, 4)`.
+
+**<Term id="fancy-indexing">Fancy indexing</Term>** uses an array or list of positions, `a[[0, 2]]`, and
+**boolean masks**, `a[a > 8]`, which keep the elements where the mask is True. Both always return copies. A mask
+result is always 1-D, because the kept elements need not form a rectangle. Assigning *through* either form, as in
+`a[a > 8] = 0`, writes into `a`.
+
+**Reshaping.** `reshape`, `.T` (transpose) and `ravel()` return views when the memory layout allows and copies
+otherwise; `flatten()` and `.copy()` always copy. `np.shares_memory(a, b)` settles any doubt.
+
+**Axes.** A reduction such as `sum`, `mean`, `max` or `argmax` with `axis=k` collapses axis `k`
+(<Term id="axis">axis</Term>): for a `(rows, columns)` table, `axis=0` gives one value per column and
+`axis=1` one per row. `keepdims=True` keeps the collapsed axis with length 1, so `(4, 3)` becomes `(4, 1)`, which
+broadcasts straight back against the original.
+
+**Combining masks.** Use `&`, `|` and `~` with parentheses around each comparison. Python’s `and`, `or` and
+chained comparisons such as `25 <= ages < 50` need a single True or False and raise `ValueError` on arrays.
+
+</Section>
+
+<Section kind="visual" title="View or copy?">
+
+Start from `a = np.arange(12).reshape(3, 4)`, take `sub` in one of ten ways, then write `-1` into every element
+of `sub`. If `sub` is a view, the `-1`s show up in `a`. Every result was recorded with NumPy.
+
+<Experiment def={experiment} title="View and copy explorer">
+  <StateCards title="After writing into sub" labelHeading="Array" noteHeading="Detail" />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The program">
+
+<Experiment def={experiment} title="views.py, linked to the explorer" controls={false}>
+  <Code example={viewsCode} title="views.py" />
+  <Readout title="What NumPy printed" />
+</Experiment>
+
+Reductions along an axis on a table of 4 students and 3 exams. The column means are $(70 + 60 + 90 + 50)/4 =
+67.5$, $(85 + 75 + 95 + 65)/4 = 80$ and $(90 + 80 + 85 + 70)/4 = 81.25$.
+
+<PythonRunner example={axisRunner} title="axes.py" />
+
+</Section>
+
+<Section kind="experiment" title="Things to try">
+
+In the explorer:
+
+- Compare `a[:, 1]` with `a[[0, 2]]`. Both pick part of `a`, but only the slice is a view: writing into the
+  fancy-indexed copy changes nothing.
+- Compare `a.ravel()` with `a.flatten()`. Same values, same shape, but only `ravel` shares memory.
+- Choose `a[1:, ::2]`. A step slice is still a view: NumPy just changes the strides to skip every other column.
+
+In the axis program, change `keepdims=True` to `keepdims=False` on the `row_centered` line and run it. Shapes
+`(4, 3)` and `(4,)` cannot broadcast, so NumPy raises `ValueError`.
+
+Masks, sorting positions and assigning through a mask:
+
+<PythonRunner example={masksRunner} title="masks.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Views and masks gone wrong">
+
+<CommonMistake
+  title="Normalizing a slice of the original"
+  wrong={'first = X[:100]\nfirst -= first.mean(axis=0)   # meant to work on a copy'}
+  error="No error: the first 100 rows of X are now changed too."
+  cause="A basic slice is a view, and -= writes into it."
+  fix={'first = X[:100] - X[:100].mean(axis=0)   # new array\n# or: first = X[:100].copy()'}
+/>
+
+<CommonMistake
+  title="Using and on arrays"
+  wrong={'ages[(ages >= 25) and (ages < 50)]'}
+  error="ValueError: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()"
+  cause="and needs one True or False; a comparison on an array gives one per element."
+  fix={'ages[(ages >= 25) & (ages < 50)]'}
+/>
+
+<CommonMistake
+  title="Subtracting row means without keepdims"
+  wrong={'X - X.mean(axis=1)   # X has shape (4, 3)'}
+  error="ValueError: operands could not be broadcast together with shapes (4,3) (4,)"
+  cause="(4,) aligns with the last axis, which has length 3."
+  fix={'X - X.mean(axis=1, keepdims=True)   # (4, 1) stretches across columns'}
+/>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+| In data and ML code | What it does |
+|---|---|
+| `X_train, X_val = X[:800], X[800:]` | Two views of one array: free, but share memory |
+| `X[idx]` with shuffled `idx` | A shuffled copy (fancy indexing) |
+| `(X - X.mean(axis=0)) / X.std(axis=0)` | Per-feature standardization |
+| `probs.argmax(axis=1)` | The predicted class for each row of a batch |
+| `y[y == -1] = 0` | Relabel in place through a mask |
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Standardize columns without side effects">
+
+<MiniExercise exercise={standardizeExercise}>
+  The starter `standardize(X)` uses one mean for the whole array and changes `X` in place. Fix it so every column
+  ends with mean 0 and standard deviation 1, and `X` is left unchanged. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Basic indexing, reshape, `.T` and `ravel` give views (shared memory); fancy indexing, masks, `flatten` and
+  `copy` give copies.
+- Writing into a view writes into the original; check with `np.shares_memory` when unsure.
+- `axis=k` collapses axis `k`; `keepdims=True` keeps it as length 1 so the result broadcasts back.
+- Combine masks with `&`, `|`, `~` and parentheses.
+
+Next: [dtypes, precision and reproducible randomness](#/learn/python/numpy/dtypes-random).
+
+</Section>

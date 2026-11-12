@@ -389,8 +389,8 @@ export const tracks: Track[] = [
         title: 'NumPy in depth',
         level: 'intermediate',
         lessons: [
-          { id: 'python/numpy/indexing-views', status: 'outline' },
-          { id: 'python/numpy/dtypes-random', status: 'outline' },
+          { id: 'python/numpy/indexing-views', status: 'written' },
+          { id: 'python/numpy/dtypes-random', status: 'written' },
         ],
       },
       {

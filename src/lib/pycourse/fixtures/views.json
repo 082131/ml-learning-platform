@@ -1,0 +1,266 @@
+{
+  "python": "3.13.18",
+  "template": "import numpy as np\n\na = np.arange(12).reshape(3, 4)\nsub = {{expr}}\nsub[...] = -1          # write into every element of sub\nprint(a)\nprint(np.shares_memory(a, sub))",
+  "variants": [
+    {
+      "id": "row",
+      "label": "a[1]  (a basic index: one row)",
+      "slots": {
+        "expr": "a[1]"
+      },
+      "stdout": "[[ 0  1  2  3]\n [-1 -1 -1 -1]\n [ 8  9 10 11]]\nTrue\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "sub before the write",
+          "value": "[4 5 6 7]",
+          "note": "shape (4,)"
+        },
+        {
+          "label": "view or copy",
+          "value": "view",
+          "note": "writes reach a"
+        },
+        {
+          "label": "a after the write",
+          "value": "[[ 0  1  2  3]\n [-1 -1 -1 -1]\n [ 8  9 10 11]]",
+          "note": "-1 marks elements changed through sub"
+        }
+      ]
+    },
+    {
+      "id": "column",
+      "label": "a[:, 1]  (a slice and an index: one column)",
+      "slots": {
+        "expr": "a[:, 1]"
+      },
+      "stdout": "[[ 0 -1  2  3]\n [ 4 -1  6  7]\n [ 8 -1 10 11]]\nTrue\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "sub before the write",
+          "value": "[1 5 9]",
+          "note": "shape (3,)"
+        },
+        {
+          "label": "view or copy",
+          "value": "view",
+          "note": "writes reach a"
+        },
+        {
+          "label": "a after the write",
+          "value": "[[ 0 -1  2  3]\n [ 4 -1  6  7]\n [ 8 -1 10 11]]",
+          "note": "-1 marks elements changed through sub"
+        }
+      ]
+    },
+    {
+      "id": "step",
+      "label": "a[1:, ::2]  (slices with a step)",
+      "slots": {
+        "expr": "a[1:, ::2]"
+      },
+      "stdout": "[[ 0  1  2  3]\n [-1  5 -1  7]\n [-1  9 -1 11]]\nTrue\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "sub before the write",
+          "value": "[[ 4  6]\n [ 8 10]]",
+          "note": "shape (2, 2)"
+        },
+        {
+          "label": "view or copy",
+          "value": "view",
+          "note": "writes reach a"
+        },
+        {
+          "label": "a after the write",
+          "value": "[[ 0  1  2  3]\n [-1  5 -1  7]\n [-1  9 -1 11]]",
+          "note": "-1 marks elements changed through sub"
+        }
+      ]
+    },
+    {
+      "id": "fancy",
+      "label": "a[[0, 2]]  (fancy indexing with a list)",
+      "slots": {
+        "expr": "a[[0, 2]]"
+      },
+      "stdout": "[[ 0  1  2  3]\n [ 4  5  6  7]\n [ 8  9 10 11]]\nFalse\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "sub before the write",
+          "value": "[[ 0  1  2  3]\n [ 8  9 10 11]]",
+          "note": "shape (2, 4)"
+        },
+        {
+          "label": "view or copy",
+          "value": "copy",
+          "note": "a is untouched by writes to sub"
+        },
+        {
+          "label": "a after the write",
+          "value": "[[ 0  1  2  3]\n [ 4  5  6  7]\n [ 8  9 10 11]]",
+          "note": "-1 marks elements changed through sub"
+        }
+      ]
+    },
+    {
+      "id": "mask",
+      "label": "a[a > 8]  (a boolean mask)",
+      "slots": {
+        "expr": "a[a > 8]"
+      },
+      "stdout": "[[ 0  1  2  3]\n [ 4  5  6  7]\n [ 8  9 10 11]]\nFalse\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "sub before the write",
+          "value": "[ 9 10 11]",
+          "note": "shape (3,)"
+        },
+        {
+          "label": "view or copy",
+          "value": "copy",
+          "note": "a is untouched by writes to sub"
+        },
+        {
+          "label": "a after the write",
+          "value": "[[ 0  1  2  3]\n [ 4  5  6  7]\n [ 8  9 10 11]]",
+          "note": "-1 marks elements changed through sub"
+        }
+      ]
+    },
+    {
+      "id": "reshape",
+      "label": "a.reshape(4, 3)  (reshape)",
+      "slots": {
+        "expr": "a.reshape(4, 3)"
+      },
+      "stdout": "[[-1 -1 -1 -1]\n [-1 -1 -1 -1]\n [-1 -1 -1 -1]]\nTrue\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "sub before the write",
+          "value": "[[ 0  1  2]\n [ 3  4  5]\n [ 6  7  8]\n [ 9 10 11]]",
+          "note": "shape (4, 3)"
+        },
+        {
+          "label": "view or copy",
+          "value": "view",
+          "note": "writes reach a"
+        },
+        {
+          "label": "a after the write",
+          "value": "[[-1 -1 -1 -1]\n [-1 -1 -1 -1]\n [-1 -1 -1 -1]]",
+          "note": "-1 marks elements changed through sub"
+        }
+      ]
+    },
+    {
+      "id": "transpose",
+      "label": "a.T  (transpose)",
+      "slots": {
+        "expr": "a.T"
+      },
+      "stdout": "[[-1 -1 -1 -1]\n [-1 -1 -1 -1]\n [-1 -1 -1 -1]]\nTrue\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "sub before the write",
+          "value": "[[ 0  4  8]\n [ 1  5  9]\n [ 2  6 10]\n [ 3  7 11]]",
+          "note": "shape (4, 3)"
+        },
+        {
+          "label": "view or copy",
+          "value": "view",
+          "note": "writes reach a"
+        },
+        {
+          "label": "a after the write",
+          "value": "[[-1 -1 -1 -1]\n [-1 -1 -1 -1]\n [-1 -1 -1 -1]]",
+          "note": "-1 marks elements changed through sub"
+        }
+      ]
+    },
+    {
+      "id": "ravel",
+      "label": "a.ravel()  (ravel)",
+      "slots": {
+        "expr": "a.ravel()"
+      },
+      "stdout": "[[-1 -1 -1 -1]\n [-1 -1 -1 -1]\n [-1 -1 -1 -1]]\nTrue\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "sub before the write",
+          "value": "[ 0  1  2  3  4  5  6  7  8  9 10 11]",
+          "note": "shape (12,)"
+        },
+        {
+          "label": "view or copy",
+          "value": "view",
+          "note": "writes reach a"
+        },
+        {
+          "label": "a after the write",
+          "value": "[[-1 -1 -1 -1]\n [-1 -1 -1 -1]\n [-1 -1 -1 -1]]",
+          "note": "-1 marks elements changed through sub"
+        }
+      ]
+    },
+    {
+      "id": "flatten",
+      "label": "a.flatten()  (flatten)",
+      "slots": {
+        "expr": "a.flatten()"
+      },
+      "stdout": "[[ 0  1  2  3]\n [ 4  5  6  7]\n [ 8  9 10 11]]\nFalse\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "sub before the write",
+          "value": "[ 0  1  2  3  4  5  6  7  8  9 10 11]",
+          "note": "shape (12,)"
+        },
+        {
+          "label": "view or copy",
+          "value": "copy",
+          "note": "a is untouched by writes to sub"
+        },
+        {
+          "label": "a after the write",
+          "value": "[[ 0  1  2  3]\n [ 4  5  6  7]\n [ 8  9 10 11]]",
+          "note": "-1 marks elements changed through sub"
+        }
+      ]
+    },
+    {
+      "id": "copy",
+      "label": "a[1].copy()  (an explicit copy)",
+      "slots": {
+        "expr": "a[1].copy()"
+      },
+      "stdout": "[[ 0  1  2  3]\n [ 4  5  6  7]\n [ 8  9 10 11]]\nFalse\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "sub before the write",
+          "value": "[4 5 6 7]",
+          "note": "shape (4,)"
+        },
+        {
+          "label": "view or copy",
+          "value": "copy",
+          "note": "a is untouched by writes to sub"
+        },
+        {
+          "label": "a after the write",
+          "value": "[[ 0  1  2  3]\n [ 4  5  6  7]\n [ 8  9 10 11]]",
+          "note": "-1 marks elements changed through sub"
+        }
+      ]
+    }
+  ]
+}

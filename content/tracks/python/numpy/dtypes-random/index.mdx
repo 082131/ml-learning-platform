@@ -1,0 +1,155 @@
+import { dtypeCode, experiment, floatsRunner, nanRunner, rngRunner } from './code';
+import { questions, splitExercise } from './quiz';
+
+<Section kind="intuition" title="Numbers with a fixed number of bits">
+
+Python’s own `int` grows as large as it needs to. NumPy is fast because it does not: every element of an array
+has the same fixed-size <Term id="dtype">dtype</Term>, such as `int8` (1 byte), `float32` (4 bytes) or `float64`
+(8 bytes). The price is that results can silently wrap around or lose digits.
+
+The same goes for randomness. Training shuffles data, initializes weights and drops out units at random; if you
+cannot reproduce those random numbers, you cannot reproduce a result. This lesson covers the limits of
+fixed-size numbers, the special value <Term id="nan">NaN</Term>, and seeded random generators.
+
+</Section>
+
+<Section kind="technical" title="dtypes, floating point and seeds">
+
+**Integers.** `int8` holds −128 to 127, `uint8` 0 to 255, `int32` about ±2.1 billion, `int64` about ±9.2 × 10¹⁸.
+When a result does not fit, NumPy integers wrap around (<Term id="integer-overflow">integer overflow</Term>)
+without raising an error: `int8` 120 + 10 is −126. Images are often `uint8`, so `img + 100` can wrap; convert with
+`img.astype(np.float32)` first. NumPy’s default integer is 64-bit on most computers and 32-bit in this browser.
+
+**Mixing types (NumPy 2).** A Python number combined with an array adopts the array’s dtype when it is the same
+kind (int with int, float with float), and raises `OverflowError` if the value does not fit. Mixing kinds
+promotes: an `int8` array plus `0.5` becomes `float64`. Two arrays of different dtypes promote to a type that
+holds both.
+
+**Floating point.** A float stores about 7 significant decimal digits in `float32` and about 16 in `float64`,
+in binary, so most decimals (0.1, 0.2) are stored inexactly (<Term id="floating-point">floating point</Term>).
+Never compare floats with `==`; use `np.isclose(a, b)` or `np.allclose` for arrays. `float32` cannot even count
+past $2^{24} = 16{,}777{,}216$ in steps of 1. `astype(int)` truncates toward zero; `//` floors.
+
+**NaN and infinity.** NaN ("not a number") marks undefined or missing values. Every comparison with NaN is
+False, even `nan == nan`, so test with `np.isnan`. Arithmetic with NaN gives NaN, so `mean` of an array with one
+NaN is NaN; `np.nanmean`, `np.nanmax` and friends skip them. Dividing by zero gives `inf` (or `nan` for 0/0) with
+a `RuntimeWarning`, not an exception.
+
+**Randomness.** `rng = np.random.default_rng(seed)` creates a Generator whose stream is fixed by the seed
+(<Term id="random-seed">random seed</Term>). Use its methods (`rng.random`, `rng.integers`, `rng.normal`,
+`rng.permutation`, `rng.choice`) and pass `rng` to functions that need randomness. The older
+`np.random.seed(0)` seeds one hidden global generator that every library shares, which is why new code avoids it.
+Libraries have their own generators too: PyTorch needs `torch.manual_seed`.
+
+</Section>
+
+<Section kind="visual" title="The same addition in eight dtypes">
+
+`x` holds 100 and 120 in the chosen dtype, and the program adds a Python number. Watch integers wrap or get
+refused and small floats disappear in `float16`. Every result was recorded with NumPy.
+
+<Experiment def={experiment} title="dtype explorer">
+  <StateCards title="x + number" labelHeading="Array" noteHeading="Detail" />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The program">
+
+<Experiment def={experiment} title="dtypes.py, linked to the explorer" controls={false}>
+  <Code example={dtypeCode} title="dtypes.py" />
+  <Readout title="What NumPy printed or raised" />
+</Experiment>
+
+Floating-point surprises, truncation and integer division:
+
+<PythonRunner example={floatsRunner} title="floats.py" />
+
+</Section>
+
+<Section kind="experiment" title="Things to try">
+
+In the explorer:
+
+- `int8 + 10`: 120 + 10 = 130 does not fit, so it wraps to $130 - 256 = -126$. `int16 + 10` gives 130.
+- `int8 + 300`: the Python number itself does not fit in `int8`, so NumPy refuses with `OverflowError` instead
+  of wrapping.
+- `float16 + 0.001`: `float16` keeps about 3 significant digits, so 100.001 rounds back to 100.
+
+NaN in practice. The warnings for division by zero are printed separately from the results:
+
+<PythonRunner example={nanRunner} title="nan.py" />
+
+Seeded generators. Run it twice: the numbers never change. Then change `seed=42` to `seed=43` in the first line
+and only the first two printed lines change.
+
+<PythonRunner example={rngRunner} title="rng.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Precision and randomness bugs">
+
+<CommonMistake
+  title="Brightening a uint8 image"
+  wrong={'img = np.array([200, 250], dtype=np.uint8)\nbrighter = img + 100'}
+  error="No error: brighter is [44 94], because uint8 wraps at 256."
+  cause="Arithmetic keeps the uint8 dtype."
+  fix={'brighter = np.clip(img.astype(np.int16) + 100, 0, 255).astype(np.uint8)'}
+/>
+
+<CommonMistake
+  title="Finding missing values with =="
+  wrong={'missing = values == np.nan'}
+  error="No error: missing is all False, so nothing is ever found."
+  cause="NaN is not equal to anything, itself included."
+  fix={'missing = np.isnan(values)'}
+/>
+
+<CommonMistake
+  title="Seeding the global generator and hoping"
+  wrong={'np.random.seed(0)\nidx = np.random.permutation(n)'}
+  error="No error, but any library call that draws from the global generator in between shifts your split."
+  cause="np.random.seed seeds one generator shared by all code in the process."
+  fix={'rng = np.random.default_rng(0)\nidx = rng.permutation(n)'}
+/>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+| In data and ML code | Why |
+|---|---|
+| `X.astype(np.float32)` before PyTorch | Models train in float32; NumPy defaults to float64 |
+| `np.isclose(pred, expected, atol=1e-6)` in tests | Floats need a tolerance |
+| `df["col"].isna()`, `np.nanmean` | NaN marks missing data |
+| `rng = np.random.default_rng(cfg.seed)` | One seeded generator per run, recorded with the results |
+| `torch.manual_seed(0)` | PyTorch has its own generator, seeded separately |
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="A reproducible split">
+
+<MiniExercise exercise={splitExercise}>
+  The starter `split_indices(n, val_fraction, seed)` ignores its seed. Make the same seed always give the same
+  `(train_idx, val_idx)` without touching NumPy’s global generator. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Each array has one fixed-size dtype; integers wrap silently, and Python numbers adopt the array’s dtype if they
+  fit (NumPy 2).
+- Floats are approximate: compare with `np.isclose`; `float32` keeps about 7 digits, `float64` about 16.
+- NaN is never equal to anything; find it with `np.isnan` and skip it with the `nan*` functions.
+- Use `np.random.default_rng(seed)` and pass the generator around; seed PyTorch separately.
+
+Next chapter: [pandas selection, alignment and dtypes](#/learn/python/pandas/indexing-dtypes).
+
+</Section>
