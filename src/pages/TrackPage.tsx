@@ -35,7 +35,7 @@ export default function TrackPage() {
         {exam && (
           <p className={s.summary}>
             <ButtonLink to={`/exam/${track.id}`} variant="primary">
-              Certification exam: {exam.questions.length} items + hands-on
+              Take the certification exam
             </ButtonLink>
           </p>
         )}
