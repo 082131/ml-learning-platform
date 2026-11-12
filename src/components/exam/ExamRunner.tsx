@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { choose, formatClock, isMulti, timeLeft, toggleFlag, type Attempt } from '@/lib/exam/engine';
 import type { ExamDef } from '@/lib/exam/types';
 import { Button } from '@/components/ui';
+import { PromptText } from './PromptText';
 import { QuestionNav } from './QuestionNav';
 import { useNow } from './useExamStore';
 import s from './Exam.module.css';
@@ -75,7 +76,7 @@ export function ExamRunner({ exam, attempt, onChange, onSubmit }: ExamRunnerProp
                 Q{current + 1}
                 {multi ? ` · choose ${item.answer.length}` : ''}
               </span>
-              {item.prompt}
+              <PromptText text={item.prompt} />
             </legend>
             {attempt.optionOrder[item.id]!.map((orig, pos) => (
               <label key={orig} className={s.option}>

@@ -3,6 +3,7 @@ import { gradeAttempt, isCorrect, type Attempt } from '@/lib/exam/engine';
 import type { ExamDef } from '@/lib/exam/types';
 import { Badge, Button } from '@/components/ui';
 import { QuestionNav } from './QuestionNav';
+import { PromptText } from './PromptText';
 import s from './Exam.module.css';
 
 interface ExamResultsProps {
@@ -101,12 +102,12 @@ export function ExamResults({ exam, attempt, onRetake }: ExamResultsProps) {
               const chosen = attempt.answers[id] ?? [];
               return (
                 <article key={id} id={`review-${n}`} className={s.question} data-review-item={id}>
-                  <p className={s.prompt}>
+                  <div className={s.prompt}>
                     <span className={s.qnum}>
                       Q{n} · {right[id] ? '✓ right' : chosen.length ? '✗ wrong' : '✗ blank'}
                     </span>
-                    {item.prompt}
-                  </p>
+                    <PromptText text={item.prompt} />
+                  </div>
                   {attempt.optionOrder[id]!.map((orig, pos) => {
                     const correct = item.answer.includes(orig);
                     const picked = chosen.includes(orig);
