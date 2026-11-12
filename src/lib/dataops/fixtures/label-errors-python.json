@@ -1,0 +1,6 @@
+{
+ "per-class": "thresholds: cat 0.719, dog 0.499\nitem 22: labeled dog, P(dog)=0.18 -> really wrong\nitem 15: labeled cat, P(dog)=0.71 -> really wrong\nitem 13: labeled cat, P(dog)=0.52 -> really wrong\nitem 14: labeled cat, P(dog)=0.50 -> really wrong\nflagged 4, really wrong 4: precision 1.00, recall 0.80 of 5 known errors",
+ "0.5": "item 22: labeled dog, P(dog)=0.18 -> really wrong\nitem 15: labeled cat, P(dog)=0.71 -> really wrong\nitem 23: labeled dog, P(dog)=0.32 -> really wrong\nitem 20: labeled dog, P(dog)=0.45 -> label was right\nitem 13: labeled cat, P(dog)=0.52 -> really wrong\nitem 17: labeled dog, P(dog)=0.48 -> label was right\nflagged 6, really wrong 4: precision 0.67, recall 0.80 of 5 known errors",
+ "0.4": "item 22: labeled dog, P(dog)=0.18 -> really wrong\nitem 15: labeled cat, P(dog)=0.71 -> really wrong\nitem 23: labeled dog, P(dog)=0.32 -> really wrong\nflagged 3, really wrong 3: precision 1.00, recall 0.60 of 5 known errors",
+ "0.3": "item 22: labeled dog, P(dog)=0.18 -> really wrong\nitem 15: labeled cat, P(dog)=0.71 -> really wrong\nflagged 2, really wrong 2: precision 1.00, recall 0.40 of 5 known errors"
+}

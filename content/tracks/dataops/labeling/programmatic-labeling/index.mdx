@@ -117,7 +117,7 @@ $2^{10}$, so 8 halvings narrow it to a handful of items.
 <CommonMistake
   title="Treating abstain as a negative vote"
   wrong={"def refund_word(t):\n    return 1 if \"refund\" in t else 0   # 0 means \"no opinion\" here"}
-  error="(no error: every ticket without the word \"refund\" gets a confident \"not a refund\" vote)"
+  error="(no error: every ticket without the word “refund” gets a confident “not a refund” vote)"
   cause="The function has no evidence about tickets it does not match, but the vote counts as evidence against."
   fix="return a separate ABSTAIN value (None, or -1 in Snorkel) and exclude it from votes"
 />

@@ -1,0 +1,162 @@
+import { cleanlabSketch, findIssuesPython, le, oofRunner } from './code';
+import { questions, thresholdExercise } from './quiz';
+
+<Section kind="intuition" title="Let the model point at its teachers' mistakes">
+
+Every real dataset has wrong labels. A study of ten popular benchmark test sets estimated an average of 3.3% label
+errors, and enough to change which model looked best. Re-checking every label is too expensive, so the question
+is where to look first.
+
+A trained model can help, with one condition. If the model has seen an example during training, it has learned that
+example's label, right or wrong. If it has not, and it still confidently predicts a different class, the label is
+suspicious. This lesson turns that idea into a precise rule, confident learning, and measures how well it finds the
+errors an expert later confirmed.
+
+</Section>
+
+<Section kind="technical" title="Out-of-fold probabilities and per-class thresholds">
+
+**Out-of-fold probabilities.** Split the data into $k$ folds. Train on $k - 1$ of them, predict class probabilities
+for the held-out fold, and repeat until every example has one
+<Term id="out-of-fold-prediction">out-of-fold prediction</Term>. scikit-learn does it with
+`cross_val_predict(..., method="predict_proba")`.
+
+**A fixed cut-off is too blunt.** The obvious rule flags an example when the model gives its label a probability
+below 0.5. But models are more confident on some classes than others. Here the model is unsure about dogs: correctly
+labeled dogs often get $P(\text{dog})$ below 0.5, and a fixed cut-off flags them.
+
+**Per-class thresholds.** <Term id="confident-learning">Confident learning</Term> asks what is normal for each class.
+For class $c$, the <Term id="per-class-threshold">per-class threshold</Term> is the model's average probability of $c$
+over the examples labeled $c$:
+
+$$
+t_c = \frac{1}{|\{i : \tilde y_i = c\}|} \sum_{i : \tilde y_i = c} \hat p_i(c)
+$$
+
+where $\tilde y_i$ is the given (possibly wrong) label and $\hat p_i(c)$ the out-of-fold probability. An example
+"confidently belongs" to every class whose threshold it reaches; if several, the most probable one. When that class
+differs from the given label, the example is flagged.
+
+With the lesson's 24 photos, $t_{\text{cat}} = 0.719$ and $t_{\text{dog}} = 0.499$. A photo labeled cat with
+$P(\text{dog}) = 0.52$ reaches the dog threshold and not the cat one ($1 - 0.52 = 0.48 < 0.719$), so it is flagged.
+
+**Scoring an audit.** Against an expert re-review, <Term id="precision-recall">precision</Term> is the share of flagged
+items that are really wrong (reviewer time well spent), and recall is the share of real errors that were flagged.
+
+**Ranking.** Reviewers rarely finish the list, so flagged items are ordered by self-confidence, the probability the
+model gives to the label the item has, lowest first.
+
+</Section>
+
+<Section kind="visual" title="Fixed cut-offs against per-class thresholds">
+
+<Experiment def={le} title="An audit of 24 cat and dog labels">
+  <LabelErrorStrips />
+  <Readout title="What the experiment computed" />
+</Experiment>
+
+Things to try:
+
+- **Cut-off 0.5** (default): 6 flagged, 4 really wrong. Items 17 and 20 are correctly labeled dogs that the model is
+  merely unsure about. Precision 0.67, recall 0.80.
+- **Cut-offs 0.4 and 0.3** stop the false alarms but find fewer errors: recall 0.60, then 0.40.
+- **Per-class thresholds:** 4 flagged, all 4 really wrong. Precision 1.00 with the same recall 0.80 as the 0.5 cut-off.
+  It catches item 14 (labeled cat, $P(\text{dog}) = 0.50$), which every fixed cut-off misses.
+- **What still slips.** Item 23 is a cat labeled dog with $P(\text{dog}) = 0.32$. Its $P(\text{cat}) = 0.68$ is just
+  below the cat threshold, so no method except a loose cut-off sees it.
+
+</Section>
+
+<Section kind="code" title="The audit in Python, and why out-of-fold matters">
+
+The program behind the visual. The method is filled from the control:
+
+<Experiment def={le} title="find_issues.py, linked to the experiment" controls={false}>
+  <Code example={findIssuesPython} title="find_issues.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+**In-sample against out-of-fold.** 60 points with 4 wrong labels. A flexible model scored on its own training data
+simply repeats the labels it saw. Cross-validated predictions do not:
+
+<PythonRunner example={oofRunner} title="oof.py" />
+
+**With libraries.** In a project, `cross_val_predict` produces the probabilities and cleanlab's `find_label_issues`
+applies confident learning, for any number of classes:
+
+<Code example={cleanlabSketch} title="cleanlab_issues.py" />
+
+<Callout kind="simplification">
+  The probabilities in the experiment are written out by hand to make the example readable; in practice they come from
+  cross-validation as in oof.py. The library version builds a full "confident joint" (a count matrix of given label
+  against likely true label) and offers several filtering rules; the lesson shows the core idea for two classes.
+</Callout>
+
+</Section>
+
+<Section kind="mistakes" title="Audits that mislead">
+
+<CommonMistake
+  title="Auditing with in-sample predictions"
+  wrong={"model.fit(X, y)\nsuspects = np.where(model.predict(X) != y)[0]   # almost empty"}
+  error="(no error: a flexible model fits the wrong labels too, so it rarely disagrees with them)"
+  cause="The model has memorized the labels being checked."
+  fix={"pred_probs = cross_val_predict(model, X, y, cv=5, method=\"predict_proba\")"}
+/>
+
+<CommonMistake
+  title="Auto-relabeling with the model's prediction"
+  wrong={"y[suspects] = pred_probs[suspects].argmax(axis=1)"}
+  error="(no error: some correct labels are overwritten with the model's mistakes, which the next model then learns)"
+  cause="A flag is a suspicion. At a 0.5 cut-off in the experiment, a third of the flagged labels were right."
+  fix="send flagged items to human review, most suspicious first, and record each decision"
+/>
+
+<CommonMistake
+  title="Cleaning the training set but not the test set"
+  wrong={"train = clean(train)   # test keeps its 3% wrong labels"}
+  error="(no error: model comparisons on the test set still reward copying annotator mistakes)"
+  cause="Test-set label errors decide which model you ship."
+  fix="audit the test set with extra care (several expert reviewers), and freeze it as a versioned gold set"
+/>
+
+</Section>
+
+<Section kind="practice" title="Label audits as a routine">
+
+- **Audit every new batch** of labels before it joins the training set, with a model trained on the existing data.
+- **Track the error rate** per annotator, per guideline version and per class: errors cluster, and the clusters point
+  at fixes upstream.
+- **Budget reviews by rank.** Review the top of the list until precision falls below what the time is worth.
+- **Keep hard cases.** Ambiguous items that experts also disagree on are kept with a note or a soft label, not deleted.
+- **Version the corrections** with who changed what and why ([dataset versioning](#/learn/dataops/versioning/data-snapshots)).
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Flag issues with per-class thresholds">
+
+<MiniExercise exercise={thresholdExercise}>
+  Write `flag_issues(labels, p_one)` for two classes. Compute $t_0$ and $t_1$, then flag each item whose most probable
+  above-threshold class differs from its given label.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Use out-of-fold probabilities: a model that trained on a label tends to agree with it.
+- Confident learning compares each item with the model's typical confidence for each class, instead of one cut-off.
+- In the experiment, per-class thresholds found 4 of 5 errors with no false alarms; the 0.5 cut-off found 4 with 2
+  false alarms.
+- Flags go to human review, ranked by self-confidence, and corrections become a new dataset version.
+
+Next: [data baselines, skew and drift detection](#/learn/dataops/validation/baselines-drift), checking the data
+itself rather than its labels.
+
+</Section>

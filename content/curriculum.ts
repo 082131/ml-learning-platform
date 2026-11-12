@@ -387,7 +387,7 @@ export const tracks: Track[] = [
         lessons: [
           { id: 'dataops/labeling/annotation-agreement', status: 'written' },
           { id: 'dataops/labeling/programmatic-labeling', status: 'written' },
-          { id: 'dataops/labeling/label-errors', status: 'outline' },
+          { id: 'dataops/labeling/label-errors', status: 'written' },
         ],
       },
       {
