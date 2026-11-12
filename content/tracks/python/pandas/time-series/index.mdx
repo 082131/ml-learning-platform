@@ -1,0 +1,155 @@
+import { experiment, gapsRunner, resampleRunner, rollingCode } from './code';
+import { lagExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Rows that have an order in time">
+
+Sales per day, sensor readings per minute, loss per training step: in a time series the order of the rows is
+part of the data. That brings new questions. What was the total per week? What is the trend once day-to-day
+noise is smoothed out? Which hours are missing?
+
+And one trap that matters for ML above all: a feature that quietly uses tomorrow’s value. It scores
+beautifully in testing and fails in production, because tomorrow is never available when you predict. pandas
+makes both the right and the wrong version a one-liner, so this lesson is about telling them apart.
+
+</Section>
+
+<Section kind="technical" title="Datetimes, resampling, windows and gaps">
+
+**Parsing.** `pd.to_datetime(col)` turns text into `datetime64` values. Put them in the index with
+`set_index("ts").sort_index()` to get a <Term id="datetime-index">DatetimeIndex</Term>, which lets you select
+with strings (`df.loc["2026-03-05"]` gives every row on that day) and use the `.dt` accessor on columns
+(`.dt.hour`, `.dt.day_name()`).
+
+**Time zones.** A timestamp without a zone is ambiguous. Store and compute in UTC
+(`pd.to_datetime(col, utc=True)`), because UTC has no daylight-saving jumps; convert with `tz_convert` only to
+display local time. On 29 March 2026, 00:30 UTC is 01:30 in Oslo and one hour later it is 03:30 there: local
+clocks skipped an hour, UTC did not.
+
+**Resampling.** `s.resample("D").sum()` puts rows into calendar bins (here days) and aggregates each bin
+(<Term id="resampling">resampling</Term>). Every bin in the range appears, including empty ones: `sum` and
+`count` give 0 for them, `mean` gives NaN. Common rules: `"h"` hour, `"D"` day, `"W-SUN"` weeks ending Sunday,
+`"MS"` month start.
+
+**Windows and shifts.** `s.shift(1)` moves each value one row later, so row *t* sees row *t − 1*;
+`s.diff(1)` is `s - s.shift(1)`. `s.rolling(n).mean()` averages the *n* rows ending at each row
+(<Term id="rolling-window">rolling window</Term>), with NaN until *n* rows exist (`min_periods` lowers that);
+`rolling("7D")` uses a time span instead of a row count. `expanding()` uses every row so far. A **feature for
+predicting row *t*** may only use what is known before *t*: shift first, then window. `center=True` and
+negative shifts read the future and belong in plots and analysis, never in features.
+
+**Gaps.** `s.asfreq("h")` reindexes to a regular frequency and exposes missing timestamps as NaN rows. Then
+choose: `ffill()` repeats the last value (right for a state that persists, such as a price), and
+`interpolate(method="time")` draws a straight line (right for a smooth physical signal). Either way, count what
+you filled.
+
+</Section>
+
+<Section kind="visual" title="Which windows look into the future?">
+
+A week of daily sales with a spike of 30 on Thursday 5 March. Pick an operation: the cards show its value on
+the spike day, how many rows come out as NaN, and whether it uses future values. Every run was recorded with
+pandas 3.
+
+<Experiment def={experiment} title="Window and shift explorer">
+  <StateCards title="The feature on the spike day" labelHeading="Property" noteHeading="Meaning" />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The program">
+
+<Experiment def={experiment} title="windows.py, linked to the explorer" controls={false}>
+  <Code example={rollingCode} title="windows.py" />
+  <Readout title="What pandas printed" />
+</Experiment>
+
+Parsing, resampling to days and to weeks, and selecting one day by string. Note the empty days, which get a sum
+of 0:
+
+<PythonRunner example={resampleRunner} title="resample.py" />
+
+</Section>
+
+<Section kind="experiment" title="Things to try">
+
+In the explorer:
+
+- `rolling(3).mean()` on 5 March is $(12 + 9 + 30) / 3 = 17$. It includes the spike itself.
+- `shift(1).rolling(3).mean()` on 5 March is $(10 + 12 + 9) / 3 = 10.33$: the days before the spike only. That
+  is the version you could compute the evening before.
+- `rolling(3, center=True).mean()` on 5 March is $(9 + 30 + 11) / 3 = 16.67$. It uses 6 March, a day in the
+  future.
+
+Gaps: `asfreq("h")` exposes the missing 05:00 reading, then forward fill and time interpolation fill the three
+missing hours differently. Between 5.0 at 01:00 and 8.0 at 04:00, interpolation adds 1.0 per hour.
+
+<PythonRunner example={gapsRunner} title="gaps.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Time series traps">
+
+<CommonMistake
+  title="A centered window as a feature"
+  wrong={'df["trend"] = df["sales"].rolling(7, center=True).mean()'}
+  error="No error: validation scores look great, and production predictions are much worse."
+  cause="A centered window averages 3 future days into every row."
+  fix={'df["trend"] = df["sales"].shift(1).rolling(7).mean()'}
+/>
+
+<CommonMistake
+  title="Windows over unsorted rows"
+  wrong={'df["avg"] = df["temp"].rolling(3).mean()   # rows in file order'}
+  error="No error: each window mixes unrelated times."
+  cause="rolling works on row order, not on dates."
+  fix={'df = df.sort_values("ts")\ndf["avg"] = df["temp"].rolling(3).mean()'}
+/>
+
+<CommonMistake
+  title="Trusting a resampled sum"
+  wrong={'daily = events.resample("D").sum()   # the sensor was offline on 4 March'}
+  error="No error: 4 March shows 0, which looks like a real quiet day."
+  cause="Empty bins sum to 0."
+  fix={'counts = events.resample("D").size()\ndaily = events.resample("D").sum().where(counts > 0)'}
+/>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+| In data and ML code | What it does |
+|---|---|
+| `pd.to_datetime(df["ts"], utc=True)` | Unambiguous timestamps |
+| `df.resample("h", on="ts")["requests"].sum()` | Traffic per hour from raw events |
+| `df["lag_7"] = df["y"].shift(7)` | Same day last week as a feature |
+| `loss.rolling(50).mean()` | A smoothed training curve |
+| `df.groupby("store")["y"].shift(1)` | Lags per store, never crossing stores |
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Leak-free features">
+
+<MiniExercise exercise={lagExercise}>
+  The starter `add_features(df)` builds `lag_1` from tomorrow and `mean_prev_3` including today. Fix both so
+  `lag_1` is yesterday’s sales and `mean_prev_3` is the mean of the 3 days **before** each row, without changing
+  `df`. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Parse to `datetime64`, keep UTC, and sort by time before any window.
+- `resample` bins by calendar time; empty bins exist and sum to 0.
+- `shift`, `diff`, `rolling` and `expanding` follow row order; for features, shift first so only the past is used.
+- `asfreq` exposes gaps; choose `ffill` or `interpolate` deliberately and count what you filled.
+
+Next chapter: [missing values, duplicates and types](#/learn/python/cleaning/missing-duplicates-types).
+
+</Section>

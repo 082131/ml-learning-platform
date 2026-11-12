@@ -1,0 +1,214 @@
+{
+  "python": "3.13.18",
+  "template": "import pandas as pd\n\nsales = pd.Series(\n    [10, 12, 9, 30, 11, 13, 12],\n    index=pd.date_range(\"2026-03-02\", periods=7, freq=\"D\"),\n)\nfeature = sales.{{op}}\nprint(feature.round(2).tolist())",
+  "variants": [
+    {
+      "id": "shift1",
+      "label": ".shift(1)  (yesterday’s value)",
+      "slots": {
+        "op": "shift(1)"
+      },
+      "stdout": "[nan, 10.0, 12.0, 9.0, 30.0, 11.0, 13.0]\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "value on 2026-03-05",
+          "value": "9.0",
+          "note": "the day with the spike of 30"
+        },
+        {
+          "label": "missing values",
+          "value": "1",
+          "note": "rows where the window is not full"
+        },
+        {
+          "label": "time direction",
+          "value": "past",
+          "note": "uses only earlier days: safe as a forecasting feature"
+        }
+      ]
+    },
+    {
+      "id": "diff1",
+      "label": ".diff(1)  (change since yesterday)",
+      "slots": {
+        "op": "diff(1)"
+      },
+      "stdout": "[nan, 2.0, -3.0, 21.0, -19.0, 2.0, -1.0]\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "value on 2026-03-05",
+          "value": "21.0",
+          "note": "the day with the spike of 30"
+        },
+        {
+          "label": "missing values",
+          "value": "1",
+          "note": "rows where the window is not full"
+        },
+        {
+          "label": "time direction",
+          "value": "past",
+          "note": "uses the row’s own value: fine for analysis; as a feature it must be known at prediction time"
+        }
+      ]
+    },
+    {
+      "id": "roll3",
+      "label": ".rolling(3).mean()  (trailing 3-day mean)",
+      "slots": {
+        "op": "rolling(3).mean()"
+      },
+      "stdout": "[nan, nan, 10.33, 17.0, 16.67, 18.0, 12.0]\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "value on 2026-03-05",
+          "value": "17.0",
+          "note": "the day with the spike of 30"
+        },
+        {
+          "label": "missing values",
+          "value": "2",
+          "note": "rows where the window is not full"
+        },
+        {
+          "label": "time direction",
+          "value": "past",
+          "note": "uses the row’s own value: fine for analysis; as a feature it must be known at prediction time"
+        }
+      ]
+    },
+    {
+      "id": "roll3min",
+      "label": ".rolling(3, min_periods=1).mean()  (trailing mean, partial windows)",
+      "slots": {
+        "op": "rolling(3, min_periods=1).mean()"
+      },
+      "stdout": "[10.0, 11.0, 10.33, 17.0, 16.67, 18.0, 12.0]\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "value on 2026-03-05",
+          "value": "17.0",
+          "note": "the day with the spike of 30"
+        },
+        {
+          "label": "missing values",
+          "value": "0",
+          "note": "rows where the window is not full"
+        },
+        {
+          "label": "time direction",
+          "value": "past",
+          "note": "uses the row’s own value: fine for analysis; as a feature it must be known at prediction time"
+        }
+      ]
+    },
+    {
+      "id": "roll3c",
+      "label": ".rolling(3, center=True).mean()  (centered 3-day mean)",
+      "slots": {
+        "op": "rolling(3, center=True).mean()"
+      },
+      "stdout": "[nan, 10.33, 17.0, 16.67, 18.0, 12.0, nan]\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "value on 2026-03-05",
+          "value": "16.67",
+          "note": "the day with the spike of 30"
+        },
+        {
+          "label": "missing values",
+          "value": "2",
+          "note": "rows where the window is not full"
+        },
+        {
+          "label": "time direction",
+          "value": "future",
+          "note": "uses values after the row’s own date: leaks the future into a feature"
+        }
+      ]
+    },
+    {
+      "id": "shiftroll",
+      "label": ".shift(1).rolling(3).mean()  (mean of the previous 3 days)",
+      "slots": {
+        "op": "shift(1).rolling(3).mean()"
+      },
+      "stdout": "[nan, nan, nan, 10.33, 17.0, 16.67, 18.0]\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "value on 2026-03-05",
+          "value": "10.33",
+          "note": "the day with the spike of 30"
+        },
+        {
+          "label": "missing values",
+          "value": "3",
+          "note": "rows where the window is not full"
+        },
+        {
+          "label": "time direction",
+          "value": "past",
+          "note": "uses only earlier days: safe as a forecasting feature"
+        }
+      ]
+    },
+    {
+      "id": "expand",
+      "label": ".expanding().max()  (running maximum)",
+      "slots": {
+        "op": "expanding().max()"
+      },
+      "stdout": "[10.0, 12.0, 12.0, 30.0, 30.0, 30.0, 30.0]\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "value on 2026-03-05",
+          "value": "30.0",
+          "note": "the day with the spike of 30"
+        },
+        {
+          "label": "missing values",
+          "value": "0",
+          "note": "rows where the window is not full"
+        },
+        {
+          "label": "time direction",
+          "value": "past",
+          "note": "uses the row’s own value: fine for analysis; as a feature it must be known at prediction time"
+        }
+      ]
+    },
+    {
+      "id": "shiftneg",
+      "label": ".shift(-1)  (tomorrow’s value)",
+      "slots": {
+        "op": "shift(-1)"
+      },
+      "stdout": "[12.0, 9.0, 30.0, 11.0, 13.0, 12.0, nan]\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "value on 2026-03-05",
+          "value": "11.0",
+          "note": "the day with the spike of 30"
+        },
+        {
+          "label": "missing values",
+          "value": "1",
+          "note": "rows where the window is not full"
+        },
+        {
+          "label": "time direction",
+          "value": "future",
+          "note": "uses values after the row’s own date: leaks the future into a feature"
+        }
+      ]
+    }
+  ]
+}

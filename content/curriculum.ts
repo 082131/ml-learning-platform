@@ -400,7 +400,7 @@ export const tracks: Track[] = [
         lessons: [
           { id: 'python/pandas/indexing-dtypes', status: 'written' },
           { id: 'python/pandas/groupby-merge-reshape', status: 'written' },
-          { id: 'python/pandas/time-series', status: 'outline' },
+          { id: 'python/pandas/time-series', status: 'written' },
         ],
       },
       {
