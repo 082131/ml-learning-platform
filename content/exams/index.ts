@@ -2,6 +2,7 @@ import type { TrackId } from '@/lib/types';
 import type { ExamDef } from '@/lib/exam/types';
 import { aiExam } from './ai';
 import { dataopsExam } from './dataops';
+import { deployExam } from './deploy';
 import { dataExam } from './data';
 import { inferenceExam } from './inference';
 import { mlExam } from './ml';
@@ -15,6 +16,7 @@ export const exams: Partial<Record<TrackId, ExamDef>> = {
   inference: inferenceExam,
   python: pythonExam,
   dataops: dataopsExam,
+  deploy: deployExam,
 };
 
 export const getExam = (track: string): ExamDef | undefined => exams[track as TrackId];

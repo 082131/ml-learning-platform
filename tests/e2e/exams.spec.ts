@@ -17,7 +17,7 @@ test.beforeEach(async ({ context }) => {
   await servePyodideLocally(context);
 });
 
-for (const track of ['ml', 'data', 'ai', 'inference', 'dataops', 'python']) {
+for (const track of ['ml', 'data', 'ai', 'inference', 'dataops', 'python', 'deploy']) {
   test(`the ${track} exam page shows its blueprint and certifications`, async ({ page }) => {
     await page.goto(`./#/exam/${track}`);
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
