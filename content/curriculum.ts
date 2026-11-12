@@ -427,7 +427,7 @@ export const tracks: Track[] = [
         level: 'intermediate',
         lessons: [
           { id: 'python/pytorch/tensors-autograd', status: 'written' },
-          { id: 'python/pytorch/datasets-modules', status: 'outline' },
+          { id: 'python/pytorch/datasets-modules', status: 'written' },
           { id: 'python/pytorch/training-loop', status: 'outline' },
         ],
       },

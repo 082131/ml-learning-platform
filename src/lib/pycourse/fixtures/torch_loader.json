@@ -1,0 +1,174 @@
+{
+  "python": "3.13.18",
+  "template": "import torch\nfrom torch import nn\nfrom torch.utils.data import DataLoader, TensorDataset\n\ntorch.manual_seed(0)\nX = torch.randn(10, 4)                  # 10 examples, 4 features\ny = torch.randint(0, 3, (10,))          # 3 classes\nloader = DataLoader(TensorDataset(X, y), batch_size={{bs}}, shuffle=True, drop_last={{drop}})\nmodel = nn.Sequential(nn.Linear(4, {{hidden}}), nn.ReLU(), nn.Linear({{hidden}}, 3))\n\nfor xb, yb in loader:\n    logits = model(xb)\n    print(tuple(xb.shape), tuple(yb.shape), \"->\", tuple(logits.shape))\nprint(sum(p.numel() for p in model.parameters()), \"parameters\")",
+  "variants": [
+    {
+      "id": "bs4-keep-h8",
+      "label": "batch_size=4, drop_last=False, hidden=8",
+      "slots": {
+        "bs": "4",
+        "drop": "False",
+        "hidden": "8"
+      },
+      "stdout": "(4, 4) (4,) -> (4, 3)\n(4, 4) (4,) -> (4, 3)\n(2, 4) (2,) -> (2, 3)\n67 parameters\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "len(loader)",
+          "value": "3",
+          "note": "batches per epoch; 10 of 10 examples used"
+        },
+        {
+          "label": "last batch",
+          "value": "2 of 4",
+          "note": "drop_last=True discards a short final batch"
+        },
+        {
+          "label": "parameters",
+          "value": "67",
+          "note": "(4·8 + 8) + (8·3 + 3): weights plus biases"
+        }
+      ]
+    },
+    {
+      "id": "bs4-drop-h8",
+      "label": "batch_size=4, drop_last=True, hidden=8",
+      "slots": {
+        "bs": "4",
+        "drop": "True",
+        "hidden": "8"
+      },
+      "stdout": "(4, 4) (4,) -> (4, 3)\n(4, 4) (4,) -> (4, 3)\n67 parameters\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "len(loader)",
+          "value": "2",
+          "note": "batches per epoch; 8 of 10 examples used"
+        },
+        {
+          "label": "last batch",
+          "value": "dropped",
+          "note": "drop_last=True discards a short final batch"
+        },
+        {
+          "label": "parameters",
+          "value": "67",
+          "note": "(4·8 + 8) + (8·3 + 3): weights plus biases"
+        }
+      ]
+    },
+    {
+      "id": "bs3-keep-h8",
+      "label": "batch_size=3, drop_last=False, hidden=8",
+      "slots": {
+        "bs": "3",
+        "drop": "False",
+        "hidden": "8"
+      },
+      "stdout": "(3, 4) (3,) -> (3, 3)\n(3, 4) (3,) -> (3, 3)\n(3, 4) (3,) -> (3, 3)\n(1, 4) (1,) -> (1, 3)\n67 parameters\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "len(loader)",
+          "value": "4",
+          "note": "batches per epoch; 10 of 10 examples used"
+        },
+        {
+          "label": "last batch",
+          "value": "1 of 3",
+          "note": "drop_last=True discards a short final batch"
+        },
+        {
+          "label": "parameters",
+          "value": "67",
+          "note": "(4·8 + 8) + (8·3 + 3): weights plus biases"
+        }
+      ]
+    },
+    {
+      "id": "bs10-keep-h8",
+      "label": "batch_size=10, drop_last=False, hidden=8",
+      "slots": {
+        "bs": "10",
+        "drop": "False",
+        "hidden": "8"
+      },
+      "stdout": "(10, 4) (10,) -> (10, 3)\n67 parameters\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "len(loader)",
+          "value": "1",
+          "note": "batches per epoch; 10 of 10 examples used"
+        },
+        {
+          "label": "last batch",
+          "value": "full (10)",
+          "note": "drop_last=True discards a short final batch"
+        },
+        {
+          "label": "parameters",
+          "value": "67",
+          "note": "(4·8 + 8) + (8·3 + 3): weights plus biases"
+        }
+      ]
+    },
+    {
+      "id": "bs16-drop-h8",
+      "label": "batch_size=16, drop_last=True, hidden=8",
+      "slots": {
+        "bs": "16",
+        "drop": "True",
+        "hidden": "8"
+      },
+      "stdout": "67 parameters\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "len(loader)",
+          "value": "0",
+          "note": "batches per epoch; 0 of 10 examples used"
+        },
+        {
+          "label": "last batch",
+          "value": "dropped",
+          "note": "drop_last=True discards a short final batch"
+        },
+        {
+          "label": "parameters",
+          "value": "67",
+          "note": "(4·8 + 8) + (8·3 + 3): weights plus biases"
+        }
+      ]
+    },
+    {
+      "id": "bs4-keep-h32",
+      "label": "batch_size=4, drop_last=False, hidden=32",
+      "slots": {
+        "bs": "4",
+        "drop": "False",
+        "hidden": "32"
+      },
+      "stdout": "(4, 4) (4,) -> (4, 3)\n(4, 4) (4,) -> (4, 3)\n(2, 4) (2,) -> (2, 3)\n259 parameters\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "len(loader)",
+          "value": "3",
+          "note": "batches per epoch; 10 of 10 examples used"
+        },
+        {
+          "label": "last batch",
+          "value": "2 of 4",
+          "note": "drop_last=True discards a short final batch"
+        },
+        {
+          "label": "parameters",
+          "value": "259",
+          "note": "(4·32 + 32) + (32·3 + 3): weights plus biases"
+        }
+      ]
+    }
+  ]
+}

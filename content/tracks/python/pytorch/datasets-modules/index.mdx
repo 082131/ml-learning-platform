@@ -1,0 +1,149 @@
+import { datasetCode, experiment, loaderCode, recordedNote } from './code';
+import { questions, scaleExercise } from './quiz';
+
+<Section kind="intuition" title="From a cleaned table to batches a model can eat">
+
+By now you can clean a table and analyze it. To train a model on it, PyTorch needs two more pieces. A
+<Term id="torch-dataset">Dataset</Term> answers "how many examples are there?" and "give me example *i*" (the
+`__len__` and `__getitem__` protocol from the classes lesson). A <Term id="dataloader">DataLoader</Term> asks
+the Dataset for examples in a random order and stacks them into <Term id="batch">batches</Term>.
+
+On the other side sits the model: an <Term id="nn-module">nn.Module</Term> that holds its layers and parameters
+and says, in `forward`, how input becomes output. Get the shapes right where these pieces meet and the training
+loop in the next lesson is a few lines.
+
+</Section>
+
+<Section kind="technical" title="Dataset, DataLoader and nn.Module">
+
+**Dataset.** Subclass `torch.utils.data.Dataset` and implement `__len__` and `__getitem__(i)`, returning one
+example, usually `(features, label)` as tensors. Do the expensive conversion once, in `__init__`
+(DataFrame to `float32` tensor), not in every `__getitem__`. If your data already sits in tensors,
+`TensorDataset(X, y)` does the job. `random_split(ds, [0.8, 0.2])` splits a Dataset, but splitting the DataFrame
+first lets you fit preprocessing on the training rows only.
+
+**DataLoader.** `DataLoader(ds, batch_size=32, shuffle=True)` yields batches: it samples indices, calls
+`ds[i]` for each, and stacks the results, so a batch of feature vectors of shape `(4,)` becomes `(32, 4)` and the
+labels `(32,)`. The last batch is smaller unless `drop_last=True`. `shuffle=True` for training,
+`shuffle=False` for evaluation. `num_workers` loads batches in parallel processes.
+
+**nn.Module.** Subclass `nn.Module`, call `super().__init__()` first, assign layers as attributes in
+`__init__`, and write `forward(self, x)`. Assigned layers are registered automatically, so
+`model.parameters()` finds every weight and bias and `model.to(device)` moves them all. Call the model as
+`model(x)`, which runs `forward` inside `nn.Module.__call__`. `nn.Sequential` chains layers when `forward` would
+just call them in order. `nn.Linear(in, out)` has `in × out` weights and `out` biases.
+
+**Shapes at the boundary.** Every layer works on a batch: `nn.Linear(4, 3)` maps `(batch, 4)` to
+`(batch, 3)`. Check the shapes of one batch through the model before you train: `xb.shape`, `model(xb).shape`,
+`yb.shape`. Losses are strict about them (for example `BCEWithLogitsLoss` wants outputs and targets with the
+same shape), which is why the classifier below squeezes `(batch, 1)` down to `(batch,)`.
+
+</Section>
+
+<Section kind="visual" title="Batches and parameters">
+
+Ten examples with 4 features each, 3 classes. Pick a batch size, `drop_last` and a hidden size: the cards show
+how many batches an epoch has, what happens to the last one, and how many parameters the model has.
+
+<Experiment def={experiment} title="DataLoader and model explorer">
+  <StateCards title="One epoch" labelHeading="Quantity" noteHeading="Why" source="Recorded in PyTorch 2.14" />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The program">
+
+The readout lists the shape of every batch the loader produced, and the model’s output shape for it.
+
+<Experiment def={experiment} title="loader.py, linked to the explorer" controls={false}>
+  <Code example={loaderCode} title="loader.py" />
+  <Readout title="What PyTorch printed" />
+</Experiment>
+
+</Section>
+
+<Section kind="experiment" title="Things to try">
+
+In the explorer:
+
+- `batch_size=4` gives batches of 4, 4 and 2. With `drop_last=True` the batch of 2 is skipped, so only 8 of the
+  10 examples are used each epoch.
+- `batch_size=16, drop_last=True` gives **zero** batches: the only batch would be short, so it is dropped and
+  the loop body never runs. A silent bug if your dataset is small.
+- Change the hidden size from 8 to 32. Parameters grow from $(4 \cdot 8 + 8) + (8 \cdot 3 + 3) = 67$ to
+  $(4 \cdot 32 + 32) + (32 \cdot 3 + 3) = 259$.
+
+A Dataset built from a pandas DataFrame, standardized with statistics from the training rows only, and a model
+written as an `nn.Module` subclass. {recordedNote}
+
+<Code example={datasetCode} title="dataset.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Dataset and model mistakes">
+
+<CommonMistake
+  title="Forgetting super().__init__()"
+  wrong={'class Net(nn.Module):\n    def __init__(self):\n        self.fc = nn.Linear(4, 3)'}
+  error="AttributeError: cannot assign module before Module.__init__() call"
+  cause="nn.Module’s registry of layers does not exist yet."
+  fix={'    def __init__(self):\n        super().__init__()\n        self.fc = nn.Linear(4, 3)'}
+/>
+
+<CommonMistake
+  title="Shapes that broadcast in the loss"
+  wrong={'loss = nn.functional.mse_loss(model(xb), yb)   # (32, 1) and (32,)'}
+  error="UserWarning: Using a target size (torch.Size([32])) that is different to the input size (torch.Size([32, 1])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size."
+  cause="(32, 1) − (32,) broadcasts to (32, 32): every prediction is compared with every target."
+  fix={'loss = nn.functional.mse_loss(model(xb).squeeze(1), yb)'}
+/>
+
+<CommonMistake
+  title="Converting inside __getitem__"
+  wrong={'def __getitem__(self, i):\n    row = self.df.iloc[i]\n    return torch.tensor(row[FEATURES].to_numpy(dtype="float32")), ...'}
+  error="No error: just an epoch that takes far longer than the model itself."
+  cause="pandas row access and tensor creation run once per example, every epoch."
+  fix={'# in __init__, once:\nself.X = torch.tensor(df[FEATURES].to_numpy(), dtype=torch.float32)'}
+/>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+| In ML code | What it does |
+|---|---|
+| `class ImageFolderDataset(Dataset)` reading files in `__getitem__` | Streams data too big for memory |
+| `DataLoader(train_ds, batch_size=64, shuffle=True, num_workers=4)` | Fast, shuffled training batches |
+| `DataLoader(val_ds, batch_size=256, shuffle=False)` | Evaluation in larger, ordered batches |
+| `sum(p.numel() for p in model.parameters())` | Model size, to compare architectures |
+| `print(model)` | The layer tree with every shape |
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Standardize with training statistics">
+
+<MiniExercise exercise={scaleExercise}>
+  This exercise runs in your browser with NumPy. The starter standardizes the validation set with its own
+  statistics. Fix `standardize_split(X_train, X_val)` so both arrays are scaled with the training columns’ mean
+  and standard deviation. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A Dataset is `__len__` plus `__getitem__`; convert to `float32` tensors once, in `__init__`.
+- A DataLoader shuffles, batches and stacks; the last batch is short unless `drop_last=True`.
+- An nn.Module calls `super().__init__()`, registers layers as attributes and defines `forward`; call it as
+  `model(x)`.
+- Fit preprocessing on training data only, and check one batch’s shapes through the model before training.
+
+Next: [the training loop, evaluation and debugging](#/learn/python/pytorch/training-loop).
+
+</Section>
