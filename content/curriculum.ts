@@ -436,7 +436,7 @@ export const tracks: Track[] = [
         title: 'Project',
         level: 'advanced',
         project: 'python/project/end-to-end',
-        lessons: [{ id: 'python/project/end-to-end', status: 'outline' }],
+        lessons: [{ id: 'python/project/end-to-end', status: 'written' }],
       },
     ],
   },
