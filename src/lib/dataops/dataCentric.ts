@@ -44,7 +44,7 @@ export function makePoints(count: number, seed: number): Point[] {
   return points;
 }
 
-const MAX_N = SIZES[SIZES.length - 1];
+const MAX_N = Math.max(...SIZES);
 let cache: { pool: Point[]; test: Point[]; order: Int32Array[] } | undefined;
 
 /**
