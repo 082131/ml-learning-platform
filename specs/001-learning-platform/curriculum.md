@@ -122,11 +122,24 @@ IDs are `track/chapter/lesson`. Prerequisites are written as short IDs within th
 13. `inference/ops/monitoring-load-testing`: Monitoring, load testing, production debugging · A · O
 14. `inference/capstone/deploy-benchmark`: Capstone: deploy, benchmark, optimize · A · O
 
+## T.06 ML Data Operations (`dataops`)
+Builds on T.02 (links to its orchestration, data quality and feature-pipeline lessons instead of repeating them).
+1. `dataops/foundations/data-centric-ml`: Data-centric ML: when better data beats a better model · B · **W** · k-NN test accuracy over training size × label noise, with k=1 vs k=15
+2. `dataops/labeling/annotation-agreement`: Annotation guidelines and inter-annotator agreement · I · **W** · two scripted annotators on 20 comments, guidelines v1/v2, balanced vs rare, Cohen's kappa
+3. `dataops/labeling/programmatic-labeling`: Weak supervision and active learning · I · **W** · five labeling functions on 16 tickets with coverage, conflicts and accuracy; uncertainty vs random sampling runner
+4. `dataops/labeling/label-errors`: Finding label errors with confident learning · I · **W** · out-of-fold probabilities, per-class thresholds vs fixed cut-offs, precision and recall of the flags
+5. `dataops/validation/baselines-drift`: Data baselines, skew and drift detection · I · **W** · KS test and PSI on a shifted serving window of 200 to 20,000 values
+6. `dataops/versioning/data-snapshots`: Data snapshots, branches and time travel · A · **W** · storage of 10 versions under full copy, copy-on-write and merge-on-read
+7. `dataops/pipelines/retraining-triggers`: Continuous training and retraining triggers · A · **W** · 52 weeks of a stated decay model under five retraining policies and label delay
+8. `dataops/pipelines/privacy-governance`: Privacy, consent and governance of training data · A · **W** · k-anonymity and l-diversity of a 16-row table under generalization; plain hash vs HMAC
+9. `dataops/capstone/data-ops-pipeline`: Capstone: a data operations pipeline for a labeled dataset · A · **W** · brief with a gated stdlib reference pipeline (gold, kappa, PSI, erasure, version hash)
+
 ---
 
 ## Counts
 - ML: 55 entries (46 lessons, 4 chapter projects, 5 capstones), all written.
 - Data: 12, all written. AI: 13 (3 written). Inference: 14 (3 written).
+- DataOps: 9, all written.
 - Release 2: write the remaining 30 outline lessons, one thread per track.
 
 ## Progression rules

@@ -152,6 +152,13 @@ Close each content thread with: content validation green, `check`, `e2e` and `bu
 - [x] I109 `inference/serving/apis-containers` · I110 `inference/ops/monitoring-load-testing` · I111 `inference/capstone/deploy-benchmark`
 - [x] I004 Fill objectives and prerequisites for all 11 outline lessons.
 
+## ML Data Operations track (T.06, 9 entries)
+- [x] D001 Track skeleton: `dataops` TrackId, curriculum chapters, nav chip, smoke and content-count tests, CPython runner test.
+- [x] D002 `dataops/foundations/data-centric-ml` · D003 `dataops/labeling/annotation-agreement` · D004 `dataops/labeling/programmatic-labeling` · D005 `dataops/labeling/label-errors`
+- [x] D006 `dataops/validation/baselines-drift` · D007 `dataops/versioning/data-snapshots` · D008 `dataops/pipelines/retraining-triggers` · D009 `dataops/pipelines/privacy-governance`
+- [x] D010 `dataops/capstone/data-ops-pipeline`: brief, gated reference pipeline, self-assessment and exercise.
+- [x] D011 e2e specs for all nine entries (interaction linked across visual, code and printout; axe in both themes; no horizontal scroll).
+
 ## Thread 12: Verification and polish
 **Reads**: spec.md (Success Criteria, Edge Cases), constitution, tasks.md.
 - [ ] Q001 Run the full crawl, axe and e2e at 360, 390, 768, 1280 and 1600px, then fix what fails.
