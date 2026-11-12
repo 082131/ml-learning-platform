@@ -395,7 +395,7 @@ export const tracks: Track[] = [
         title: 'Validation and drift',
         level: 'intermediate',
         lessons: [
-          { id: 'dataops/validation/baselines-drift', status: 'outline' },
+          { id: 'dataops/validation/baselines-drift', status: 'written' },
         ],
       },
       {

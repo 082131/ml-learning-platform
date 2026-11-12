@@ -1,0 +1,184 @@
+import { dr, driftPython, scipySketch, validateRunner } from './code';
+import { ksExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Is today's data the data the model was trained for?">
+
+A model is a summary of its training data. When the data it sees in production stops looking like that training
+data, its predictions become guesses about a world it never saw. Nothing crashes: the service keeps answering, and
+the answers quietly get worse.
+
+So every production model needs a reference, a written-down description of what its input data should look like,
+and checks that compare each new batch with it. Some differences are bugs (a column in cents instead of euros), some
+are the world changing (a new customer segment), and some are noise. This lesson builds the reference, then measures
+change with two standard statistics and shows where each one misleads.
+
+</Section>
+
+<Section kind="technical" title="Baselines, kinds of change and two statistics">
+
+**The baseline.** A <Term id="data-baseline">data baseline</Term> is computed once from the training data and stored
+with the model version. It has two parts:
+
+- A **schema**: column types, allowed categories (the domain), value ranges and how often a value may be missing.
+  Schema checks catch broken data: they are pass/fail, and a failure blocks or quarantines the batch, like the
+  [data quality checks](#/learn/data/quality/observability-testing) of the Data Engineering track.
+- **Statistics**: histograms, quantiles and category frequencies. Distribution tests compare new data with them.
+
+**Four kinds of change.** Write the data as inputs $x$ and target $y$:
+
+| Change | What moves | Data checks see it? |
+| --- | --- | --- |
+| <Term id="data-drift">Data drift</Term> (covariate shift) | $P(x)$, the inputs | yes |
+| Label drift (prior shift) | $P(y)$, the class balance | only once labels arrive |
+| <Term id="concept-drift">Concept drift</Term> | $P(y \mid x)$, the right answer for the same input | no: needs labels and performance |
+| <Term id="training-serving-skew">Training-serving skew</Term> | how a feature is computed in training versus serving | yes, by comparing logged serving features with training |
+
+**The Kolmogorov–Smirnov statistic.** For two samples, the empirical CDF $F(v)$ is the share of values at or below
+$v$. The <Term id="ks-test">KS test</Term> uses their largest gap:
+
+$$
+D = \max_v \lvert F_{\text{base}}(v) - F_{\text{serving}}(v) \rvert
+$$
+
+$D$ is between 0 and 1 and works for any continuous distribution. Its <Term id="p-value">p-value</Term> comes from the
+Kolmogorov distribution evaluated at $\lambda \approx D\sqrt{nm/(n+m)}$: for the same $D$, larger samples give a
+smaller p-value.
+
+**The population stability index** splits the baseline into bins (here 10 bins of equal count), takes the baseline
+share $e_i$ and serving share $a_i$ in each, and sums
+
+$$
+\text{PSI} = \sum_i (a_i - e_i)\ln\frac{a_i}{e_i}
+$$
+
+The usual reading: below 0.1 stable, 0.1 to 0.25 investigate, above 0.25 a major shift. The
+[training-serving lesson](#/learn/data/features/training-serving) introduced <Term id="population-stability-index">PSI</Term>
+for skew; here it watches drift over time.
+
+**Significance is not importance.** A p-value answers "is there any difference at all?". With 20,000 values per
+window, the answer is nearly always yes. PSI and $D$ are effect sizes: they say how big the difference is. Monitoring
+tools alert on an effect-size threshold, and categorical features use the same idea with a chi-squared test or PSI over
+categories.
+
+</Section>
+
+<Section kind="visual" title="Shift the serving data, change the window">
+
+<Experiment def={dr} title="Drift in one feature">
+  <DriftBars />
+  <Readout title="What the experiment computed" />
+</Experiment>
+
+Things to try:
+
+- **Default** (+0.05, a window of 200): KS alerts (p = 0.0303) and PSI says investigate (0.114). Now set the shift to
+  0: PSI is still 0.066 and the window mean is 2.062, not 1.988. With 200 values, noise alone moves the statistics.
+- **Same +0.05, window of 20,000:** KS alerts (p = 0.0125), PSI is 0.019, stable. The shift is real and tiny.
+- **+0.1, window of 2,000:** the p-value is below 0.0001, yet PSI is only 0.055. A test on large samples alerts on changes no one
+  would act on.
+- **+0.25 (43% of a standard deviation):** every window alerts, and PSI rises to 0.19 to 0.33. This is drift worth a
+  look.
+
+</Section>
+
+<Section kind="code" title="Drift in Python, a baseline schema, and the library versions">
+
+The program behind the visual, with the shift and the window filled from the controls:
+
+<Experiment def={dr} title="drift.py, linked to the experiment" controls={false}>
+  <Code example={driftPython} title="drift.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+**Inferring a schema and validating a batch.** The baseline's schema part, in a few lines. A new batch with a new
+country, missing ages, an age sent as text and a basket value in cents:
+
+<PythonRunner example={validateRunner} title="validate.py" />
+
+Each anomaly is a broken-data problem, not drift, and would block the batch before any drift statistic is computed.
+TensorFlow Data Validation (`infer_schema`, `validate_statistics`), Great Expectations and SageMaker Model Monitor
+(`suggest_baseline`) generate the same kind of schema and constraints from training data.
+
+**With SciPy.** In a project, use the library tests and alert on effect size:
+
+<Code example={scipySketch} title="drift_scipy.py" />
+
+<Callout kind="simplification">
+  The lesson checks one feature. A real model has dozens, so some will cross any p-value threshold by chance; teams
+  correct for many tests or rely on effect sizes, and rank features by importance so that drift in an unimportant
+  feature does not page anyone. The baseline here is a sample of 1,000 values; tools usually keep full histograms or
+  sketches of the whole training set.
+</Callout>
+
+</Section>
+
+<Section kind="mistakes" title="Alerts that cry wolf, or never fire">
+
+<CommonMistake
+  title="Alerting on the p-value alone"
+  wrong={"if ks_2samp(train, serving).pvalue < 0.05:\n    page_on_call()"}
+  error="(no error: with a day of traffic, the pager fires every day for shifts nobody would act on)"
+  cause="With large samples, every real-world difference is statistically significant."
+  fix="alert on an effect size (PSI > 0.2, or KS D > 0.1), and use the p-value only to ignore tiny windows"
+/>
+
+<CommonMistake
+  title="Comparing with last week instead of the training baseline"
+  wrong={"reference = serving_logs(last_week)   # moving reference"}
+  error="(no error: drift of 1% a week is invisible every week, and 50% after a year)"
+  cause="A moving reference only sees sudden changes. The model was trained on the baseline, so that is what matters."
+  fix="compare with the training baseline stored with the model version; add a week-over-week check only for sudden jumps"
+/>
+
+<CommonMistake
+  title="Retraining on broken data"
+  wrong={"if psi(train.basket, serving.basket) > 0.25:\n    retrain(on=serving)   # basket is in cents since last night"}
+  error="(no error: the new model learns the unit bug and is wrong once the bug is fixed)"
+  cause="A huge shift in one feature overnight is more often a pipeline bug than a change in the world."
+  fix="run schema and range checks first; block broken batches; only real drift may trigger retraining"
+/>
+
+</Section>
+
+<Section kind="practice" title="Validation and monitoring in production">
+
+- **Generate the baseline with the training run**, and version it with the model. Review the inferred schema by hand
+  once: inference guesses, people decide.
+- **Validate before use.** Schema checks run on every training batch and on serving inputs; failures block or
+  quarantine.
+- **Log serving features.** Without them you cannot measure skew or drift.
+- **Monitor important features first,** with effect-size thresholds tuned on historical windows where nothing was
+  wrong.
+- **Watch performance when labels arrive,** since concept drift is invisible to data checks.
+- **Route alerts to a decision:** fix the pipeline, accept the change, or retrain
+  ([retraining triggers](#/learn/dataops/pipelines/retraining-triggers)).
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Compute the KS statistic">
+
+<MiniExercise exercise={ksExercise}>
+  Write `ks_statistic(a, b)`: for every value in either sample, compare the share of `a` at or below it with the share
+  of `b`, and return the largest absolute difference.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A baseline (schema plus statistics from the training data) is the reference every new batch is checked against.
+- Schema failures are broken data and block; distribution changes are drift and are measured.
+- KS D and PSI measure how much a feature moved; the p-value mostly reflects the sample size. In the experiment a
+  9%-of-a-standard-deviation shift was "significant" with 20,000 values while PSI stayed at 0.019.
+- Concept drift changes the right answers without changing the inputs; only labeled performance reveals it.
+
+Next: [data snapshots, branches and time travel](#/learn/dataops/versioning/data-snapshots), so the exact training
+data behind a baseline can always be rebuilt.
+
+</Section>
