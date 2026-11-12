@@ -411,7 +411,7 @@ export const tracks: Track[] = [
         title: 'Retraining and governance',
         level: 'advanced',
         lessons: [
-          { id: 'dataops/pipelines/retraining-triggers', status: 'outline' },
+          { id: 'dataops/pipelines/retraining-triggers', status: 'written' },
           { id: 'dataops/pipelines/privacy-governance', status: 'outline' },
         ],
       },

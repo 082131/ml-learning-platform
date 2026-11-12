@@ -1,0 +1,17 @@
+{
+ "never,0": "policy never, label delay 0 weeks\nretrained in weeks: none\nretrains: 0, mean accuracy 0.7742, worst week 0.596",
+ "never,2": "policy never, label delay 2 weeks\nretrained in weeks: none\nretrains: 0, mean accuracy 0.7742, worst week 0.596",
+ "never,6": "policy never, label delay 6 weeks\nretrained in weeks: none\nretrains: 0, mean accuracy 0.7742, worst week 0.596",
+ "every-13,0": "policy every-13, label delay 0 weeks\nretrained in weeks: 13, 26, 39\nretrains: 3, mean accuracy 0.8822, worst week 0.752",
+ "every-13,2": "policy every-13, label delay 2 weeks\nretrained in weeks: 13, 26, 39\nretrains: 3, mean accuracy 0.8822, worst week 0.752",
+ "every-13,6": "policy every-13, label delay 6 weeks\nretrained in weeks: 13, 26, 39\nretrains: 3, mean accuracy 0.8822, worst week 0.752",
+ "every-4,0": "policy every-4, label delay 0 weeks\nretrained in weeks: 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48\nretrains: 12, mean accuracy 0.9071, worst week 0.788",
+ "every-4,2": "policy every-4, label delay 2 weeks\nretrained in weeks: 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48\nretrains: 12, mean accuracy 0.9071, worst week 0.788",
+ "every-4,6": "policy every-4, label delay 6 weeks\nretrained in weeks: 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48\nretrains: 12, mean accuracy 0.9071, worst week 0.788",
+ "drift,0": "policy drift, label delay 0 weeks\nretrained in weeks: 10, 20, 30, 33, 43\nretrains: 5, mean accuracy 0.9032, worst week 0.884",
+ "drift,2": "policy drift, label delay 2 weeks\nretrained in weeks: 10, 20, 30, 33, 43\nretrains: 5, mean accuracy 0.9032, worst week 0.884",
+ "drift,6": "policy drift, label delay 6 weeks\nretrained in weeks: 10, 20, 30, 33, 43\nretrains: 5, mean accuracy 0.9032, worst week 0.884",
+ "accuracy,0": "policy accuracy, label delay 0 weeks\nretrained in weeks: 11, 22, 33, 44\nretrains: 4, mean accuracy 0.9009, worst week 0.880",
+ "accuracy,2": "policy accuracy, label delay 2 weeks\nretrained in weeks: 13, 26, 35, 48\nretrains: 4, mean accuracy 0.8942, worst week 0.768",
+ "accuracy,6": "policy accuracy, label delay 6 weeks\nretrained in weeks: 17, 34, 51\nretrains: 3, mean accuracy 0.8863, worst week 0.736"
+}

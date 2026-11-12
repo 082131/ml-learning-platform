@@ -1,0 +1,177 @@
+import { ctRunner, ctSketch, rt, triggersPython } from './code';
+import { questions, triggerExercise } from './quiz';
+
+<Section kind="intuition" title="Models go stale; the question is when to notice">
+
+A model is trained on a snapshot of the past and deployed into a future that keeps moving. Customers change, products
+change, fraudsters change. Retraining fixes this, but each run costs compute, review time and the risk of shipping a
+worse model. Retrain too rarely and the model drifts out of date; retrain constantly and you pay for runs that change
+nothing.
+
+Teams answer this with a continuous-training pipeline that runs the same steps every time, and a trigger that decides
+when to run it. This lesson compares the common triggers on one year of simulated drift, with a slow trend and one
+sudden shift, and shows why the best trigger depends on how quickly you can see the truth.
+
+</Section>
+
+<Section kind="technical" title="The pipeline, four triggers and label delay">
+
+**The pipeline.** <Term id="continuous-training">Continuous training</Term> automates what a person would otherwise do
+by hand:
+
+1. **Trigger** (below) starts a run.
+2. **Snapshot**: pin the data version ([snapshots and time travel](#/learn/dataops/versioning/data-snapshots)), so every
+   later step sees the same rows.
+3. **Validate**: schema and drift checks against the baseline
+   ([baselines and drift](#/learn/dataops/validation/baselines-drift)); broken data stops the run.
+4. **Train** with versioned code and config.
+5. **Evaluate**: compare the candidate with the production model on the newest labeled data and on important slices.
+6. **Gate**: promote only if the candidate beats production by a margin and no slice regresses
+   (a <Term id="release-gate">release gate</Term>); register it with its data version, metrics and trigger.
+
+**Four triggers.** A <Term id="retraining-trigger">retraining trigger</Term> is one of:
+
+| Trigger | Watches | Strength | Weakness |
+| --- | --- | --- | --- |
+| Schedule | the calendar | simple, predictable cost | blind to sudden changes; may run for nothing |
+| Data volume | new labeled rows | uses data as it arrives | blind to whether anything changed |
+| Input drift | $P(x)$ against the baseline | reacts the same day | misses concept drift; can fire on harmless shifts |
+| Performance | accuracy on new labels | watches what matters | late by the label delay |
+
+**Label delay.** The <Term id="label-delay">label delay</Term> is the time from a prediction to knowing its true
+outcome: seconds for a click, weeks for a fraud chargeback, months for a loan default. A performance trigger with
+delay $L$ sees week $w$'s accuracy only in week $w + L$.
+
+**The decay model used below.** The data moves 1 unit per week, and jumps 30 units in week 33. A model trained in week
+$t$ has accuracy
+
+$$
+\text{acc}(w) = 0.92 - 0.004 \cdot \lvert \text{world}(w) - \text{world}(t) \rvert
+$$
+
+This is a model chosen to be simple and stated in full, not a measurement: real models decay unevenly, and some barely
+decay at all.
+
+</Section>
+
+<Section kind="visual" title="One year, five policies">
+
+<Experiment def={rt} title="Retraining policies under drift">
+  <RetrainChart />
+  <Readout title="What the experiment computed" />
+</Experiment>
+
+Things to try:
+
+- **Never retrain:** accuracy slides to 0.596 by the end of the year; mean 0.7742.
+- **Quarterly** (default): 3 runs, mean 0.8822. The shift in week 33 waits until week 39: worst week 0.752.
+- **Monthly:** 12 runs, mean 0.9071, but weeks 33 to 35 still run a pre-shift model (0.788).
+- **Input drift:** 5 runs, mean 0.9032, nearly as good as monthly with fewer than half the runs. It retrains in
+  week 33 itself, so the worst week is 0.884.
+- **Accuracy trigger, then raise the label delay:** with no delay it retrains in week 33 (mean 0.9009). With a 2-week
+  delay it reacts in week 35 and the worst week falls to 0.768; with 6 weeks, to 0.736.
+
+</Section>
+
+<Section kind="code" title="The policies in Python, and a pipeline with a gate">
+
+The simulation behind the chart, with the policy and delay filled from the controls:
+
+<Experiment def={rt} title="triggers.py, linked to the experiment" controls={false}>
+  <Code example={triggersPython} title="triggers.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+**A continuous-training run, end to end.** Four scheduled runs of a small pipeline: validate the week's snapshot,
+train a candidate, compare it with production on the newest labeled rows, and promote only if it wins by 0.01. Week 8
+has an upstream bug:
+
+<PythonRunner example={ctRunner} title="ct_pipeline.py" />
+
+Week 8 stops at validation. Week 12's candidate wins clearly after the data has moved. Week 16's candidate loses by
+0.03 on a holdout of 100 rows, so production stays: without the gate, the pipeline would have shipped a regression.
+
+**The same steps in an orchestrator.** Each function becomes a task in Airflow, Kubeflow Pipelines, Vertex AI Pipelines
+or SageMaker Pipelines, and the trigger becomes a schedule, an event, or an alert:
+
+<Code example={ctSketch} title="continuous_training.py" />
+
+<Callout kind="simplification">
+  The decay model is linear and identical for every week, and retraining is instant and always perfect. In reality a
+  retrained model needs enough post-shift labeled data, so a model retrained the day of a shift may still be poor;
+  evaluation holdouts are small and noisy; and deployment adds a canary stage. The comparison between policies, not
+  the exact numbers, is the point.
+</Callout>
+
+</Section>
+
+<Section kind="mistakes" title="Triggers that fire wrong">
+
+<CommonMistake
+  title="Retraining on every drift alert without validation"
+  wrong={"if psi > 0.25:\n    train_and_deploy(latest_data)"}
+  error="(no error: a unit bug upstream triggers a retrain, and the new model learns the bug)"
+  cause="Drift alerts fire on broken pipelines as well as real change."
+  fix="validate the snapshot first, and deploy only through the evaluation gate"
+/>
+
+<CommonMistake
+  title="Evaluating the candidate on data the production model never had a chance on"
+  wrong={"new = accuracy(candidate, candidate_train_holdout)\nold = accuracy(production, production_train_holdout)"}
+  error="(no error: the comparison is meaningless because the two numbers come from different data)"
+  cause="Each model is scored on its own held-out set, from different time periods."
+  fix="score both models on the same, newest labeled data (and on fixed gold slices)"
+/>
+
+<CommonMistake
+  title="Relying only on a performance trigger with long label delay"
+  wrong={"retrain_when(accuracy_last_week() < 0.88)   # chargebacks arrive after 60 days"}
+  error="(no error: two months of bad fraud decisions before the trigger can see anything)"
+  cause="Performance can only be measured once labels arrive."
+  fix="add input-drift and prediction-distribution monitors as early warnings, and keep a schedule as a backstop"
+/>
+
+</Section>
+
+<Section kind="practice" title="Running continuous training">
+
+- **Start with a schedule plus alerts.** A simple schedule, with drift and performance monitors that alert a person.
+  Automate triggers once you trust the signals.
+- **Make the pipeline the only way to ship.** Manual retrains skip validation and lose lineage.
+- **Gate on fixed criteria** written down before the run: margin, slices, latency, size.
+- **Record why each run happened:** the trigger, data version, metrics and decision go into the registry.
+- **Measure the label delay** for your problem; it decides how much you can rely on performance triggers.
+- **Track the cost:** runs per month, compute per run, and how often the gate rejects. Frequent rejections mean the
+  trigger fires for nothing.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="When can a performance trigger fire?">
+
+<MiniExercise exercise={triggerExercise}>
+  Write `first_alert(acc_by_week, delay, floor)`. Labels for week `w` arrive in week `w + delay`. Return the first week
+  in which the trigger knows that some week's accuracy fell below `floor`, or `None` if that never happens within the
+  list.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Continuous training runs the same steps every time: snapshot, validate, train, evaluate, gate, register.
+- Schedules are blind to sudden changes; input-drift triggers react at once but miss concept drift; performance
+  triggers watch what matters but lag by the label delay.
+- In the simulation, a drift trigger matched monthly retraining's mean accuracy with fewer than half the runs, and
+  avoided its worst week.
+- A gate that compares candidate and production on the same newest data keeps automation from shipping regressions.
+
+Next: [privacy, consent and governance](#/learn/dataops/pipelines/privacy-governance), the rules that decide what data
+the pipeline may use at all.
+
+</Section>
