@@ -1,0 +1,137 @@
+import { brief, capstoneRunner, setupCode } from './code';
+import { consolidateExercise, questions } from './quiz';
+
+<Section kind="intuition" title="From good labels once to good labels every week">
+
+Each lesson in this track solved one problem: measuring whether annotators agree, labeling at scale with rules,
+finding the labels that are wrong, catching data that drifted, versioning datasets, deciding when to retrain and
+keeping personal data out of places it should not be. A team that trains on your data every week needs all of them at
+once, and needs them to run without anyone remembering to.
+
+In this capstone you build that pipeline. The model at the end is beside the point. The work is in the gates: a batch
+of labels is published only if the annotators can be trusted, agree with each other and describe data like the
+baseline, every published training set has an ID that names exactly its rows, and a person who asks to be deleted
+disappears from every version that is still kept.
+
+</Section>
+
+<Section kind="technical" title="What you will build">
+
+A repository with a pipeline, its tests, a datasheet and a runbook. Each part comes from a lesson in this track or the
+Data Engineering track:
+
+| Part | Does | From lesson |
+| --- | --- | --- |
+| guidelines and agreement | measures kappa per batch and per class, and updates the guidelines when it falls | [annotation and agreement](#/learn/dataops/labeling/annotation-agreement) |
+| gold and adjudication | drops annotators who fail gold questions; sends split votes to a person | [annotation and agreement](#/learn/dataops/labeling/annotation-agreement) |
+| weak labels | labels the easy majority with labeling functions, sends uncertain items to people | [programmatic labeling](#/learn/dataops/labeling/programmatic-labeling) |
+| label audit | flags likely errors with out-of-fold probabilities and per-class thresholds | [finding label errors](#/learn/dataops/labeling/label-errors) |
+| validation | blocks on schema violations and on drift against a stored baseline | [baselines and drift](#/learn/dataops/validation/baselines-drift) |
+| versions | publishes each training set as a content-addressed version; branches for relabeling | [snapshots and time travel](#/learn/dataops/versioning/data-snapshots) |
+| retraining | starts training only from a validated version, through an evaluation gate | [retraining triggers](#/learn/dataops/pipelines/retraining-triggers) |
+| privacy and erasure | keyed tokens before labeling, k and l before sharing, deletion across versions | [privacy and governance](#/learn/dataops/pipelines/privacy-governance) |
+| orchestration and checks | runs the steps on a schedule with retries and data tests | [orchestration](#/learn/data/orchestration/dags-retries), [data quality](#/learn/data/quality/observability-testing) |
+
+**Four properties to prove, not just claim.**
+
+1. **Gated.** No batch reaches the published set unless every gate passed, and each stop names the gate and the
+   number that failed it.
+2. **Reproducible.** Rebuilding a version from the raw exports and the same inputs gives the same version ID; the ID of
+   the training set is stored with every model.
+3. **Erasable.** After a deletion request is completed, the person's token is absent from the latest version, every
+   older version still kept has been rewritten or expired, and the log says when.
+4. **Documented.** The datasheet and runbook answer what a newcomer would otherwise ask you: where the data came from,
+   who labeled it how, what each gate means and what to do when it fires.
+
+</Section>
+
+<Section kind="code" title="The reference pipeline">
+
+A complete, small version uses only Python's standard library. Start from it, then replace each part with the real
+thing. Set up a folder:
+
+<Code example={setupCode} title="terminal" />
+
+`capstone.py` runs three weekly batches through the gates, then rebuilds week 2 after an erasure request:
+
+<PythonRunner example={capstoneRunner} title="capstone.py" />
+
+What the four lines show:
+
+- **Week 1** passes every gate; all three annotators pass the gold questions.
+- **Week 2**: chen is careless, misses a gold question and is left out. The batch is published with ana's and ben's
+  labels only.
+- **The erasure request** removes the 3 rows of one person from week 2, and the version ID changes with them.
+- **Week 3** has two labeling sessions with a different careless annotator in each. Ana is caught by the gold
+  questions; ben passes them by luck, and the agreement gate stops the batch instead.
+
+<Callout kind="simplification">
+  The reference pipeline has two gold questions, one numeric feature, a hash in place of a versioned table and a set in
+  place of an erasure log, and it never trains a model. The milestones replace each of these with the real thing. Its
+  week 3 also shows why a single gate is not enough: two gold questions let a guessing annotator through, and only
+  the agreement check caught it.
+</Callout>
+
+</Section>
+
+<Section kind="practice" title="The brief">
+
+Tick each milestone when it is done; your progress is saved in this browser.
+
+<Project brief={brief} />
+
+</Section>
+
+<Section kind="mistakes" title="Where pipelines like this go wrong">
+
+<CommonMistake
+  title="Majority vote over every annotator"
+  wrong={"label = Counter(votes.values()).most_common(1)[0][0]"}
+  error="(no error: a guessing annotator decides every item where the other two disagree)"
+  cause="Every vote counts the same, whether or not the annotator can be trusted."
+  fix={"trusted = [a for a in annotators if passes_gold(a)]\n# unanimous among trusted -> label; split -> adjudication queue"}
+/>
+
+<CommonMistake
+  title="Choosing a gate's threshold after seeing the batch"
+  wrong={"if kappa < 0.55:   # was 0.6, lowered so this week could ship"}
+  error="(no error: the gate now passes everything it was meant to stop)"
+  cause="A threshold moved to fit the data in front of you no longer tests that data."
+  fix="write each threshold with its reason before the batch arrives, and change it only through review, for every future batch"
+/>
+
+<CommonMistake
+  title="Version IDs that change when nothing changed"
+  wrong={"version = hashlib.sha256(str(rows).encode()).hexdigest()   # rows in whatever order the query returned"}
+  error="(no error: rebuilding last month's data gives a new ID, so nobody can tell whether it matches)"
+  cause="The hash covers row order and formatting, not just content."
+  fix={"version = hashlib.sha256(json.dumps(sorted_rows, sort_keys=True).encode()).hexdigest()"}
+/>
+
+</Section>
+
+<Section kind="check" title="Self-assessment">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Trusted annotators and unanimous labels">
+
+<MiniExercise exercise={consolidateExercise}>
+  Write `consolidate(items, gold)` in plain Python. Return the sorted list of annotators who answer every gold item
+  correctly, and the labels of the non-gold items on which all of them agree.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A labeled dataset is published through gates: trusted annotators, agreement, label audits, schema and drift.
+- Every published set gets a content-derived version ID, stored with each model trained on it.
+- Erasure is a pipeline across copies and versions, proven by a test and a log, not a single DELETE.
+- One gate is rarely enough: in the reference run, the gold check missed a guessing annotator and the agreement gate
+  caught it.
+- Write the datasheet and runbook while you still remember why each gate exists.
+
+</Section>

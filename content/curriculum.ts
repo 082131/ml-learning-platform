@@ -421,7 +421,7 @@ export const tracks: Track[] = [
         level: 'advanced',
         project: 'dataops/capstone/data-ops-pipeline',
         lessons: [
-          { id: 'dataops/capstone/data-ops-pipeline', status: 'outline' },
+          { id: 'dataops/capstone/data-ops-pipeline', status: 'written' },
         ],
       },
     ],
