@@ -398,8 +398,8 @@ export const tracks: Track[] = [
         title: 'pandas for analysis',
         level: 'intermediate',
         lessons: [
-          { id: 'python/pandas/indexing-dtypes', status: 'outline' },
-          { id: 'python/pandas/groupby-merge-reshape', status: 'outline' },
+          { id: 'python/pandas/indexing-dtypes', status: 'written' },
+          { id: 'python/pandas/groupby-merge-reshape', status: 'written' },
           { id: 'python/pandas/time-series', status: 'outline' },
         ],
       },

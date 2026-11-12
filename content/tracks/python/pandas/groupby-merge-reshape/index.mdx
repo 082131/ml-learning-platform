@@ -1,0 +1,151 @@
+import { experiment, groupbyCode, mergeRunner, reshapeRunner } from './code';
+import { questions, shareExercise } from './quiz';
+
+<Section kind="intuition" title="Most analysis is three verbs">
+
+Look at almost any analysis notebook and you find the same three moves. **Group**: total sales per region,
+average rating per product. **Join**: attach each order’s user plan from another table. **Reshape**: turn one
+row per store-and-month into a table with a column per month, or back.
+
+pandas has one tool for each: `groupby`, `merge` and `pivot_table`/`melt`. They are short to write and easy to
+get subtly wrong: a join that silently duplicates rows, a group total that silently drops missing keys. This
+lesson shows the shape of each result, so you can predict it before you run it.
+
+</Section>
+
+<Section kind="technical" title="groupby, merge and reshape">
+
+**Split-apply-combine.** `df.groupby(key)[col].op()` splits rows by `key`, applies `op` to each group’s `col`,
+and combines the answers (<Term id="split-apply-combine">split-apply-combine</Term>,
+<Term id="group-by">group by</Term>). The kind of `op` decides the shape:
+
+- An **aggregation** (`sum`, `mean`, `size`, `count`, `min`, `agg([...])`) gives **one row per group**, indexed
+  by the key (sorted). `count` skips NaN values; `size` counts rows.
+- A **transform** (`transform("sum")`, `cumsum`, `rank`, `shift`) gives **one value per original row**, in the
+  original order, which is how you add "share of my group’s total" as a column.
+- `filter(lambda g: ...)` keeps or drops whole groups.
+
+Group by several keys with a list, and name outputs with `agg(total=("sales", "sum"))`. Rows with a missing key
+are dropped unless you pass `dropna=False`.
+
+**Merge.** `left.merge(right, on="key", how=...)` matches rows by key values, as an SQL join does
+(<Term id="sql-join">join</Term>): `inner` keeps matches, `left` keeps every left row (NaN where no match), `outer`
+keeps everything. Each duplicate key on one side **multiplies** the matching rows on the other. Guard every
+merge with `validate="many_to_one"` (or `one_to_one`), which raises `MergeError` when keys are not unique, and
+use `indicator=True` to see which rows matched.
+
+**Reshape.** In <Term id="long-format">long format</Term> each row is one observation (store, month, sales);
+wide format has a column per month. `pivot_table(index, columns, values, aggfunc)` goes long to wide, aggregating
+duplicates; `melt(id_vars, var_name, value_name)` goes wide to long. Plotting libraries and `groupby` usually want
+long format.
+
+</Section>
+
+<Section kind="visual" title="Split, apply, combine">
+
+Six sales rows. Pick a key and an operation: each card is one group, with the original row labels and amounts
+that went into it and what the operation produced for it. The last card says what shape the combined result has.
+Every run was recorded with pandas 3.
+
+<Experiment def={experiment} title="groupby explorer">
+  <StateCards title="Groups and results" labelHeading="Group" noteHeading="Result" />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The program">
+
+<Experiment def={experiment} title="groupby.py, linked to the explorer" controls={false}>
+  <Code example={groupbyCode} title="groupby.py" />
+  <Readout title="What pandas printed" />
+</Experiment>
+
+Joins: an inner join drops order 4, whose user does not exist; a left join keeps it with NaN. A duplicate user
+turns 4 orders into 5 rows, and `validate` catches it.
+
+<PythonRunner example={mergeRunner} title="merge.py" />
+
+</Section>
+
+<Section kind="experiment" title="Things to try">
+
+In the explorer:
+
+- Compare `sum()` with `transform("sum")` for region. The numbers are the same (north: $120 + 95 + 30 = 245$),
+  but `transform` repeats 245 on rows 0, 2 and 5.
+- Pick `cumsum()`. Within north it runs $120$, $120 + 95 = 215$, $215 + 30 = 245$, following the original row
+  order.
+- Switch the key to `rep`. `ana` and `ben` each have two sales, so four groups come out instead of three.
+
+Reshaping: long to wide and back, a named aggregation, and each row’s share of its store’s total.
+
+<PythonRunner example={reshapeRunner} title="reshape.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Joins and groups that lie">
+
+<CommonMistake
+  title="A many-to-many merge"
+  wrong={'orders.merge(users, on="user_id")   # users has a duplicated id'}
+  error="No error: the result has more rows than orders, and every sum over it is inflated."
+  cause="Each duplicate key multiplies the matching rows."
+  fix={'orders.merge(users, on="user_id", how="left", validate="many_to_one")'}
+/>
+
+<CommonMistake
+  title="Losing rows with missing keys"
+  wrong={'df.groupby("region")["amount"].sum().sum()   # smaller than df["amount"].sum()'}
+  error="No error: rows whose region is NaN are silently left out."
+  cause="groupby drops missing keys by default."
+  fix={'df.groupby("region", dropna=False)["amount"].sum()'}
+/>
+
+<CommonMistake
+  title="pivot with duplicate entries"
+  wrong={'long.pivot(index="store", columns="month", values="sales")'}
+  error="ValueError: Index contains duplicate entries, cannot reshape"
+  cause="pivot cannot decide which of two values for (B, feb) to keep."
+  fix={'long.pivot_table(index="store", columns="month", values="sales", aggfunc="sum")'}
+/>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+| In data and ML code | What it builds |
+|---|---|
+| `df.groupby("user_id")["amount"].agg(["sum", "count"])` | Per-user features for a model |
+| `df["user_mean"] = df.groupby("user_id")["x"].transform("mean")` | A group statistic on every row |
+| `events.merge(users, on="user_id", how="left", validate="many_to_one")` | Enrich events safely |
+| `metrics.pivot_table(index="epoch", columns="split", values="loss")` | Train and validation loss side by side |
+| `wide.melt(id_vars="run")` | Long format for plotting many runs |
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Top seller per region">
+
+<MiniExercise exercise={shareExercise}>
+  The starter `top_rep_per_region(sales)` picks the rep with the single largest sale. Fix it to return, for each
+  region, the rep with the largest **total** amount, as a dict such as `{"n": "cy", "s": "ben"}`. Run the tests to
+  check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Aggregations give one row per group; transforms give one value per row, in the original order.
+- Merges multiply rows on duplicate keys: always pass `validate`, and check row counts.
+- `groupby` drops missing keys unless `dropna=False`.
+- `pivot_table` goes long to wide (aggregating duplicates); `melt` goes wide to long.
+
+Next: [time series with pandas](#/learn/python/pandas/time-series).
+
+</Section>

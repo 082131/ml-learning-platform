@@ -1,0 +1,420 @@
+{
+  "python": "3.13.18",
+  "template": "import pandas as pd\n\nsales = pd.DataFrame({\n    \"region\": [\"north\", \"south\", \"north\", \"east\", \"south\", \"north\"],\n    \"rep\": [\"ana\", \"ben\", \"cy\", \"di\", \"ben\", \"ana\"],\n    \"amount\": [120, 80, 95, 60, 40, 30],\n})\nresult = sales.groupby(\"{{key}}\")[\"amount\"].{{op}}\nprint(result)",
+  "variants": [
+    {
+      "id": "region-sum",
+      "label": "groupby(\"region\") then .sum()",
+      "slots": {
+        "key": "region",
+        "op": "sum()"
+      },
+      "stdout": "region\neast      60\nnorth    245\nsouth    120\nName: amount, dtype: int64\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "region = east",
+          "value": "rows [3]: amounts [60]",
+          "note": "→ 60"
+        },
+        {
+          "label": "region = north",
+          "value": "rows [0, 2, 5]: amounts [120, 95, 30]",
+          "note": "→ 245"
+        },
+        {
+          "label": "region = south",
+          "value": "rows [1, 4]: amounts [80, 40]",
+          "note": "→ 120"
+        },
+        {
+          "label": "combined result",
+          "value": "Series",
+          "note": "one row per group, shape (3,)"
+        }
+      ]
+    },
+    {
+      "id": "region-mean",
+      "label": "groupby(\"region\") then .mean()",
+      "slots": {
+        "key": "region",
+        "op": "mean()"
+      },
+      "stdout": "region\neast     60.000000\nnorth    81.666667\nsouth    60.000000\nName: amount, dtype: float64\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "region = east",
+          "value": "rows [3]: amounts [60]",
+          "note": "→ 60.0"
+        },
+        {
+          "label": "region = north",
+          "value": "rows [0, 2, 5]: amounts [120, 95, 30]",
+          "note": "→ 81.66666666666667"
+        },
+        {
+          "label": "region = south",
+          "value": "rows [1, 4]: amounts [80, 40]",
+          "note": "→ 60.0"
+        },
+        {
+          "label": "combined result",
+          "value": "Series",
+          "note": "one row per group, shape (3,)"
+        }
+      ]
+    },
+    {
+      "id": "region-size",
+      "label": "groupby(\"region\") then .size()",
+      "slots": {
+        "key": "region",
+        "op": "size()"
+      },
+      "stdout": "region\neast     1\nnorth    3\nsouth    2\nName: amount, dtype: int64\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "region = east",
+          "value": "rows [3]: amounts [60]",
+          "note": "→ 1"
+        },
+        {
+          "label": "region = north",
+          "value": "rows [0, 2, 5]: amounts [120, 95, 30]",
+          "note": "→ 3"
+        },
+        {
+          "label": "region = south",
+          "value": "rows [1, 4]: amounts [80, 40]",
+          "note": "→ 2"
+        },
+        {
+          "label": "combined result",
+          "value": "Series",
+          "note": "one row per group, shape (3,)"
+        }
+      ]
+    },
+    {
+      "id": "region-agg",
+      "label": "groupby(\"region\") then .agg([\"min\", \"max\"])",
+      "slots": {
+        "key": "region",
+        "op": "agg([\"min\", \"max\"])"
+      },
+      "stdout": "        min  max\nregion          \neast     60   60\nnorth    30  120\nsouth    40   80\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "region = east",
+          "value": "rows [3]: amounts [60]",
+          "note": "→ min 60, max 60"
+        },
+        {
+          "label": "region = north",
+          "value": "rows [0, 2, 5]: amounts [120, 95, 30]",
+          "note": "→ min 30, max 120"
+        },
+        {
+          "label": "region = south",
+          "value": "rows [1, 4]: amounts [80, 40]",
+          "note": "→ min 40, max 80"
+        },
+        {
+          "label": "combined result",
+          "value": "DataFrame",
+          "note": "one row per group, shape (3, 2)"
+        }
+      ]
+    },
+    {
+      "id": "region-transform",
+      "label": "groupby(\"region\") then .transform(\"sum\")",
+      "slots": {
+        "key": "region",
+        "op": "transform(\"sum\")"
+      },
+      "stdout": "0    245\n1    120\n2    245\n3     60\n4    120\n5    245\nName: amount, dtype: int64\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "region = east",
+          "value": "rows [3]: amounts [60]",
+          "note": "→ row 3: 60"
+        },
+        {
+          "label": "region = north",
+          "value": "rows [0, 2, 5]: amounts [120, 95, 30]",
+          "note": "→ row 0: 245, row 2: 245, row 5: 245"
+        },
+        {
+          "label": "region = south",
+          "value": "rows [1, 4]: amounts [80, 40]",
+          "note": "→ row 1: 120, row 4: 120"
+        },
+        {
+          "label": "combined result",
+          "value": "Series",
+          "note": "one value per row (same length as sales)"
+        }
+      ]
+    },
+    {
+      "id": "region-cumsum",
+      "label": "groupby(\"region\") then .cumsum()",
+      "slots": {
+        "key": "region",
+        "op": "cumsum()"
+      },
+      "stdout": "0    120\n1     80\n2    215\n3     60\n4    120\n5    245\nName: amount, dtype: int64\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "region = east",
+          "value": "rows [3]: amounts [60]",
+          "note": "→ row 3: 60"
+        },
+        {
+          "label": "region = north",
+          "value": "rows [0, 2, 5]: amounts [120, 95, 30]",
+          "note": "→ row 0: 120, row 2: 215, row 5: 245"
+        },
+        {
+          "label": "region = south",
+          "value": "rows [1, 4]: amounts [80, 40]",
+          "note": "→ row 1: 80, row 4: 120"
+        },
+        {
+          "label": "combined result",
+          "value": "Series",
+          "note": "one value per row (same length as sales)"
+        }
+      ]
+    },
+    {
+      "id": "rep-sum",
+      "label": "groupby(\"rep\") then .sum()",
+      "slots": {
+        "key": "rep",
+        "op": "sum()"
+      },
+      "stdout": "rep\nana    150\nben    120\ncy      95\ndi      60\nName: amount, dtype: int64\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "rep = ana",
+          "value": "rows [0, 5]: amounts [120, 30]",
+          "note": "→ 150"
+        },
+        {
+          "label": "rep = ben",
+          "value": "rows [1, 4]: amounts [80, 40]",
+          "note": "→ 120"
+        },
+        {
+          "label": "rep = cy",
+          "value": "rows [2]: amounts [95]",
+          "note": "→ 95"
+        },
+        {
+          "label": "rep = di",
+          "value": "rows [3]: amounts [60]",
+          "note": "→ 60"
+        },
+        {
+          "label": "combined result",
+          "value": "Series",
+          "note": "one row per group, shape (4,)"
+        }
+      ]
+    },
+    {
+      "id": "rep-mean",
+      "label": "groupby(\"rep\") then .mean()",
+      "slots": {
+        "key": "rep",
+        "op": "mean()"
+      },
+      "stdout": "rep\nana    75.0\nben    60.0\ncy     95.0\ndi     60.0\nName: amount, dtype: float64\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "rep = ana",
+          "value": "rows [0, 5]: amounts [120, 30]",
+          "note": "→ 75.0"
+        },
+        {
+          "label": "rep = ben",
+          "value": "rows [1, 4]: amounts [80, 40]",
+          "note": "→ 60.0"
+        },
+        {
+          "label": "rep = cy",
+          "value": "rows [2]: amounts [95]",
+          "note": "→ 95.0"
+        },
+        {
+          "label": "rep = di",
+          "value": "rows [3]: amounts [60]",
+          "note": "→ 60.0"
+        },
+        {
+          "label": "combined result",
+          "value": "Series",
+          "note": "one row per group, shape (4,)"
+        }
+      ]
+    },
+    {
+      "id": "rep-size",
+      "label": "groupby(\"rep\") then .size()",
+      "slots": {
+        "key": "rep",
+        "op": "size()"
+      },
+      "stdout": "rep\nana    2\nben    2\ncy     1\ndi     1\nName: amount, dtype: int64\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "rep = ana",
+          "value": "rows [0, 5]: amounts [120, 30]",
+          "note": "→ 2"
+        },
+        {
+          "label": "rep = ben",
+          "value": "rows [1, 4]: amounts [80, 40]",
+          "note": "→ 2"
+        },
+        {
+          "label": "rep = cy",
+          "value": "rows [2]: amounts [95]",
+          "note": "→ 1"
+        },
+        {
+          "label": "rep = di",
+          "value": "rows [3]: amounts [60]",
+          "note": "→ 1"
+        },
+        {
+          "label": "combined result",
+          "value": "Series",
+          "note": "one row per group, shape (4,)"
+        }
+      ]
+    },
+    {
+      "id": "rep-agg",
+      "label": "groupby(\"rep\") then .agg([\"min\", \"max\"])",
+      "slots": {
+        "key": "rep",
+        "op": "agg([\"min\", \"max\"])"
+      },
+      "stdout": "     min  max\nrep          \nana   30  120\nben   40   80\ncy    95   95\ndi    60   60\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "rep = ana",
+          "value": "rows [0, 5]: amounts [120, 30]",
+          "note": "→ min 30, max 120"
+        },
+        {
+          "label": "rep = ben",
+          "value": "rows [1, 4]: amounts [80, 40]",
+          "note": "→ min 40, max 80"
+        },
+        {
+          "label": "rep = cy",
+          "value": "rows [2]: amounts [95]",
+          "note": "→ min 95, max 95"
+        },
+        {
+          "label": "rep = di",
+          "value": "rows [3]: amounts [60]",
+          "note": "→ min 60, max 60"
+        },
+        {
+          "label": "combined result",
+          "value": "DataFrame",
+          "note": "one row per group, shape (4, 2)"
+        }
+      ]
+    },
+    {
+      "id": "rep-transform",
+      "label": "groupby(\"rep\") then .transform(\"sum\")",
+      "slots": {
+        "key": "rep",
+        "op": "transform(\"sum\")"
+      },
+      "stdout": "0    150\n1    120\n2     95\n3     60\n4    120\n5    150\nName: amount, dtype: int64\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "rep = ana",
+          "value": "rows [0, 5]: amounts [120, 30]",
+          "note": "→ row 0: 150, row 5: 150"
+        },
+        {
+          "label": "rep = ben",
+          "value": "rows [1, 4]: amounts [80, 40]",
+          "note": "→ row 1: 120, row 4: 120"
+        },
+        {
+          "label": "rep = cy",
+          "value": "rows [2]: amounts [95]",
+          "note": "→ row 2: 95"
+        },
+        {
+          "label": "rep = di",
+          "value": "rows [3]: amounts [60]",
+          "note": "→ row 3: 60"
+        },
+        {
+          "label": "combined result",
+          "value": "Series",
+          "note": "one value per row (same length as sales)"
+        }
+      ]
+    },
+    {
+      "id": "rep-cumsum",
+      "label": "groupby(\"rep\") then .cumsum()",
+      "slots": {
+        "key": "rep",
+        "op": "cumsum()"
+      },
+      "stdout": "0    120\n1     80\n2     95\n3     60\n4    120\n5    150\nName: amount, dtype: int64\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "rep = ana",
+          "value": "rows [0, 5]: amounts [120, 30]",
+          "note": "→ row 0: 120, row 5: 150"
+        },
+        {
+          "label": "rep = ben",
+          "value": "rows [1, 4]: amounts [80, 40]",
+          "note": "→ row 1: 80, row 4: 120"
+        },
+        {
+          "label": "rep = cy",
+          "value": "rows [2]: amounts [95]",
+          "note": "→ row 2: 95"
+        },
+        {
+          "label": "rep = di",
+          "value": "rows [3]: amounts [60]",
+          "note": "→ row 3: 60"
+        },
+        {
+          "label": "combined result",
+          "value": "Series",
+          "note": "one value per row (same length as sales)"
+        }
+      ]
+    }
+  ]
+}

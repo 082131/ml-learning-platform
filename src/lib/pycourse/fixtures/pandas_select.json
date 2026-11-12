@@ -1,0 +1,134 @@
+{
+  "python": "3.13.18",
+  "template": "import pandas as pd\n\ndf = pd.DataFrame(\n    {\"city\": [\"Oslo\", \"Lima\", \"Pune\", \"Kyiv\"], \"temp\": [4.5, 19.0, 31.2, 8.1]},\n    index=[10, 20, 30, 40],\n)\n{{line}}\nprint(df)",
+  "variants": [
+    {
+      "id": "loc-label",
+      "label": "loc with a row label",
+      "slots": {
+        "line": "print(df.loc[20, \"temp\"])"
+      },
+      "stdout": "19.0\n    city  temp\n10  Oslo   4.5\n20  Lima  19.0\n30  Pune  31.2\n40  Kyiv   8.1\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "df[\"temp\"] afterwards",
+          "value": "[4.5, 19.0, 31.2, 8.1]",
+          "note": "df is unchanged"
+        }
+      ]
+    },
+    {
+      "id": "iloc-pos",
+      "label": "iloc with positions",
+      "slots": {
+        "line": "print(df.iloc[1, 1])"
+      },
+      "stdout": "19.0\n    city  temp\n10  Oslo   4.5\n20  Lima  19.0\n30  Pune  31.2\n40  Kyiv   8.1\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "df[\"temp\"] afterwards",
+          "value": "[4.5, 19.0, 31.2, 8.1]",
+          "note": "df is unchanged"
+        }
+      ]
+    },
+    {
+      "id": "loc-slice",
+      "label": "a loc slice includes its end label",
+      "slots": {
+        "line": "print(df.loc[20:30, \"temp\"].tolist())"
+      },
+      "stdout": "[19.0, 31.2]\n    city  temp\n10  Oslo   4.5\n20  Lima  19.0\n30  Pune  31.2\n40  Kyiv   8.1\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "df[\"temp\"] afterwards",
+          "value": "[4.5, 19.0, 31.2, 8.1]",
+          "note": "df is unchanged"
+        }
+      ]
+    },
+    {
+      "id": "iloc-slice",
+      "label": "an iloc slice excludes its end",
+      "slots": {
+        "line": "print(df.iloc[1:3][\"temp\"].tolist())"
+      },
+      "stdout": "[19.0, 31.2]\n    city  temp\n10  Oslo   4.5\n20  Lima  19.0\n30  Pune  31.2\n40  Kyiv   8.1\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "df[\"temp\"] afterwards",
+          "value": "[4.5, 19.0, 31.2, 8.1]",
+          "note": "df is unchanged"
+        }
+      ]
+    },
+    {
+      "id": "bracket-int",
+      "label": "integer key on a labeled Series",
+      "slots": {
+        "line": "print(df[\"temp\"][1])"
+      },
+      "stdout": "",
+      "error": "KeyError: 1",
+      "cards": [
+        {
+          "label": "df[\"temp\"] afterwards",
+          "value": "[4.5, 19.0, 31.2, 8.1]",
+          "note": "df is unchanged"
+        }
+      ]
+    },
+    {
+      "id": "loc-assign",
+      "label": "loc assignment changes df",
+      "slots": {
+        "line": "df.loc[df[\"temp\"] > 10, \"temp\"] = 0.0"
+      },
+      "stdout": "    city  temp\n10  Oslo   4.5\n20  Lima   0.0\n30  Pune   0.0\n40  Kyiv   8.1\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "df[\"temp\"] afterwards",
+          "value": "[4.5, 0.0, 0.0, 8.1]",
+          "note": "df was changed"
+        }
+      ]
+    },
+    {
+      "id": "chained",
+      "label": "chained assignment",
+      "slots": {
+        "line": "df[df[\"temp\"] > 10][\"temp\"] = 0.0"
+      },
+      "stdout": "    city  temp\n10  Oslo   4.5\n20  Lima  19.0\n30  Pune  31.2\n40  Kyiv   8.1\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "df[\"temp\"] afterwards",
+          "value": "[4.5, 19.0, 31.2, 8.1]",
+          "note": "df is unchanged"
+        }
+      ]
+    },
+    {
+      "id": "subset-copy",
+      "label": "change a filtered subset",
+      "slots": {
+        "line": "hot = df[df[\"temp\"] > 10]; hot[\"temp\"] = 0.0; print(hot[\"temp\"].tolist())"
+      },
+      "stdout": "[0.0, 0.0]\n    city  temp\n10  Oslo   4.5\n20  Lima  19.0\n30  Pune  31.2\n40  Kyiv   8.1\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "df[\"temp\"] afterwards",
+          "value": "[4.5, 19.0, 31.2, 8.1]",
+          "note": "df is unchanged"
+        }
+      ]
+    }
+  ]
+}

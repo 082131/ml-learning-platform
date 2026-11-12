@@ -1,0 +1,152 @@
+import { alignRunner, dtypesRunner, experiment, selectCode } from './code';
+import { questions, revenueExercise } from './quiz';
+
+<Section kind="intuition" title="Labels, not positions">
+
+A NumPy array knows only positions. A pandas <Term id="dataframe">DataFrame</Term> also has **labels**: the
+index for rows and the names for columns. Labels make data self-describing: row `20` stays row `20` after you
+filter, sort or join, and two tables combine by matching labels rather than by hoping their rows line up.
+
+Most pandas confusion comes from mixing labels with positions, from changes that do not stick (or stick where
+you did not expect), and from types: a column of numbers that became floats or text. This lesson works through
+all three, with pandas 3 behavior.
+
+</Section>
+
+<Section kind="technical" title="loc, iloc, alignment, copy-on-write and dtypes">
+
+**Two indexers.** `df.loc[rows, cols]` selects by **label**: a label, a list of labels, a label slice (which
+**includes** its end) or a boolean mask. `df.iloc[rows, cols]` selects by **position**, like NumPy, and slices
+exclude the end. `df["col"]` picks a column and `df[mask]` filters rows. For a Series, `s[key]` means a label in
+pandas 3; there is no fallback to positions, so use `s.iloc[i]` for those.
+
+**Alignment.** When two Series or DataFrames meet in arithmetic, pandas matches rows by index label, keeps the
+union of labels, and puts NaN where one side has no value (<Term id="index-alignment">index alignment</Term>).
+`s.add(t, fill_value=0)` treats a missing label as 0 instead. Assigning a Series as a new column aligns it to the
+DataFrame’s index, so labels the DataFrame lacks are dropped.
+
+**Copy-on-write.** In pandas 3, every selection behaves like a copy
+(<Term id="copy-on-write">copy-on-write</Term>): pandas shares memory until one side is modified, and then copies.
+So the rule is simple. To change `df`, assign in **one step on df itself**: `df.loc[mask, "col"] = value` or
+`df["col"] = ...`. A chained assignment such as `df[mask]["col"] = value` changes a temporary object, leaves
+`df` alone, and pandas warns. A filtered subset you keep (`hot = df[mask]`) can be changed freely without
+affecting `df`.
+
+**dtypes that fit the data.** pandas reads numbers as `int64` or `float64` and text as `str`. A missing value in
+an integer column turns it into `float64`, because NaN is a float; the nullable `"Int64"` dtype keeps integers
+and shows missing values as `<NA>`. A <Term id="categorical-dtype">categorical dtype</Term> stores each distinct
+value once plus a small integer code per row, which saves memory on repetitive text and, when `ordered=True`,
+gives a meaningful sort order. `pd.to_datetime` turns date text into `datetime64`, which unlocks `.dt` accessors
+and date arithmetic.
+
+</Section>
+
+<Section kind="visual" title="What does each line select, and does df change?">
+
+The same four-row table, with row labels 10, 20, 30 and 40. Pick a line: you see what it prints or raises, and
+whether `df` itself changed. Every run was recorded with pandas 3.
+
+<Experiment def={experiment} title="Selection and assignment explorer">
+  <StateCards title="After the line runs" labelHeading="Column" noteHeading="df" />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The program">
+
+<Experiment def={experiment} title="select.py, linked to the explorer" controls={false}>
+  <Code example={selectCode} title="select.py" />
+  <Readout title="What pandas printed or raised" />
+</Experiment>
+
+Alignment by label. `returns` lists `tue` first, but labels decide, not order: `tue` is $250 - 5 = 245$ and
+`mon` is $100 - 20 = 80$. `wed` has no return, so it is NaN unless you pass `fill_value=0`.
+
+<PythonRunner example={alignRunner} title="align.py" />
+
+</Section>
+
+<Section kind="experiment" title="Things to try">
+
+In the explorer:
+
+- Compare the `loc` slice with the `iloc` slice: both return `[19.0, 31.2]`, because `loc` includes label 30
+  while `iloc` stops before position 3.
+- Pick the integer key on a Series. Label `1` does not exist, so pandas 3 raises `KeyError: 1`; older versions
+  silently fell back to position 1.
+- Compare `loc` assignment with chained assignment. Only the one-step `loc` changes `df`.
+
+dtypes in practice. `count` arrives as `float64` because of the missing value; `"Int64"` brings integers back.
+The ordered category makes `max` return `L` and sorting follow S, M, L instead of the alphabet.
+
+<PythonRunner example={dtypesRunner} title="dtypes.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Selection mistakes">
+
+<CommonMistake
+  title="Chained assignment"
+  wrong={'df[df["temp"] > 10]["temp"] = 0.0'}
+  error="ChainedAssignmentError warning, and df is unchanged."
+  cause="The first [] returns a new object under copy-on-write; the second assignment changes only that."
+  fix={'df.loc[df["temp"] > 10, "temp"] = 0.0'}
+/>
+
+<CommonMistake
+  title="Using a position as a label"
+  wrong={'df["temp"][1]   # index labels are 10, 20, 30, 40'}
+  error="KeyError: 1"
+  cause="In pandas 3, [] on a Series always means a label."
+  fix={'df["temp"].iloc[1]'}
+/>
+
+<CommonMistake
+  title="Comparing columns from different tables by position"
+  wrong={'df_a["y"] - df_b["y"]   # after df_b was filtered or sorted'}
+  error="No error: pandas aligns by label, so rows match by index, and unmatched labels become NaN."
+  cause="Arithmetic between pandas objects always aligns on the index."
+  fix={'df_a["y"].to_numpy() - df_b["y"].to_numpy()   # only if you really mean position\n# or: reset_index(drop=True) on both first'}
+/>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+| In data and ML code | What it does |
+|---|---|
+| `df.loc[df["label"].isna(), "label"] = "unknown"` | Fill in place, in one step |
+| `X = df.iloc[:, :-1]`, `y = df.iloc[:, -1]` | Features and target by position |
+| `df.astype({"user_id": "Int64", "plan": "category"})` | Right-size dtypes after loading |
+| `pd.to_datetime(df["ts"], utc=True)` | Real timestamps from text |
+| `df.reset_index(drop=True)` | Back to 0..n−1 labels after filtering |
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Add a column without side effects">
+
+<MiniExercise exercise={revenueExercise}>
+  The starter `add_revenue(df)` changes the caller’s DataFrame and leaves NaN where `qty` is missing. Return a
+  new DataFrame with `revenue = price × qty`, counting a missing quantity as 0, and leave `df` unchanged. Run the
+  tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- `loc` is by label (slices include the end), `iloc` by position (slices exclude it); `s[key]` is a label in
+  pandas 3.
+- Arithmetic aligns on index labels and fills unmatched ones with NaN.
+- Under copy-on-write, change a DataFrame in one step on the DataFrame itself (`df.loc[mask, col] = v`).
+- Pick dtypes on purpose: `Int64` for integers with gaps, `category` for repeated labels, `datetime64` for dates.
+
+Next: [groupby, merge and reshape](#/learn/python/pandas/groupby-merge-reshape).
+
+</Section>
