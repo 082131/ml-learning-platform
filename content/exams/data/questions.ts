@@ -129,7 +129,7 @@ export const questions = [
     [
       'Write to staging, then atomically overwrite the whole partition once it succeeds',
       'Append to the target partition and delete duplicates with a DISTINCT query each morning',
-      'Lower the job\'s parallelism so fewer tasks write when one fails',
+      "Lower the job's parallelism so fewer tasks write when one fails",
       'Retry only the failed tasks, since successful tasks wrote complete files that are correct',
     ],
     [0],
@@ -164,7 +164,7 @@ export const questions = [
   q(
     'data-013',
     'ingest',
-    'In Apache Beam or Google Dataflow, which windowing strategy groups a user\'s events into bursts separated by 30 minutes of inactivity?',
+    "In Apache Beam or Google Dataflow, which windowing strategy groups a user's events into bursts separated by 30 minutes of inactivity?",
     [
       'Session windows with a 30-minute gap duration',
       'Sliding windows of 30 minutes every 1 minute',
@@ -212,7 +212,7 @@ export const questions = [
       'The job must disable checkpointing, since checkpoints and transactions conflict in Kafka',
     ],
     [0],
-    'Flink\'s exactly-once Kafka sink uses transactions committed on checkpoint completion. Consumers with the default read_uncommitted see aborted or pending records. acks=0 weakens durability, and transactions do span partitions.',
+    "Flink's exactly-once Kafka sink uses transactions committed on checkpoint completion. Consumers with the default read_uncommitted see aborted or pending records. acks=0 weakens durability, and transactions do span partitions.",
   ),
   q(
     'data-017',
@@ -261,7 +261,7 @@ export const questions = [
       'The job loses its record of processed files and offsets, so it may reprocess or skip data',
       'Nothing; Spark rebuilds the checkpoint from the output table, so progress is preserved',
       'The job runs faster afterward, since it no longer has to read the old checkpoint metadata',
-      'The job refuses to start until the checkpoint is restored from the cluster\'s automatic backup',
+      "The job refuses to start until the checkpoint is restored from the cluster's automatic backup",
     ],
     [0],
     'The checkpoint holds source offsets, the file-source log and state. Deleting it means the job no longer knows what it processed, which causes reprocessing (duplicates) or, with some starting-offset settings, gaps.',
@@ -269,7 +269,7 @@ export const questions = [
   q(
     'data-021',
     'ingest',
-    'Which TWO techniques reduce the cost of a scheduled BigQuery transformation that scans a 50 TB table daily but only needs yesterday\'s data? (Choose two.)',
+    "Which TWO techniques reduce the cost of a scheduled BigQuery transformation that scans a 50 TB table daily but only needs yesterday's data? (Choose two.)",
     [
       'Partition the table by event date and filter on the partition column in the query',
       'Cluster the table on commonly filtered columns so fewer blocks are read for each query',
@@ -317,7 +317,7 @@ export const questions = [
       'The load step is skipped, and data is queried directly in the operational database',
     ],
     [0],
-    'ELT loads raw data, then uses the warehouse\'s scalable compute (for example with dbt) for transformations, keeping raw history for reprocessing.',
+    "ELT loads raw data, then uses the warehouse's scalable compute (for example with dbt) for transformations, keeping raw history for reprocessing.",
   ),
   q(
     'data-025',
@@ -368,7 +368,7 @@ export const questions = [
       'The exact meaning of one row, which determines which dimensions and measures can attach',
       'The physical block size of the table, which determines compression and scan efficiency',
       'The number of rows loaded per batch, which determines how often the table is refreshed',
-      'The level of the data\'s security classification, which determines who can query it',
+      "The level of the data's security classification, which determines who can query it",
     ],
     [0],
     'Kimball modeling starts with the grain (for example "one row per order line"). Mixing grains causes double counting when facts are summed.',
@@ -481,7 +481,7 @@ export const questions = [
   q(
     'data-037',
     'store',
-    'Which TWO features does Apache Iceberg provide that help when a table\'s partitioning must change? (Choose two.)',
+    "Which TWO features does Apache Iceberg provide that help when a table's partitioning must change? (Choose two.)",
     [
       'Partition evolution, so new data uses the new spec without rewriting old files',
       'Hidden partitioning, so queries filter on columns rather than on partition paths',
@@ -563,7 +563,7 @@ export const questions = [
     'store',
     'Which TWO workloads suit a row-oriented OLTP database better than a columnar warehouse? (Choose two.)',
     [
-      'Updating one order\'s status thousands of times per second with strict consistency',
+      "Updating one order's status thousands of times per second with strict consistency",
       'Reading a single customer record by primary key for a web page in milliseconds',
       'Summing revenue by region over five years of history for a quarterly report',
       'Computing distinct counts over a billion events grouped by device type',
@@ -672,7 +672,7 @@ export const questions = [
     'An Airflow DAG has catchup=True, a daily schedule and a start_date six months ago. It is deployed today for the first time. What happens?',
     [
       'The scheduler creates runs for every missed daily interval since the start date',
-      'Only today\'s run is created, since catchup applies only after the first successful run',
+      "Only today's run is created, since catchup applies only after the first successful run",
       'The DAG fails validation, since start dates in the past are not allowed in Airflow',
       'One combined run covers all six months, since catchup merges the missed intervals',
     ],
@@ -684,13 +684,13 @@ export const questions = [
     'ops',
     'An Airflow task reads "today\'s" data with datetime.now(). Backfills and retries load the wrong day. What is the correct approach?',
     [
-      'Use the run\'s logical date (data interval) from the template context, not the wall clock',
+      "Use the run's logical date (data interval) from the template context, not the wall clock",
       'Use datetime.utcnow() instead, since the scheduler stores all timestamps in UTC',
       'Disable retries so the task never runs on a different day from its schedule',
       'Hard-code the date in an Airflow Variable and update it manually after each run',
     ],
     [0],
-    'Idempotent tasks derive their data window from the run\'s data interval (for example {{ data_interval_start }}), so reruns and backfills process the intended period.',
+    "Idempotent tasks derive their data window from the run's data interval (for example {{ data_interval_start }}), so reruns and backfills process the intended period.",
   ),
   q(
     'data-053',
@@ -739,7 +739,7 @@ export const questions = [
     [
       'Volume checks that compare row counts with recent history and alert',
       'Schema checks that each column type matches the table definition',
-      'Uptime checks that confirm the orchestrator\'s scheduler process is running normally',
+      "Uptime checks that confirm the orchestrator's scheduler process is running normally",
       'CPU alerts that fire when worker utilization stays low',
     ],
     [0],
@@ -779,8 +779,8 @@ export const questions = [
       'Consumer lag, the gap between the latest offset and the committed offset per partition',
       'End-to-end latency from event time to availability in the sink',
       'The total number of messages processed since the job first started running',
-      'The CPU utilization of the message broker\'s busiest machine',
-      'The size in bytes of the job\'s compiled application package',
+      "The CPU utilization of the message broker's busiest machine",
+      "The size in bytes of the job's compiled application package",
     ],
     [0, 1],
     'Rising lag or growing event-to-sink latency show the job falling behind. Cumulative counts and broker CPU do not measure backlog.',
@@ -792,7 +792,7 @@ export const questions = [
     [
       'Raise worker concurrency or worker count and check pool and parallelism limits',
       'Add more DAG files so the scheduler can distribute tasks across more DAG parsers',
-      'Increase each task\'s retries so that queued tasks get more attempts to start',
+      "Increase each task's retries so that queued tasks get more attempts to start",
       'Lower the schedule interval of every DAG so that runs are created more often',
     ],
     [0],
@@ -818,8 +818,8 @@ export const questions = [
     [
       'The schema, semantics, quality guarantees and change process for a dataset',
       'The hourly rate the platform team charges producers for storing their data',
-      'The physical servers the producer\'s data must be stored on for performance',
-      'The list of dashboards that are allowed to display the producer\'s data',
+      "The physical servers the producer's data must be stored on for performance",
+      "The list of dashboards that are allowed to display the producer's data",
     ],
     [0],
     'Data contracts make producer guarantees explicit (fields, types, meaning, freshness, and how breaking changes are announced), and are often enforced in CI.',
@@ -829,8 +829,8 @@ export const questions = [
     'ops',
     'A Step Functions workflow orchestrates Glue jobs. A transient failure in one step should retry three times with backoff, then send the error to an SNS topic. Where is this configured?',
     [
-      'In the state\'s Retry and Catch fields in the state machine definition',
-      'Inside each Glue job\'s script, with a loop that retries the job\'s main function',
+      "In the state's Retry and Catch fields in the state machine definition",
+      "Inside each Glue job's script, with a loop that retries the job's main function",
       'In an EventBridge rule that restarts the whole workflow after any failure',
       'In the IAM role of the state machine, which defines how often steps may retry',
     ],
@@ -870,7 +870,7 @@ export const questions = [
     'Which logging practice best supports troubleshooting a multi-step data pipeline?',
     [
       'Centralized structured logs carrying run, task and partition IDs',
-      'Verbose print statements in each task, kept on each worker\'s local disk',
+      "Verbose print statements in each task, kept on each worker's local disk",
       'Logging only failures, since successful runs contain no useful information',
       'Writing every processed row to the log so any value can be traced later',
     ],
@@ -893,7 +893,7 @@ export const questions = [
   q(
     'data-068',
     'ops',
-    'A query in Athena scans 2 TB and costs too much. The table is partitioned by dt, but the query filters with WHERE date(event_ts) = DATE \'2026-11-01\'. Why does partitioning not help?',
+    "A query in Athena scans 2 TB and costs too much. The table is partitioned by dt, but the query filters with WHERE date(event_ts) = DATE '2026-11-01'. Why does partitioning not help?",
     [
       'The filter is on event_ts, not on the partition column dt, so no partitions are pruned',
       'Athena ignores all partitions unless the table is stored as compressed CSV files',
@@ -901,7 +901,7 @@ export const questions = [
       'The date() function is not supported, so Athena falls back to a full table scan',
     ],
     [0],
-    'Pruning needs predicates on the partition column. Add WHERE dt = \'2026-11-01\' (or use partition projection) so only that partition is listed and read.',
+    "Pruning needs predicates on the partition column. Add WHERE dt = '2026-11-01' (or use partition projection) so only that partition is listed and read.",
   ),
   q(
     'data-069',
@@ -923,7 +923,7 @@ export const questions = [
     [
       'Per-task duration and start times, to find which step varies and whether it waits on inputs',
       'The total row count of the final table, to check whether late nights load more data',
-      'The memory of the orchestrator\'s database, to see whether it slows the scheduler',
+      "The memory of the orchestrator's database, to see whether it slows the scheduler",
       'The number of DAGs in the environment, to see whether too many DAGs exist overall',
     ],
     [0],
@@ -1015,12 +1015,7 @@ export const questions = [
     'data-077',
     'security',
     'Which service or feature centrally manages fine-grained permissions on data lake tables in AWS?',
-    [
-      'Lake Formation',
-      'Amazon Macie',
-      'AWS Config',
-      'Amazon GuardDuty',
-    ],
+    ['Lake Formation', 'Amazon Macie', 'AWS Config', 'Amazon GuardDuty'],
     [0],
     'Lake Formation grants database, table, column and row-level permissions over the Glue Data Catalog. Macie discovers sensitive data in S3, Config tracks resource configuration, and GuardDuty detects threats.',
   ),
@@ -1099,7 +1094,7 @@ export const questions = [
       'Delete the rows through a table format that rewrites affected files, then expire old snapshots',
       'Mark the customer as deleted in a separate table, keeping the original files unchanged',
       'Do nothing, since immutable files are exempt from erasure requirements by design',
-      'Encrypt the files again with a new key so the customer\'s rows can no longer be read',
+      "Encrypt the files again with a new key so the customer's rows can no longer be read",
     ],
     [0],
     'Row-level deletes in Delta, Iceberg or Hudi rewrite or mark files, but old snapshots still hold the data until they are expired and vacuumed. Re-encrypting everything does not delete one customer.',
@@ -1110,7 +1105,7 @@ export const questions = [
     'A Redshift cluster must not be reachable from the internet but analysts connect from the corporate network. Which setup fits?',
     [
       'Use private subnets with no public access, reached by VPN or Direct Connect',
-      'Enable public accessibility and restrict the security group to the analysts\' home IPs',
+      "Enable public accessibility and restrict the security group to the analysts' home IPs",
       'Enable public accessibility and require SSL connections from every client',
       'Place it in a public subnet and rely on the database password for protection',
     ],
@@ -1139,7 +1134,7 @@ export const questions = [
       'Use private network paths such as VPC endpoints or private service access',
       'Encrypt the database storage volume with a customer-managed KMS key',
       'Enable point-in-time recovery so that intercepted data can be restored',
-      'Give the pipeline\'s service account read-only access to the database',
+      "Give the pipeline's service account read-only access to the database",
     ],
     [0, 1],
     'TLS with certificate checks protects the connection, and private paths keep traffic off public networks. Storage encryption protects data at rest; recovery and read-only roles address other risks.',
@@ -1152,7 +1147,7 @@ export const questions = [
       'Administrative or management-plane audit logs from the cloud provider and catalog',
       'Query history of the warehouse, which records every SELECT run against each table',
       'Billing reports, which list every API call made by each user during the month',
-      'Storage access logs, which record each object read from the table\'s bucket',
+      "Storage access logs, which record each object read from the table's bucket",
     ],
     [0],
     'Admin activity logs (CloudTrail management events, Cloud Audit Logs admin activity, catalog audit logs) record DDL and permission changes. Query history and access logs record reads.',
@@ -1245,7 +1240,7 @@ export const questions = [
     [
       'Schema and type checks against the expected feature schema',
       'Distribution checks (for example PSI or KS) against the previous training data',
-      'A check that the model\'s validation accuracy exceeds the production model',
+      "A check that the model's validation accuracy exceeds the production model",
       'A load test of the serving endpoint at twice the expected peak traffic',
       'A review of the model card wording by the legal and compliance teams',
     ],
@@ -1281,7 +1276,7 @@ export const questions = [
   q(
     'data-097',
     'mlops',
-    'Which practice prevents a model\'s evaluation set from leaking into training when datasets are rebuilt monthly?',
+    "Which practice prevents a model's evaluation set from leaking into training when datasets are rebuilt monthly?",
     [
       'Assign splits by a stable hash of the entity ID, so they never change on rebuild',
       'Shuffle the data with a new random seed each month and take the first 20% as the test set',
