@@ -1,0 +1,176 @@
+import { deltaSql, dvcPipeline, lakefsBash, manifestRunner, sn, versionsPython } from './code';
+import { manifestExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Every training set should be a bookmark, not a memory">
+
+A model is trained on some data on some day. Then the data moves on: labels get corrected, new rows arrive, a bad
+batch is deleted. Months later someone asks why the model treats a case strangely, and the only honest answer starts
+with "we would need the exact training data". If the table has been overwritten, it is gone.
+
+Data versioning makes every state of a dataset addressable, like commits in Git. The [ML versioning
+lesson](#/learn/ml/practice/versioning) showed how content hashes identify a dataset. This lesson goes a level down: how
+table formats and data version control keep hundreds of versions of a large dataset without storing hundreds of
+copies, what each new version costs, and how branches let you change data safely.
+
+</Section>
+
+<Section kind="technical" title="Snapshots, copy-on-write, merge-on-read and branches">
+
+**Snapshots are lists of files.** Table formats (Delta Lake, Apache Iceberg, Hudi) store data in immutable files,
+usually Parquet, plus metadata. Each version, or snapshot, is a list of the files that make up the table at that moment.
+A new version adds new files and lists them instead of some old ones; files no version needs any more are deleted
+later. Unchanged files are shared between versions, so storing a version costs only what changed.
+
+**What "what changed" means depends on how updates are written:**
+
+- <Term id="copy-on-write">Copy-on-write</Term>: every data file holding at least one changed row is rewritten in full.
+  Reads are simple; writes cost (touched files) × (rows per file).
+- <Term id="merge-on-read">Merge-on-read</Term>: only the changed rows (or delete markers) go to small delta files.
+  Writes are cheap; reads must merge deltas until a **compaction** rewrites them into new base files.
+
+With $N$ rows in files of $F$ rows, and $u$ rows updated at random, the chance a file holds no changed row is about
+$(1 - F/N)^u$. For $N = 100{,}000$, $F = 1{,}000$ and $u = 1{,}000$ that is $0.99^{1000} \approx 0.00004$: every file is
+rewritten. The same 1,000 rows in one block touch 1 or 2 files.
+
+**Time travel.** Because old snapshots keep their file lists, you can query a table as of a version or time:
+<Term id="time-travel">time travel</Term>. Old files are removed only when snapshots expire (`VACUUM` in Delta Lake,
+`expire_snapshots` in Iceberg), so the <Term id="snapshot-retention">retention period</Term> decides how far back you can
+go.
+
+**Branches.** A <Term id="data-branch">data branch</Term> is a named, writable line of snapshots that starts from an
+existing one and shares its files. A relabeling job can write to a branch, be validated there, and be merged into the
+main line atomically, or thrown away. lakeFS does this over any object store; Iceberg and Nessie support branches and
+tags in the catalog.
+
+**Versioning outside tables.** For files (images, audio, model weights), DVC stores each file once by its
+<Term id="content-hash">content hash</Term> in remote storage and records the hashes in small files committed to Git,
+so `git checkout` plus `dvc checkout` restores data and code together.
+
+</Section>
+
+<Section kind="visual" title="What does each new version cost?">
+
+<Experiment def={sn} title="Ten versions of a 100,000-row table">
+  <SnapshotStorage />
+  <Readout title="What the experiment computed" />
+</Experiment>
+
+Things to try:
+
+- **Default** (1,000 random updates, files of 1,000 rows): copy-on-write rewrites all 100 files every version and ends
+  at 11.00× the table, the same as full copies. Merge-on-read stores 1.10×.
+- **One block** with the same 1,000 updates: copy-on-write rewrites 2 files per version and ends at 1.20×. The update
+  pattern, not the amount, decides the cost.
+- **100 random updates:** copy-on-write still rewrites 62.8 of 100 files per version (7.28×). With files of 10,000 rows
+  it rewrites all 10 files.
+- **Files of 10,000 rows, one block of 100:** 1 file per version but 10,000 rows each time, 2.00×. Bigger files make
+  every touched file more expensive.
+
+</Section>
+
+<Section kind="code" title="The cost model in Python, manifests, and the tools">
+
+The program behind the visual, with the three settings filled from the controls:
+
+<Experiment def={sn} title="versions.py, linked to the experiment" controls={false}>
+  <Code example={versionsPython} title="versions.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+**A version is a manifest of hashes.** Correct one label and only one file's hash changes; the version ID, a hash of
+the manifest, changes too, and rebuilding the same content gives the same ID:
+
+<PythonRunner example={manifestRunner} title="manifest.py" />
+
+**Time travel in Delta Lake.** Pin the version a model trained on, query it later, restore it after a bad write:
+
+<Code example={deltaSql} title="time_travel.sql" />
+
+**A relabeling on a branch, with lakeFS:**
+
+<Code example={lakefsBash} title="relabel_branch.sh" />
+
+**Data and pipeline versioning with DVC:** stages declare their inputs and outputs; `dvc repro` reruns only the stages
+whose input hashes changed and records them in `dvc.lock`:
+
+<Code example={dvcPipeline} title="dvc_pipeline.sh" />
+
+<Callout kind="simplification">
+  The cost model counts rows written and ignores compression, file metadata and the work of compaction. Real tables
+  also change file layout over time (compaction, clustering, Z-ordering), and Delta Lake's deletion vectors and
+  Iceberg's v2 delete files let one table mix both strategies. The rule of thumb survives: scattered updates are
+  expensive under copy-on-write, and laying data out so updates cluster (by date, or by the key you correct) makes
+  versions cheap.
+</Callout>
+
+</Section>
+
+<Section kind="mistakes" title="Versions you cannot get back">
+
+<CommonMistake
+  title="Overwriting the training table in place"
+  wrong={"df.to_parquet(\"s3://ml/train/examples.parquet\")   # same path every night"}
+  error="(no error: last month's training data no longer exists anywhere)"
+  cause="A plain file path has no history. The model registry points at a path whose contents have changed."
+  fix="write through a table format or DVC, and record the version ID (or manifest hash) with every trained model"
+/>
+
+<CommonMistake
+  title="Rebuilding a training set by date"
+  wrong={"spark.read.option(\"timestampAsOf\", \"2026-10-01\").table(\"examples\")   # 'the day we trained'"}
+  error="(no error: the job ran at 03:00, a relabel was committed at 09:00, and you load the later one)"
+  cause="A date is not a version. Several commits can happen in a day."
+  fix={"spark.read.option(\"versionAsOf\", 42).table(\"examples\")   # the version logged by the training run"}
+/>
+
+<CommonMistake
+  title="A short retention period with no pinned versions"
+  wrong={"VACUUM examples RETAIN 168 HOURS;   -- nightly, the default 7 days"}
+  error="(no error: the data behind last quarter's production model is deleted)"
+  cause="Retention applies to every old snapshot, including the ones released models depend on."
+  fix="tag or copy the versions used by released models, and set retention from your reproducibility and deletion policies"
+/>
+
+</Section>
+
+<Section kind="practice" title="Versioning data in production">
+
+- **Log the data version with every training run**, next to the code commit and config
+  ([experiment tracking](#/learn/ml/practice/experiment-tracking)).
+- **Lay out for your updates.** Partition or cluster by the column you append or correct by, so versions touch few
+  files.
+- **Compact on a schedule** if you use merge-on-read, and watch read latency.
+- **Use branches for risky changes:** relabeling, backfills, schema changes. Validate, then merge.
+- **Write the retention policy down:** how long versions are kept, which are pinned, and how deletion requests reach
+  old versions ([privacy and governance](#/learn/dataops/pipelines/privacy-governance)).
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Diff two dataset versions">
+
+<MiniExercise exercise={manifestExercise}>
+  Write `diff_manifests(old, new)`. Both arguments map file names to content hashes. Return three sorted lists: files
+  added, files removed, and files whose hash changed.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A table version is a list of immutable files; versions share unchanged files, so a version costs what it rewrites.
+- Copy-on-write rewrites every touched file: 1,000 scattered updates rewrote the whole table, the same 1,000 rows in
+  one block cost 2 files.
+- Merge-on-read writes only changed rows and pays at read time until compaction.
+- Pin the exact version each model trained on; branches make data changes reviewable; retention decides how long the
+  past stays reachable.
+
+Next: [continuous training and retraining triggers](#/learn/dataops/pipelines/retraining-triggers), deciding when a
+new data version should become a new model.
+
+</Section>

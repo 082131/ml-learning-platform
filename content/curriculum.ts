@@ -403,7 +403,7 @@ export const tracks: Track[] = [
         title: 'Dataset versioning',
         level: 'advanced',
         lessons: [
-          { id: 'dataops/versioning/data-snapshots', status: 'outline' },
+          { id: 'dataops/versioning/data-snapshots', status: 'written' },
         ],
       },
       {

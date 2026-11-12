@@ -178,3 +178,14 @@
   outline: 2px solid var(--err);
   outline-offset: 2px;
 }
+.fileCell {
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 2px;
+  background: var(--surface-2);
+}
+.fileCell[data-tone='err'] {
+  border: 2px dashed var(--err);
+  background: color-mix(in srgb, var(--err) 25%, var(--surface));
+}
