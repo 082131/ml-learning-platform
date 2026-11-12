@@ -1,0 +1,155 @@
+import { categoriesRunner, experiment, outlierCode, textRunner } from './code';
+import { normalizeExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Same thing, many spellings; rare thing, real or wrong?">
+
+People type `New York`, `new york ` and `NYC` for one city. Product codes hide a number inside free text. A
+plan column has `Pro`, `pro ` and `PRO`. Until they are unified, every count and group is split across spellings.
+
+Numbers have their own version of the problem: a few values far from the rest. Some are errors (a duration of
+95 minutes because a timer was left running), some are the most interesting rows in the table. Cleaning has to
+**find** them reliably and then **decide** what they are, and the second part is not a formula.
+
+</Section>
+
+<Section kind="technical" title="Text, categories and outliers">
+
+**Text.** The `.str` accessor applies string methods to every value and passes missing values through:
+`strip`, `lower`, `replace`, `contains`, `startswith`, `split`, `len`. Normalize in a fixed order: strip
+whitespace, lowercase, remove punctuation, then unify known aliases with an explicit dictionary.
+
+**Regular expressions.** A <Term id="regular-expression">regular expression</Term> describes a text pattern:
+`\d+` one or more digits, `\s` whitespace, `\w` a letter, digit or underscore, `[-\s]?` an optional hyphen or
+space, `(...)` a group to capture, `(?i)` ignore case. `s.str.extract(pattern)` returns one column per captured
+group, with NaN where the pattern does not match; `s.str.contains(pattern)` gives a mask. Write the raw string
+form, `r"\d+"`, so Python does not interpret the backslashes.
+
+**Categories.** Map spellings to a fixed set with `s.map(table)`, which turns anything not in the table into NaN,
+and then **report** the unmapped values instead of letting them vanish. `replace` leaves unknown values as they
+were, which hides new spellings. Finish with a categorical dtype listing the allowed values.
+
+**Outliers.** An <Term id="outlier">outlier</Term> rule flags values; it does not judge them. Three common
+rules:
+
+- **IQR rule**: outside $[Q_1 - k \cdot \mathrm{IQR},\ Q_3 + k \cdot \mathrm{IQR}]$, where
+  $\mathrm{IQR} = Q_3 - Q_1$ (<Term id="interquartile-range">interquartile range</Term>) and $k$ is 1.5 or 3.
+  Quartiles ignore the extremes, so the rule is robust.
+- **z-score**: $|x - \bar x| / s > 3$ (<Term id="z-score">z-score</Term>). Simple, but the mean and standard
+  deviation include the outliers, which can hide them (masking), especially in small samples.
+- **Robust z**: $0.6745\,(x - \text{median}) / \text{MAD} > 3.5$, using the median absolute deviation.
+
+**Then decide.** Impossible values (a negative age, a heart rate of 0) are errors: set them to missing. Possible
+but extreme values are data: keep them, and if a method is sensitive to them, cap with `clip` at chosen
+percentiles (winsorizing) or use a robust statistic. Never drop rows only because a rule flagged them.
+
+</Section>
+
+<Section kind="visual" title="Which rule finds the outliers?">
+
+Twelve task durations in minutes: ten between 12 and 16, plus 95 and 120. Pick a rule and see what it flags,
+with the statistics it is based on. Every run was recorded with pandas 3.
+
+<Experiment def={experiment} title="Outlier rule explorer">
+  <StateCards title="What the rule flags" labelHeading="Quantity" noteHeading="Detail" />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The program">
+
+<Experiment def={experiment} title="outliers.py, linked to the explorer" controls={false}>
+  <Code example={outlierCode} title="outliers.py" />
+  <Readout title="The flagged values" />
+</Experiment>
+
+Normalizing city names and extracting fields from product codes. `NYC` becomes `new york` through the alias
+table, and the code that does not match the pattern gets NaN in both columns:
+
+<PythonRunner example={textRunner} title="text.py" />
+
+</Section>
+
+<Section kind="experiment" title="Things to try">
+
+In the explorer:
+
+- Pick `z-score above 3`. Nothing is flagged: 120 has a z-score of only 2.46, because the standard deviation
+  (36.84) was inflated by 95 and 120 themselves.
+- Pick the IQR rule. With $Q_1 = 13$ and $Q_3 = 15.25$, the fences are $13 - 3.375 = 9.625$ and
+  $15.25 + 3.375 = 18.625$, so both extremes are flagged.
+- Pick the robust z. The median is 14 and the MAD is 1, so 120 scores $0.6745 \times 106 / 1 = 71.5$.
+
+Mapping categories with an explicit table, reporting what did not map, and capping extremes at the 5th and 95th
+percentiles:
+
+<PythonRunner example={categoriesRunner} title="categories.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Cleaning text and outliers badly">
+
+<CommonMistake
+  title="Matching a regex as plain text"
+  wrong={'codes.str.replace(".", "")'}
+  error="No error in pandas 3: the dot is matched literally, because regex defaults to False."
+  cause="Older code relied on regex=True by default; be explicit either way."
+  fix={'codes.str.replace(r"[^\\w\\s]", "", regex=True)   # remove punctuation'}
+/>
+
+<CommonMistake
+  title="replace that hides new spellings"
+  wrong={'plan = plan.replace({"Pro": "pro", "Free": "free"})'}
+  error="No error: 'PRO ', 'trial' and every future variant pass through untouched."
+  cause="replace leaves unknown values alone."
+  fix={'mapped = plan.str.strip().str.lower().map(table)\nassert mapped.notna().all(), plan[mapped.isna()].unique()'}
+/>
+
+<CommonMistake
+  title="Dropping every flagged row"
+  wrong={'df = df[z.abs() <= 3]'}
+  error="No error: real extreme customers vanish from the analysis, and the next z-scores shift."
+  cause="A flag means unusual, not wrong."
+  fix={'df["duration_flag"] = flagged   # inspect, then fix errors and keep real values'}
+/>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+| In data and ML code | What it does |
+|---|---|
+| `df["city"].str.strip().str.lower()` | The first step for any text key |
+| `df["sku"].str.extract(r"(\d+)")` | Pull a number out of free text |
+| `df["plan"].map(PLAN_TABLE)` plus a check | Fixed categories, with new spellings reported |
+| `x.clip(*x.quantile([0.01, 0.99]))` | Winsorize before a mean-sensitive model |
+| `RobustScaler` in scikit-learn | Scaling with the median and IQR |
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Country codes, with no silent misses">
+
+<MiniExercise exercise={normalizeExercise}>
+  Write `normalize_country(s)`. Strip and lowercase each value, map it with `CODES`, keep genuinely missing
+  values as missing, and raise `ValueError` naming any present value that could not be mapped. Run the tests to
+  check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Normalize text in a fixed order (strip, lowercase, punctuation, aliases) with the `.str` accessor.
+- `str.extract` with a raw-string regex pulls fields out of free text; non-matches become NaN.
+- Map categories with `map` and report unmapped values instead of hiding them.
+- IQR and robust z resist masking; the plain z-score can miss outliers. Flag, inspect, then fix errors and keep
+  real extremes.
+
+Next chapter: [exploratory analysis and choosing charts](#/learn/python/analysis/eda-visualization).
+
+</Section>

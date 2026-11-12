@@ -1,0 +1,192 @@
+{
+  "python": "3.13.18",
+  "template": "import pandas as pd\n\nraw = pd.DataFrame({\n    \"id\": [1, 2, 2, 3, 4, 5, 6, 7],\n    \"age\": [\"34\", \"29\", \"29\", \"n/a\", \"41\", \"\", \"230\", \"38\"],\n    \"income\": [52000, None, None, 61000, None, 1200000, 48000, 55000],\n})\ndf = raw.drop_duplicates().copy()\ndf[\"age\"] = pd.to_numeric(df[\"age\"], errors=\"coerce\")\ndf[\"age\"] = df[\"age\"].where(df[\"age\"].between(0, 120))\n{{strategy}}\nprint(len(df), df[\"income\"].isna().sum())\nprint(round(df[\"income\"].mean()), df[\"income\"].median())",
+  "variants": [
+    {
+      "id": "drop",
+      "label": "drop rows with missing income",
+      "slots": {
+        "strategy": "df = df.dropna(subset=[\"income\"])"
+      },
+      "stdout": "5 0\n283200 55000.0\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "rows",
+          "value": "5",
+          "note": "8 raw rows, 1 exact duplicate removed first"
+        },
+        {
+          "label": "income values",
+          "value": "52,000, 61,000, 1,200,000, 48,000, 55,000",
+          "note": "filled values sit where the gaps were"
+        },
+        {
+          "label": "age after coercion",
+          "value": "34, NaN, NaN, NaN, 38",
+          "note": "n/a and empty could not be parsed; 230 is impossible"
+        },
+        {
+          "label": "columns",
+          "value": "id, age, income",
+          "note": "a flag column keeps the fact a value was missing"
+        }
+      ]
+    },
+    {
+      "id": "zero",
+      "label": "fill with 0",
+      "slots": {
+        "strategy": "df[\"income\"] = df[\"income\"].fillna(0)"
+      },
+      "stdout": "7 0\n202286 52000.0\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "rows",
+          "value": "7",
+          "note": "8 raw rows, 1 exact duplicate removed first"
+        },
+        {
+          "label": "income values",
+          "value": "52,000, 0, 61,000, 0, 1,200,000, 48,000, 55,000",
+          "note": "filled values sit where the gaps were"
+        },
+        {
+          "label": "age after coercion",
+          "value": "34, 29, NaN, 41, NaN, NaN, 38",
+          "note": "n/a and empty could not be parsed; 230 is impossible"
+        },
+        {
+          "label": "columns",
+          "value": "id, age, income",
+          "note": "a flag column keeps the fact a value was missing"
+        }
+      ]
+    },
+    {
+      "id": "mean",
+      "label": "fill with the mean",
+      "slots": {
+        "strategy": "df[\"income\"] = df[\"income\"].fillna(df[\"income\"].mean())"
+      },
+      "stdout": "7 0\n283200 61000.0\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "rows",
+          "value": "7",
+          "note": "8 raw rows, 1 exact duplicate removed first"
+        },
+        {
+          "label": "income values",
+          "value": "52,000, 283,200, 61,000, 283,200, 1,200,000, 48,000, 55,000",
+          "note": "filled values sit where the gaps were"
+        },
+        {
+          "label": "age after coercion",
+          "value": "34, 29, NaN, 41, NaN, NaN, 38",
+          "note": "n/a and empty could not be parsed; 230 is impossible"
+        },
+        {
+          "label": "columns",
+          "value": "id, age, income",
+          "note": "a flag column keeps the fact a value was missing"
+        }
+      ]
+    },
+    {
+      "id": "median",
+      "label": "fill with the median",
+      "slots": {
+        "strategy": "df[\"income\"] = df[\"income\"].fillna(df[\"income\"].median())"
+      },
+      "stdout": "7 0\n218000 55000.0\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "rows",
+          "value": "7",
+          "note": "8 raw rows, 1 exact duplicate removed first"
+        },
+        {
+          "label": "income values",
+          "value": "52,000, 55,000, 61,000, 55,000, 1,200,000, 48,000, 55,000",
+          "note": "filled values sit where the gaps were"
+        },
+        {
+          "label": "age after coercion",
+          "value": "34, 29, NaN, 41, NaN, NaN, 38",
+          "note": "n/a and empty could not be parsed; 230 is impossible"
+        },
+        {
+          "label": "columns",
+          "value": "id, age, income",
+          "note": "a flag column keeps the fact a value was missing"
+        }
+      ]
+    },
+    {
+      "id": "flag",
+      "label": "median plus a missingness flag",
+      "slots": {
+        "strategy": "df[\"income_missing\"] = df[\"income\"].isna(); df[\"income\"] = df[\"income\"].fillna(df[\"income\"].median())"
+      },
+      "stdout": "7 0\n218000 55000.0\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "rows",
+          "value": "7",
+          "note": "8 raw rows, 1 exact duplicate removed first"
+        },
+        {
+          "label": "income values",
+          "value": "52,000, 55,000, 61,000, 55,000, 1,200,000, 48,000, 55,000",
+          "note": "filled values sit where the gaps were"
+        },
+        {
+          "label": "age after coercion",
+          "value": "34, 29, NaN, 41, NaN, NaN, 38",
+          "note": "n/a and empty could not be parsed; 230 is impossible"
+        },
+        {
+          "label": "columns",
+          "value": "id, age, income, income_missing",
+          "note": "a flag column keeps the fact a value was missing"
+        }
+      ]
+    },
+    {
+      "id": "none",
+      "label": "leave the gaps",
+      "slots": {
+        "strategy": "pass"
+      },
+      "stdout": "7 2\n283200 55000.0\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "rows",
+          "value": "7",
+          "note": "8 raw rows, 1 exact duplicate removed first"
+        },
+        {
+          "label": "income values",
+          "value": "52,000, NaN, 61,000, NaN, 1,200,000, 48,000, 55,000",
+          "note": "filled values sit where the gaps were"
+        },
+        {
+          "label": "age after coercion",
+          "value": "34, 29, NaN, 41, NaN, NaN, 38",
+          "note": "n/a and empty could not be parsed; 230 is impossible"
+        },
+        {
+          "label": "columns",
+          "value": "id, age, income",
+          "note": "a flag column keeps the fact a value was missing"
+        }
+      ]
+    }
+  ]
+}

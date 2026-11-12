@@ -1,0 +1,153 @@
+import { auditRunner, dedupeRunner, experiment, imputeCode } from './code';
+import { cleanExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Cleaning is a series of decisions">
+
+Raw data arrives with gaps, repeats and values in the wrong type: `"1,250.00"` as text, `"n/a"` in an age
+column, February 30th, the same user twice. None of these raise an error on load. They show up later as a mean
+that is slightly off or a model that quietly learns from duplicates.
+
+Cleaning is not a single function call. It is a short list of decisions, each of which changes the data:
+what counts as missing, which row of a duplicate to keep, how to fill a gap. Good cleaning code makes every
+decision visible, counts what it changed, and fails loudly when the data breaks a rule.
+
+</Section>
+
+<Section kind="technical" title="Audit, coerce, deduplicate, fill, validate">
+
+**Audit first.** Before changing anything, look: `df.shape`, `df.dtypes` (a numeric column read as `str`
+means some value is not a number), `df.isna().sum()`, `df.duplicated().sum()` (whole-row duplicates),
+`df[key].duplicated().sum()` (key duplicates), `describe()` for impossible ranges, and `value_counts()` on text
+columns for spelling variants.
+
+**Coerce types.** `pd.to_numeric(col, errors="coerce")` and `pd.to_datetime(col, errors="coerce",
+format=...)` convert what they can and turn the rest into NaN or NaT. They never complain, so compare missing
+counts before and after: the difference is the number of parse failures. Clean the text first where the fix is
+known (remove thousands separators), and treat impossible values (age 230, a negative fee) as missing with
+`where`.
+
+**Duplicates.** `drop_duplicates()` removes rows identical in every column. When a key should be unique,
+decide which row wins: usually the latest, with
+`sort_values("updated").drop_duplicates(subset="user_id", keep="last")`.
+
+**Missing values.** Ask why a value is missing before choosing (<Term id="missing-value">missing value</Term>).
+Dropping rows is simple but discards their other columns and can bias the sample. Filling
+(<Term id="imputation">imputation</Term>) with the median is robust to outliers; the mean is not; a constant
+such as 0 is right only when it is the true meaning ("no purchases"). For a model, add a
+<Term id="missingness-indicator">missingness indicator</Term> so the fact that a value was missing is not lost.
+In an ML pipeline, compute fill statistics on the training split only.
+
+**Validate.** End with assertions about what must be true (<Term id="data-validation">data validation</Term>):
+unique keys, ranges, allowed categories, no missing labels. A failed assertion stops the pipeline with a
+message, which is far cheaper than a wrong number in a report.
+
+</Section>
+
+<Section kind="visual" title="Five ways to handle missing income">
+
+Seven users after removing one duplicate row: two have no income, and one earns 1,200,000. Pick a policy and see
+the rows and statistics it leaves behind. Every run was recorded with pandas 3.
+
+<Experiment def={experiment} title="Missing value explorer">
+  <StateCards title="The table after the policy" labelHeading="Property" noteHeading="Note" />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The cleaning script">
+
+<Experiment def={experiment} title="impute.py, linked to the explorer" controls={false}>
+  <Code example={imputeCode} title="impute.py" />
+  <Readout title="Rows and NaN left; mean and median income" />
+</Experiment>
+
+A first audit of a messy export. Every problem below is found without changing the data:
+
+<PythonRunner example={auditRunner} title="audit.py" />
+
+</Section>
+
+<Section kind="experiment" title="Things to try">
+
+In the explorer:
+
+- Compare the mean fill with the median fill. The mean of the five known incomes is
+  $(52{,}000 + 61{,}000 + 1{,}200{,}000 + 48{,}000 + 55{,}000) / 5 = 283{,}200$, far above every typical value; the
+  median is 55,000.
+- Choose dropping. Two users disappear, and with them two valid ages (29 and 41): dropping one column’s gaps
+  costs every other column’s data in those rows.
+- Choose filling with 0. The median falls to 52,000, because the made-up zeros now count as real incomes.
+
+Keeping the newest record per user, then checking the result with assertions:
+
+<PythonRunner example={dedupeRunner} title="dedupe.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Cleaning mistakes">
+
+<CommonMistake
+  title="Casting before cleaning"
+  wrong={'df["age"] = df["age"].astype(int)'}
+  error={'ValueError: invalid literal for int() with base 10: \'n/a\''}
+  cause="astype refuses any value it cannot convert."
+  fix={'df["age"] = pd.to_numeric(df["age"], errors="coerce")\nprint(df["age"].isna().sum(), "could not be parsed or were missing")'}
+/>
+
+<CommonMistake
+  title="Filling with statistics from all the data"
+  wrong={'df["income"] = df["income"].fillna(df["income"].median())\ntrain, test = split(df)'}
+  error="No error: the test rows helped choose the fill value (leakage)."
+  cause="The median was computed before splitting."
+  fix={'train, test = split(df)\nfill = train["income"].median()\ntrain["income"] = train["income"].fillna(fill)\ntest["income"] = test["income"].fillna(fill)'}
+/>
+
+<CommonMistake
+  title="Comparing with None"
+  wrong={'df[df["income"] == None]'}
+  error="No error: the result is empty."
+  cause="Missing values are NaN, and comparisons with NaN are always False."
+  fix={'df[df["income"].isna()]'}
+/>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+| In data and ML code | What it does |
+|---|---|
+| `df.isna().mean().sort_values()` | Share of missing values per column |
+| `pd.to_numeric(col, errors="coerce")` | Parse numbers, count failures |
+| `drop_duplicates(subset=key, keep="last")` | One row per key, newest wins |
+| `SimpleImputer(strategy="median", add_indicator=True)` | scikit-learn’s fill-plus-flag, fitted on train |
+| `assert df[key].is_unique` | A cheap validation gate |
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="A cleaning function that fails loudly">
+
+<MiniExercise exercise={cleanExercise}>
+  Write `clean_users(df)`. Remove exact duplicates, parse `age` to numbers, treat ages outside 0 to 120 as
+  missing, add an `age_missing` flag, fill missing ages with the median, and `assert` that `user_id` is unique.
+  Return a new DataFrame. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Audit before you change anything: dtypes, missing counts, whole-row and key duplicates, ranges.
+- Coerce with `errors="coerce"` and count the NaN it created; turn impossible values into missing ones.
+- Choose a missing-value policy on purpose: the median resists outliers, dropping loses other columns, and a flag
+  keeps the signal.
+- End every cleaning step with assertions.
+
+Next: [text, categories and outliers](#/learn/python/cleaning/text-categories-outliers).
+
+</Section>

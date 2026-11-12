@@ -408,8 +408,8 @@ export const tracks: Track[] = [
         title: 'Data cleaning',
         level: 'intermediate',
         lessons: [
-          { id: 'python/cleaning/missing-duplicates-types', status: 'outline' },
-          { id: 'python/cleaning/text-categories-outliers', status: 'outline' },
+          { id: 'python/cleaning/missing-duplicates-types', status: 'written' },
+          { id: 'python/cleaning/text-categories-outliers', status: 'written' },
         ],
       },
       {

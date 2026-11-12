@@ -1,0 +1,161 @@
+{
+  "python": "3.13.18",
+  "template": "import pandas as pd\n\nminutes = pd.Series([12, 14, 13, 15, 14, 13, 16, 15, 14, 95, 13, 120])\nq1, q3 = minutes.quantile(0.25), minutes.quantile(0.75)\niqr = q3 - q1\nz = (minutes - minutes.mean()) / minutes.std()\nmad = (minutes - minutes.median()).abs().median()\nrobust_z = 0.6745 * (minutes - minutes.median()) / mad\nflagged = {{rule}}\nprint(minutes[flagged].tolist())",
+  "variants": [
+    {
+      "id": "iqr15",
+      "label": "IQR rule, k = 1.5",
+      "slots": {
+        "rule": "(minutes < q1 - 1.5 * iqr) | (minutes > q3 + 1.5 * iqr)"
+      },
+      "stdout": "[95, 120]\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "flagged",
+          "value": "[95, 120]",
+          "note": "2 of 12 values"
+        },
+        {
+          "label": "IQR fences",
+          "value": "9.625 to 18.625 (k = 1.5)",
+          "note": "Q1 = 13, Q3 = 15.25, IQR = 2.25"
+        },
+        {
+          "label": "z of 95 and 120",
+          "value": "1.78 and 2.46",
+          "note": "mean 29.50 and std 36.84 are inflated by the outliers themselves"
+        },
+        {
+          "label": "robust z of 95 and 120",
+          "value": "54.6 and 71.5",
+          "note": "median 14, MAD 1"
+        }
+      ]
+    },
+    {
+      "id": "iqr3",
+      "label": "IQR rule, k = 3",
+      "slots": {
+        "rule": "(minutes < q1 - 3 * iqr) | (minutes > q3 + 3 * iqr)"
+      },
+      "stdout": "[95, 120]\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "flagged",
+          "value": "[95, 120]",
+          "note": "2 of 12 values"
+        },
+        {
+          "label": "IQR fences",
+          "value": "9.625 to 18.625 (k = 1.5)",
+          "note": "Q1 = 13, Q3 = 15.25, IQR = 2.25"
+        },
+        {
+          "label": "z of 95 and 120",
+          "value": "1.78 and 2.46",
+          "note": "mean 29.50 and std 36.84 are inflated by the outliers themselves"
+        },
+        {
+          "label": "robust z of 95 and 120",
+          "value": "54.6 and 71.5",
+          "note": "median 14, MAD 1"
+        }
+      ]
+    },
+    {
+      "id": "z3",
+      "label": "z-score above 3",
+      "slots": {
+        "rule": "z.abs() > 3"
+      },
+      "stdout": "[]\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "flagged",
+          "value": "[]",
+          "note": "0 of 12 values"
+        },
+        {
+          "label": "IQR fences",
+          "value": "9.625 to 18.625 (k = 1.5)",
+          "note": "Q1 = 13, Q3 = 15.25, IQR = 2.25"
+        },
+        {
+          "label": "z of 95 and 120",
+          "value": "1.78 and 2.46",
+          "note": "mean 29.50 and std 36.84 are inflated by the outliers themselves"
+        },
+        {
+          "label": "robust z of 95 and 120",
+          "value": "54.6 and 71.5",
+          "note": "median 14, MAD 1"
+        }
+      ]
+    },
+    {
+      "id": "z2",
+      "label": "z-score above 2",
+      "slots": {
+        "rule": "z.abs() > 2"
+      },
+      "stdout": "[120]\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "flagged",
+          "value": "[120]",
+          "note": "1 of 12 values"
+        },
+        {
+          "label": "IQR fences",
+          "value": "9.625 to 18.625 (k = 1.5)",
+          "note": "Q1 = 13, Q3 = 15.25, IQR = 2.25"
+        },
+        {
+          "label": "z of 95 and 120",
+          "value": "1.78 and 2.46",
+          "note": "mean 29.50 and std 36.84 are inflated by the outliers themselves"
+        },
+        {
+          "label": "robust z of 95 and 120",
+          "value": "54.6 and 71.5",
+          "note": "median 14, MAD 1"
+        }
+      ]
+    },
+    {
+      "id": "robust",
+      "label": "robust z (median and MAD) above 3.5",
+      "slots": {
+        "rule": "robust_z.abs() > 3.5"
+      },
+      "stdout": "[95, 120]\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "flagged",
+          "value": "[95, 120]",
+          "note": "2 of 12 values"
+        },
+        {
+          "label": "IQR fences",
+          "value": "9.625 to 18.625 (k = 1.5)",
+          "note": "Q1 = 13, Q3 = 15.25, IQR = 2.25"
+        },
+        {
+          "label": "z of 95 and 120",
+          "value": "1.78 and 2.46",
+          "note": "mean 29.50 and std 36.84 are inflated by the outliers themselves"
+        },
+        {
+          "label": "robust z of 95 and 120",
+          "value": "54.6 and 71.5",
+          "note": "median 14, MAD 1"
+        }
+      ]
+    }
+  ]
+}
