@@ -60,7 +60,10 @@ export function recordedExperiment(
 
 /** One readout line per printed line, then the exception if the run raised one. */
 export function recordedReadout(r: RecordedVariant): ReadoutItem[] {
-  const lines = r.stdout.replace(/\n$/, '').split('\n').filter((l) => l !== '');
+  const lines = r.stdout
+    .replace(/\n$/, '')
+    .split('\n')
+    .filter((l) => l !== '');
   const items: ReadoutItem[] = lines.map((line, i) => ({ label: `printed line ${i + 1}`, value: line }));
   if (r.error) items.push({ label: 'raised', value: r.error, status: 'error' });
   if (items.length === 0) items.push({ label: 'printed', value: '(nothing)' });

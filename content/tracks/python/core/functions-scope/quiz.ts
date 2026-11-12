@@ -10,7 +10,8 @@ export const questions: QuizQuestion[] = [
       {
         text: '"kg"',
         correct: false,
-        explain: 'unit is not a parameter name, so "kg" goes into options as {"unit": "kg"}; it never touches fill.',
+        explain:
+          'unit is not a parameter name, so "kg" goes into options as {"unit": "kg"}; it never touches fill.',
       },
       {
         text: '0',
@@ -20,7 +21,8 @@ export const questions: QuizQuestion[] = [
       {
         text: 'None',
         correct: false,
-        explain: 'None is an item inside the values list. Items of a list are never spread into other parameters.',
+        explain:
+          'None is an item inside the values list. Items of a list are never spread into other parameters.',
       },
       {
         text: 'It raises TypeError',
@@ -37,12 +39,14 @@ export const questions: QuizQuestion[] = [
       {
         text: 'scale is keyword-only, so only 2 positional slots exist',
         correct: true,
-        explain: 'Parameters after the bare * accept only name=value. The third positional value has nowhere to go.',
+        explain:
+          'Parameters after the bare * accept only name=value. The third positional value has nowhere to go.',
       },
       {
         text: '10 is an int, and scale was declared as a float',
         correct: false,
-        explain: 'Defaults do not declare types; Python never checks that 10 matches 1.0. The message is about positions.',
+        explain:
+          'Defaults do not declare types; Python never checks that 10 matches 1.0. The message is about positions.',
       },
       {
         text: 'fill cannot be passed by position',
@@ -65,7 +69,8 @@ export const questions: QuizQuestion[] = [
       {
         text: '[2]',
         correct: false,
-        explain: 'That is what you would get if the default were created on every call, but it is created once.',
+        explain:
+          'That is what you would get if the default were created on every call, but it is created once.',
       },
       {
         text: '[2, 1]',
@@ -75,7 +80,8 @@ export const questions: QuizQuestion[] = [
       {
         text: '[1, 2]',
         correct: true,
-        explain: 'The default list is created once, when def runs, and every call that omits acc shares and mutates it.',
+        explain:
+          'The default list is created once, when def runs, and every call that omits acc shares and mutates it.',
       },
     ],
   },
@@ -88,12 +94,14 @@ export const questions: QuizQuestion[] = [
       {
         text: 'total becomes 5',
         correct: false,
-        explain: 'Only with `global total` inside the function. Without it, the assignment makes total local.',
+        explain:
+          'Only with `global total` inside the function. Without it, the assignment makes total local.',
       },
       {
         text: 'UnboundLocalError',
         correct: true,
-        explain: 'Because the body assigns total, total is local in the whole body; += reads it before it has a value.',
+        explain:
+          'Because the body assigns total, total is local in the whole body; += reads it before it has a value.',
       },
       {
         text: 'A new local total of 5',
@@ -103,19 +111,22 @@ export const questions: QuizQuestion[] = [
       {
         text: 'NameError: total is not defined',
         correct: false,
-        explain: 'Python knows total is a local name here; its error type is UnboundLocalError, a subclass of NameError with its own message.',
+        explain:
+          'Python knows total is a local name here; its error type is UnboundLocalError, a subclass of NameError with its own message.',
       },
     ],
   },
   {
     id: 'hints',
     type: 'choice',
-    prompt: 'A function is declared as `def mean(xs: list[float]) -> float`. What happens on `mean(["a", "b"])`?',
+    prompt:
+      'A function is declared as `def mean(xs: list[float]) -> float`. What happens on `mean(["a", "b"])`?',
     options: [
       {
         text: 'Python raises a TypeError before the body runs',
         correct: false,
-        explain: 'Python does not check type hints at run time. Any error comes from the body, for example from sum().',
+        explain:
+          'Python does not check type hints at run time. Any error comes from the body, for example from sum().',
       },
       {
         text: 'The hint converts the strings to floats',
@@ -125,7 +136,8 @@ export const questions: QuizQuestion[] = [
       {
         text: 'The body runs; a checker like mypy would flag the call',
         correct: true,
-        explain: 'Hints are documentation that tools can check before you run the code. At run time they are ignored.',
+        explain:
+          'Hints are documentation that tools can check before you run the code. At run time they are ignored.',
       },
     ],
   },

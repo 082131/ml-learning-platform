@@ -1,188 +1,188 @@
 {
- "python": "3.13.18",
- "template": "readings = [4, -1, 7, 0, 9]\ndata = {{expr}}\nfirst = sum(data)\nsecond = sum(data)\nprint(type(data).__name__, first, second)",
- "variants": [
-  {
-   "id": "list-comp",
-   "label": "list comprehension [...]",
-   "slots": {
-    "expr": "[r * 2 for r in readings if r > 0]"
-   },
-   "stdout": "list 40 40\n",
-   "error": null,
-   "cards": [
+  "python": "3.13.18",
+  "template": "readings = [4, -1, 7, 0, 9]\ndata = {{expr}}\nfirst = sum(data)\nsecond = sum(data)\nprint(type(data).__name__, first, second)",
+  "variants": [
     {
-     "label": "type(data)",
-     "value": "list",
-     "note": "can be looped over again"
+      "id": "list-comp",
+      "label": "list comprehension [...]",
+      "slots": {
+        "expr": "[r * 2 for r in readings if r > 0]"
+      },
+      "stdout": "list 40 40\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "type(data)",
+          "value": "list",
+          "note": "can be looped over again"
+        },
+        {
+          "label": "first sum(data)",
+          "value": "40",
+          "note": "the first pass"
+        },
+        {
+          "label": "second sum(data)",
+          "value": "40",
+          "note": "same as the first"
+        }
+      ]
     },
     {
-     "label": "first sum(data)",
-     "value": "40",
-     "note": "the first pass"
+      "id": "gen-expr",
+      "label": "generator expression (...)",
+      "slots": {
+        "expr": "(r * 2 for r in readings if r > 0)"
+      },
+      "stdout": "generator 40 0\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "type(data)",
+          "value": "generator",
+          "note": "an iterator: one pass only"
+        },
+        {
+          "label": "first sum(data)",
+          "value": "40",
+          "note": "the first pass"
+        },
+        {
+          "label": "second sum(data)",
+          "value": "0",
+          "note": "nothing was left to add"
+        }
+      ]
     },
     {
-     "label": "second sum(data)",
-     "value": "40",
-     "note": "same as the first"
+      "id": "set-comp",
+      "label": "set comprehension {...}",
+      "slots": {
+        "expr": "{r % 2 for r in readings}"
+      },
+      "stdout": "set 1 1\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "type(data)",
+          "value": "set",
+          "note": "can be looped over again"
+        },
+        {
+          "label": "first sum(data)",
+          "value": "1",
+          "note": "the first pass"
+        },
+        {
+          "label": "second sum(data)",
+          "value": "1",
+          "note": "same as the first"
+        }
+      ]
+    },
+    {
+      "id": "map",
+      "label": "map(abs, readings)",
+      "slots": {
+        "expr": "map(abs, readings)"
+      },
+      "stdout": "map 21 0\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "type(data)",
+          "value": "map",
+          "note": "an iterator: one pass only"
+        },
+        {
+          "label": "first sum(data)",
+          "value": "21",
+          "note": "the first pass"
+        },
+        {
+          "label": "second sum(data)",
+          "value": "0",
+          "note": "nothing was left to add"
+        }
+      ]
+    },
+    {
+      "id": "iter",
+      "label": "iter(readings)",
+      "slots": {
+        "expr": "iter(readings)"
+      },
+      "stdout": "list_iterator 19 0\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "type(data)",
+          "value": "list_iterator",
+          "note": "an iterator: one pass only"
+        },
+        {
+          "label": "first sum(data)",
+          "value": "19",
+          "note": "the first pass"
+        },
+        {
+          "label": "second sum(data)",
+          "value": "0",
+          "note": "nothing was left to add"
+        }
+      ]
+    },
+    {
+      "id": "range",
+      "label": "range(5)",
+      "slots": {
+        "expr": "range(5)"
+      },
+      "stdout": "range 10 10\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "type(data)",
+          "value": "range",
+          "note": "can be looped over again"
+        },
+        {
+          "label": "first sum(data)",
+          "value": "10",
+          "note": "the first pass"
+        },
+        {
+          "label": "second sum(data)",
+          "value": "10",
+          "note": "same as the first"
+        }
+      ]
+    },
+    {
+      "id": "dict-comp",
+      "label": "dict comprehension {k: v}",
+      "slots": {
+        "expr": "{i: r for i, r in enumerate(readings)}"
+      },
+      "stdout": "dict 10 10\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "type(data)",
+          "value": "dict",
+          "note": "can be looped over again"
+        },
+        {
+          "label": "first sum(data)",
+          "value": "10",
+          "note": "the first pass"
+        },
+        {
+          "label": "second sum(data)",
+          "value": "10",
+          "note": "same as the first"
+        }
+      ]
     }
-   ]
-  },
-  {
-   "id": "gen-expr",
-   "label": "generator expression (...)",
-   "slots": {
-    "expr": "(r * 2 for r in readings if r > 0)"
-   },
-   "stdout": "generator 40 0\n",
-   "error": null,
-   "cards": [
-    {
-     "label": "type(data)",
-     "value": "generator",
-     "note": "an iterator: one pass only"
-    },
-    {
-     "label": "first sum(data)",
-     "value": "40",
-     "note": "the first pass"
-    },
-    {
-     "label": "second sum(data)",
-     "value": "0",
-     "note": "nothing was left to add"
-    }
-   ]
-  },
-  {
-   "id": "set-comp",
-   "label": "set comprehension {...}",
-   "slots": {
-    "expr": "{r % 2 for r in readings}"
-   },
-   "stdout": "set 1 1\n",
-   "error": null,
-   "cards": [
-    {
-     "label": "type(data)",
-     "value": "set",
-     "note": "can be looped over again"
-    },
-    {
-     "label": "first sum(data)",
-     "value": "1",
-     "note": "the first pass"
-    },
-    {
-     "label": "second sum(data)",
-     "value": "1",
-     "note": "same as the first"
-    }
-   ]
-  },
-  {
-   "id": "map",
-   "label": "map(abs, readings)",
-   "slots": {
-    "expr": "map(abs, readings)"
-   },
-   "stdout": "map 21 0\n",
-   "error": null,
-   "cards": [
-    {
-     "label": "type(data)",
-     "value": "map",
-     "note": "an iterator: one pass only"
-    },
-    {
-     "label": "first sum(data)",
-     "value": "21",
-     "note": "the first pass"
-    },
-    {
-     "label": "second sum(data)",
-     "value": "0",
-     "note": "nothing was left to add"
-    }
-   ]
-  },
-  {
-   "id": "iter",
-   "label": "iter(readings)",
-   "slots": {
-    "expr": "iter(readings)"
-   },
-   "stdout": "list_iterator 19 0\n",
-   "error": null,
-   "cards": [
-    {
-     "label": "type(data)",
-     "value": "list_iterator",
-     "note": "an iterator: one pass only"
-    },
-    {
-     "label": "first sum(data)",
-     "value": "19",
-     "note": "the first pass"
-    },
-    {
-     "label": "second sum(data)",
-     "value": "0",
-     "note": "nothing was left to add"
-    }
-   ]
-  },
-  {
-   "id": "range",
-   "label": "range(5)",
-   "slots": {
-    "expr": "range(5)"
-   },
-   "stdout": "range 10 10\n",
-   "error": null,
-   "cards": [
-    {
-     "label": "type(data)",
-     "value": "range",
-     "note": "can be looped over again"
-    },
-    {
-     "label": "first sum(data)",
-     "value": "10",
-     "note": "the first pass"
-    },
-    {
-     "label": "second sum(data)",
-     "value": "10",
-     "note": "same as the first"
-    }
-   ]
-  },
-  {
-   "id": "dict-comp",
-   "label": "dict comprehension {k: v}",
-   "slots": {
-    "expr": "{i: r for i, r in enumerate(readings)}"
-   },
-   "stdout": "dict 10 10\n",
-   "error": null,
-   "cards": [
-    {
-     "label": "type(data)",
-     "value": "dict",
-     "note": "can be looped over again"
-    },
-    {
-     "label": "first sum(data)",
-     "value": "10",
-     "note": "the first pass"
-    },
-    {
-     "label": "second sum(data)",
-     "value": "10",
-     "note": "same as the first"
-    }
-   ]
-  }
- ]
+  ]
 }

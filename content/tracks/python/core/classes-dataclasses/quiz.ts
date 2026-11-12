@@ -6,20 +6,52 @@ export const questions: QuizQuestion[] = [
     type: 'choice',
     prompt: 'In `kitchen.mean()`, what is `self` inside `mean`?',
     options: [
-      { text: 'The Readings class', correct: false, explain: 'self is the instance. The class is type(self), or Readings itself.' },
-      { text: 'The kitchen object', correct: true, explain: 'kitchen.mean() is shorthand for Readings.mean(kitchen); the instance is passed as the first argument.' },
-      { text: 'A copy of kitchen', correct: false, explain: 'Nothing is copied: self is another name for the same object, so changes through self are visible on kitchen.' },
-      { text: 'Nothing; mean has no arguments', correct: false, explain: 'Methods receive the instance automatically as their first parameter, by convention named self.' },
+      {
+        text: 'The Readings class',
+        correct: false,
+        explain: 'self is the instance. The class is type(self), or Readings itself.',
+      },
+      {
+        text: 'The kitchen object',
+        correct: true,
+        explain:
+          'kitchen.mean() is shorthand for Readings.mean(kitchen); the instance is passed as the first argument.',
+      },
+      {
+        text: 'A copy of kitchen',
+        correct: false,
+        explain:
+          'Nothing is copied: self is another name for the same object, so changes through self are visible on kitchen.',
+      },
+      {
+        text: 'Nothing; mean has no arguments',
+        correct: false,
+        explain:
+          'Methods receive the instance automatically as their first parameter, by convention named self.',
+      },
     ],
   },
   {
     id: 'for-getitem',
     type: 'choice',
-    prompt: 'A class defines only `__getitem__` (returning `self.values[i]`), no `__iter__`. What does `for v in obj:` do?',
+    prompt:
+      'A class defines only `__getitem__` (returning `self.values[i]`), no `__iter__`. What does `for v in obj:` do?',
     options: [
-      { text: 'TypeError: object is not iterable', correct: false, explain: 'Python falls back to the old sequence protocol when __getitem__ exists.' },
-      { text: 'Calls obj[0], obj[1], … until IndexError', correct: true, explain: 'That fallback is why a list-backed __getitem__ makes the object loopable.' },
-      { text: 'Loops forever', correct: false, explain: 'Only if __getitem__ never raises IndexError. Indexing a list past its end does raise it.' },
+      {
+        text: 'TypeError: object is not iterable',
+        correct: false,
+        explain: 'Python falls back to the old sequence protocol when __getitem__ exists.',
+      },
+      {
+        text: 'Calls obj[0], obj[1], … until IndexError',
+        correct: true,
+        explain: 'That fallback is why a list-backed __getitem__ makes the object loopable.',
+      },
+      {
+        text: 'Loops forever',
+        correct: false,
+        explain: 'Only if __getitem__ never raises IndexError. Indexing a list past its end does raise it.',
+      },
     ],
   },
   {
@@ -27,9 +59,22 @@ export const questions: QuizQuestion[] = [
     type: 'choice',
     prompt: 'With `@dataclass class P: x: int`, what is `P(1) == P(1)`?',
     options: [
-      { text: 'False', correct: false, explain: 'That is the default for a plain class (it compares identity), but @dataclass writes an __eq__ that compares fields.' },
-      { text: 'True', correct: true, explain: 'The generated __eq__ compares the fields in order, and both have x == 1.' },
-      { text: 'TypeError', correct: false, explain: 'Comparing two instances of the same dataclass is always allowed.' },
+      {
+        text: 'False',
+        correct: false,
+        explain:
+          'That is the default for a plain class (it compares identity), but @dataclass writes an __eq__ that compares fields.',
+      },
+      {
+        text: 'True',
+        correct: true,
+        explain: 'The generated __eq__ compares the fields in order, and both have x == 1.',
+      },
+      {
+        text: 'TypeError',
+        correct: false,
+        explain: 'Comparing two instances of the same dataclass is always allowed.',
+      },
     ],
   },
   {
@@ -37,20 +82,51 @@ export const questions: QuizQuestion[] = [
     type: 'choice',
     prompt: 'Why does `@dataclass class C: items: list = []` fail when the class is defined?',
     options: [
-      { text: 'Fields cannot have type list', correct: false, explain: 'list fields are fine; the problem is the shared default object.' },
-      { text: 'A mutable default would be shared by every instance', correct: true, explain: 'The dataclass decorator refuses it with ValueError and tells you to use field(default_factory=list).' },
-      { text: 'Defaults must come before fields without defaults', correct: false, explain: 'That is a different rule. Here there is only one field.' },
-      { text: 'Class bodies cannot contain assignments', correct: false, explain: 'Class bodies can assign; that is how class attributes and defaults are written.' },
+      {
+        text: 'Fields cannot have type list',
+        correct: false,
+        explain: 'list fields are fine; the problem is the shared default object.',
+      },
+      {
+        text: 'A mutable default would be shared by every instance',
+        correct: true,
+        explain:
+          'The dataclass decorator refuses it with ValueError and tells you to use field(default_factory=list).',
+      },
+      {
+        text: 'Defaults must come before fields without defaults',
+        correct: false,
+        explain: 'That is a different rule. Here there is only one field.',
+      },
+      {
+        text: 'Class bodies cannot contain assignments',
+        correct: false,
+        explain: 'Class bodies can assign; that is how class attributes and defaults are written.',
+      },
     ],
   },
   {
     id: 'torch-protocol',
     type: 'choice',
-    prompt: 'What must a map-style `torch.utils.data.Dataset` subclass implement for a DataLoader to batch it?',
+    prompt:
+      'What must a map-style `torch.utils.data.Dataset` subclass implement for a DataLoader to batch it?',
     options: [
-      { text: '__iter__ and __next__', correct: false, explain: 'Those make an iterable-style dataset. A map-style dataset is indexed.' },
-      { text: '__len__ and __getitem__', correct: true, explain: 'The DataLoader asks for len(ds) to build indices, then calls ds[i] for each index in a batch.' },
-      { text: 'forward and backward', correct: false, explain: 'Those belong to models and autograd, not datasets.' },
+      {
+        text: '__iter__ and __next__',
+        correct: false,
+        explain: 'Those make an iterable-style dataset. A map-style dataset is indexed.',
+      },
+      {
+        text: '__len__ and __getitem__',
+        correct: true,
+        explain:
+          'The DataLoader asks for len(ds) to build indices, then calls ds[i] for each index in a batch.',
+      },
+      {
+        text: 'forward and backward',
+        correct: false,
+        explain: 'Those belong to models and autograd, not datasets.',
+      },
     ],
   },
 ];

@@ -9,12 +9,14 @@ export const questions: QuizQuestion[] = [
       {
         text: '[1, 2]',
         correct: false,
-        explain: 'That would be true for b = b + [3], which builds a new list. += on a list extends it in place.',
+        explain:
+          'That would be true for b = b + [3], which builds a new list. += on a list extends it in place.',
       },
       {
         text: '[1, 2, 3]',
         correct: true,
-        explain: 'list += is in place (it calls extend), and a and b name the same list, so a sees the change.',
+        explain:
+          'list += is in place (it calls extend), and a and b name the same list, so a sees the change.',
       },
       {
         text: '[1, 2, [3]]',
@@ -41,7 +43,8 @@ export const questions: QuizQuestion[] = [
       {
         text: '[[0, 9], [1]]',
         correct: true,
-        explain: 'A shallow copy shares its items. Appending through b[0] changes the inner list a[0] also names.',
+        explain:
+          'A shallow copy shares its items. Appending through b[0] changes the inner list a[0] also names.',
       },
       {
         text: '[[0], [1], 9]',
@@ -63,7 +66,8 @@ export const questions: QuizQuestion[] = [
       {
         text: 'It is unchanged',
         correct: true,
-        explain: 'xs = [0] makes the local name point at a new list. Only in-place changes such as xs[0] = 0 reach data.',
+        explain:
+          'xs = [0] makes the local name point at a new list. Only in-place changes such as xs[0] = 0 reach data.',
       },
       {
         text: 'It is emptied',
@@ -130,7 +134,8 @@ export const questions: QuizQuestion[] = [
 
 export const scaleExercise: Exercise = {
   id: 'py-aliasing-scaled',
-  prompt: 'Write scaled(rows, factor) that returns a scaled copy of a list of lists and leaves rows unchanged.',
+  prompt:
+    'Write scaled(rows, factor) that returns a scaled copy of a list of lists and leaves rows unchanged.',
   starter: `def scaled(rows, factor):
     out = rows.copy()
     for row in out:

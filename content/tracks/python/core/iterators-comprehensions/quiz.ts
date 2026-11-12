@@ -6,10 +6,27 @@ export const questions: QuizQuestion[] = [
     type: 'choice',
     prompt: '`g = (x * x for x in [1, 2, 3])`. What does `print(sum(g), sum(g))` print?',
     options: [
-      { text: '14 14', correct: false, explain: 'A list would give 14 twice; a generator is used up by the first sum.' },
-      { text: '14 0', correct: true, explain: 'The first sum consumes every value. The second finds nothing and returns 0, the sum of no numbers.' },
-      { text: '14, then StopIteration', correct: false, explain: 'sum catches the end of the iterator itself, so no exception reaches you.' },
-      { text: '0 14', correct: false, explain: 'Generators produce values on the first request; nothing is delayed until a second pass.' },
+      {
+        text: '14 14',
+        correct: false,
+        explain: 'A list would give 14 twice; a generator is used up by the first sum.',
+      },
+      {
+        text: '14 0',
+        correct: true,
+        explain:
+          'The first sum consumes every value. The second finds nothing and returns 0, the sum of no numbers.',
+      },
+      {
+        text: '14, then StopIteration',
+        correct: false,
+        explain: 'sum catches the end of the iterator itself, so no exception reaches you.',
+      },
+      {
+        text: '0 14',
+        correct: false,
+        explain: 'Generators produce values on the first request; nothing is delayed until a second pass.',
+      },
     ],
   },
   {
@@ -17,20 +34,50 @@ export const questions: QuizQuestion[] = [
     type: 'choice',
     prompt: 'Which comprehension gives the squares of the **even** numbers in `xs`?',
     options: [
-      { text: '[x * x if x % 2 == 0 for x in xs]', correct: false, explain: 'A trailing if after the for filters; an if before for needs an else and is a SyntaxError without one.' },
-      { text: '[x * x for x in xs if x % 2]', correct: false, explain: 'x % 2 is 1 (truthy) for odd numbers, so this keeps the odd ones.' },
-      { text: '[x * x for x in xs if x % 2 == 0]', correct: true, explain: 'The expression comes first, then the loop, then the filter.' },
+      {
+        text: '[x * x if x % 2 == 0 for x in xs]',
+        correct: false,
+        explain:
+          'A trailing if after the for filters; an if before for needs an else and is a SyntaxError without one.',
+      },
+      {
+        text: '[x * x for x in xs if x % 2]',
+        correct: false,
+        explain: 'x % 2 is 1 (truthy) for odd numbers, so this keeps the odd ones.',
+      },
+      {
+        text: '[x * x for x in xs if x % 2 == 0]',
+        correct: true,
+        explain: 'The expression comes first, then the loop, then the filter.',
+      },
     ],
   },
   {
     id: 'lazy',
     type: 'choice',
-    prompt: 'A generator function `parse(path)` opens a 50 GB file and yields one row at a time. What does `rows = parse("big.csv")` do?',
+    prompt:
+      'A generator function `parse(path)` opens a 50 GB file and yields one row at a time. What does `rows = parse("big.csv")` do?',
     options: [
-      { text: 'Reads the whole file into memory', correct: false, explain: 'Calling a generator function runs none of its body.' },
-      { text: 'Reads the first row only', correct: false, explain: 'Not even that: the body starts on the first next() call.' },
-      { text: 'Creates a generator; no line is read yet', correct: true, explain: 'Work happens only as values are requested, one row at a time.' },
-      { text: 'Raises an error because the file is too big', correct: false, explain: 'Streaming exists precisely so file size does not matter.' },
+      {
+        text: 'Reads the whole file into memory',
+        correct: false,
+        explain: 'Calling a generator function runs none of its body.',
+      },
+      {
+        text: 'Reads the first row only',
+        correct: false,
+        explain: 'Not even that: the body starts on the first next() call.',
+      },
+      {
+        text: 'Creates a generator; no line is read yet',
+        correct: true,
+        explain: 'Work happens only as values are requested, one row at a time.',
+      },
+      {
+        text: 'Raises an error because the file is too big',
+        correct: false,
+        explain: 'Streaming exists precisely so file size does not matter.',
+      },
     ],
   },
   {
@@ -38,9 +85,22 @@ export const questions: QuizQuestion[] = [
     type: 'choice',
     prompt: 'What is `list(zip([1, 2, 3], ["a", "b"]))`?',
     options: [
-      { text: "[(1, 'a'), (2, 'b'), (3, None)]", correct: false, explain: 'zip does not pad. itertools.zip_longest fills with None.' },
-      { text: "[(1, 'a'), (2, 'b')]", correct: true, explain: 'zip stops at the shortest input. Use zip(..., strict=True) to raise an error on a length mismatch instead.' },
-      { text: 'ValueError: lengths differ', correct: false, explain: 'Only with strict=True. By default the extra item is silently dropped.' },
+      {
+        text: "[(1, 'a'), (2, 'b'), (3, None)]",
+        correct: false,
+        explain: 'zip does not pad. itertools.zip_longest fills with None.',
+      },
+      {
+        text: "[(1, 'a'), (2, 'b')]",
+        correct: true,
+        explain:
+          'zip stops at the shortest input. Use zip(..., strict=True) to raise an error on a length mismatch instead.',
+      },
+      {
+        text: 'ValueError: lengths differ',
+        correct: false,
+        explain: 'Only with strict=True. By default the extra item is silently dropped.',
+      },
     ],
   },
   {

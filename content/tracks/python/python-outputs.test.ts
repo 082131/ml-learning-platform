@@ -44,7 +44,8 @@ function run(python: string, code: string): { out: string; ok: boolean } {
   }
 }
 const canRunHere = (code: string) =>
-  !uses(code, 'torch') && ['numpy', 'pandas', 'matplotlib', 'scipy'].every((m) => !uses(code, m) || hasModule(m));
+  !uses(code, 'torch') &&
+  ['numpy', 'pandas', 'matplotlib', 'scipy'].every((m) => !uses(code, m) || hasModule(m));
 
 describe.skipIf(!hasPython)('Python course examples', () => {
   it('found the examples and exercises', () => {
@@ -65,11 +66,14 @@ describe.skipIf(!hasPython)('Python course examples', () => {
   }
 
   for (const ex of exercises)
-    it.skipIf(!canRunHere(ex.solution + (ex.tests ?? '')))(`${ex.id}: the solution passes and the starter fails`, () => {
-      const solved = run('python3', `${ex.solution}\n${ex.tests}`);
-      expect(solved.ok, solved.out).toBe(true);
-      expect(run('python3', `${ex.starter ?? ''}\n${ex.tests}`).ok).toBe(false);
-    });
+    it.skipIf(!canRunHere(ex.solution + (ex.tests ?? '')))(
+      `${ex.id}: the solution passes and the starter fails`,
+      () => {
+        const solved = run('python3', `${ex.solution}\n${ex.tests}`);
+        expect(solved.ok, solved.out).toBe(true);
+        expect(run('python3', `${ex.starter ?? ''}\n${ex.tests}`).ok).toBe(false);
+      },
+    );
 
   const fixtureDir = path.resolve('src/lib/pycourse/fixtures');
   const scripts = readdirSync(fixtureDir).filter((f) => f.endsWith('.py') && !f.startsWith('_'));

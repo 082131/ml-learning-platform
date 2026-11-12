@@ -1,235 +1,235 @@
 {
- "python": "3.13.18",
- "template": "import copy\n\nrow = [0, 0]\na = [row, [5, 6]]\nb = {{setup}}\n{{change}}\nprint(\"a =\", a)\nprint(\"b =\", b)\nprint(a is b, a[0] is b[0])",
- "variants": [
-  {
-   "id": "alias-mutate",
-   "label": "b = a, then b[0].append(1)",
-   "slots": {
-    "setup": "a",
-    "change": "b[0].append(1)"
-   },
-   "stdout": "a = [[0, 0, 1], [5, 6]]\nb = [[0, 0, 1], [5, 6]]\nTrue True\n",
-   "error": null,
-   "cards": [
+  "python": "3.13.18",
+  "template": "import copy\n\nrow = [0, 0]\na = [row, [5, 6]]\nb = {{setup}}\n{{change}}\nprint(\"a =\", a)\nprint(\"b =\", b)\nprint(a is b, a[0] is b[0])",
+  "variants": [
     {
-     "label": "a = b",
-     "value": "[[0, 0, 1], [5, 6]]",
-     "note": "list object #1, shared by a, b"
+      "id": "alias-mutate",
+      "label": "b = a, then b[0].append(1)",
+      "slots": {
+        "setup": "a",
+        "change": "b[0].append(1)"
+      },
+      "stdout": "a = [[0, 0, 1], [5, 6]]\nb = [[0, 0, 1], [5, 6]]\nTrue True\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "a = b",
+          "value": "[[0, 0, 1], [5, 6]]",
+          "note": "list object #1, shared by a, b"
+        },
+        {
+          "label": "row = a[0] = b[0]",
+          "value": "[0, 0, 1]",
+          "note": "list object #2, shared by row, a[0], b[0]"
+        },
+        {
+          "label": "a[1] = b[1]",
+          "value": "[5, 6]",
+          "note": "list object #3, shared by a[1], b[1]"
+        }
+      ]
     },
     {
-     "label": "row = a[0] = b[0]",
-     "value": "[0, 0, 1]",
-     "note": "list object #2, shared by row, a[0], b[0]"
+      "id": "alias-rebind",
+      "label": "b = a, then b = [[99]]",
+      "slots": {
+        "setup": "a",
+        "change": "b = [[99]]"
+      },
+      "stdout": "a = [[0, 0], [5, 6]]\nb = [[99]]\nFalse False\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "a",
+          "value": "[[0, 0], [5, 6]]",
+          "note": "list object #1, only a"
+        },
+        {
+          "label": "b",
+          "value": "[[99]]",
+          "note": "list object #2, only b"
+        },
+        {
+          "label": "row = a[0]",
+          "value": "[0, 0]",
+          "note": "list object #3, shared by row, a[0]"
+        },
+        {
+          "label": "a[1]",
+          "value": "[5, 6]",
+          "note": "list object #4, only a[1]"
+        },
+        {
+          "label": "b[0]",
+          "value": "[99]",
+          "note": "list object #5, only b[0]"
+        }
+      ]
     },
     {
-     "label": "a[1] = b[1]",
-     "value": "[5, 6]",
-     "note": "list object #3, shared by a[1], b[1]"
+      "id": "alias-plus",
+      "label": "b = a, then b = b + [[7]]",
+      "slots": {
+        "setup": "a",
+        "change": "b = b + [[7]]"
+      },
+      "stdout": "a = [[0, 0], [5, 6]]\nb = [[0, 0], [5, 6], [7]]\nFalse True\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "a",
+          "value": "[[0, 0], [5, 6]]",
+          "note": "list object #1, only a"
+        },
+        {
+          "label": "b",
+          "value": "[[0, 0], [5, 6], [7]]",
+          "note": "list object #2, only b"
+        },
+        {
+          "label": "row = a[0] = b[0]",
+          "value": "[0, 0]",
+          "note": "list object #3, shared by row, a[0], b[0]"
+        },
+        {
+          "label": "a[1] = b[1]",
+          "value": "[5, 6]",
+          "note": "list object #4, shared by a[1], b[1]"
+        }
+      ]
+    },
+    {
+      "id": "alias-iadd",
+      "label": "b = a, then b += [[7]]",
+      "slots": {
+        "setup": "a",
+        "change": "b += [[7]]"
+      },
+      "stdout": "a = [[0, 0], [5, 6], [7]]\nb = [[0, 0], [5, 6], [7]]\nTrue True\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "a = b",
+          "value": "[[0, 0], [5, 6], [7]]",
+          "note": "list object #1, shared by a, b"
+        },
+        {
+          "label": "row = a[0] = b[0]",
+          "value": "[0, 0]",
+          "note": "list object #2, shared by row, a[0], b[0]"
+        },
+        {
+          "label": "a[1] = b[1]",
+          "value": "[5, 6]",
+          "note": "list object #3, shared by a[1], b[1]"
+        }
+      ]
+    },
+    {
+      "id": "shallow-outer",
+      "label": "b = a.copy(), then b.append([7])",
+      "slots": {
+        "setup": "a.copy()",
+        "change": "b.append([7])"
+      },
+      "stdout": "a = [[0, 0], [5, 6]]\nb = [[0, 0], [5, 6], [7]]\nFalse True\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "a",
+          "value": "[[0, 0], [5, 6]]",
+          "note": "list object #1, only a"
+        },
+        {
+          "label": "b",
+          "value": "[[0, 0], [5, 6], [7]]",
+          "note": "list object #2, only b"
+        },
+        {
+          "label": "row = a[0] = b[0]",
+          "value": "[0, 0]",
+          "note": "list object #3, shared by row, a[0], b[0]"
+        },
+        {
+          "label": "a[1] = b[1]",
+          "value": "[5, 6]",
+          "note": "list object #4, shared by a[1], b[1]"
+        }
+      ]
+    },
+    {
+      "id": "shallow-inner",
+      "label": "b = a.copy(), then b[0].append(1)",
+      "slots": {
+        "setup": "a.copy()",
+        "change": "b[0].append(1)"
+      },
+      "stdout": "a = [[0, 0, 1], [5, 6]]\nb = [[0, 0, 1], [5, 6]]\nFalse True\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "a",
+          "value": "[[0, 0, 1], [5, 6]]",
+          "note": "list object #1, only a"
+        },
+        {
+          "label": "b",
+          "value": "[[0, 0, 1], [5, 6]]",
+          "note": "list object #2, only b"
+        },
+        {
+          "label": "row = a[0] = b[0]",
+          "value": "[0, 0, 1]",
+          "note": "list object #3, shared by row, a[0], b[0]"
+        },
+        {
+          "label": "a[1] = b[1]",
+          "value": "[5, 6]",
+          "note": "list object #4, shared by a[1], b[1]"
+        }
+      ]
+    },
+    {
+      "id": "deep-inner",
+      "label": "b = copy.deepcopy(a), then b[0].append(1)",
+      "slots": {
+        "setup": "copy.deepcopy(a)",
+        "change": "b[0].append(1)"
+      },
+      "stdout": "a = [[0, 0], [5, 6]]\nb = [[0, 0, 1], [5, 6]]\nFalse False\n",
+      "error": null,
+      "cards": [
+        {
+          "label": "a",
+          "value": "[[0, 0], [5, 6]]",
+          "note": "list object #1, only a"
+        },
+        {
+          "label": "b",
+          "value": "[[0, 0, 1], [5, 6]]",
+          "note": "list object #2, only b"
+        },
+        {
+          "label": "row = a[0]",
+          "value": "[0, 0]",
+          "note": "list object #3, shared by row, a[0]"
+        },
+        {
+          "label": "a[1]",
+          "value": "[5, 6]",
+          "note": "list object #4, only a[1]"
+        },
+        {
+          "label": "b[0]",
+          "value": "[0, 0, 1]",
+          "note": "list object #5, only b[0]"
+        },
+        {
+          "label": "b[1]",
+          "value": "[5, 6]",
+          "note": "list object #6, only b[1]"
+        }
+      ]
     }
-   ]
-  },
-  {
-   "id": "alias-rebind",
-   "label": "b = a, then b = [[99]]",
-   "slots": {
-    "setup": "a",
-    "change": "b = [[99]]"
-   },
-   "stdout": "a = [[0, 0], [5, 6]]\nb = [[99]]\nFalse False\n",
-   "error": null,
-   "cards": [
-    {
-     "label": "a",
-     "value": "[[0, 0], [5, 6]]",
-     "note": "list object #1, only a"
-    },
-    {
-     "label": "b",
-     "value": "[[99]]",
-     "note": "list object #2, only b"
-    },
-    {
-     "label": "row = a[0]",
-     "value": "[0, 0]",
-     "note": "list object #3, shared by row, a[0]"
-    },
-    {
-     "label": "a[1]",
-     "value": "[5, 6]",
-     "note": "list object #4, only a[1]"
-    },
-    {
-     "label": "b[0]",
-     "value": "[99]",
-     "note": "list object #5, only b[0]"
-    }
-   ]
-  },
-  {
-   "id": "alias-plus",
-   "label": "b = a, then b = b + [[7]]",
-   "slots": {
-    "setup": "a",
-    "change": "b = b + [[7]]"
-   },
-   "stdout": "a = [[0, 0], [5, 6]]\nb = [[0, 0], [5, 6], [7]]\nFalse True\n",
-   "error": null,
-   "cards": [
-    {
-     "label": "a",
-     "value": "[[0, 0], [5, 6]]",
-     "note": "list object #1, only a"
-    },
-    {
-     "label": "b",
-     "value": "[[0, 0], [5, 6], [7]]",
-     "note": "list object #2, only b"
-    },
-    {
-     "label": "row = a[0] = b[0]",
-     "value": "[0, 0]",
-     "note": "list object #3, shared by row, a[0], b[0]"
-    },
-    {
-     "label": "a[1] = b[1]",
-     "value": "[5, 6]",
-     "note": "list object #4, shared by a[1], b[1]"
-    }
-   ]
-  },
-  {
-   "id": "alias-iadd",
-   "label": "b = a, then b += [[7]]",
-   "slots": {
-    "setup": "a",
-    "change": "b += [[7]]"
-   },
-   "stdout": "a = [[0, 0], [5, 6], [7]]\nb = [[0, 0], [5, 6], [7]]\nTrue True\n",
-   "error": null,
-   "cards": [
-    {
-     "label": "a = b",
-     "value": "[[0, 0], [5, 6], [7]]",
-     "note": "list object #1, shared by a, b"
-    },
-    {
-     "label": "row = a[0] = b[0]",
-     "value": "[0, 0]",
-     "note": "list object #2, shared by row, a[0], b[0]"
-    },
-    {
-     "label": "a[1] = b[1]",
-     "value": "[5, 6]",
-     "note": "list object #3, shared by a[1], b[1]"
-    }
-   ]
-  },
-  {
-   "id": "shallow-outer",
-   "label": "b = a.copy(), then b.append([7])",
-   "slots": {
-    "setup": "a.copy()",
-    "change": "b.append([7])"
-   },
-   "stdout": "a = [[0, 0], [5, 6]]\nb = [[0, 0], [5, 6], [7]]\nFalse True\n",
-   "error": null,
-   "cards": [
-    {
-     "label": "a",
-     "value": "[[0, 0], [5, 6]]",
-     "note": "list object #1, only a"
-    },
-    {
-     "label": "b",
-     "value": "[[0, 0], [5, 6], [7]]",
-     "note": "list object #2, only b"
-    },
-    {
-     "label": "row = a[0] = b[0]",
-     "value": "[0, 0]",
-     "note": "list object #3, shared by row, a[0], b[0]"
-    },
-    {
-     "label": "a[1] = b[1]",
-     "value": "[5, 6]",
-     "note": "list object #4, shared by a[1], b[1]"
-    }
-   ]
-  },
-  {
-   "id": "shallow-inner",
-   "label": "b = a.copy(), then b[0].append(1)",
-   "slots": {
-    "setup": "a.copy()",
-    "change": "b[0].append(1)"
-   },
-   "stdout": "a = [[0, 0, 1], [5, 6]]\nb = [[0, 0, 1], [5, 6]]\nFalse True\n",
-   "error": null,
-   "cards": [
-    {
-     "label": "a",
-     "value": "[[0, 0, 1], [5, 6]]",
-     "note": "list object #1, only a"
-    },
-    {
-     "label": "b",
-     "value": "[[0, 0, 1], [5, 6]]",
-     "note": "list object #2, only b"
-    },
-    {
-     "label": "row = a[0] = b[0]",
-     "value": "[0, 0, 1]",
-     "note": "list object #3, shared by row, a[0], b[0]"
-    },
-    {
-     "label": "a[1] = b[1]",
-     "value": "[5, 6]",
-     "note": "list object #4, shared by a[1], b[1]"
-    }
-   ]
-  },
-  {
-   "id": "deep-inner",
-   "label": "b = copy.deepcopy(a), then b[0].append(1)",
-   "slots": {
-    "setup": "copy.deepcopy(a)",
-    "change": "b[0].append(1)"
-   },
-   "stdout": "a = [[0, 0], [5, 6]]\nb = [[0, 0, 1], [5, 6]]\nFalse False\n",
-   "error": null,
-   "cards": [
-    {
-     "label": "a",
-     "value": "[[0, 0], [5, 6]]",
-     "note": "list object #1, only a"
-    },
-    {
-     "label": "b",
-     "value": "[[0, 0, 1], [5, 6]]",
-     "note": "list object #2, only b"
-    },
-    {
-     "label": "row = a[0]",
-     "value": "[0, 0]",
-     "note": "list object #3, shared by row, a[0]"
-    },
-    {
-     "label": "a[1]",
-     "value": "[5, 6]",
-     "note": "list object #4, only a[1]"
-    },
-    {
-     "label": "b[0]",
-     "value": "[0, 0, 1]",
-     "note": "list object #5, only b[0]"
-    },
-    {
-     "label": "b[1]",
-     "value": "[5, 6]",
-     "note": "list object #6, only b[1]"
-    }
-   ]
-  }
- ]
+  ]
 }
