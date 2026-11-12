@@ -1,0 +1,151 @@
+import { countdownProgram, experiment, iterCode, streamRunner, toolsRunner } from './code';
+import { batchesExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Ask for the next value">
+
+A `for` loop does not need a list. It needs something that can answer one question over and over: "what is the
+next value?" Lists answer it, but so do files (the next line), database cursors (the next row) and PyTorch
+DataLoaders (the next batch).
+
+Python has two tools built on that question. **Comprehensions** build a whole list, dict or set in one
+readable expression. **Generators** produce values one at a time, only when asked, so they can work through a
+file much larger than memory.
+
+</Section>
+
+<Section kind="technical" title="Iterables, iterators, comprehensions, generators">
+
+**The protocol.** An *iterable* is anything `iter(x)` accepts: lists, tuples, dicts, sets, strings, ranges,
+files. `iter(x)` returns an <Term id="iterator">iterator</Term>, and `next(it)` returns its next value or
+raises `StopIteration` when it is done. `for v in x` does exactly this. A list gives a fresh iterator every
+time, so you can loop over it again; an iterator is its own iterator, so once it is used up it stays empty.
+
+**Comprehensions.** A <Term id="comprehension">comprehension</Term> writes a building loop as one expression:
+`[f(x) for x in xs if cond(x)]` for a list, `{k: v for k, v in pairs}` for a dict, `{x % 2 for x in xs}` for a
+set. Read it as "f(x), for each x in xs, if cond(x)". Nested `for` clauses run in the same order as nested loops.
+Use a plain loop once a comprehension needs more than one condition or a side effect such as printing.
+
+**Generators.** Parentheses instead of brackets give a generator expression: the same syntax, but nothing is
+computed until someone asks. A function that contains `yield` is a generator function: calling it returns a
+<Term id="generator">generator</Term>, and each `next()` runs the body up to the next `yield`, then pauses with
+its local variables kept. This is <Term id="lazy-evaluation">lazy evaluation</Term>: memory stays constant
+however long the sequence is.
+
+**The everyday helpers.** `enumerate(xs, start=1)` gives `(index, value)` pairs. `zip(a, b)` walks two
+sequences together and stops at the shorter one (`strict=True` raises an error on a length mismatch instead).
+`sorted(xs, key=f)` sorts by `f(x)` and returns a new list. `any` and `all` stop as soon as the answer is known.
+`itertools.islice(it, n)` takes the next `n` values; `itertools.chain` joins iterables.
+
+</Section>
+
+<Section kind="visual" title="Can you read it twice?">
+
+Each expression builds `data` from the same five readings, and the program sums `data` twice. The cards show
+what kind of object was built and what each pass found. Every run was recorded in CPython.
+
+<Experiment def={experiment} title="One pass or many">
+  <StateCards title="After two passes" labelHeading="Value" noteHeading="Meaning" />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The program">
+
+<Experiment def={experiment} title="passes.py, linked to the explorer" controls={false}>
+  <Code example={iterCode} title="passes.py" />
+  <Readout title="What Python printed" />
+</Experiment>
+
+The everyday iteration tools on a small table of names and scores:
+
+<PythonRunner example={toolsRunner} title="tools.py" />
+
+</Section>
+
+<Section kind="experiment" title="Things to try">
+
+In the explorer:
+
+- Compare the list comprehension with the generator expression. Both keep 4, 7 and 9 and double them, so the
+  first sum is $8 + 14 + 18 = 40$; only the list gives 40 again.
+- Pick the set comprehension. `r % 2` maps the five readings to just `{0, 1}`, so the sum is 1: a set keeps
+  each value once.
+- Pick the dict comprehension. Looping over a dict gives its **keys**, so the sum is $0 + 1 + 2 + 3 + 4 = 10$.
+
+Step through a generator function and watch it pause at `yield` and resume where it left off:
+
+<StepThrough example={countdownProgram} title="countdown.py" />
+
+A generator that parses a file lazily, skipping bad rows. `islice` takes two rows; the final `list(rows)` gets
+nothing, because the generator is already used up:
+
+<PythonRunner example={streamRunner} title="stream.py" />
+
+</Section>
+
+<Section kind="mistakes" title="One-pass surprises">
+
+<CommonMistake
+  title="Looping over an iterator twice"
+  wrong={'rows = (parse(line) for line in f)\nn = sum(1 for _ in rows)\ntotal = sum(r.amount for r in rows)'}
+  error="No error: total is 0, because the count used up every row."
+  cause="A generator can be consumed only once."
+  fix={'rows = [parse(line) for line in f]   # if it fits in memory\n# or compute both in one loop'}
+/>
+
+<CommonMistake
+  title="A condition in the wrong place"
+  wrong={'[x * x if x > 0 for x in xs]'}
+  error="SyntaxError: expected 'else' after 'if' expression"
+  cause="An if before the for is a conditional expression and needs else; a filter goes after the for."
+  fix={'[x * x for x in xs if x > 0]'}
+/>
+
+<CommonMistake
+  title="zip silently drops data"
+  wrong={'for x, y in zip(features, labels):  # 1000 features, 998 labels'}
+  error="No error: the last 2 features are skipped."
+  cause="zip stops at the shorter input."
+  fix={'for x, y in zip(features, labels, strict=True):'}
+/>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+| In data and ML code | What it is |
+|---|---|
+| `for batch in loader:` | A PyTorch DataLoader hands out batches through the iterator protocol |
+| `for line in open("log.txt"):` | Files are iterators over lines: constant memory |
+| `pd.read_csv(path, chunksize=100_000)` | Returns an iterator of DataFrames for files too big to load at once |
+| `{w: i for i, w in enumerate(vocab)}` | A dict comprehension building a token-to-id table |
+| `sorted(runs, key=lambda r: r["val_loss"])` | The best experiment run first |
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Batch any stream">
+
+<MiniExercise exercise={batchesExercise}>
+  Write a generator `batches(items, size)` that yields lists of `size` items, with a shorter last batch if
+  needed. It must use `yield` and work on any iterable, including an iterator with no `len()`. Run the tests to
+  check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- `for` asks an iterator for the next value until `StopIteration`; lists restart, iterators do not.
+- Comprehensions build lists, dicts and sets in one expression: value, loop, filter.
+- Generators (`yield`, or parentheses) compute lazily and can be consumed once.
+- `enumerate`, `zip(strict=True)`, `sorted(key=...)`, `any`, `all` and `itertools` cover most loops.
+
+Next: [classes, dataclasses and the data model](#/learn/python/core/classes-dataclasses).
+
+</Section>

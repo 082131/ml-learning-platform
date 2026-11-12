@@ -1,0 +1,167 @@
+import { argsRunner, bindCode, defaultsRunner, experiment, scopeProgram } from './code';
+import { normalizeExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Every library call is an argument puzzle">
+
+Data work is mostly calling other people’s <Term id="python-function">functions</Term>. `pd.read_csv` has over
+fifty parameters, `plt.plot` accepts any number of style options, and a PyTorch model’s `forward` often takes
+`mask=None`. You can only read those calls, and write functions others can use, if you know exactly which value
+lands in which parameter.
+
+This lesson is about that binding, and about the two places where functions most often surprise people: default
+values that are created only once, and names that mean different things inside and outside a function.
+
+</Section>
+
+<Section kind="technical" title="Parameters, arguments and scope">
+
+**Parameters and arguments.** In `def describe(values, fill=0)`, `values` and `fill` are *parameters*. In
+`describe([1, 2], 3)`, the values passed are *arguments*. A positional argument binds by position; a
+<Term id="keyword-argument">keyword argument</Term> such as `fill=3` binds by name. Positional arguments must
+come before keyword ones in a call.
+
+**Defaults.** `fill=0` makes the parameter optional. The default is evaluated **once**, when `def` runs, and
+stored on the function (`describe.__defaults__`). That is harmless for `0` or `None`, but a default list or dict
+is one shared object that every call mutates. Use `None` and create the list inside the body.
+
+**The special markers.** In a parameter list:
+
+- `*args` collects extra positional arguments into a tuple.
+- A bare `*` takes nothing but makes every later parameter **keyword-only**.
+- `**kwargs` collects extra keyword arguments into a dict.
+- A `/` makes every earlier parameter positional-only; you will see it in built-in signatures such as `len(obj, /)`.
+
+In a call, `*seq` spreads a sequence into positional arguments and `**mapping` spreads a dict into keyword
+arguments.
+
+**Scope.** A name is looked up in the local function, then any enclosing function, then the module (global),
+then Python’s built-ins: the LEGB rule of <Term id="variable-scope">scope</Term>. One rule decides whether a name
+is local: if the function **assigns** to it anywhere in its body, it is local for the whole body. Reading a
+global is fine; changing one needs `global name` (or `nonlocal name` for an enclosing function), and code that
+does so is usually clearer if it returns the new value instead.
+
+**Hints and docstrings.** `def mean(xs: list[float]) -> float:` adds <Term id="type-hint">type hints</Term>.
+Python ignores them when running; editors and checkers such as mypy use them to catch mistakes. A docstring, the
+string on the first line of the body, is what `help(mean)` shows.
+
+</Section>
+
+<Section kind="visual" title="Watch arguments bind">
+
+Pick a call. Each card is one parameter after Python has bound the call, with where its value came from. Some
+calls fail before the body runs; then you see the exact error. Every call was run in CPython and recorded.
+
+<Experiment def={experiment} title="Argument binding explorer">
+  <StateCards title="Parameters after binding" labelHeading="Parameter" noteHeading="Came from" />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The function and the call">
+
+The code shows the call you picked. Click the highlighted parts for notes; the readout shows what the program
+printed or raised.
+
+<Experiment def={experiment} title="describe.py, linked to the explorer" controls={false}>
+  <Code example={bindCode} title="describe.py" />
+  <Readout title="What Python printed" />
+</Experiment>
+
+`*args`, `**kwargs` and unpacking in action, plus a `lambda` (a one-expression function without a name) used
+as a sort key:
+
+<PythonRunner example={argsRunner} title="log_metrics.py" />
+
+</Section>
+
+<Section kind="experiment" title="Things to try">
+
+In the explorer:
+
+- Compare `describe([2, None, 7])` with `describe([2, None, 7], 3)`. The mean goes from `3.0` to `4.0`: the
+  missing reading now counts as 3, so $(2 + 3 + 7) / 3 = 4$.
+- Choose `describe([2, None, 7], 3, 10)`. Only `values` and `fill` accept positions, so the third value has
+  nowhere to go.
+- Choose the `**{...}` call. Spreading a dict is how code passes a saved configuration into a function.
+
+Step through the scope example. Watch `count` appear inside `count_high` and disappear when it returns, while
+`threshold` stays visible throughout.
+
+<StepThrough example={scopeProgram} title="scope.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Defaults and scope traps">
+
+Run this to see the shared default list for yourself, then the fix:
+
+<PythonRunner example={defaultsRunner} title="defaults.py" />
+
+<CommonMistake
+  title="A mutable default argument"
+  wrong={'def add_reading(value, readings=[]):\n    readings.append(value)\n    return readings'}
+  error="No error: the second call returns [1, 2] instead of [2]."
+  cause="The default list is created once, when def runs, and shared by every call that leaves readings out."
+  fix={'def add_reading(value, readings=None):\n    if readings is None:\n        readings = []\n    readings.append(value)\n    return readings'}
+/>
+
+<CommonMistake
+  title="Changing a global without saying so"
+  wrong={'total = 0\ndef add(x):\n    total += x'}
+  error="UnboundLocalError: cannot access local variable 'total' where it is not associated with a value"
+  cause="Assigning total anywhere in the body makes it local for the whole body, so += reads a local that has no value yet."
+  fix={'def add(total, x):\n    return total + x\n\ntotal = add(total, 5)'}
+/>
+
+<CommonMistake
+  title="A positional argument after a keyword"
+  wrong={'describe(values=[1, 2], 3)'}
+  error="SyntaxError: positional argument follows keyword argument"
+  cause="Python binds positional arguments first, so they must all come before any name=value."
+  fix={'describe([1, 2], 3)  # or describe([1, 2], fill=3)'}
+/>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+| In data and ML code | What the signature tells you |
+|---|---|
+| `pd.read_csv(path, sep=";", na_values=["?"])` | One required positional argument, dozens of keyword options |
+| `df.sort_values("price", ascending=False)` | `by` by position, the rest by name |
+| `np.mean(a, axis=0, keepdims=True)` | Options you name so a reader knows what `0` means |
+| `plt.plot(x, y, **style)` | A dict of style options spread into keywords |
+| `def forward(self, x, *, mask=None)` | A model whose optional inputs must be named |
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="A keyword-only rescaler">
+
+<MiniExercise exercise={normalizeExercise}>
+  Write `normalize(values, *, low=0.0, high=1.0)`. It returns a **new** list in which the smallest value becomes
+  `low` and the largest becomes `high`, with everything else scaled linearly between them. `low` and `high` must
+  be keyword-only, and the input list must not change. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Positional arguments bind left to right, keywords bind by name, defaults fill the rest; anything that does not
+  fit raises `TypeError` before the body runs.
+- `*args` and `**kwargs` collect extras; a bare `*` makes later parameters keyword-only; `*` and `**` in a call
+  spread a list or dict.
+- Defaults are evaluated once: use `None` for a default list or dict.
+- Assigning a name anywhere in a function makes it local there (LEGB); return new values instead of changing
+  globals.
+
+Next: [names, objects and mutability](#/learn/python/core/references-mutability) explains why that shared default
+list behaves the way it does.
+
+</Section>

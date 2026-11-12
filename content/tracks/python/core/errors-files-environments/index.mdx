@@ -1,0 +1,169 @@
+import { exceptionsRunner, experiment, filesRunner, parseCode, venvCommands } from './code';
+import { loadExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Fail loudly, read carefully, run the same everywhere">
+
+Real data breaks code. A column has `"1,250.5"` in it, a file is missing, a key is spelled differently in last
+month’s export. Python reports each problem as an <Term id="exception">exception</Term>, and how you handle it
+decides whether a bad row is counted and reported, or silently corrupts a result.
+
+This lesson covers the three skills around that: reading a <Term id="traceback">traceback</Term>, catching only
+what you expect, and the plumbing every project needs: files, paths and an environment that installs the same
+library versions on every machine.
+
+</Section>
+
+<Section kind="technical" title="Exceptions, files and environments">
+
+**Reading a traceback.** When an exception is not caught, Python prints the chain of calls that led to it, from
+the outermost call down to the failing line, then the error type and message. Read it **from the bottom up**.
+A real one, from a script whose second row has a `cost` column instead of `price`:
+
+```
+Traceback (most recent call last):
+  File "train.py", line 8, in <module>
+    print(total_price(rows))
+  File "train.py", line 5, in <genexpr>
+    return sum(float(r["price"]) for r in rows)
+                     ~^^^^^^^^^
+KeyError: 'price'
+```
+
+(Shortened: Python 3.13 also lists the `total_price` frame between those two.) The last line says what (a
+missing key, `'price'`), the line above says where, and the carets point at the exact expression.
+
+**Catching.** `try:` runs a block; `except SomeError as e:` runs if that type (or a subclass) was raised;
+`else:` runs only if nothing was raised; `finally:` always runs. Catch the most specific type you expect, around
+the smallest block that can raise it. `raise ValueError("message")` signals a problem yourself, and
+`raise NewError(...) from e` keeps the original error attached as `e.__cause__`.
+
+**Common built-in exceptions.** `ValueError` (right type, bad value: `int("x")`), `TypeError` (wrong type:
+`"a" + 1`), `KeyError` (missing dict key), `IndexError`, `AttributeError` (no such attribute: `None.replace`),
+`FileNotFoundError`, `ZeroDivisionError`.
+
+**Files.** `pathlib.Path` represents a path: `Path("data") / "train.csv"` joins parts on any operating system,
+and `.exists()`, `.suffix`, `.stem`, `.read_text()`, `.iterdir()` do what they say. Open files in a `with` block,
+a <Term id="context-manager">context manager</Term> that closes the file even when an error happens. The `csv`
+module reads every value as a string; `json.loads` and `json.dumps` convert between JSON text and dicts and lists.
+
+**Environments.** A <Term id="virtual-environment">virtual environment</Term> is a folder with its own Python
+and packages. Create one per project, install into it, and record exact versions (`numpy==2.4.6`) in
+`requirements.txt` so anyone can rebuild the same environment. Always install with `python -m pip`, which
+guarantees you install into the Python you are running. Tools such as conda and uv manage environments too; the
+idea is the same.
+
+</Section>
+
+<Section kind="visual" title="Which inputs survive the parser?">
+
+`parse_amount` turns text such as `"1,250.5"` into a float. Pick an input and see whether the function returns a
+value, returns `None`, raises its own error, or crashes with an error it never meant to catch. Each run was
+recorded in CPython.
+
+<Experiment def={experiment} title="Error handling explorer">
+  <StateCards title="What happened" labelHeading="Value" noteHeading="Why" />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The parser">
+
+<Experiment def={experiment} title="parse_amount.py, linked to the explorer" controls={false}>
+  <Code example={parseCode} title="parse_amount.py" />
+  <Readout title="What Python printed or raised" />
+</Experiment>
+
+The full `try` statement, chaining one error to another, and catching two types:
+
+<PythonRunner example={exceptionsRunner} title="config.py" />
+
+</Section>
+
+<Section kind="experiment" title="Things to try">
+
+In the explorer:
+
+- Pick `"nan"`. `float("nan")` succeeds, and every comparison with NaN is False, so it slips past the negative
+  check. Cleaning code has to test for NaN explicitly.
+- Pick `None` and then `12`. Both crash with `AttributeError`, because `except ValueError` does not catch it.
+  That is the point: a column full of ints means an earlier step went wrong, and you want to know.
+- Pick `"-3"`. The function raises its own `ValueError` **after** the try block, so its own except does not
+  swallow it.
+
+Files with `pathlib`, CSV and JSON. The folder is temporary, so this runs the same in your browser and on your
+computer. Note that `csv` gives back strings: `'0.92'`, which has to be converted with `float()`.
+
+<PythonRunner example={filesRunner} title="files.py" />
+
+Setting up an environment for a project (run in a terminal, not here):
+
+<Code example={venvCommands} title="terminal" />
+
+</Section>
+
+<Section kind="mistakes" title="Handling errors badly">
+
+<CommonMistake
+  title="Swallowing every error"
+  wrong={'try:\n    df = load_and_clean(path)\nexcept Exception:\n    df = None'}
+  error="No error: a typo inside load_and_clean becomes df = None, and the crash happens 200 lines later."
+  cause="except Exception catches bugs as well as the bad data you expected."
+  fix={'try:\n    df = load_and_clean(path)\nexcept FileNotFoundError:\n    print(f"missing input: {path}")\n    raise'}
+/>
+
+<CommonMistake
+  title="Building paths with string addition"
+  wrong={'path = folder + "/" + name + ".csv"'}
+  error="TypeError: unsupported operand type(s) for +: 'PosixPath' and 'str'"
+  cause="Once folder is a Path, + no longer joins; and hand-written / breaks on Windows-style paths."
+  fix={'path = folder / f"{name}.csv"'}
+/>
+
+<CommonMistake
+  title="Installing into the wrong Python"
+  wrong={'pip install pandas\npython train.py'}
+  error="ModuleNotFoundError: No module named 'pandas'"
+  cause="pip and python can belong to different installations, so the package lands somewhere python does not look."
+  fix={'python -m pip install pandas'}
+/>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+| In data and ML code | What it does |
+|---|---|
+| `pd.to_numeric(col, errors="coerce")` | pandas’ version of the parser above: bad values become NaN |
+| `Path("runs") / run_id / "model.pt"` | Portable paths for checkpoints and logs |
+| `with open(log, "a") as f:` | Appends a line to a log and always closes it |
+| `json.dump(config, f, indent=2)` | Saves a run’s settings next to its results |
+| `requirements.txt` / `pyproject.toml` | Pinned versions that make an experiment reproducible |
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Parse ages and report the rest">
+
+<MiniExercise exercise={loadExercise}>
+  The starter for `parse_ages(values)` crashes on the first bad string. Make it return `(ages, bad)`: the ints it
+  could parse that lie between 0 and 120, and the original strings it rejected, in order. `int(" 41 ")` works,
+  because `int` ignores surrounding spaces. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Read tracebacks from the bottom: error type, message, then the failing line.
+- Catch specific exceptions around small blocks; raise your own with clear messages, and chain with `from`.
+- Use `pathlib` for paths and `with` for files; `csv` gives strings, `json` gives dicts and lists.
+- One virtual environment per project, with pinned versions, installed with `python -m pip`.
+
+Next chapter: [NumPy indexing, views and copies](#/learn/python/numpy/indexing-views).
+
+</Section>

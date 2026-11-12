@@ -1,0 +1,148 @@
+import { aliasCode, experiment, functionsRunner, numpyRunner } from './code';
+import { questions, scaleExercise } from './quiz';
+
+<Section kind="intuition" title="Names are labels, not boxes">
+
+It is tempting to picture `b = a` as copying a value into a box called `b`. Python does something else: every
+value is an **object** living somewhere in memory, and a name is a label stuck on an object. `b = a` sticks a
+second label on the same object.
+
+That difference is invisible for numbers and strings, and very visible for lists, dicts, NumPy arrays, pandas
+DataFrames and PyTorch tensors. It explains the shared default list from the last lesson, the "my backup changed"
+bug, and why some functions change the data you pass them.
+
+</Section>
+
+<Section kind="technical" title="Objects, references and mutability">
+
+**Assignment binds.** `name = expression` evaluates the expression to an object and binds the name to it.
+Nothing is copied. A list or dict also holds references, not copies, to its items.
+
+**Mutable or not.** A <Term id="mutable-object">mutable object</Term> (list, dict, set, NumPy array,
+DataFrame, tensor) can change in place: `append`, `x[i] = v`, `sort()`, `+=` on a list or array. Immutable
+objects (int, float, str, tuple, frozenset) never change; `y += 1` on an int builds a new int and rebinds `y`.
+A tuple cannot change which objects it holds, but a list inside a tuple can still change.
+
+**Aliasing.** When two names refer to one mutable object, any in-place change through one name is visible
+through the other. This is <Term id="aliasing">aliasing</Term>. Function arguments are aliases too: the
+parameter and the caller’s variable name the same object, so a function that calls `values.sort()` reorders the
+caller’s list.
+
+**Rebinding is not changing.** `b = b + [3]` builds a new list and moves the label `b`; `b += [3]` extends the
+existing list. With an alias around, those two lines give different results.
+
+**Copies.** A <Term id="shallow-copy">shallow copy</Term> (`list(x)`, `x.copy()`, `x[:]`, `dict(d)`) is a
+new outer container that shares its items. `copy.deepcopy(x)` copies all the way down. For NumPy arrays,
+`arr.copy()` copies the numbers (they are not separate objects); for DataFrames, `df.copy()` does the same.
+
+**Checking.** `a is b` is True when both names refer to one object; `a == b` compares values. `id(x)` is a
+number unique to an object while it lives. Use `is` mainly for `x is None`.
+
+</Section>
+
+<Section kind="visual" title="Who shares what">
+
+Start from `row = [0, 0]` and `a = [row, [5, 6]]`, make `b` in one of three ways, then change something.
+Each card is one list object, labeled with every name and index that reaches it. Every run was recorded in
+CPython, comparing objects with `is`.
+
+<Experiment def={experiment} title="Object sharing explorer">
+  <StateCards title="List objects after the change" labelHeading="Names" noteHeading="Object" />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The program behind the cards">
+
+<Experiment def={experiment} title="sharing.py, linked to the explorer" controls={false}>
+  <Code example={aliasCode} title="sharing.py" />
+  <Readout title="What Python printed" />
+</Experiment>
+
+</Section>
+
+<Section kind="experiment" title="Things to try">
+
+In the explorer:
+
+- Compare `b = b + [[7]]` with `b += [[7]]`. With the first, `a` keeps 2 items; with the second, `a` gains
+  `[7]` too, and `a is b` stays True.
+- Compare `a.copy()` then `b.append([7])` with `a.copy()` then `b[0].append(1)`. The shallow copy protects the
+  outer list but not the inner ones: in the second case `row` changes as well.
+- Choose `copy.deepcopy`. Now `row`, `a[0]` and `b[0]` split into separate objects, so the change reaches only
+  `b`.
+
+Functions and immutable values:
+
+<PythonRunner example={functionsRunner} title="functions.py" />
+
+The same rules in NumPy, where in-place operators such as `*=` are common in training code:
+
+<PythonRunner example={numpyRunner} title="arrays.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Backups that are not backups">
+
+<CommonMistake
+  title="Saving an array by assignment"
+  wrong={'best_weights = weights\nweights -= lr * grad   # training continues'}
+  error="No error: best_weights silently follows every later update."
+  cause="best_weights and weights name the same array, and -= updates it in place."
+  fix={'best_weights = weights.copy()'}
+/>
+
+<CommonMistake
+  title="Building a grid with *"
+  wrong={'grid = [[0] * 3] * 2\ngrid[0][0] = 1\nprint(grid)   # [[1, 0, 0], [1, 0, 0]]'}
+  error="No error: both rows change, because the outer * repeats one reference to the same inner list."
+  cause="Multiplying a list copies references, not objects."
+  fix={'grid = [[0] * 3 for _ in range(2)]'}
+/>
+
+<CommonMistake
+  title="Using a list as a dict key"
+  wrong={'counts = {}\ncounts[[1, 2]] = 3'}
+  error="TypeError: unhashable type: 'list'"
+  cause="Dict keys must be immutable (hashable), because a key that changed would be lost in the dict."
+  fix={'counts[(1, 2)] = 3   # a tuple works'}
+/>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+| In data and ML code | Why it matters |
+|---|---|
+| `best = model.state_dict()` | It references live tensors; checkpoints use `copy.deepcopy(model.state_dict())` |
+| `X_train = X; X_train -= mean` | Also changes `X`; write `X_train = X - mean` |
+| `df2 = df` then `df2["x"] = 0` | Adds the column to `df` too: one DataFrame, two names |
+| `def augment(batch): batch.append(...)` | Changes the caller’s list; return a new one instead |
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Scale without side effects">
+
+<MiniExercise exercise={scaleExercise}>
+  The starter for `scaled(rows, factor)` returns the right numbers but changes the caller’s data. Fix it so it
+  returns new, scaled inner lists and leaves `rows` exactly as it was. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A name is a label on an object; assignment and argument passing never copy.
+- Mutable objects can change in place, and every alias sees the change; immutable ones never change.
+- `x = x + y` rebinds; `x += y` changes lists and arrays in place.
+- Shallow copies share their items; use `copy.deepcopy` or build new inner objects when items are mutable.
+
+Next: [iterators, comprehensions and generators](#/learn/python/core/iterators-comprehensions).
+
+</Section>

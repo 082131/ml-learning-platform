@@ -6,7 +6,14 @@ import { Logo } from './Logo';
 import { ThemeToggle } from './ThemeToggle';
 import s from './TopNav.module.css';
 
-const TRACK_CHIP: Record<string, string> = { ml: 'ML', data: 'Data', ai: 'AI', inference: 'Inference', dataops: 'DataOps' };
+const TRACK_CHIP: Record<string, string> = {
+  ml: 'ML',
+  data: 'Data',
+  ai: 'AI',
+  inference: 'Inference',
+  python: 'Python',
+  dataops: 'DataOps',
+};
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
 interface NavItem {

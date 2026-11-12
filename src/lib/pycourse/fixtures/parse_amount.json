@@ -1,0 +1,174 @@
+{
+ "python": "3.13.18",
+ "template": "def parse_amount(text):\n    try:\n        value = float(text.replace(\",\", \"\"))\n    except ValueError:\n        return None\n    if value < 0:\n        raise ValueError(f\"negative amount: {value}\")\n    return value\n\nprint(parse_amount({{text}}))",
+ "variants": [
+  {
+   "id": "thousands",
+   "label": "parse_amount(\"1,250.5\")",
+   "slots": {
+    "text": "\"1,250.5\""
+   },
+   "stdout": "1250.5\n",
+   "error": null,
+   "cards": [
+    {
+     "label": "input",
+     "value": "'1,250.5'",
+     "note": "str"
+    },
+    {
+     "label": "outcome",
+     "value": "returned 1250.5",
+     "note": "float() succeeded and the value is not negative"
+    }
+   ]
+  },
+  {
+   "id": "word",
+   "label": "parse_amount(\"abc\")",
+   "slots": {
+    "text": "\"abc\""
+   },
+   "stdout": "None\n",
+   "error": null,
+   "cards": [
+    {
+     "label": "input",
+     "value": "'abc'",
+     "note": "str"
+    },
+    {
+     "label": "outcome",
+     "value": "returned None",
+     "note": "float() raised ValueError; except returned None"
+    }
+   ]
+  },
+  {
+   "id": "empty",
+   "label": "parse_amount(\"\")",
+   "slots": {
+    "text": "\"\""
+   },
+   "stdout": "None\n",
+   "error": null,
+   "cards": [
+    {
+     "label": "input",
+     "value": "''",
+     "note": "str"
+    },
+    {
+     "label": "outcome",
+     "value": "returned None",
+     "note": "float() raised ValueError; except returned None"
+    }
+   ]
+  },
+  {
+   "id": "negative",
+   "label": "parse_amount(\"-3\")",
+   "slots": {
+    "text": "\"-3\""
+   },
+   "stdout": "",
+   "error": "ValueError: negative amount: -3.0",
+   "cards": [
+    {
+     "label": "input",
+     "value": "'-3'",
+     "note": "str"
+    },
+    {
+     "label": "outcome",
+     "value": "raised ValueError",
+     "note": "the function raised its own ValueError after the try block"
+    }
+   ]
+  },
+  {
+   "id": "sci",
+   "label": "parse_amount(\"1e3\")",
+   "slots": {
+    "text": "\"1e3\""
+   },
+   "stdout": "1000.0\n",
+   "error": null,
+   "cards": [
+    {
+     "label": "input",
+     "value": "'1e3'",
+     "note": "str"
+    },
+    {
+     "label": "outcome",
+     "value": "returned 1000.0",
+     "note": "float() succeeded and the value is not negative"
+    }
+   ]
+  },
+  {
+   "id": "nan",
+   "label": "parse_amount(\"nan\")",
+   "slots": {
+    "text": "\"nan\""
+   },
+   "stdout": "nan\n",
+   "error": null,
+   "cards": [
+    {
+     "label": "input",
+     "value": "'nan'",
+     "note": "str"
+    },
+    {
+     "label": "outcome",
+     "value": "returned nan",
+     "note": "float() accepted it: NaN is a valid float, and NaN < 0 is False"
+    }
+   ]
+  },
+  {
+   "id": "none",
+   "label": "parse_amount(None)",
+   "slots": {
+    "text": "None"
+   },
+   "stdout": "",
+   "error": "AttributeError: 'NoneType' object has no attribute 'replace'",
+   "cards": [
+    {
+     "label": "input",
+     "value": "None",
+     "note": "NoneType"
+    },
+    {
+     "label": "outcome",
+     "value": "raised AttributeError",
+     "note": "the error happened inside try, but except only catches ValueError"
+    }
+   ]
+  },
+  {
+   "id": "number",
+   "label": "parse_amount(12)",
+   "slots": {
+    "text": "12"
+   },
+   "stdout": "",
+   "error": "AttributeError: 'int' object has no attribute 'replace'",
+   "cards": [
+    {
+     "label": "input",
+     "value": "12",
+     "note": "int"
+    },
+    {
+     "label": "outcome",
+     "value": "raised AttributeError",
+     "note": "the error happened inside try, but except only catches ValueError"
+    }
+   ]
+  }
+ ]
+}

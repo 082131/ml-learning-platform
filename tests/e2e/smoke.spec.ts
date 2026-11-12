@@ -28,12 +28,13 @@ test.beforeEach(async ({ page }) => {
   await page.evaluate(() => localStorage.clear());
 });
 
-test('visits all four tracks from the navigation', async ({ page }) => {
+test('visits every track from the navigation', async ({ page }) => {
   for (const [chip, title] of [
     [/^(ML|Machine Learning Engineer)$/, 'Machine Learning Engineer'],
     [/^(Data|Data Engineering)$/, 'Data Engineering'],
     [/^(AI|AI Engineer)$/, 'AI Engineer'],
     [/^(Inference|Inference Engineer)$/, 'Inference Engineer'],
+    [/^(Python|Python for Data & ML)$/, 'Python for Data & ML'],
     [/^(DataOps|ML Data Operations)$/, 'ML Data Operations'],
   ] as const) {
     await openNav(page, chip);

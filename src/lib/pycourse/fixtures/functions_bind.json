@@ -1,0 +1,191 @@
+{
+ "python": "3.13.18",
+ "template": "def describe(values, fill=0, *, scale=1.0, **options):\n    total = 0\n    for v in values:\n        total += fill if v is None else v\n    return round(total / len(values) * scale, 2), options\n\nmean, options = describe({{args}})\nprint(mean, options)",
+ "variants": [
+  {
+   "id": "only-values",
+   "label": "describe([2, None, 7])",
+   "slots": {
+    "args": "[2, None, 7]"
+   },
+   "stdout": "3.0 {}\n",
+   "error": null,
+   "cards": [
+    {
+     "label": "values",
+     "value": "[2, None, 7]",
+     "note": "from the call"
+    },
+    {
+     "label": "fill",
+     "value": "0",
+     "note": "default"
+    },
+    {
+     "label": "scale",
+     "value": "1.0",
+     "note": "default"
+    },
+    {
+     "label": "options",
+     "value": "{}",
+     "note": "collects keywords no parameter claims"
+    }
+   ]
+  },
+  {
+   "id": "positional-fill",
+   "label": "describe([2, None, 7], 3)",
+   "slots": {
+    "args": "[2, None, 7], 3"
+   },
+   "stdout": "4.0 {}\n",
+   "error": null,
+   "cards": [
+    {
+     "label": "values",
+     "value": "[2, None, 7]",
+     "note": "from the call"
+    },
+    {
+     "label": "fill",
+     "value": "3",
+     "note": "from the call"
+    },
+    {
+     "label": "scale",
+     "value": "1.0",
+     "note": "default"
+    },
+    {
+     "label": "options",
+     "value": "{}",
+     "note": "collects keywords no parameter claims"
+    }
+   ]
+  },
+  {
+   "id": "keyword-scale",
+   "label": "describe([2, None, 7], scale=10)",
+   "slots": {
+    "args": "[2, None, 7], scale=10"
+   },
+   "stdout": "30.0 {}\n",
+   "error": null,
+   "cards": [
+    {
+     "label": "values",
+     "value": "[2, None, 7]",
+     "note": "from the call"
+    },
+    {
+     "label": "fill",
+     "value": "0",
+     "note": "default"
+    },
+    {
+     "label": "scale",
+     "value": "10",
+     "note": "keyword-only, passed by name"
+    },
+    {
+     "label": "options",
+     "value": "{}",
+     "note": "collects keywords no parameter claims"
+    }
+   ]
+  },
+  {
+   "id": "extra-keyword",
+   "label": "describe([2, None, 7], fill=3, unit=\"kg\")",
+   "slots": {
+    "args": "[2, None, 7], fill=3, unit=\"kg\""
+   },
+   "stdout": "4.0 {'unit': 'kg'}\n",
+   "error": null,
+   "cards": [
+    {
+     "label": "values",
+     "value": "[2, None, 7]",
+     "note": "from the call"
+    },
+    {
+     "label": "fill",
+     "value": "3",
+     "note": "from the call"
+    },
+    {
+     "label": "scale",
+     "value": "1.0",
+     "note": "default"
+    },
+    {
+     "label": "options",
+     "value": "{'unit': 'kg'}",
+     "note": "collects keywords no parameter claims"
+    }
+   ]
+  },
+  {
+   "id": "positional-scale",
+   "label": "describe([2, None, 7], 3, 10)",
+   "slots": {
+    "args": "[2, None, 7], 3, 10"
+   },
+   "stdout": "",
+   "error": "TypeError: describe() takes from 1 to 2 positional arguments but 3 were given",
+   "cards": []
+  },
+  {
+   "id": "twice",
+   "label": "describe([2, None, 7], 3, fill=1)",
+   "slots": {
+    "args": "[2, None, 7], 3, fill=1"
+   },
+   "stdout": "",
+   "error": "TypeError: describe() got multiple values for argument 'fill'",
+   "cards": []
+  },
+  {
+   "id": "missing",
+   "label": "describe(fill=3)",
+   "slots": {
+    "args": "fill=3"
+   },
+   "stdout": "",
+   "error": "TypeError: describe() missing 1 required positional argument: 'values'",
+   "cards": []
+  },
+  {
+   "id": "unpacked",
+   "label": "describe(**{\"values\": [2, None, 7], \"scale\": 0.5})",
+   "slots": {
+    "args": "**{\"values\": [2, None, 7], \"scale\": 0.5}"
+   },
+   "stdout": "1.5 {}\n",
+   "error": null,
+   "cards": [
+    {
+     "label": "values",
+     "value": "[2, None, 7]",
+     "note": "from the call"
+    },
+    {
+     "label": "fill",
+     "value": "0",
+     "note": "default"
+    },
+    {
+     "label": "scale",
+     "value": "0.5",
+     "note": "keyword-only, passed by name"
+    },
+    {
+     "label": "options",
+     "value": "{}",
+     "note": "collects keywords no parameter claims"
+    }
+   ]
+  }
+ ]
+}

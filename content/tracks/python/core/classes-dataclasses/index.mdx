@@ -1,0 +1,152 @@
+import { classProgram, dataclassRunner, datasetRunner, torchDataset } from './code';
+import { questions, vocabExercise } from './quiz';
+
+<Section kind="intuition" title="Data with its own behavior">
+
+Sooner or later a dict of settings or a pair of lists stops being enough. You want one object that holds a
+dataset’s rows **and** knows how many it has and how to hand out row `i`; or a training configuration that checks
+its own learning rate.
+
+A <Term id="python-class">class</Term> bundles data with the functions that act on it. Python’s data model goes
+one step further: if your class defines a few specially named methods, the built-in syntax works on it.
+`len(ds)`, `ds[3]` and `for x in ds` call your code. That is exactly how PyTorch’s `Dataset` works, so this
+lesson ends there.
+
+</Section>
+
+<Section kind="technical" title="Classes, instances and the data model">
+
+**Defining and creating.** `class Readings:` defines a class. Calling it, `Readings("kitchen", [21.5, 22.0])`,
+creates an *instance* and runs `__init__(self, name, values)` on it, where `self` is the new object.
+`self.name = name` creates an *instance attribute*: each object has its own. Names assigned directly in the class
+body are *class attributes*, shared by all instances.
+
+**Methods.** A function defined in the class body is a method. `kitchen.mean()` is shorthand for
+`Readings.mean(kitchen)`: Python passes the instance as the first argument, which is why every method starts with
+`self`.
+
+**<Term id="dunder-method">Dunder methods</Term>.** Python translates syntax into calls of double-underscore
+methods:
+
+| You write | Python calls |
+|---|---|
+| `len(x)` | `x.__len__()` |
+| `x[i]` | `x.__getitem__(i)` |
+| `v in x` | `x.__contains__(v)` |
+| `print(x)`, the console | `x.__repr__()` (or `__str__` for print, if defined) |
+| `x == y` | `x.__eq__(y)` |
+| `for v in x` | `x.__iter__()`, or `__getitem__(0)`, `(1)`, … until `IndexError` |
+
+**<Term id="dataclass">Dataclasses</Term>.** For classes that are mostly fields, `@dataclass` writes
+`__init__`, `__repr__` and `__eq__` from annotated class attributes. Fields with defaults must come after fields
+without. A mutable default needs `field(default_factory=list)`, so each instance gets its own list.
+`__post_init__` runs after the generated `__init__`, which is the place for validation. `frozen=True` makes
+instances read-only, and `dataclasses.asdict` turns one into a dict, handy for logging a run’s configuration.
+
+**Inheritance, briefly.** `class PairsDataset(Dataset):` inherits from `Dataset`. Your class gets the parent’s
+methods and overrides the ones it defines. `super().__init__()` runs the parent’s `__init__`; PyTorch modules
+need that call, as you will see in the PyTorch chapter.
+
+</Section>
+
+<Section kind="code" title="A class that behaves like a sequence">
+
+Click the highlighted parts for notes, then step through to watch `self` fill up and the dunder methods get
+called.
+
+<Code example={classProgram} title="readings.py" />
+
+<StepThrough example={classProgram} title="readings.py" />
+
+</Section>
+
+<Section kind="experiment" title="Things to try">
+
+Dataclasses: generated methods, a safe list default, validation, and a frozen instance.
+
+<PythonRunner example={dataclassRunner} title="config.py" />
+
+- Change `lr=0.01` to `lr=0.01, epochs=3` in `fast` and run it again. The comparison on the next line becomes
+  False, because `__eq__` compares every field.
+- Delete `frozen=True` and run it. Assigning `p.x = 5.0` now works and nothing is printed for it.
+
+The Dataset protocol in plain Python: `__len__` and `__getitem__`, and a small generator that batches by index,
+which is what a DataLoader does.
+
+<PythonRunner example={datasetRunner} title="dataset.py" />
+
+The same thing with PyTorch. Each batch is now a tensor, and the last batch is smaller, exactly as above. This
+code was run with PyTorch 2.14.1 on a CPU; PyTorch does not run in your browser, so the output shown is the
+recorded one.
+
+<Code example={torchDataset} title="torch_dataset.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Class pitfalls">
+
+<CommonMistake
+  title="Forgetting self"
+  wrong={'class Readings:\n    def mean():\n        return sum(self.values) / len(self.values)\n\nReadings().mean()'}
+  error="TypeError: Readings.mean() takes 0 positional arguments but 1 was given"
+  cause="Python always passes the instance as the first argument of a method call."
+  fix={'    def mean(self):'}
+/>
+
+<CommonMistake
+  title="A mutable dataclass default"
+  wrong={'@dataclass\nclass Batch:\n    items: list = []'}
+  error="ValueError: mutable default <class 'list'> for field items is not allowed: use default_factory"
+  cause="One list would be shared by every instance; dataclasses refuse it when the class is defined."
+  fix={'    items: list = field(default_factory=list)'}
+/>
+
+<CommonMistake
+  title="Not calling the parent’s __init__"
+  wrong={'class Net(nn.Module):\n    def __init__(self):\n        self.layer = nn.Linear(2, 1)'}
+  error="AttributeError: cannot assign module before Module.__init__() call"
+  cause="nn.Module sets up its registry of layers in its own __init__, which never ran."
+  fix={'    def __init__(self):\n        super().__init__()\n        self.layer = nn.Linear(2, 1)'}
+/>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+| In data and ML code | The idea |
+|---|---|
+| `class MyData(torch.utils.data.Dataset)` | `__len__` and `__getitem__` |
+| `class Net(nn.Module)` with `forward` | Inheritance, `super().__init__()`, and `model(x)` calling `__call__` |
+| `@dataclass class TrainConfig` | Typed, printable, comparable run settings |
+| `df.shape`, `arr.T` | Attributes and properties on library objects |
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="A token vocabulary">
+
+<MiniExercise exercise={vocabExercise}>
+  Write a `Vocabulary` class. `add(token)` gives a new token the next integer id (0, 1, 2, …) and returns the
+  token’s id, new or old. Add `__len__`, `__getitem__` (token to id, `KeyError` for unknown tokens) and
+  `__contains__`. Run the tests to check it.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A class bundles attributes and methods; calling it runs `__init__` with `self` as the new instance.
+- Dunder methods connect your class to Python syntax: `__len__`, `__getitem__`, `__contains__`, `__repr__`,
+  `__eq__`.
+- `@dataclass` writes the boilerplate for field-holding classes; use `default_factory` for mutable defaults and
+  `__post_init__` for validation.
+- A PyTorch map-style `Dataset` is just `__len__` plus `__getitem__`.
+
+Next: [errors, files and environments](#/learn/python/core/errors-files-environments).
+
+</Section>

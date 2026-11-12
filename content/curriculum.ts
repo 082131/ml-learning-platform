@@ -366,6 +366,81 @@ export const tracks: Track[] = [
     ],
   },
   {
+    id: 'python',
+    title: 'Python for Data & ML',
+    code: 'T.05',
+    summary:
+      'Python as data and ML engineers use it: the language in depth, NumPy, pandas, data cleaning, statistics for analysis, and PyTorch.',
+    chapters: [
+      {
+        id: 'core',
+        title: 'Python you will actually use',
+        level: 'beginner',
+        lessons: [
+          { id: 'python/core/functions-scope', status: 'written' },
+          { id: 'python/core/references-mutability', status: 'written' },
+          { id: 'python/core/iterators-comprehensions', status: 'written' },
+          { id: 'python/core/classes-dataclasses', status: 'written' },
+          { id: 'python/core/errors-files-environments', status: 'written' },
+        ],
+      },
+      {
+        id: 'numpy',
+        title: 'NumPy in depth',
+        level: 'intermediate',
+        lessons: [
+          { id: 'python/numpy/indexing-views', status: 'outline' },
+          { id: 'python/numpy/dtypes-random', status: 'outline' },
+        ],
+      },
+      {
+        id: 'pandas',
+        title: 'pandas for analysis',
+        level: 'intermediate',
+        lessons: [
+          { id: 'python/pandas/indexing-dtypes', status: 'outline' },
+          { id: 'python/pandas/groupby-merge-reshape', status: 'outline' },
+          { id: 'python/pandas/time-series', status: 'outline' },
+        ],
+      },
+      {
+        id: 'cleaning',
+        title: 'Data cleaning',
+        level: 'intermediate',
+        lessons: [
+          { id: 'python/cleaning/missing-duplicates-types', status: 'outline' },
+          { id: 'python/cleaning/text-categories-outliers', status: 'outline' },
+        ],
+      },
+      {
+        id: 'analysis',
+        title: 'Data science and analysis',
+        level: 'intermediate',
+        lessons: [
+          { id: 'python/analysis/eda-visualization', status: 'outline' },
+          { id: 'python/analysis/statistical-inference', status: 'outline' },
+        ],
+      },
+      {
+        id: 'pytorch',
+        title: 'PyTorch',
+        level: 'intermediate',
+        lessons: [
+          { id: 'python/pytorch/tensors-autograd', status: 'outline' },
+          { id: 'python/pytorch/datasets-modules', status: 'outline' },
+          { id: 'python/pytorch/training-loop', status: 'outline' },
+        ],
+      },
+      {
+        id: 'project',
+        title: 'Project',
+        level: 'advanced',
+        project: 'python/project/end-to-end',
+        lessons: [{ id: 'python/project/end-to-end', status: 'outline' }],
+      },
+    ],
+  },
+  {
     id: 'dataops',
     title: 'ML Data Operations',
     code: 'T.06',
@@ -376,9 +451,7 @@ export const tracks: Track[] = [
         id: 'foundations',
         title: 'Data-centric ML',
         level: 'beginner',
-        lessons: [
-          { id: 'dataops/foundations/data-centric-ml', status: 'written' },
-        ],
+        lessons: [{ id: 'dataops/foundations/data-centric-ml', status: 'written' }],
       },
       {
         id: 'labeling',
@@ -394,17 +467,13 @@ export const tracks: Track[] = [
         id: 'validation',
         title: 'Validation and drift',
         level: 'intermediate',
-        lessons: [
-          { id: 'dataops/validation/baselines-drift', status: 'written' },
-        ],
+        lessons: [{ id: 'dataops/validation/baselines-drift', status: 'written' }],
       },
       {
         id: 'versioning',
         title: 'Dataset versioning',
         level: 'advanced',
-        lessons: [
-          { id: 'dataops/versioning/data-snapshots', status: 'written' },
-        ],
+        lessons: [{ id: 'dataops/versioning/data-snapshots', status: 'written' }],
       },
       {
         id: 'pipelines',
@@ -420,9 +489,7 @@ export const tracks: Track[] = [
         title: 'Capstone',
         level: 'advanced',
         project: 'dataops/capstone/data-ops-pipeline',
-        lessons: [
-          { id: 'dataops/capstone/data-ops-pipeline', status: 'written' },
-        ],
+        lessons: [{ id: 'dataops/capstone/data-ops-pipeline', status: 'written' }],
       },
     ],
   },
