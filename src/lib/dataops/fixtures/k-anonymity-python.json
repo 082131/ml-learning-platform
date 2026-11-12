@@ -1,0 +1,20 @@
+{
+ "exact,5,keep": "equivalence classes: 16, k = 1, l = 1\nattacker knows (58, 10407, F) -> generalized ('58', '10407', 'F')\n1 matching row(s), possible diagnoses ['diabetes'] -> row identified",
+ "exact,5,drop": "equivalence classes: 16, k = 1, l = 1\nattacker knows (58, 10407, F) -> generalized ('58', '10407', '*')\n1 matching row(s), possible diagnoses ['diabetes'] -> row identified",
+ "exact,3,keep": "equivalence classes: 16, k = 1, l = 1\nattacker knows (58, 10407, F) -> generalized ('58', '104**', 'F')\n1 matching row(s), possible diagnoses ['diabetes'] -> row identified",
+ "exact,3,drop": "equivalence classes: 16, k = 1, l = 1\nattacker knows (58, 10407, F) -> generalized ('58', '104**', '*')\n1 matching row(s), possible diagnoses ['diabetes'] -> row identified",
+ "exact,0,keep": "equivalence classes: 16, k = 1, l = 1\nattacker knows (58, 10407, F) -> generalized ('58', '*****', 'F')\n1 matching row(s), possible diagnoses ['diabetes'] -> row identified",
+ "exact,0,drop": "equivalence classes: 16, k = 1, l = 1\nattacker knows (58, 10407, F) -> generalized ('58', '*****', '*')\n1 matching row(s), possible diagnoses ['diabetes'] -> row identified",
+ "10y,5,keep": "equivalence classes: 16, k = 1, l = 1\nattacker knows (58, 10407, F) -> generalized ('50-59', '10407', 'F')\n1 matching row(s), possible diagnoses ['diabetes'] -> row identified",
+ "10y,5,drop": "equivalence classes: 13, k = 1, l = 1\nattacker knows (58, 10407, F) -> generalized ('50-59', '10407', '*')\n1 matching row(s), possible diagnoses ['diabetes'] -> row identified",
+ "10y,3,keep": "equivalence classes: 8, k = 2, l = 1\nattacker knows (58, 10407, F) -> generalized ('50-59', '104**', 'F')\n2 matching row(s), possible diagnoses ['diabetes'] -> diagnosis revealed",
+ "10y,3,drop": "equivalence classes: 4, k = 4, l = 1\nattacker knows (58, 10407, F) -> generalized ('50-59', '104**', '*')\n4 matching row(s), possible diagnoses ['diabetes'] -> diagnosis revealed",
+ "10y,0,keep": "equivalence classes: 8, k = 2, l = 1\nattacker knows (58, 10407, F) -> generalized ('50-59', '*****', 'F')\n2 matching row(s), possible diagnoses ['diabetes'] -> diagnosis revealed",
+ "10y,0,drop": "equivalence classes: 4, k = 4, l = 1\nattacker knows (58, 10407, F) -> generalized ('50-59', '*****', '*')\n4 matching row(s), possible diagnoses ['diabetes'] -> diagnosis revealed",
+ "20y,5,keep": "equivalence classes: 16, k = 1, l = 1\nattacker knows (58, 10407, F) -> generalized ('40-59', '10407', 'F')\n1 matching row(s), possible diagnoses ['diabetes'] -> row identified",
+ "20y,5,drop": "equivalence classes: 13, k = 1, l = 1\nattacker knows (58, 10407, F) -> generalized ('40-59', '10407', '*')\n1 matching row(s), possible diagnoses ['diabetes'] -> row identified",
+ "20y,3,keep": "equivalence classes: 8, k = 2, l = 1\nattacker knows (58, 10407, F) -> generalized ('40-59', '104**', 'F')\n2 matching row(s), possible diagnoses ['diabetes'] -> diagnosis revealed",
+ "20y,3,drop": "equivalence classes: 4, k = 4, l = 1\nattacker knows (58, 10407, F) -> generalized ('40-59', '104**', '*')\n4 matching row(s), possible diagnoses ['diabetes'] -> diagnosis revealed",
+ "20y,0,keep": "equivalence classes: 6, k = 2, l = 2\nattacker knows (58, 10407, F) -> generalized ('40-59', '*****', 'F')\n4 matching row(s), possible diagnoses ['asthma', 'diabetes'] -> not revealed",
+ "20y,0,drop": "equivalence classes: 3, k = 4, l = 3\nattacker knows (58, 10407, F) -> generalized ('40-59', '*****', '*')\n8 matching row(s), possible diagnoses ['asthma', 'diabetes', 'flu', 'migraine'] -> not revealed"
+}

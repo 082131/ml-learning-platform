@@ -412,7 +412,7 @@ export const tracks: Track[] = [
         level: 'advanced',
         lessons: [
           { id: 'dataops/pipelines/retraining-triggers', status: 'written' },
-          { id: 'dataops/pipelines/privacy-governance', status: 'outline' },
+          { id: 'dataops/pipelines/privacy-governance', status: 'written' },
         ],
       },
       {

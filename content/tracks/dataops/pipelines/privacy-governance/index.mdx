@@ -1,0 +1,176 @@
+import { datasheet, ka, kanonPython, pseudoRunner } from './code';
+import { kExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Removing names is not anonymizing">
+
+Training data is often about people: their purchases, messages, health, location. Teams usually start by deleting
+names and emails and call the result anonymous. It rarely is. Age, postcode and sex together single out most people,
+and anyone who knows those three facts about a neighbour can find their row and read the rest.
+
+ML data operations has to answer three questions for every dataset: may we use this data for this purpose, how do we
+reduce what it reveals about individuals, and can we delete a person's data everywhere it was copied, including old
+versions. This lesson measures re-identification risk on a small table, shows how to pseudonymize identifiers
+correctly, and connects deletion to the dataset versioning of the previous lessons.
+
+</Section>
+
+<Section kind="technical" title="Identifiers, pseudonyms, k-anonymity and governance">
+
+**Three kinds of fields.**
+
+- Direct identifiers name a person: name, email, phone, account number. Remove them or replace them with tokens.
+- <Term id="quasi-identifier">Quasi-identifiers</Term> do not name anyone alone but do in combination: age, postcode,
+  sex, job title, signup date.
+- Sensitive attributes are what must not leak: a diagnosis, a salary, a religion.
+
+**Pseudonymization.** <Term id="pseudonymization">Pseudonymization</Term> replaces an identifier with a token that can
+only be linked back with separately kept information. A keyed hash, $\text{HMAC}_K(\text{email})$, gives the same token
+for the same person in every table (so joins still work) and cannot be computed without the key $K$. A plain hash can
+be computed by anyone, so a list of candidate emails reveals who is in the data. Pseudonymized data is still personal
+data under the GDPR, because the key holder can re-identify it.
+
+**k-anonymity.** Group the rows by their (generalized) quasi-identifiers. A table is
+<Term id="k-anonymity">k-anonymous</Term> if every group has at least $k$ rows: someone who knows a person's
+quasi-identifiers can narrow them down only to $k$ rows. You raise $k$ by generalizing (age 58 → 50–59, postcode
+10407 → 104\*\*) or suppressing fields.
+
+**l-diversity.** If every row in a group shares one sensitive value, the group reveals it whatever $k$ is.
+<Term id="l-diversity">l-diversity</Term> requires at least $l$ distinct sensitive values in every group.
+
+Both are measures on a released table, not guarantees against every attack: an attacker with extra knowledge can
+still learn something. Stronger, mathematical guarantees come from differential privacy, which adds calibrated noise
+to statistics or training (for example DP-SGD).
+
+**Governance around the data.** Beyond the table itself:
+
+- **Purpose and basis:** each dataset records why it may be used (consent, contract, legitimate interest) and for what.
+- **Documentation:** a <Term id="datasheet-for-datasets">datasheet</Term> (or data card) records collection, labeling,
+  personal data, known gaps, intended and unsuitable uses, and retention.
+- **Erasure:** a deletion request must reach the main table, old snapshots (until
+  <Term id="snapshot-retention">retention</Term> expires them), branches, exports and backups, and a policy must say what
+  happens to models trained on the data.
+- **Access:** the people and jobs that can read raw personal data should be few, logged and separate from those that
+  use pseudonymized training sets.
+
+</Section>
+
+<Section kind="visual" title="Generalize until the table stops leaking">
+
+<Experiment def={ka} title="Re-identifying Lena">
+  <KAnonGroups />
+  <Readout title="What the experiment computed" />
+</Experiment>
+
+The attacker knows that Lena is 58, lives in postcode 10407 and is female. Things to try:
+
+- **Default** (exact values): 16 groups of one. k = 1, so Lena's row, and her diagnosis, are found directly.
+- **10-year bands, sex kept, full postcode:** still 16 groups of one. Generalizing one field is rarely enough.
+- **10-year bands and 3 postcode digits:** k = 2, but Lena's group of two both have diabetes.
+- **Now remove sex:** k = 4, the table is 4-anonymous, and the diagnosis is still revealed: all four people in their
+  fifties in district 104 have diabetes (l = 1).
+- **20-year bands, postcode removed, sex removed:** k = 4 and l = 3. Lena hides among 8 rows with 4 diagnoses, but the
+  table has lost almost everything a model could use about location.
+
+</Section>
+
+<Section kind="code" title="k and l in Python, and pseudonyms that hold">
+
+The program behind the visual, with the three generalization settings filled from the controls:
+
+<Experiment def={ka} title="kanon.py, linked to the experiment" controls={false}>
+  <Code example={kanonPython} title="kanon.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+**Plain hashes against keyed hashes.** A training export replaced emails with SHA-256 hashes. An attacker with a
+guess list hashes each guess:
+
+<PythonRunner example={pseudoRunner} title="pseudonymize.py" />
+
+The plain hash confirms that ben@example.com is in the export. The HMAC tokens cannot be computed without the key, and
+the same person still gets the same token, so tables can be joined. Keep the key in a secrets manager, never with the
+data.
+
+**A datasheet for the refund dataset** from the labeling lessons, recording what a later team needs to know:
+
+<Code example={datasheet} title="datasheet.json" />
+
+<Callout kind="simplification">
+  The table has 16 rows so that every group fits on screen; real releases have millions, and the same measures apply.
+  Legal requirements differ by country and sector (GDPR in the EU and UK, HIPAA for US health data, and others), and
+  this lesson is not legal advice: the engineering point is that consent, purpose, retention and erasure must be
+  recorded with the data and enforced by the pipeline, not remembered by people.
+</Callout>
+
+</Section>
+
+<Section kind="mistakes" title="Data that was never as private as it looked">
+
+<CommonMistake
+  title="Hashing identifiers without a key"
+  wrong={"df[\"user\"] = df[\"email\"].map(lambda e: hashlib.sha256(e.encode()).hexdigest())"}
+  error="(no error: anyone with a list of emails can find those users in the export)"
+  cause="A plain hash is a public function; it hides nothing from someone who can guess the input."
+  fix={"df[\"user\"] = df[\"email\"].map(lambda e: hmac.new(KEY, e.encode(), hashlib.sha256).hexdigest())"}
+/>
+
+<CommonMistake
+  title="Calling a table anonymous after dropping names"
+  wrong={"release = patients.drop(columns=[\"name\", \"email\"])   # age, postcode, sex, diagnosis remain"}
+  error="(no error: most rows are unique on age, postcode and sex, so they can be linked to a voter list or a social profile)"
+  cause="Quasi-identifiers in combination identify people."
+  fix="measure k and l on the quasi-identifiers, generalize or suppress until both meet your policy, or release only aggregates"
+/>
+
+<CommonMistake
+  title="Deleting a person from the latest version only"
+  wrong={"DELETE FROM training_examples WHERE user_token = :token;   -- done?"}
+  error="(no error: time travel, branches, exports and backups still contain the rows)"
+  cause="Versioned data keeps the past on purpose."
+  fix="track every copy, expire or rewrite old snapshots on a deadline, and log that the request was completed"
+/>
+
+</Section>
+
+<Section kind="practice" title="Governance in a data pipeline">
+
+- **Classify fields at ingestion** (direct identifier, quasi-identifier, sensitive) and store the classification with
+  the schema.
+- **Pseudonymize early** with a keyed hash, so most pipelines never see raw identifiers.
+- **Measure before release:** compute k and l for any table leaving the team; scrub personal data from free text before
+  it reaches annotators.
+- **Write the datasheet with the first version** and update it with every major change (new source, new guideline,
+  new known gap).
+- **Make erasure a pipeline:** one request ID, every copy listed, deadlines, and a completion log that an auditor can
+  read.
+- **Minimize:** keep only the fields and history the model needs; data you never stored cannot leak.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Compute k and l">
+
+<MiniExercise exercise={kExercise}>
+  Write `k_and_l(rows)`. Each row is `(qi, sensitive)`, where `qi` is a tuple of generalized quasi-identifiers. Return
+  the smallest group size `k` and the fewest distinct sensitive values in any group `l`.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Quasi-identifiers in combination identify people; dropping names is not anonymization.
+- k-anonymity bounds how far an attacker can narrow down a row; l-diversity stops a group from revealing its sensitive
+  value. In the experiment a 4-anonymous table still revealed Lena's diagnosis.
+- Pseudonymize with a keyed hash; a plain hash is reversible by guessing.
+- Purpose, datasheets, retention and erasure across versions are part of the data pipeline.
+
+Next: the [capstone](#/learn/dataops/capstone/data-ops-pipeline) combines labeling, validation, versioning, retraining
+and governance in one pipeline.
+
+</Section>
