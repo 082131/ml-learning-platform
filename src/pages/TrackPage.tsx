@@ -6,7 +6,8 @@ import { PixelProgressGrid } from '@/components/layout/PixelProgressGrid';
 import { StatGrid } from '@/components/layout/StatGrid';
 import { LessonCard, LEVEL_LABEL } from '@/components/learning/LessonCard';
 import grid from '@/components/learning/LessonGrid.module.css';
-import { SectionLabel } from '@/components/ui';
+import { ButtonLink, SectionLabel } from '@/components/ui';
+import { getExam } from '@/app/exams';
 import { trackStats } from '@/lib/progress/recommend';
 import type { Level } from '@/lib/types';
 import NotFound from './NotFound';
@@ -20,6 +21,7 @@ export default function TrackPage() {
   const track = curriculum.getTrack(trackId);
   if (!track) return <NotFound />;
 
+  const exam = getExam(track.id);
   const lessons = curriculum.lessonsOf(track.id);
   const stats = trackStats(track, progress);
   const projects = lessons.filter((l) => l.meta.kind !== 'lesson').length;
@@ -30,6 +32,13 @@ export default function TrackPage() {
     <>
       <PageHeader code={track.code} label="Track" title={track.title}>
         <p className={s.summary}>{track.summary}</p>
+        {exam && (
+          <p className={s.summary}>
+            <ButtonLink to={`/exam/${track.id}`} variant="primary">
+              Certification exam: {exam.questions.length} items + hands-on
+            </ButtonLink>
+          </p>
+        )}
         <StatGrid
           label="Track progress"
           stats={[
