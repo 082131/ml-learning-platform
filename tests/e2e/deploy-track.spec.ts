@@ -116,6 +116,8 @@ test('the capstone shows its brief', async ({ page }) => {
 
 for (const path of [...LESSONS.map((l) => l.path), 'capstone/quantize-and-ship'])
   test(`${path}: no serious accessibility issues and no horizontal scroll, in both themes`, async ({ page }) => {
+    // Buttons animate their colors on a theme change; reduced motion makes axe see the final colors.
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto(`./#/learn/deploy/${path}`);
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     await page.waitForLoadState('networkidle');
