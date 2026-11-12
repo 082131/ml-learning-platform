@@ -1,0 +1,167 @@
+import { experiment, loopCode, overfitCode, recordedNote, trainCode } from './code';
+import { loopExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Five lines, repeated thousands of times">
+
+Every PyTorch model learns in the same <Term id="training-loop">training loop</Term>. For each batch: run the
+model, measure the loss, clear the old gradients, compute new ones, and nudge the parameters. That is five lines.
+Around them sit a few habits that separate a loop that works from one that quietly does not: switching between
+training and evaluation mode, evaluating without gradients, watching the validation loss, saving the best
+<Term id="checkpoint">checkpoint</Term>, and testing the setup on one batch before spending hours on all of them.
+
+</Section>
+
+<Section kind="technical" title="Anatomy of the loop">
+
+**The batch step.** `loss = loss_fn(model(xb), yb)`, then `opt.zero_grad()`, `loss.backward()`, `opt.step()`.
+`backward()` *adds* each gradient to `p.grad`, which is why `zero_grad()` must run once per step, before
+`backward()`. `step()` reads `p.grad` and updates `p`: for plain SGD, `p -= lr * p.grad`; Adam also keeps running
+averages of past gradients per parameter.
+
+**Train and eval modes.** `model.train()` and `model.eval()` switch layers that behave differently in training,
+such as dropout (on in training, off in eval) and batch norm (batch statistics in training, stored running
+statistics in eval). They do not turn gradients on or off. That is `torch.no_grad()` (or the decorator
+`@torch.no_grad()`), which skips building the graph during evaluation and inference.
+
+**Tracking the loss.** Accumulate `loss.item()`, a Python float. Summing the loss tensors themselves would keep
+every batch’s graph alive. Weight by `len(xb)` so a short last batch counts correctly in the epoch mean.
+
+**Learning rate and batch size.** The <Term id="learning-rate">learning rate</Term> sets the step size. Too small
+and the loss crawls; too large and it jumps around or diverges. The batch size sets how many steps an epoch has
+and how noisy each gradient is: with 480 examples, batch size 8 gives 60 steps per epoch and batch size 480 gives
+one. Compare runs by steps taken, not only by epochs.
+
+**Reading the curves.** Both losses falling: keep training. Training loss falling while validation loss rises:
+<Term id="overfitting">overfitting</Term>, so keep the checkpoint with the lowest validation loss. Training loss
+flat from the start: learning rate too small, or a bug.
+
+**Checkpoints.** Save `state_dict()`s, dictionaries from parameter names to tensors, for the model and the
+optimizer, plus the epoch: `torch.save({"model": model.state_dict(), "opt": opt.state_dict(), "epoch": e}, path)`.
+To restore, build the same architecture and call `load_state_dict`. Saving the optimizer state lets you resume
+training where it stopped.
+
+**Overfit one batch first.** Before a long run, train on a single small batch for a few hundred steps. A working
+model and loop drive that loss to nearly zero. If it cannot memorize eight examples, something is broken
+(the shapes, the loss, the output layer, the order of calls), and more data will not fix it.
+
+</Section>
+
+<Section kind="visual" title="Loss curves for different settings">
+
+The same small network learns to tell points inside a circle from points outside it: 480 training and 120
+validation examples, 20 epochs, plain SGD. Pick a setting to see the loss per epoch as PyTorch recorded it. The
+y axis is fixed so you can compare runs.
+
+<Experiment def={experiment} title="Training run explorer">
+  <RecordedCurves title="Loss per epoch" yDomain={[0, 3.5]} />
+  <StateCards title="After 20 epochs" labelHeading="Quantity" noteHeading="Detail" source="Recorded in PyTorch 2.14" />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="The program">
+
+The readout shows the lines the loop printed at epochs 1, 5, 10 and 20.
+
+<Experiment def={experiment} title="train.py, linked to the explorer" controls={false}>
+  <Code example={trainCode} title="train.py" />
+  <Readout title="What PyTorch printed" />
+</Experiment>
+
+</Section>
+
+<Section kind="experiment" title="Things to try">
+
+In the explorer:
+
+- **Learning rate.** At `lr=0.01` the validation loss only goes from 0.7052 to 0.6397 in 20 epochs; at `lr=0.1`
+  it reaches 0.3181 and at `lr=1.0` it bottoms out at 0.0677 (epoch 18). At `lr=10.0` the steps overshoot: the
+  validation loss jumps between about 0.48 and 1.35 and accuracy ends at 0.717.
+- **Batch size.** With `lr=0.1`, batch size 480 takes 20 steps in total and barely learns (accuracy 0.650);
+  batch size 8 takes 1,200 steps and reaches 0.983. Same epochs, very different amounts of training.
+- **zero_grad forgotten.** The first epochs look *better* than the correct loop, because summed gradients act
+  like ever-larger steps. Then the steps overshoot, and by epoch 20 the validation loss is 1.5991. Nothing
+  raised an error.
+
+Below, a complete loop with Adam: a training function, an evaluation function under `@torch.no_grad()`, and the
+best model saved by validation loss, then restored into a fresh model. {recordedNote}
+
+<Code example={loopCode} title="loop.py" />
+
+And the overfit-one-batch check. The healthy model memorizes eight examples. The buggy one, with a ReLU after
+the output layer, gets stuck at 0.6931 = ln 2, the loss of predicting probability 0.5 for everything: its
+logits can never be negative, the optimizer pushes them to 0, and there the ReLU’s gradient is zero.
+
+<Code example={overfitCode} title="overfit.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Training loop mistakes">
+
+<CommonMistake
+  title="Calling backward twice on the same graph"
+  wrong={'loss = loss_fn(model(xb), yb)\nloss.backward()\nloss.backward()   # e.g. once more for logging'}
+  error="RuntimeError: Trying to backward through the graph a second time (or directly access saved tensors after they have already been freed). Saved intermediate values of the graph are freed when you call .backward() or autograd.grad(). Specify retain_graph=True if you need to backward through the graph a second time or if you need to access saved tensors after calling backward."
+  cause="backward() frees the graph’s saved values. A second call has nothing to work with."
+  fix={'loss = loss_fn(model(xb), yb)   # a fresh forward pass every step\nloss.backward()'}
+/>
+
+<CommonMistake
+  title="Loading a checkpoint into a different architecture"
+  wrong={'model = nn.Sequential(nn.Linear(2, 32), nn.ReLU(), nn.Linear(32, 1))\nmodel.load_state_dict(ckpt["model"])   # saved with 16 hidden units'}
+  error={'RuntimeError: Error(s) in loading state_dict for Sequential:\n\tsize mismatch for 0.weight: copying a param with shape torch.Size([16, 2]) from checkpoint, the shape in current model is torch.Size([32, 2]).\n\tsize mismatch for 0.bias: copying a param with shape torch.Size([16]) from checkpoint, the shape in current model is torch.Size([32]).\n\tsize mismatch for 2.weight: copying a param with shape torch.Size([1, 16]) from checkpoint, the shape in current model is torch.Size([1, 32]).'}
+  cause="A state_dict holds tensors by name; the model you load into must have the same names and shapes."
+  fix={'# store the settings next to the weights\ntorch.save({"hidden": 16, "model": model.state_dict()}, path)'}
+/>
+
+<CommonMistake
+  title="Evaluating in training mode"
+  wrong={'with torch.no_grad():\n    val_logits = model(X_val)   # model.eval() never called'}
+  error="No error: the validation numbers are just wrong (and different on every run) for models with dropout or batch norm."
+  cause="no_grad stops gradient tracking but leaves dropout on and batch norm using batch statistics."
+  fix={'model.eval()\nwith torch.no_grad():\n    val_logits = model(X_val)\nmodel.train()   # before the next training epoch'}
+/>
+
+</Section>
+
+<Section kind="practice" title="Where you will meet it">
+
+| In ML code | What it does |
+|---|---|
+| `for epoch in range(n): train_one_epoch(); evaluate()` | The outer loop of almost every training script |
+| `@torch.no_grad()` on `evaluate` or `predict` | Inference without building a graph |
+| `torch.save({"model": ..., "opt": ..., "epoch": ...})` | A checkpoint you can resume from |
+| `torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)` | Caps the gradient size between backward and step |
+| `torch.optim.lr_scheduler.StepLR(opt, step_size=10)` | Lowers the learning rate as training goes on |
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Reset the gradient every step">
+
+<MiniExercise exercise={loopExercise}>
+  This exercise runs in your browser with NumPy. `train_linear(X, y)` fits a linear model with mini-batch
+  gradient descent, but it adds each batch’s gradient to a running total, like a PyTorch loop without
+  `zero_grad()`. Fix it so every step uses only its own batch’s gradient. The tests check that it recovers
+  w = [3, −2] and b = 1.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Per batch: forward, loss, `zero_grad()`, `backward()`, `step()`. `backward()` adds to `.grad`.
+- `model.train()` / `model.eval()` switch dropout and batch norm; `torch.no_grad()` switches off the graph.
+  Evaluation needs both.
+- Accumulate `loss.item()`; compare runs by optimizer steps; a learning rate too large makes the loss jump.
+- Save `state_dict()`s of the model and optimizer, keep the best by validation loss, and overfit one batch before
+  any long run.
+
+Next: [an end-to-end project](#/learn/python/project/end-to-end) that puts the whole course together.
+
+</Section>

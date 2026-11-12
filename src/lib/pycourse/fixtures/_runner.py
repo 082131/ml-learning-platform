@@ -40,6 +40,8 @@ def run_fixture(path, template, variants, cards=None):
         "template": template,
         "variants": records,
     }
+    if "torch" in sys.modules:
+        data["torch"] = sys.modules["torch"].__version__.split("+")[0]
     text = json.dumps(data, indent=1, ensure_ascii=False) + "\n"
     target = pathlib.Path(path).with_suffix(".json")
     if "--check" in sys.argv:

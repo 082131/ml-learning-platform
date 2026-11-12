@@ -220,4 +220,6 @@ export interface ExperimentDef<S, R> {
   /** The id of the code example `trace` steps through. StepThrough blocks for other examples ignore it. */
   traceExample?: string;
   readout?: (s: S, r: R) => ReadoutItem[];
+  /** Where the readout's values come from, when not computed live: "recorded in CPython 3.13". */
+  resultSource?: string;
 }

@@ -428,7 +428,7 @@ export const tracks: Track[] = [
         lessons: [
           { id: 'python/pytorch/tensors-autograd', status: 'written' },
           { id: 'python/pytorch/datasets-modules', status: 'written' },
-          { id: 'python/pytorch/training-loop', status: 'outline' },
+          { id: 'python/pytorch/training-loop', status: 'written' },
         ],
       },
       {

@@ -7,7 +7,6 @@ export interface StateCard {
   note?: string;
 }
 
-/** One choice of a recorded experiment, run under CPython by a script in ./fixtures. */
 /** A histogram computed by np.histogram in the fixture, with labeled vertical markers (mean, median, …). */
 export interface RecordedHistogram {
   edges: number[];
@@ -18,6 +17,14 @@ export interface RecordedHistogram {
   tailFrom?: number;
 }
 
+/** Lines recorded per step (for example loss per epoch). Each point is [x, y]; a null y is a value that was NaN or infinite. */
+export interface RecordedCurves {
+  xLabel: string;
+  yLabel: string;
+  series: { id: string; label: string; points: (number | null)[][] }[];
+}
+
+/** One choice of a recorded experiment, run under CPython by a script in ./fixtures. */
 export interface RecordedVariant {
   id: string;
   label: string;
@@ -26,10 +33,13 @@ export interface RecordedVariant {
   error: string | null;
   cards?: StateCard[];
   hist?: RecordedHistogram;
+  curves?: RecordedCurves;
 }
 
 export interface RecordedFixture {
   python: string;
+  /** The PyTorch version, for fixtures that ran PyTorch. */
+  torch?: string;
   template: string;
   variants: RecordedVariant[];
 }
@@ -66,7 +76,14 @@ export function recordedExperiment(
     ],
     compute: (s) => byId.get(s.variant) ?? fixture.variants[0]!,
     readout: (_s, r) => recordedReadout(r),
+    resultSource: recordedSource(fixture),
   };
+}
+
+/** "recorded with PyTorch 2.14.1" or "recorded in CPython 3.13": where a fixture's outputs come from. */
+export function recordedSource(fixture: RecordedFixture): string {
+  if (fixture.torch) return `recorded with PyTorch ${fixture.torch}`;
+  return `recorded in CPython ${fixture.python.split('.').slice(0, 2).join('.')}`;
 }
 
 /** One readout line per printed line, then the exception if the run raised one. */

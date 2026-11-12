@@ -4,7 +4,7 @@ import s from './Experiment.module.css';
 
 const STATUS_LABEL = { ok: '', diverged: 'Diverged', error: 'Error' } as const;
 
-/** The experiment's computed values (`def.readout(state, result)`), labeled as computed. */
+/** The experiment's computed values (`def.readout(state, result)`), labeled as computed (or as recorded, per `def.resultSource`). */
 export function Readout({ title = 'Result' }: { title?: string }) {
   const { def, state, result } = useExperimentContext<unknown, unknown>('Readout');
   const items = def.readout?.(state, result) ?? [];
@@ -21,7 +21,7 @@ export function Readout({ title = 'Result' }: { title?: string }) {
   return (
     <section ref={ref} className={s.readout} aria-label={title} data-readout>
       <h3 className={s.readoutTitle}>
-        {title} <span className={s.computed}>computed in your browser</span>
+        {title} <span className={s.computed}>{def.resultSource ?? 'computed in your browser'}</span>
       </h3>
       <dl className={s.list}>
         {items.map((item) => (
