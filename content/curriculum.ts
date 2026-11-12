@@ -365,4 +365,65 @@ export const tracks: Track[] = [
       },
     ],
   },
+  {
+    id: 'dataops',
+    title: 'ML Data Operations',
+    code: 'T.06',
+    summary:
+      'Running the data side of machine learning: labeling, label quality, data validation and drift, dataset versioning, retraining and governance.',
+    chapters: [
+      {
+        id: 'foundations',
+        title: 'Data-centric ML',
+        level: 'beginner',
+        lessons: [
+          { id: 'dataops/foundations/data-centric-ml', status: 'written' },
+        ],
+      },
+      {
+        id: 'labeling',
+        title: 'Labeling and label quality',
+        level: 'intermediate',
+        lessons: [
+          { id: 'dataops/labeling/annotation-agreement', status: 'outline' },
+          { id: 'dataops/labeling/programmatic-labeling', status: 'outline' },
+          { id: 'dataops/labeling/label-errors', status: 'outline' },
+        ],
+      },
+      {
+        id: 'validation',
+        title: 'Validation and drift',
+        level: 'intermediate',
+        lessons: [
+          { id: 'dataops/validation/baselines-drift', status: 'outline' },
+        ],
+      },
+      {
+        id: 'versioning',
+        title: 'Dataset versioning',
+        level: 'advanced',
+        lessons: [
+          { id: 'dataops/versioning/data-snapshots', status: 'outline' },
+        ],
+      },
+      {
+        id: 'pipelines',
+        title: 'Retraining and governance',
+        level: 'advanced',
+        lessons: [
+          { id: 'dataops/pipelines/retraining-triggers', status: 'outline' },
+          { id: 'dataops/pipelines/privacy-governance', status: 'outline' },
+        ],
+      },
+      {
+        id: 'capstone',
+        title: 'Capstone',
+        level: 'advanced',
+        project: 'dataops/capstone/data-ops-pipeline',
+        lessons: [
+          { id: 'dataops/capstone/data-ops-pipeline', status: 'outline' },
+        ],
+      },
+    ],
+  },
 ];

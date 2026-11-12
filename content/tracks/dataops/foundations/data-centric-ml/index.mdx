@@ -1,0 +1,181 @@
+import { auditRunner, dc, knnPython } from './code';
+import { knnExercise, questions } from './quiz';
+
+<Section kind="intuition" title="The model is rarely the weakest part">
+
+When a model underperforms, the reflex is to change the model: a bigger network, a new architecture, another round
+of hyperparameter tuning. Often the model is fine and the data is the problem. Some <Term id="label">labels</Term>
+are wrong, some kinds of input are missing, two annotators used two different rules for the same case.
+
+<Term id="data-centric-ai">Data-centric AI</Term> turns the reflex around: hold the model fixed and improve the data.
+This track is about doing that as an engineering discipline, which is what "ML data operations" means: every stage
+data passes through, from collection to monitoring, is run on purpose, measured and repeatable.
+
+This lesson makes the case with a measurement. You will train the same simple model on data with more or fewer wrong
+labels, and more or fewer examples, and see which fix actually moves the score.
+
+</Section>
+
+<Section kind="technical" title="The data lifecycle, label noise and a fair comparison">
+
+**The lifecycle.** Data in an ML system passes through the same stages again and again: the
+<Term id="ml-data-lifecycle">ML data lifecycle</Term>. Each stage has one operational question, and each gets a lesson
+in this track:
+
+| Stage | The question | Where in this track |
+| --- | --- | --- |
+| Collect | Does the data cover the cases the model will meet? | this lesson |
+| Label | Do annotators agree, and are the labels right? | [agreement](#/learn/dataops/labeling/annotation-agreement), [programmatic labeling](#/learn/dataops/labeling/programmatic-labeling), [label errors](#/learn/dataops/labeling/label-errors) |
+| Validate | Does this batch look like the data the model was trained on? | [baselines and drift](#/learn/dataops/validation/baselines-drift) |
+| Version | Can we rebuild exactly the dataset a model was trained on? | [snapshots and time travel](#/learn/dataops/versioning/data-snapshots) |
+| Retrain | When is the model stale enough to retrain? | [retraining triggers](#/learn/dataops/pipelines/retraining-triggers) |
+| Govern | Are we allowed to use this data, and can we delete it? | [privacy and governance](#/learn/dataops/pipelines/privacy-governance) |
+
+Moving, storing and transforming data (ingestion, orchestration, data quality checks, feature pipelines) is covered by
+the [Data Engineering track](#/learn/data/features/training-serving); this track builds on it.
+
+**Label noise.** <Term id="label-noise">Label noise</Term> means some training labels are wrong. In the experiment the
+noise is symmetric: each training label is flipped with probability $p$. If 30% of labels are flipped, a model that
+memorizes its training data reproduces those errors.
+
+**The model.** <Term id="k-nearest-neighbours">k-nearest neighbours</Term> predicts the majority label of the $k$
+closest training examples. With $k = 1$ it copies the label of the single nearest one, so each wrong label creates a
+small region of wrong predictions around it. That makes it a sharp instrument for seeing what noise does.
+
+**The data.** Points $(x, y)$ are spread uniformly over the unit square. The true class is 1 inside a circle of radius
+0.3 around the centre:
+
+$$
+\text{label}(x, y) = 1 \iff (x - 0.5)^2 + (y - 0.5)^2 < 0.3^2 = 0.09
+$$
+
+**A fair comparison.** Every model is scored on the same 400 test points with correct labels. A clean test set
+measures how well the model learned the true rule. With noisy test labels, a perfect model would be marked wrong
+whenever the test label is wrong, and the differences between fixes would blur.
+
+**Three fixes, one table.** The experiment computes accuracy for 5 training sizes × 5 noise levels at once, for the
+chosen $k$. From any cell, moving right is "collect more data", moving up is "clean the labels", and changing $k$ is
+"change the model".
+
+</Section>
+
+<Section kind="visual" title="More data, cleaner labels, or a different model">
+
+<Experiment def={dc} title="k-nearest neighbours on noisy labels">
+  <AccuracyGrid />
+  <Readout title="What the experiment measured" />
+</Experiment>
+
+Things to try:
+
+- **The default** (200 examples, 30% wrong, 1-NN) scores 0.603. Doubling the data gives 0.630. Fixing 10 points of
+  noise gives 0.720, and fixing 20 points gives 0.902.
+- **The right edge.** At 30% wrong labels, even 1,600 examples reach only 0.718. The 30% row wanders between 0.60 and
+  0.72 as data grows, because 1-NN copies a new set of wrong labels with every new example.
+- **Clean and small.** 100 examples with clean labels score 0.950, better than 1,600 examples at any noise level of
+  20% or more.
+- **Change the model.** Switch to 15 neighbours: the default cell jumps to 0.855, because isolated wrong labels are
+  outvoted. Clean labels still win: 200 clean examples score 0.973 with 15-NN.
+
+</Section>
+
+<Section kind="code" title="The experiment in Python, and a cheap label audit">
+
+The full program behind every cell. The three settings are filled from the controls:
+
+<Experiment def={dc} title="knn.py, linked to the experiment" controls={false}>
+  <Code example={knnPython} title="knn.py" />
+  <Readout title="What the code prints" />
+</Experiment>
+
+**Finding wrong labels without knowing the truth.** In real projects you do not know which labels are wrong. A cheap
+first audit: flag a training example when most of its nearest neighbours carry a different label, and send only the
+flagged examples to a human reviewer. Run it on 400 examples with 30% noise:
+
+<PythonRunner example={auditRunner} title="audit.py" />
+
+The audit flags 76 of 400 examples (19%), and 73 of those are really wrong. Correcting them lifts 1-NN accuracy from
+0.630 to 0.848, more than quadrupling the data did. It also misses 61 wrong labels, so almost half the errors stay:
+at 30% noise, a wrong label often sits next to other wrong labels, and the neighbours' vote is not decisive. The [label errors lesson](#/learn/dataops/labeling/label-errors) does better with a
+model's predicted probabilities.
+
+<Callout kind="simplification">
+  Real label noise is rarely symmetric. Annotators confuse specific classes (a "fox" labeled "dog", a "refund
+  request" labeled "complaint"), and errors cluster on hard or ambiguous examples. Symmetric noise is the easiest
+  case to reason about; class-conditional noise is handled in the label errors lesson. In the review step the code
+  looks up the true label; in practice a person decides, and people make mistakes too.
+</Callout>
+
+</Section>
+
+<Section kind="mistakes" title="Treating data as fixed">
+
+<CommonMistake
+  title="Tuning the model on a noisy test set"
+  wrong={"test = labeled.sample(frac=0.2)   # same annotators, same 20% error rate as training"}
+  error="(no error: two models that differ by 2 points look different, but the test labels themselves are 20% wrong)"
+  cause="A noisy test set caps the score a perfect model can get and adds noise to every comparison, so you end up tuning to annotator mistakes."
+  fix="relabel the test set carefully (several annotators, an adjudicator), and keep it fixed while you compare fixes"
+/>
+
+<CommonMistake
+  title="Collecting more data from the same broken process"
+  wrong={"for batch in more_batches:\n    train += label_with_same_guidelines(batch)   # the same 30% error rate, ten times over"}
+  error="(no error: accuracy barely moves while labeling costs grow)"
+  cause="More examples average out random variation in the inputs, not a systematic problem in how labels are made."
+  fix="measure label quality first (agreement, audits); fix the guidelines or the labeling process, then collect more"
+/>
+
+<CommonMistake
+  title="Silently dropping the examples an audit flags"
+  wrong={"train = [p for i, p in enumerate(train) if i not in flagged]"}
+  error="(no error: accuracy may even rise, while the model gets worse on exactly the hard cases near the boundary)"
+  cause="Flagged examples are often the hard, ambiguous ones. Deleting them makes the training set easier than reality."
+  fix="send flagged examples to review; correct them, keep them, and record the decision with the dataset version"
+/>
+
+</Section>
+
+<Section kind="practice" title="Data-centric habits on a team">
+
+- **Keep a gold test set.** A few hundred examples labeled by experts, reviewed twice, never used for training.
+  Every fix is judged against it.
+- **Measure before collecting.** Estimate label noise on a random sample (have an expert relabel 200 examples) before
+  paying for more data.
+- **Version every fix.** A label correction is a data change. It gets a new dataset version and a note, like a code
+  change gets a commit ([dataset versioning](#/learn/dataops/versioning/data-snapshots)).
+- **Look at examples, not only metrics.** Read 50 errors from the validation set every week. Many turn out to be
+  label problems, not model problems.
+- **Know when to stop.** When an audit finds almost nothing and the learning curve is flat, the model is the limit:
+  then model work pays.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Write the majority vote">
+
+<MiniExercise exercise={knnExercise}>
+  Write `knn_predict(train, x, y, k)`. Each training point is `(x, y, label)` with label 0 or 1, and `k` is odd.
+  Return the majority label among the `k` points closest to `(x, y)`.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- ML data operations runs every stage of the data lifecycle (collect, label, validate, version, retrain, govern) on
+  purpose and repeatably.
+- Wrong labels cap what a model can learn. In the experiment, fixing 20 points of label noise on 200 examples beat
+  collecting eight times more noisy data.
+- Judge fixes on a clean, fixed test set; otherwise you tune to annotator mistakes.
+- Cheap audits, such as flagging examples whose neighbours disagree, find many wrong labels for a reviewer to fix.
+
+Next: [annotation and inter-annotator agreement](#/learn/dataops/labeling/annotation-agreement), where labels come
+from and how to tell whether they can be trusted.
+
+</Section>

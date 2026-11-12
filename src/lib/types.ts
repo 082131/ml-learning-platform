@@ -1,6 +1,6 @@
 // Content types shared by every thread. Change only additively (see data-model.md).
 
-export type TrackId = 'ml' | 'data' | 'ai' | 'inference';
+export type TrackId = 'ml' | 'data' | 'ai' | 'inference' | 'dataops';
 export type Level = 'beginner' | 'intermediate' | 'advanced';
 export type LessonStatus = 'written' | 'outline';
 

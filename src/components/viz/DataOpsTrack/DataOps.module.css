@@ -1,0 +1,101 @@
+/* Shared by the ML Data Operations track's visualizations. */
+.heat {
+  position: relative;
+  font-variant-numeric: tabular-nums;
+  text-align: right !important;
+  background: color-mix(in srgb, var(--accent) calc(var(--heat, 0) * 1%), var(--surface));
+}
+.current {
+  outline: 3px solid var(--ink);
+  outline-offset: -3px;
+  font-weight: 700 !important;
+}
+.marker {
+  display: block;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--ink);
+}
+.bars {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+}
+.barRow {
+  display: grid;
+  grid-template-columns: minmax(5rem, 9rem) 1fr 4.5rem;
+  align-items: center;
+  gap: var(--s-2);
+}
+.barPair {
+  display: grid;
+  gap: 2px;
+}
+.barA,
+.barB {
+  display: block;
+  height: 9px;
+  min-width: 1px;
+  border-radius: 2px;
+}
+.barA {
+  background: var(--ink-3);
+}
+.barB {
+  background: var(--accent);
+}
+.barB[data-bad='true'] {
+  background: var(--err);
+}
+.swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 4px;
+  border-radius: 2px;
+  vertical-align: -1px;
+}
+.cells {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cell {
+  display: grid;
+  place-items: center;
+  min-width: 2.2rem;
+  height: 2.2rem;
+  padding: 0 4px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: var(--surface);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+}
+.cell[data-tone='ok'] {
+  border-color: var(--ok);
+}
+.cell[data-tone='err'] {
+  border: 2px dashed var(--err);
+  color: var(--err);
+  font-weight: 600;
+}
+.cell[data-tone='warn'] {
+  border: 2px solid var(--warn);
+}
+.cell[data-tone='muted'] {
+  color: var(--ink-3);
+  border-style: dotted;
+}
+.note {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+}
