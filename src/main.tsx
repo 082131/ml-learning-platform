@@ -8,12 +8,16 @@ import './styles/tokens.css';
 import './styles/base.css';
 import { App } from './app/App';
 import { appProgressStore } from './app/progress';
+import { startSync } from './app/sync';
 
 // Debounced writes must not be lost when the tab closes.
 window.addEventListener('pagehide', () => appProgressStore.flush());
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') appProgressStore.flush();
 });
+
+// Sync across devices when the page runs as a Claude artifact; a no-op elsewhere.
+void startSync();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

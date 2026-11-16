@@ -116,7 +116,7 @@ See `data-model.md`: Track, Chapter, LessonMeta, CodeExample, Annotation, Trace 
 - **SC-005**: Axe accessibility scan reports no serious or critical violations on the dashboard, a track page and three lesson pages.
 
 ## Assumptions
-- One learner per browser. No accounts or sync in release 1.
+- One learner per browser. No accounts of our own. Since 2026-11-16, progress syncs across devices when the site is opened as a Claude artifact (see plan.md decisions); elsewhere it stays in the browser.
 - Python execution happens only in the learner's own browser (Pyodide in a Web Worker). Nothing runs on a server.
 - Framework-heavy code (PyTorch, Spark, ONNX Runtime, vLLM) is taught with real code the learner can run locally, plus labeled simulated traces and in-browser TypeScript re-implementations of the core math.
 - Remaining Data, AI and Inference lessons are a release 2 effort, one thread per track, using the same components.

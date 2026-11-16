@@ -30,7 +30,7 @@ export const emptyExamState = (): ExamState => ({ attempts: {}, history: {}, tas
 
 type StorageLike = Pick<Storage, 'getItem' | 'setItem'>;
 
-function parse(raw: string | null): ExamState {
+export function parseExamState(raw: string | null): ExamState {
   if (!raw) return emptyExamState();
   try {
     const v = JSON.parse(raw) as Partial<ExamState>;
@@ -87,7 +87,7 @@ export interface ExamStore {
 export function createExamStore(storage: StorageLike | null): ExamStore {
   let state = emptyExamState();
   try {
-    state = parse(storage?.getItem(EXAM_STORAGE_KEY) ?? null);
+    state = parseExamState(storage?.getItem(EXAM_STORAGE_KEY) ?? null);
   } catch {
     state = emptyExamState();
   }

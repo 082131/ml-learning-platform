@@ -1,6 +1,6 @@
 # ML Learning Platform: read this first
 
-An interactive, static (no backend) learning site for ML, Data, AI and Inference engineering. Vite + React + TypeScript, with MDX lessons, localStorage progress, and optional Pyodide.
+An interactive, static (no backend) learning site for ML, Data, AI and Inference engineering. Vite + React + TypeScript, with MDX lessons, localStorage progress (synced across devices through the Claude artifact store when hosted there, see `src/app/sync.ts`), and optional Pyodide.
 
 ## Before you touch anything
 1. `.specify/memory/constitution.md`: the rules (accuracy, labeled simulations, one source of truth, tests per feature).
