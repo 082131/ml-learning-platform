@@ -34,6 +34,7 @@ const LINKS: NavItem[] = [
   })),
 ];
 const UTIL_LINKS: NavItem[] = [
+  { to: '/interview', label: 'Interview', title: 'Interview prep' },
   { to: '/glossary', label: 'Glossary' },
   { to: '/bookmarks', label: 'Bookmarks' },
   { to: '/settings', label: 'Settings' },

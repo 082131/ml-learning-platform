@@ -1,5 +1,13 @@
 import { MAX_HISTORY, parseExamState, type ExamState, type SittingRecord } from '@/lib/exam/storage';
 import type { Attempt } from '@/lib/exam/engine';
+import {
+  MAX_SCREEN_HISTORY,
+  parseInterviewState,
+  type InterviewState,
+  type RatingRecord,
+  type ScreenResult,
+  type ScreenSitting,
+} from '@/lib/interview/storage';
 import { migrate } from '@/lib/progress/migrate';
 import { emptyState, type ProgressState } from '@/lib/progress/schema';
 
@@ -129,4 +137,44 @@ const EMPTY_EXAMS: ExamState = { attempts: {}, history: {}, tasks: {} };
 
 export function mergeExams(base: ExamState | null, local: ExamState, remote: ExamState): ExamState {
   return parseExamState(canonical(merge3(base ?? EMPTY_EXAMS, local, remote, examRules)));
+}
+
+const sittingPoints = (s: ScreenSitting) => Object.values(s.tasks ?? {}).reduce((sum, t) => sum + t.best, 0);
+
+const interviewRules: Rules = {
+  atomic: (path) => path.length === 2 && (path[0] === 'ratings' || path[0] === 'sittings'),
+  resolve(path, local, remote) {
+    switch (path[0]) {
+      case 'ratings': {
+        // The most recent self-rating wins.
+        const a = local as RatingRecord;
+        const b = remote as RatingRecord;
+        return a.at >= b.at ? a : b;
+      }
+      case 'sittings': {
+        const a = local as ScreenSitting;
+        const b = remote as ScreenSitting;
+        if (a.startedAt !== b.startedAt) return a.startedAt >= b.startedAt ? a : b;
+        if (Boolean(a.submittedAt) !== Boolean(b.submittedAt)) return a.submittedAt ? a : b;
+        return sittingPoints(a) >= sittingPoints(b) ? a : b;
+      }
+      case 'history': {
+        const byTime = new Map<number, ScreenResult>();
+        for (const r of [...(local as ScreenResult[]), ...(remote as ScreenResult[])]) byTime.set(r.at, r);
+        return [...byTime.values()].sort((x, y) => y.at - x.at).slice(0, MAX_SCREEN_HISTORY);
+      }
+      default:
+        return local;
+    }
+  },
+};
+
+const EMPTY_INTERVIEW: InterviewState = { ratings: {}, sittings: {}, history: {} };
+
+export function mergeInterview(
+  base: InterviewState | null,
+  local: InterviewState,
+  remote: InterviewState,
+): InterviewState {
+  return parseInterviewState(canonical(merge3(base ?? EMPTY_INTERVIEW, local, remote, interviewRules)));
 }

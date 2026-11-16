@@ -94,7 +94,7 @@ export default function SettingsPage() {
           {synced ? (
             <>
               <p>
-                Lesson progress, quiz results, bookmarks, exam results and your theme are saved in this
+                Lesson progress, quiz results, bookmarks, exam results, interview practice and your theme are saved in this
                 browser and synced to your Claude account. Open this page on another device where you are
                 signed in to Claude and the same progress appears. Only you can read it.
               </p>

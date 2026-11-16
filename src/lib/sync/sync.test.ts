@@ -3,7 +3,8 @@ import { emptyExamState, type ExamState } from '@/lib/exam/storage';
 import { migrate } from '@/lib/progress/migrate';
 import { emptyState, type ProgressState } from '@/lib/progress/schema';
 import { createSync, type RemoteDoc, type RemoteSnapshot, type SyncedStore } from './engine';
-import { canonical, mergeExams, mergeProgress } from './merge';
+import { emptyInterviewState, type InterviewState } from '@/lib/interview/storage';
+import { canonical, mergeExams, mergeInterview, mergeProgress } from './merge';
 
 const state = (patch: Partial<ProgressState>): ProgressState => ({ ...emptyState(), ...patch });
 
@@ -244,5 +245,33 @@ describe('createSync', () => {
     const b = device(c2.doc, state({ completed: { a: 't' } }));
     await settle();
     expect(b.sync.getStatus().phase).toBe('read-only');
+  });
+});
+
+describe('mergeInterview', () => {
+  const iv = (patch: Partial<InterviewState>): InterviewState => ({ ...emptyInterviewState(), ...patch });
+
+  it('keeps the latest self-rating and ratings made on either device', () => {
+    const local = iv({ ratings: { a: { rating: 1, at: 10, times: 1 }, b: { rating: 3, at: 5, times: 1 } } });
+    const remote = iv({ ratings: { a: { rating: 3, at: 20, times: 2 }, c: { rating: 2, at: 7, times: 1 } } });
+    const merged = mergeInterview(null, local, remote);
+    expect(merged.ratings.a).toEqual({ rating: 3, at: 20, times: 2 });
+    expect(Object.keys(merged.ratings).sort()).toEqual(['a', 'b', 'c']);
+  });
+
+  it('prefers the newer sitting, then the submitted one, and joins screen history', () => {
+    const older = { startedAt: 1, submittedAt: 9, tasks: {} };
+    const newer = { startedAt: 50, tasks: { t: { code: 'x', passed: ['a'], best: 30 } } };
+    const merged = mergeInterview(
+      null,
+      iv({ sittings: { ml: older }, history: { ml: [{ at: 9, percent: 40, passed: false }] } }),
+      iv({ sittings: { ml: newer }, history: { ml: [{ at: 3, percent: 90, passed: true }] } }),
+    );
+    expect(merged.sittings.ml).toEqual(newer);
+    expect(merged.history.ml!.map((r) => r.at)).toEqual([9, 3]);
+    const submitted = { ...newer, submittedAt: 99 };
+    expect(
+      mergeInterview(null, iv({ sittings: { ml: newer } }), iv({ sittings: { ml: submitted } })).sittings.ml,
+    ).toEqual(submitted);
   });
 });

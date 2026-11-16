@@ -15,6 +15,10 @@ interface HandsOnTaskProps {
   record?: TaskRecord;
   onRun: (run: { code: string; passed: string[]; score: number }) => void;
   onReveal: (code: string) => void;
+  /** No more edits or runs: a timed screen after time is up. */
+  locked?: boolean;
+  /** `penalty` (default): revealing scores 0. `hidden`: no solution during a timed sitting. `shown`: always visible. */
+  solution?: 'penalty' | 'hidden' | 'shown';
 }
 
 interface CheckResult {
@@ -25,7 +29,15 @@ interface CheckResult {
 /** Last line of a Python failure, which is the assert message the check wrote. */
 const lastLine = (msg?: string) => msg?.trim().split('\n').pop() ?? '';
 
-export function HandsOnTask({ task, index, record, onRun, onReveal }: HandsOnTaskProps) {
+export function HandsOnTask({
+  task,
+  index,
+  record,
+  onRun,
+  onReveal,
+  locked = false,
+  solution = 'penalty',
+}: HandsOnTaskProps) {
   const runner = usePythonRunner();
   const [code, setCode] = useState(record?.code ?? task.starter);
   const [results, setResults] = useState<Record<string, CheckResult>>({});
@@ -64,7 +76,7 @@ export function HandsOnTask({ task, index, record, onRun, onReveal }: HandsOnTas
           Task {index + 1}. {task.title}
         </h3>
         <span className={s.meta}>
-          {record?.revealed ? (
+          {record?.revealed && solution === 'penalty' ? (
             <Badge tone="warn">Solution revealed · 0 / {total}</Badge>
           ) : (
             <>
@@ -77,13 +89,20 @@ export function HandsOnTask({ task, index, record, onRun, onReveal }: HandsOnTas
         <InlineText text={task.brief} />
       </div>
       <div className={s.editorWrap}>
-        <CodeEditor value={code} onChange={setCode} label={`Task ${index + 1} code editor`} />
+        <CodeEditor
+          value={code}
+          onChange={locked ? () => undefined : setCode}
+          label={`Task ${index + 1} code editor`}
+        />
       </div>
       <div className={s.row}>
-        <Button variant="primary" onClick={runChecks} disabled={phase !== null}>
+        <Button variant="primary" onClick={runChecks} disabled={phase !== null || locked}>
           Run graded checks
         </Button>
-        <Button onClick={() => setCode(task.starter)} disabled={phase !== null || code === task.starter}>
+        <Button
+          onClick={() => setCode(task.starter)}
+          disabled={phase !== null || locked || code === task.starter}
+        >
           Reset to starter
         </Button>
         <span className={s.meta} role="status">
@@ -109,7 +128,7 @@ export function HandsOnTask({ task, index, record, onRun, onReveal }: HandsOnTas
           );
         })}
       </ul>
-      {record?.revealed ? (
+      {solution === 'hidden' ? null : record?.revealed || solution === 'shown' ? (
         <div className={s.section}>
           <span className={s.meta}>Reference solution</span>
           <PlainCode source={task.solution} language="python" label="Reference solution" />

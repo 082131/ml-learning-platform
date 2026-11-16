@@ -36,7 +36,8 @@ export default function TrackPage() {
           <p className={s.summary}>
             <ButtonLink to={`/exam/${track.id}`} variant="primary">
               Take the certification exam
-            </ButtonLink>
+            </ButtonLink>{' '}
+            <ButtonLink to={`/interview?role=${track.id}`}>Practice interview questions</ButtonLink>
           </p>
         )}
         <StatGrid

@@ -11,6 +11,8 @@ const GlossaryPage = lazy(() => import('@/pages/GlossaryPage'));
 const BookmarksPage = lazy(() => import('@/pages/BookmarksPage'));
 const SettingsPage = lazy(() => import('@/pages/SettingsPage'));
 const ExamPage = lazy(() => import('@/pages/ExamPage'));
+const InterviewPage = lazy(() => import('@/pages/InterviewPage'));
+const ScreenPage = lazy(() => import('@/pages/ScreenPage'));
 const NotFound = lazy(() => import('@/pages/NotFound'));
 
 // Developer pages: in dev builds, and in the e2e build (VITE_DEV_PAGES=true). Removed from production builds.
@@ -26,6 +28,8 @@ export function AppRoutes() {
         <Route path="learn/:track" element={<TrackPage />} />
         <Route path="learn/:track/:chapter/:lesson" element={<LessonPage />} />
         <Route path="exam/:track" element={<ExamPage />} />
+        <Route path="interview" element={<InterviewPage />} />
+        <Route path="interview/screen/:id" element={<ScreenPage />} />
         <Route path="glossary" element={<GlossaryPage />} />
         <Route path="bookmarks" element={<BookmarksPage />} />
         <Route path="settings" element={<SettingsPage />} />

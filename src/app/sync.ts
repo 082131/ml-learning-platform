@@ -1,9 +1,11 @@
 import { useSyncExternalStore } from 'react';
 import { appExamStore } from '@/components/exam/useExamStore';
+import { appInterviewStore } from '@/components/interview/useInterviewStore';
 import { parseExamState } from '@/lib/exam/storage';
+import { parseInterviewState } from '@/lib/interview/storage';
 import { migrate } from '@/lib/progress/migrate';
 import { createSync, type BaseStorage, type RemoteDoc, type Sync, type SyncStatus } from '@/lib/sync/engine';
-import { mergeExams, mergeProgress } from '@/lib/sync/merge';
+import { mergeExams, mergeInterview, mergeProgress } from '@/lib/sync/merge';
 import { appProgressStore } from './progress';
 
 // Cross-device sync. When the site is opened as a Claude artifact, the viewer gets a private
@@ -74,6 +76,13 @@ export async function startSync(): Promise<Sync | null> {
           doc: db.doc(`${mine}/exams`),
           parse: (json) => parseExamState(json),
           merge: mergeExams,
+        },
+        {
+          name: 'interview',
+          store: appInterviewStore,
+          doc: db.doc(`${mine}/interview`),
+          parse: (json) => parseInterviewState(json),
+          merge: mergeInterview,
         },
       ],
       { bases: browserBases(uid) },

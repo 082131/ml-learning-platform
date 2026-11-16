@@ -24,7 +24,8 @@ export default function Dashboard() {
       <PageHeader code="00" label="Dashboard" title="Your learning">
         <p className={s.lead}>
           Four tracks, one lesson at a time. Progress is saved in this browser (
-          <Link to="/settings">details</Link>).
+          <Link to="/settings">details</Link>). Getting ready to apply? Try{' '}
+          <Link to="/interview">interview prep</Link>: questions with model answers and timed coding screens.
         </p>
       </PageHeader>
       <PixelProgressGrid

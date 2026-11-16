@@ -57,7 +57,7 @@ export const submit = (attempt: Attempt, now: number): Attempt =>
   attempt.submittedAt !== undefined ? attempt : { ...attempt, submittedAt: now };
 
 /** Milliseconds left, never below zero. */
-export function timeLeft(attempt: Attempt, minutes: number, now: number): number {
+export function timeLeft(attempt: Pick<Attempt, 'startedAt'>, minutes: number, now: number): number {
   return Math.max(0, attempt.startedAt + minutes * MS_PER_MINUTE - now);
 }
 
