@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { planExercise } from '../../content/tracks/python/project/end-to-end/quiz';
+import type { Exercise } from '../../src/lib/types';
 import { servePyodideLocally } from './pyodide';
 
 // Every lesson of the Python for Data & ML track (T.05).
@@ -36,6 +37,8 @@ for (const lesson of LESSONS) {
     await open(page, lesson);
     for (const theme of ['light', 'dark']) {
       await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme);
+      // Let color transitions finish, or axe can sample a color halfway between the two themes.
+      await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)));
       const results = await new AxeBuilder({ page }).analyze();
       const serious = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
       expect(
@@ -129,4 +132,50 @@ test.describe('Python in the lesson @network', () => {
     await exercise.getByRole('button', { name: 'Run tests' }).click();
     await expect(exercise).toContainText('All tests passed.', { timeout: 60_000 });
   });
+});
+
+test.describe('Every browser example prints its lesson output @network', () => {
+  test.describe.configure({ timeout: 240_000 });
+  for (const lesson of LESSONS) {
+    test(`${lesson}: every runner's real output matches the expected output shown`, async ({
+      page,
+      context,
+    }, info) => {
+      test.skip(info.project.name === 'phone', 'Runs the same Python as desktop; once is enough.');
+      await servePyodideLocally(context);
+      await open(page, lesson);
+      const runners = page.locator('[data-python-runner]');
+      const count = await runners.count();
+      for (let i = 0; i < count; i++) {
+        const runner = runners.nth(i);
+        const shown = runner.getByRole('group', { name: 'Expected output' });
+        if ((await shown.count()) === 0) continue; // an exercise editor: it has tests, not an expected output
+        const expected = (await shown.innerText()).replace(/\n$/, '');
+        await runner.getByRole('button', { name: 'Run', exact: true }).click();
+        const result = runner.locator('[data-run-status]');
+        await expect(result).toBeVisible({ timeout: 180_000 });
+        await expect(result, (await result.textContent()) ?? '').toHaveAttribute('data-run-status', 'ok');
+        const printed = (await runner.getByRole('group', { name: 'Printed output' }).innerText()).replace(
+          /\n$/,
+          '',
+        );
+        expect(printed, `runner ${i + 1} of ${lesson}`).toBe(expected);
+      }
+
+      // The exercise: the starter must fail its tests and the reference solution must pass, in the browser.
+      const quiz = (await import(`../../content/tracks/python/${lesson}/quiz`)) as Record<string, unknown>;
+      const exercise = Object.values(quiz).find(
+        (v): v is Exercise => typeof v === 'object' && v !== null && 'tests' in v && 'solution' in v,
+      );
+      if (!exercise) return;
+      const box = page.locator(`[data-exercise="${exercise.id}"]`);
+      const status = box.locator('[data-run-status]');
+      await box.getByRole('button', { name: 'Run tests' }).click();
+      await expect(status).toBeVisible({ timeout: 180_000 });
+      await expect(status).not.toHaveAttribute('data-run-status', 'ok');
+      await box.getByRole('textbox', { name: 'Your solution code editor' }).fill(exercise.solution);
+      await box.getByRole('button', { name: 'Run tests' }).click();
+      await expect(box).toContainText('All tests passed.', { timeout: 60_000 });
+    });
+  }
 });

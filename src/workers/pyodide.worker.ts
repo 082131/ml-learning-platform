@@ -15,7 +15,10 @@ interface PyProxyFn {
 interface Pyodide {
   version: string;
   runPython(code: string): unknown;
-  loadPackagesFromImports(code: string): Promise<unknown>;
+  loadPackagesFromImports(
+    code: string,
+    options?: { messageCallback?: (message: string) => void },
+  ): Promise<unknown>;
   setStdout(options: { batched: (text: string) => void }): void;
   setStderr(options: { batched: (text: string) => void }): void;
   globals: { get(name: string): PyProxyFn };
@@ -61,7 +64,9 @@ scope.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
   try {
     if (IMPORTS.test(source)) {
       post({ type: 'phase', id: data.id, phase: 'loading-packages' });
-      await py.loadPackagesFromImports(source);
+      // Pyodide reports "Loading numpy" / "Loaded numpy" through stdout by default, which would show up
+      // as if the learner's program had printed it. The phase message above already says what is happening.
+      await py.loadPackagesFromImports(source, { messageCallback: () => {} });
     }
   } catch (e) {
     post({
