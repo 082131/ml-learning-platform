@@ -586,9 +586,9 @@ export const tracks: Track[] = [
         title: 'Collaborating on GitHub',
         level: 'intermediate',
         lessons: [
-          { id: 'git/github/remotes', status: 'outline' },
-          { id: 'git/github/pull-requests', status: 'outline' },
-          { id: 'git/github/actions-ci', status: 'outline' },
+          { id: 'git/github/remotes', status: 'written' },
+          { id: 'git/github/pull-requests', status: 'written' },
+          { id: 'git/github/actions-ci', status: 'written' },
         ],
       },
       {
@@ -596,8 +596,8 @@ export const tracks: Track[] = [
         title: 'Releases and versioning',
         level: 'advanced',
         lessons: [
-          { id: 'git/releases/semver-releases', status: 'outline' },
-          { id: 'git/releases/ml-versioning', status: 'outline' },
+          { id: 'git/releases/semver-releases', status: 'written' },
+          { id: 'git/releases/ml-versioning', status: 'written' },
         ],
       },
       {

@@ -1,0 +1,156 @@
+import { owners, prFlow, prTemplate, protection, reviewCommands } from './code';
+import { ownersExercise, questions } from './quiz';
+
+<Section kind="intuition" title="A conversation before the merge">
+
+On a team, nobody merges straight into `main`. You push a branch and open a
+<Term id="pull-request">pull request</Term> (PR): a page that says "here is a change, please look at it before it
+goes in". Teammates read the diff, ask questions, suggest fixes, and the CI system runs the tests. When everyone is
+satisfied, one click merges the branch.
+
+The PR is where a team's quality bar lives. It catches bugs, but just as often it spreads knowledge: the reviewer
+learns the code, and the author learns the team's standards. For ML work it is also where someone asks the
+questions a diff cannot answer: did the validation metric move, is there leakage, what does this cost to serve?
+
+</Section>
+
+<Section kind="technical" title="Pull requests, protection rules and code owners">
+
+A PR compares a **head** branch with a **base** branch (usually `main`) and shows the commits in `base..head`.
+Pushing to the head branch updates the PR. <Term id="code-review">Code review</Term> on GitHub has three verdicts:
+**Comment**, **Approve** and **Request changes**.
+
+<Term id="branch-protection">Branch protection rules</Term> (or the newer rulesets) make the merge button enforce
+the process. Common rules for `main`:
+
+| Rule | Blocks the merge until |
+| ---- | ---------------------- |
+| Require approvals (n) | n reviewers approved, and nobody's "request changes" is outstanding |
+| Require review from code owners | an owner of each changed file approved |
+| Require status checks | the named CI checks passed on the latest commit |
+| Require branches to be up to date | the branch contains the latest `main` (so CI tested the merged code) |
+| Require conversation resolution | every review thread is resolved |
+| Require linear history | (allows only squash or rebase merging) |
+| Block force pushes and deletions | (on by default for protected branches) |
+
+<Term id="codeowners">CODEOWNERS</Term> (in `.github/`, the root or `docs/`) maps path patterns to people or teams.
+GitHub requests a review from the owners of each changed file. The **last** matching line wins, so the file goes
+from general to specific.
+
+The merge button offers merge commit, squash and merge, and rebase and merge (previous lesson). Teams choose a
+<Term id="workflow-strategy">workflow</Term> around this: most use short-lived feature branches merged into `main`
+(GitHub flow or trunk-based development); long-lived `develop` and `release` branches (Git flow) suit products that
+ship versions on a schedule.
+
+</Section>
+
+<Section kind="visual" title="Try it: can this PR merge?">
+
+Set the repository's rules and the state of the pull request. The merge box lists every rule that blocks the
+merge, and which merge methods are allowed.
+
+<Experiment def={protection} title="Branch protection and the merge box">
+  <ProtectionView />
+  <Readout title="What the rules decide" />
+</Experiment>
+
+Things to try:
+
+- Set checks to passing and approvals to 1. Three rules still block: no code owner has approved, the branch is
+  behind `main`, and a conversation is open.
+- Set "a reviewer requested changes" to yes: even with enough approvals, the merge is blocked until that reviewer
+  approves or the review is dismissed.
+- Turn on linear history: merge commits disappear from the allowed methods.
+
+Now the code owners of a change. Type any path:
+
+<Experiment def={owners} title="Who must review this file?">
+  <OwnersView />
+  <Readout title="What CODEOWNERS decides" />
+</Experiment>
+
+Try `train.py`, `data/raw/customers.csv`, `configs/xgb/params.yaml`, `docs/index.md` and
+`src/serving/vendor/fastjson.py`. The last line has a pattern and no owners, so vendored code has nobody.
+
+</Section>
+
+<Section kind="code" title="A pull request from start to finish">
+
+The whole flow with Git and the GitHub CLI (`gh`):
+
+<Code example={prFlow} title="pr.sh" />
+
+Reviewing someone else's PR:
+
+<Code example={reviewCommands} title="review.sh" />
+
+A PR template sets expectations for every PR, including the numbers a model change needs:
+
+<Code example={prTemplate} title=".github/pull_request_template.md" />
+
+</Section>
+
+<Section kind="mistakes" title="PRs that are hard to review">
+
+<CommonMistake
+  title="One giant pull request"
+  wrong={'feat: new feature pipeline, refactor loaders, bump pandas, fix typo   (+3,812 −2,904)'}
+  error="(no error) reviewers skim, approve, and the bug in line 2,140 ships"
+  cause="Review quality drops sharply with size. Mixed concerns hide the change that matters."
+  fix="Split by concern: the refactor (no behaviour change), the dependency bump, then the feature. Each PR does one thing."
+/>
+
+<CommonMistake
+  title="Reviewing only the diff of an ML change"
+  wrong={'"LGTM 👍"   # on a PR that changes the train/test split'}
+  error="(no error) validation accuracy jumps from 0.81 to 0.97 because of leakage, and nobody asks why"
+  cause="Data and metric effects are invisible in code. The review never looked at results."
+  fix="Require before/after metrics in the PR template, run the change locally (gh pr checkout), and ask why any big jump happened."
+/>
+
+<CommonMistake
+  title="Comments about the author instead of the code"
+  wrong={'"Why would you do it this way?"'}
+  error="(no error) the author gets defensive and the real issue gets lost"
+  cause="The comment judges rather than explains."
+  fix={'"This refits the scaler on every batch, so test-time scaling differs from training. Fit once on the train split?"'}
+/>
+
+</Section>
+
+<Section kind="practice" title="Good PRs and good reviews">
+
+- **Small and focused**: aim for a few hundred changed lines, one concern each.
+- **Describe what, why, and how it was tested**, and link the issue (`Closes #123`).
+- **Review within a working day.** Waiting is the most expensive part of most PRs.
+- **Comment on the code, explain the reason, and mark nitpicks** as such ("nit:"), so the author knows what blocks.
+- **Protect `main`**: required review, required checks, up-to-date branches, no force pushes.
+- **Keep CODEOWNERS small and current**; an owner who left the team blocks every PR for that path.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={ownersExercise}>
+  Implement the "last match wins" rule of CODEOWNERS for a few common pattern shapes.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A pull request is GitHub's page for merging a head branch into a base branch, with diff, reviews and checks.
+- Branch protection turns the team's rules (approvals, code owners, CI, up-to-date, resolved threads) into a merge
+  button that stays disabled until they are met.
+- CODEOWNERS assigns reviewers by path; the last matching line wins.
+- Small, well-described PRs get better reviews; for ML changes, review the results, not only the code.
+
+Next: [Continuous integration with GitHub Actions](#/learn/git/github/actions-ci).
+
+</Section>

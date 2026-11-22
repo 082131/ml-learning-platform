@@ -1,0 +1,166 @@
+import { changelogMd, precedenceRunner, pythonSpecifiers, ranges, release, releaseShell, semver } from './code';
+import { nextVersionExercise, questions } from './quiz';
+
+<Section kind="intuition" title="A version number is a promise">
+
+When you publish a library, a model package or an API, other people's code starts to depend on it. Every new
+version raises one question for them: is it safe to upgrade? A version number can answer it, if everyone agrees
+what the parts mean.
+
+<Term id="semantic-versioning">Semantic Versioning</Term> is that agreement. In `2.4.1`, the first number changes
+when you break something, the second when you add something, the third when you only fix something. A user on
+2.4.1 can take 2.4.7 or 2.9.0 without reading anything, and knows to read the notes before 3.0.0.
+
+Git supplies the mechanics: a <Term id="git-tag">tag</Term> pins a version name to the exact commit it was built
+from, and a <Term id="changelog">changelog</Term> tells people what changed in words.
+
+</Section>
+
+<Section kind="technical" title="SemVer, Conventional Commits, tags and releases">
+
+**SemVer 2.0.0** versions are `MAJOR.MINOR.PATCH`, with an optional pre-release (`-rc.1`) and build metadata
+(`+build.7`):
+
+| Change to the public API | Bump | 1.4.2 becomes |
+| ------------------------ | ---- | ------------- |
+| Incompatible (removed or renamed function, changed return type) | MAJOR | 2.0.0 |
+| New, backward-compatible functionality; deprecations | MINOR | 1.5.0 |
+| Backward-compatible bug fixes only | PATCH | 1.4.3 |
+
+Rules worth knowing: `0.y.z` promises nothing (initial development); a pre-release such as `2.0.0-rc.1` sorts
+**before** `2.0.0`; build metadata is ignored for ordering; a released version's contents must never change.
+
+<Term id="conventional-commits">Conventional Commits</Term> puts the bump into each commit message:
+`feat: ...` (minor), `fix: ...` (patch), `feat!: ...` or a `BREAKING CHANGE:` footer (major), and types like
+`docs`, `test`, `chore`, `refactor` that do not release on their own. Tools such as semantic-release and
+release-please read them to compute the next version and write the changelog.
+
+A <Term id="release">release</Term> combines three things:
+
+1. An <Term id="annotated-tag">annotated tag</Term> (`git tag -a v1.1.0 -m "..."`), pushed with `git push origin v1.1.0`.
+2. A changelog entry, in the Keep a Changelog format: Added, Changed, Deprecated, Removed, Fixed, Security.
+3. A GitHub release on that tag, with notes and built files attached (a wheel, a model card, a container digest).
+
+On the consumer side, version **ranges** rely on the promise: npm's `^1.2.3` accepts anything below 2.0.0, `~1.2.3`
+anything below 1.3.0; Python's `~=2.2` accepts `>=2.2, ==2.*`.
+
+</Section>
+
+<Section kind="visual" title="Try it: from commits to a version">
+
+Pick the current version and the commits merged since the last release. The view classifies each commit, picks the
+highest bump, and writes the changelog section.
+
+<Experiment def={semver} title="Next version from commit messages">
+  <SemverView />
+  <Readout title="What the release tool computes" />
+</Experiment>
+
+Try "docs, tests and chores only": no release. Try a breaking change from `0.4.2` (this tool, like semantic-release
+by default, goes to 1.0.0), and any change from `2.0.0-rc.1`, which releases as `2.0.0`.
+
+What a range accepts:
+
+<Experiment def={ranges} title="npm caret and tilde ranges">
+  <RangeView />
+  <Readout title="What the range matches" />
+</Experiment>
+
+`2.0.0-rc.1` never matches `^1.2.3`, even though it sorts below 2.0.0: npm excludes pre-releases unless the range
+itself names a pre-release of the same version.
+
+Finally, tag and publish a release in the sandbox. The annotated tag's id is real: it hashes the tag text.
+
+<Experiment def={release} title="Git sandbox: tagging a release">
+  <GitSandbox />
+  <GitGraph />
+  <Readout title="What the sandbox computed" />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="Versions in practice">
+
+SemVer precedence is not string sorting. A sort key that follows the spec:
+
+<PythonRunner example={precedenceRunner} title="semver_sort.py" />
+
+Tagging and publishing a release, from a real run:
+
+<Code example={releaseShell} title="release.sh" />
+
+A changelog in the Keep a Changelog format:
+
+<Code example={changelogMd} title="CHANGELOG.md" />
+
+Constraints on your own dependencies:
+
+<Code example={pythonSpecifiers} title="pyproject.toml" />
+
+</Section>
+
+<Section kind="mistakes" title="Release mistakes">
+
+<CommonMistake
+  title="Moving a published tag"
+  wrong={'git tag -f v1.1.0 HEAD   # "small fix, same version"\ngit push -f origin v1.1.0'}
+  error="(no error) users who already installed 1.1.0 have different code from those who install it now"
+  cause="A released version must never change. Caches, mirrors and lock files keep the old content under the same name."
+  fix="Release 1.1.1 with the fix. Versions are cheap; trust is not."
+/>
+
+<CommonMistake
+  title="A breaking change in a minor release"
+  wrong={'# 1.4.0: predict() now returns probabilities instead of labels\ngit tag -a v1.5.0 -m "Probabilities"'}
+  error="(in users' code) ValueError: Classification metrics can't handle a mix of binary and continuous targets"
+  cause="Everyone with ^1.4.0 or ~=1.4 upgrades automatically, and their code breaks."
+  fix="Add predict_proba() in 1.5.0 and deprecate the old behaviour; change predict() in 2.0.0."
+/>
+
+<CommonMistake
+  title="Using the commit log as the changelog"
+  wrong={'## 1.5.0\n- wip\n- fix tests\n- address review comments\n- merge main'}
+  error="(no error) users cannot tell what changed for them"
+  cause="Commit messages are written for developers during the work."
+  fix="Write the changelog for users, grouped by Added / Changed / Fixed, or generate it from Conventional Commits and edit it."
+/>
+
+</Section>
+
+<Section kind="practice" title="Release habits">
+
+- **Decide what your public API is** (documented functions, CLI flags, the model's input schema) and version that.
+- **Deprecate before removing**: warn for at least one minor release, remove in the next major.
+- **Use annotated tags with a `v` prefix**, and never move them.
+- **Automate**: Conventional Commits plus release-please or semantic-release in CI, so every release has a tag,
+  notes and artifacts.
+- **Libraries declare ranges, applications pin exact versions** in a lock file.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={nextVersionExercise}>
+  Compute the next release version from Conventional Commits messages, the way release tools do.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- SemVer: MAJOR for breaking changes, MINOR for compatible features, PATCH for fixes; 0.y.z promises nothing;
+  pre-releases sort before their release.
+- Conventional Commits (`feat`, `fix`, `!`, `BREAKING CHANGE:`) let tools compute the version and changelog.
+- A release is an annotated tag, a changelog entry and a GitHub release with artifacts. Never change a published
+  version.
+- Ranges (`^`, `~`, `~=`) work only because publishers keep the SemVer promise.
+
+Next: [Versioning data and models](#/learn/git/releases/ml-versioning).
+
+</Section>
