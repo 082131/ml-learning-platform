@@ -1,0 +1,125 @@
+import { brief, capstone, featureFlow, releaseFlow, setupRepo } from './code';
+import { changelogExercise, questions } from './quiz';
+
+<Section kind="intuition" title="One feature, start to finish">
+
+Each lesson in this track covered one piece: commits, branches, merging, remotes, pull requests, CI, versions,
+documentation. In a team they are one routine, repeated for every change. This capstone runs it end to end on a
+small ML repository: add an evaluation feature on a branch, get it reviewed and tested, merge it with its
+documentation, and publish version 1.1.0 with a changelog and a tag.
+
+When you can do this without looking anything up, you can work in almost any team's repository.
+
+</Section>
+
+<Section kind="technical" title="What you will do">
+
+The repository starts at `v1.0.0` on GitHub, with `main` protected. The work, and the lesson each step comes from:
+
+| Step | Lesson |
+| ---- | ------ |
+| Branch, commit with Conventional Commits messages | [Branches](#/learn/git/branching/branches-head), [Semantic versioning](#/learn/git/releases/semver-releases) |
+| Feature with docstring, doctest and tests; README and changelog in the same PR | [READMEs and docstrings](#/learn/git/docs/readmes-docstrings) |
+| Rebase on `origin/main`, resolve any conflict | [Merge and rebase](#/learn/git/branching/merge-rebase), [Conflicts](#/learn/git/branching/merge-conflicts) |
+| Push, open a PR, pass required checks and review | [Remotes](#/learn/git/github/remotes), [Pull requests](#/learn/git/github/pull-requests), [CI](#/learn/git/github/actions-ci) |
+| Choose the version, write the changelog, tag, release | [Semantic versioning](#/learn/git/releases/semver-releases) |
+| Record lineage for the trained model | [Versioning data and models](#/learn/git/releases/ml-versioning) |
+
+</Section>
+
+<Section kind="visual" title="Rehearse it in the sandbox">
+
+The sandbox starts from a clone of the repository at `v1.0.0`; a teammate has pushed a commit since. The guided path
+is the whole flow, ending with an annotated `v1.1.0` tag pushed to `origin`. Here the merge is a merge commit, like
+GitHub's "Create a merge commit" button; in your own repository you can squash instead.
+
+<Experiment def={capstone} title="Git sandbox: from branch to release">
+  <GitSandbox />
+  <GitGraph />
+  <GitAreas />
+  <Readout title="What the sandbox computed" />
+</Experiment>
+
+Things to check at the end: `git log --oneline --all` shows `main`, `origin/main` and the `v1.1.0` tag on the same
+merge commit, and the feature commits sit on top of Grace's commit because of the rebase. Try `git cat-file -p
+v1.1.0` to read the tag object.
+
+</Section>
+
+<Section kind="code" title="The same flow on GitHub">
+
+Set up the repository once:
+
+<Code example={setupRepo} title="setup.sh" />
+
+The feature, from branch to merge:
+
+<Code example={featureFlow} title="feature.sh" />
+
+The release:
+
+<Code example={releaseFlow} title="release.sh" />
+
+</Section>
+
+<Section kind="practice" title="The brief">
+
+<Project brief={brief} />
+
+</Section>
+
+<Section kind="mistakes" title="Where this goes wrong">
+
+<CommonMistake
+  title="Tagging before the merge"
+  wrong={'git switch feat/evaluate\ngit tag -a v1.1.0 -m "Add evaluate()"\ngit push origin v1.1.0'}
+  error="(no error) after a squash merge, the tagged commit is not in main; git describe on main still says v1.0.0-1-g..."
+  cause="The tag names the branch commit, which squash merging replaced with a new one."
+  fix="Merge first, git pull on main, then tag the commit main points to."
+/>
+
+<CommonMistake
+  title="Releasing with a red or skipped CI"
+  wrong={'# required checks were "still running"; an admin bypassed protection to merge'}
+  error="(next day) ImportError: cannot import name 'evaluate' from 'churn_model' (in the published package)"
+  cause="The release was cut from a commit nobody had tested."
+  fix="Do not bypass protection for releases. Wait for green checks on the exact commit you tag."
+/>
+
+<CommonMistake
+  title="Forgetting the version string in the package"
+  wrong={'git tag -a v1.1.0 -m "..."   # pyproject.toml still says version = "1.0.0"'}
+  error={'$ pip show churn-model\nVersion: 1.0.0'}
+  cause="The tag and the package metadata disagree."
+  fix="Bump the version in the release PR, or derive it from the tag (setuptools-scm, hatch-vcs) so there is one source."
+/>
+
+</Section>
+
+<Section kind="check" title="Self-assessment">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise" title="Draft the changelog">
+
+<MiniExercise exercise={changelogExercise}>
+  Generate the changelog draft for a release from its Conventional Commits messages.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- The team routine: branch, commit (Conventional Commits), document in the same PR, rebase, push, review with
+  required CI, merge, release.
+- The version comes from the commits; the changelog is written for users; the annotated tag goes on the merged
+  commit in `main`.
+- Protection rules and CI make the routine enforceable, not just recommended.
+- With code, data pointers, docs and tags all in Git, any release can be rebuilt and explained later.
+
+You have finished the Git, GitHub and Documentation track. The certification exam tests all of it, including a
+hands-on part.
+
+</Section>

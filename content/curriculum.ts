@@ -605,8 +605,8 @@ export const tracks: Track[] = [
         title: 'Documentation',
         level: 'intermediate',
         lessons: [
-          { id: 'git/docs/readmes-docstrings', status: 'outline' },
-          { id: 'git/docs/docs-sites', status: 'outline' },
+          { id: 'git/docs/readmes-docstrings', status: 'written' },
+          { id: 'git/docs/docs-sites', status: 'written' },
         ],
       },
       {
@@ -614,7 +614,7 @@ export const tracks: Track[] = [
         title: 'Capstone',
         level: 'advanced',
         project: 'git/capstone/release-ml-repo',
-        lessons: [{ id: 'git/capstone/release-ml-repo', status: 'outline' }],
+        lessons: [{ id: 'git/capstone/release-ml-repo', status: 'written' }],
       },
     ],
   },

@@ -285,7 +285,7 @@ export const DOC_EXAMPLES: Record<string, DocExample> = {
 
     Examples:
         >>> split(list(range(10)), test_size=0.3)
-        ([7, 4, 1, 2, 9, 3, 0], [5, 6, 8])
+        ([7, 8, 1, 5, 3, 4, 2], [0, 9, 6])
     """`,
   },
   numpy: {

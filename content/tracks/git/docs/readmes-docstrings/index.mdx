@@ -1,0 +1,155 @@
+import { docstrings, doctestRunner, modelCard, pydoclintToml, readme, readmeMd } from './code';
+import { docCheckExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Documentation is part of the change">
+
+Code tells the computer what to do. Documentation tells people what the code is for, how to use it, and when not
+to. Without it, every user has to read the source, and every teammate has to interrupt the author.
+
+Good documentation lives **in the repository, next to the code**, and changes in the same pull request as the code
+it describes. Then Git versions it with everything else: the docs for v1.3.0 are the docs at the v1.3.0 tag. This
+lesson covers the documentation every project needs, from the outside in:
+
+- the <Term id="readme">README</Term>, the front door of the repository;
+- <Term id="docstring">docstrings</Term>, the documentation callers see in their editor;
+- <Term id="doctest">doctests</Term>, examples that are also tests, so they stay true;
+- the <Term id="model-card">model card</Term>, which says what a model is for and where it fails.
+
+</Section>
+
+<Section kind="technical" title="READMEs, docstrings, doctests and model cards">
+
+**A README** answers a newcomer's questions in order: what is it, why would I use it, how do I install it, how do I
+use it for the common case, how good is it (for a model), how do I contribute, and what license applies. Longer
+material moves to `CONTRIBUTING.md`, `MODEL_CARD.md` or a docs site, linked from the README.
+
+**A docstring** is the string literal right after a `def` or `class` line (PEP 257). Python stores it in
+`__doc__`, and `help()`, IDEs and documentation generators read it from there. Write it for the caller: a one-line
+summary in the imperative, a blank line, details, then sections. The two common section styles, both understood by
+Sphinx (napoleon) and mkdocstrings:
+
+| Google style | NumPy style |
+| ------------ | ----------- |
+| `Args:` / `Returns:` / `Raises:` / `Examples:` headers | `Parameters`, `Returns`, ... underlined with dashes |
+| `name (type): description` on one line | `name : type` on one line, description indented below |
+| compact; common in applications | roomy; standard in the scientific Python stack |
+
+With type hints in the signature, many teams leave types out of the docstring so they cannot disagree.
+
+**A doctest** is an example written as an interactive session (`>>> call`, then the expected output). The `doctest`
+module, or `pytest --doctest-modules`, runs it and compares the printed output exactly. An example that is also a
+test cannot go stale silently.
+
+**A model card** (Mitchell et al., 2019) documents a trained model: intended and out-of-scope uses, training data,
+evaluation overall and by segment, limitations, and lineage. Hugging Face shows it as the model's README.
+
+</Section>
+
+<Section kind="visual" title="Try it: docstrings and READMEs">
+
+Pick a docstring. The view parses it the way a documentation generator does, renders the reference entry, and
+compares the documented parameters with the signature, like the linter pydoclint.
+
+<Experiment def={docstrings} title="Docstring to API reference">
+  <DocstringView />
+  <Readout title="What the parser found" />
+</Experiment>
+
+"Stale" is the common real-world case: a parameter was renamed, the docstring was not updated, and nothing failed.
+A docs linter in CI catches it.
+
+Now build a README. Add sections and watch which reader questions remain unanswered:
+
+<Experiment def={readme} title="Build a README">
+  <ReadmeBuilder />
+  <Readout title="What the README answers" />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="Documentation that stays true">
+
+The Google-style docstring from the view above, with the implementation, checked by doctest. Change the expected
+output in the docstring, or the function, and run it again:
+
+<PythonRunner example={doctestRunner} title="split.py" />
+
+A README that answers the questions in order:
+
+<Code example={readmeMd} title="README.md" />
+
+A short model card:
+
+<Code example={modelCard} title="MODEL_CARD.md" />
+
+Checking documentation in CI, like any other code quality rule:
+
+<Code example={pydoclintToml} title="pyproject.toml" />
+
+</Section>
+
+<Section kind="mistakes" title="Documentation that misleads">
+
+<CommonMistake
+  title="Docstrings that repeat the code"
+  wrong={'def split(rows, test_size=0.2, seed=0):\n    """Split function. Takes rows, test_size and seed."""'}
+  error="(no error) the reader learns nothing the signature did not already say"
+  cause="It describes what the code is, not what the caller needs: meaning, units, ranges, errors, return value."
+  fix={'"""Split rows into a shuffled train and test set.\n\nArgs:\n    test_size (float): Share of rows for the test set, between 0 and 1.\n..."""'}
+/>
+
+<CommonMistake
+  title="A README quick start that does not run"
+  wrong={'pip install churn-model\nchurn-train   # the package was renamed and the command needs --config'}
+  error="churn-train: error: the following arguments are required: --config"
+  cause="Nobody runs the README's commands after changes, so they drift."
+  fix="Run the quick start in CI (a job that follows the README in a clean container), or test it with doctest-style tools."
+/>
+
+<CommonMistake
+  title="Reporting one overall metric for a model"
+  wrong={'## Model\nAccuracy: 94%'}
+  error="(no error, later) the model is used for new customers, where it is much worse, and nobody was warned"
+  cause="With an 8% churn rate, always predicting 'stays' already scores 92%. One number hides both the baseline and the weak segments."
+  fix="Report the metric that matches the use (recall at top 5%, ROC AUC), a baseline, metrics by segment, and the known limits."
+/>
+
+</Section>
+
+<Section kind="practice" title="Documentation habits">
+
+- **Update docs in the same pull request as the code**, and ask for it in the PR template.
+- **Every public function, class and module gets a docstring**; private helpers get one when they are not obvious.
+- **Put at least one runnable example in each important docstring** and run doctests in CI.
+- **Lint docstrings** (ruff's D rules, pydoclint) so missing and stale docs fail the build.
+- **Ship a model card with every released model** and update it when the data or metrics change.
+- **Write comments for why, docstrings for how to use, and commit messages for what changed and why.**
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={docCheckExercise}>
+  Build the core of a documentation linter: find parameters that are missing from a docstring, or documented but no
+  longer in the signature.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Keep documentation in the repository and change it in the same PR as the code; Git then versions it.
+- A README answers, in order: what, why, install, use, results, contribute, license.
+- Docstrings document the caller's view (arguments, returns, raises, examples) in Google or NumPy style; doctests
+  keep the examples true.
+- A model card states intended and out-of-scope uses, data, metrics by segment, limits and lineage.
+
+Next: [Documentation sites, API references and docs as code](#/learn/git/docs/docs-sites).
+
+</Section>

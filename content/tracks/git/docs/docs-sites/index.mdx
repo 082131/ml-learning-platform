@@ -1,0 +1,159 @@
+import { adrMd, apiPage, diataxis, docsTree, mkdocsYaml, pagesWorkflow, sphinxConf } from './code';
+import { linkExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Four kinds of reader, four kinds of page">
+
+Once a project outgrows its README, documentation tends to become one long page that tries to teach, instruct,
+list every option and explain the design at the same time. Beginners drown in detail and experts cannot find the
+fact they need.
+
+The <Term id="diataxis">Diataxis</Term> framework fixes this by noticing that readers come with one of four needs:
+
+| The reader wants to | They need a | Example |
+| ------------------- | ----------- | ------- |
+| learn, by doing | **tutorial** | "Train your first churn model" |
+| get a task done | **how-to guide** | "How to train on a GPU" |
+| look up a fact | **reference** | "train(config, data, seed) parameters" |
+| understand why | **explanation** | "Why we stratify the split" |
+
+Write each page for one need, and link between them. And treat the pages like code: Markdown in the repository,
+changed in pull requests, built and checked by CI, published automatically. That practice is called
+<Term id="docs-as-code">docs as code</Term>.
+
+</Section>
+
+<Section kind="technical" title="Docs sites, generated references and decision records">
+
+A <Term id="static-site-generator">static site generator</Term> turns a folder of Markdown into a website with
+navigation and search. For Python projects the two common choices:
+
+| | MkDocs (with Material and mkdocstrings) | Sphinx |
+| --- | --- | --- |
+| Pages written in | Markdown | reStructuredText, or Markdown with MyST |
+| API reference from docstrings | `::: package.function` (mkdocstrings) | `.. autofunction::` (autodoc + napoleon) |
+| Config | `mkdocs.yml` | `docs/conf.py` |
+| Typical users | applications, newer libraries | the scientific Python stack (NumPy, scikit-learn, pandas) |
+
+The <Term id="api-reference">API reference</Term> is generated from docstrings, so it is versioned and reviewed
+with the code. Hand-written pages carry the tutorials, guides and explanations.
+
+Docs as code in practice:
+
+- `docs/` lives in the main repository; a docs change and the code change it describes share a pull request.
+- CI builds the site on every PR in strict mode, so broken links and missing pages fail the check.
+- Merges to `main` publish the site (GitHub Pages, Read the Docs). Read the Docs can also keep one version of the
+  docs per release tag.
+
+An <Term id="adr">architecture decision record</Term> (ADR) is a short, numbered page per significant decision:
+context, decision, consequences, status. ADRs are never rewritten; a new ADR supersedes an old one, so the reasoning
+behind the current design stays readable.
+
+</Section>
+
+<Section kind="visual" title="Try it: sort pages into Diataxis kinds">
+
+For each page summary, choose the kind of documentation it is. Some are deliberately tricky: a title that starts
+with "How" is not always a how-to guide.
+
+<Experiment def={diataxis} title="Diataxis sorter">
+  <DiataxisSorter />
+  <Readout title="Your sorting" />
+</Experiment>
+
+The last item, a "Quickstart" that also lists every option and the project's history, is the most common real
+problem: one page doing three jobs. Diataxis would keep the tutorial and move the rest to reference and explanation
+pages.
+
+</Section>
+
+<Section kind="code" title="A docs site for a Python ML project">
+
+A layout with one folder per Diataxis kind:
+
+<Code example={docsTree} title="docs/ layout" />
+
+MkDocs configuration with an API reference generated from docstrings:
+
+<Code example={mkdocsYaml} title="mkdocs.yml" />
+
+The whole API page:
+
+<Code example={apiPage} title="docs/reference/api.md" />
+
+The same with Sphinx:
+
+<Code example={sphinxConf} title="docs/conf.py" />
+
+Build on every pull request, publish from `main` to GitHub Pages:
+
+<Code example={pagesWorkflow} title=".github/workflows/docs.yml" />
+
+An architecture decision record:
+
+<Code example={adrMd} title="docs/decisions/0003-use-dvc-for-data.md" />
+
+</Section>
+
+<Section kind="mistakes" title="Docs sites that rot">
+
+<CommonMistake
+  title="Docs in a wiki, away from the code"
+  wrong={'Code: GitHub repository\nDocs: a company wiki page, last edited 14 months ago'}
+  error="(no error) the docs describe an API that no longer exists"
+  cause="Nothing connects a code change to the page that describes it, and no review covers the wiki."
+  fix="Move the docs into docs/ in the repository, review them in the same PRs, and build them in CI."
+/>
+
+<CommonMistake
+  title="Building without --strict"
+  wrong={'- run: mkdocs build'}
+  error={'WARNING - Doc file \'index.md\' contains a link \'how-to/gpu.md\', but the target is not found among documentation files.   (and the build still succeeds)'}
+  cause="Warnings do not fail the build, so broken links ship."
+  fix={'- run: mkdocs build --strict   # Sphinx: sphinx-build -W --keep-going'}
+/>
+
+<CommonMistake
+  title="A hand-written API reference"
+  wrong={'## train(config, data)\nTrains a model. `config` is a dict ...   # written once, two releases ago'}
+  error="(no error) the page misses the seed argument added in 1.2 and the exception added in 1.3"
+  cause="The reference duplicates the code, so it must be updated by hand and never is."
+  fix="Generate it from docstrings (mkdocstrings or autodoc) and lint the docstrings."
+/>
+
+</Section>
+
+<Section kind="practice" title="Docs-as-code habits">
+
+- **Organise by reader need**: tutorials, how-to guides, reference, explanation. One need per page.
+- **Generate the reference; write the rest.**
+- **Build docs on every PR with warnings as errors**, and publish from `main` automatically.
+- **Add "edit this page" links** so readers can send fixes as pull requests.
+- **Record big decisions as ADRs** in the repository, and supersede rather than rewrite them.
+- **Version the docs with releases** when users run more than one version.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={linkExercise}>
+  Write the broken-link check that strict docs builds run, for relative links between Markdown pages.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Diataxis: tutorials (learn), how-to guides (do), reference (look up), explanation (understand); one need per page.
+- MkDocs or Sphinx turn `docs/` into a site; mkdocstrings or autodoc generate the API reference from docstrings.
+- Docs as code: docs in the repository, reviewed in PRs, built strictly in CI, published from `main`.
+- ADRs record the context, decision and consequences of significant choices, and are superseded, not edited.
+
+Next: [Capstone: release an ML repository](#/learn/git/capstone/release-ml-repo).
+
+</Section>
