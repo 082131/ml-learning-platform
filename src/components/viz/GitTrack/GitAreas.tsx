@@ -53,7 +53,7 @@ export function GitAreas() {
       {paths.length === 0 ? (
         <p className={s.empty}>The working tree is empty. Create a file with echo "text" &gt; name.txt.</p>
       ) : (
-        <div className={s.areasScroll}>
+        <div className={s.areasScroll} tabIndex={0} role="region" aria-label="Files in the three areas (scrolls sideways)">
           <table className={s.areas}>
             <thead>
               <tr>

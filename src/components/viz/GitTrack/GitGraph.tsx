@@ -49,7 +49,7 @@ export function GitGraph() {
       {g.nodes.length === 0 ? (
         <p className={s.empty}>No commits yet. Stage a file and commit it to see the first node.</p>
       ) : (
-        <div className={s.graphScroll}>
+        <div className={s.graphScroll} tabIndex={0} role="region" aria-label="Commit graph (scrolls sideways)">
           <svg className={s.graph} width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Commit graph">
             <defs>
               <marker id="git-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
