@@ -14,6 +14,7 @@ const TRACK_CHIP: Record<string, string> = {
   python: 'Python',
   dataops: 'DataOps',
   deploy: 'Deploy',
+  git: 'Git',
 };
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 

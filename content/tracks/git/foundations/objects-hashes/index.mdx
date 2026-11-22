@@ -1,0 +1,150 @@
+import { hashRunner, objects, refsShell, shellWalkthrough } from './code';
+import { objectExercise, questions } from './quiz';
+
+<Section kind="intuition" title="A database of fingerprinted snapshots">
+
+Under the commands, Git is a small database with one rule: every piece of stored data is named by a fingerprint of
+its own content. Feed the bytes of a file through SHA-1 and you get a 40-character
+<Term id="object-id">object id</Term> such as `ce013625…`. The same bytes give the same id on every computer, and
+changing a single byte gives an unrelated one. That is a <Term id="content-hash">content hash</Term>, the same idea
+data versioning tools use for datasets.
+
+Three things follow from that rule, and they explain most of Git's behaviour:
+
+- **Identical content is stored once.** Ten copies of a file, or one file unchanged across a thousand commits, is
+  one stored object.
+- **History cannot change silently.** A commit's id covers its files, its parent's id, its author, dates and
+  message. Change anything in the past and every id after it changes, so everyone can see it happened.
+- **Ids can be checked.** If a disk or a network corrupts an object, its content no longer matches its name.
+
+</Section>
+
+<Section kind="technical" title="Four object types">
+
+Everything in `.git/objects` is one of four <Term id="git-object">objects</Term>:
+
+| Object | Stores | Points to |
+| ------ | ------ | --------- |
+| <Term id="blob">Blob</Term> | The bytes of one file. No name, no permissions, no date | nothing |
+| <Term id="tree-object">Tree</Term> | One folder: a sorted list of entries (mode, name, id) | blobs and other trees |
+| Commit | A root tree id, parent ids, author and committer with times, and the message | one tree, zero or more parent commits |
+| Tag (annotated) | A target id, the tag name, a tagger with time, and a message | usually a commit |
+
+Each object's id is the SHA-1 of a short header and the content:
+
+**id = SHA-1 of ( `<type> <size>`, a zero byte, then the content )**
+
+`git add` writes blobs. `git commit` writes one tree per folder, from the deepest up, and then the commit. A
+branch is not an object at all: it is a file in `.git/refs/heads/` that holds one commit id.
+
+Git has used SHA-1 since 2005. SHA-1 collisions can now be manufactured, so Git uses a hardened SHA-1 that detects
+the known attack, and supports SHA-256 repositories (`git init --object-format=sha256`). Hosting support for
+SHA-256 is still limited, so almost every repository you meet uses SHA-1.
+
+</Section>
+
+<Section kind="visual" title="Try it: read the objects">
+
+This sandbox starts empty. The guided path stores two files with the same content, commits, and then prints the
+objects with `git cat-file`. The panel under the terminal shows the HEAD commit's text, its tree and its blobs,
+recomputed after each command.
+
+<Experiment def={objects} title="Git sandbox: the object database">
+  <GitSandbox />
+  <GitObjects />
+  <GitGraph />
+  <Readout title="What the sandbox computed" />
+</Experiment>
+
+Things to notice:
+
+- `git hash-object greeting.txt` prints `ce013625…` before anything is committed: the id depends on the bytes only.
+- In `HEAD^{tree}`, `copy.txt` and `greeting.txt` show the same blob id. Git stored the content once.
+- After changing `src/train.py`, three ids change: the blob, the `src` tree and the root tree. The two text files
+  keep their ids, so the second snapshot costs one blob and two small trees.
+- The second commit has a `parent` line. Try `git cat-file -p HEAD~1` to see the first commit again.
+
+</Section>
+
+<Section kind="code" title="The same thing with real Git and Python">
+
+A real run, with the dates fixed so the ids are reproducible. Your ids will differ because your name and clock
+differ:
+
+<Code example={shellWalkthrough} title="looking inside .git" />
+
+Branches and HEAD are plain text files:
+
+<Code example={refsShell} title=".git/HEAD and .git/refs" />
+
+Git's ids are ordinary SHA-1 hashes. This program rebuilds the blob, the tree and the commit from the run above and
+gets the same three ids. Change a byte and run it again:
+
+<PythonRunner example={hashRunner} title="object_ids.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Misreadings that cause real trouble">
+
+<CommonMistake
+  title="Thinking git rm removes a file from history"
+  wrong={'git rm data/customers.csv\ngit commit -m "Remove customer data"'}
+  error="(no error) the blob is still in every earlier commit and every clone"
+  cause="Commits are immutable snapshots. A new commit without the file does not change old ones."
+  fix="To purge it, rewrite history with git filter-repo, force-push, and have everyone re-clone. For secrets, rotate them first: a rewrite cannot reach copies already made."
+/>
+
+<CommonMistake
+  title="Expecting Git to track an empty folder"
+  wrong={'mkdir outputs\ngit add outputs\ngit commit -m "Add outputs folder"'}
+  error="nothing added to commit but untracked files present"
+  cause="Trees list files and subfolders. A folder with no files has no tree entry, so Git has nothing to store."
+  fix={'touch outputs/.gitkeep   # any file works; .gitkeep is a convention\ngit add outputs/.gitkeep'}
+/>
+
+<CommonMistake
+  title="Treating a short id as permanent"
+  wrong={'# in a paper, a ticket or a config file\nmodel trained at commit 85665b2'}
+  error="error: short object ID 85665b2 is ambiguous (years later, in a bigger repository)"
+  cause="A 7-character prefix is unique only among the objects that exist now."
+  fix="Record the full 40-character id (git rev-parse HEAD), or a tag, wherever it must stay valid."
+/>
+
+</Section>
+
+<Section kind="practice" title="Using ids well">
+
+- **Log the full commit id with every training run**, next to the data version and the config. With an id you can
+  always rebuild the exact code.
+- **Use `git cat-file -p` when Git surprises you.** Reading the commit or tree usually explains it.
+- **Prefer annotated tags for releases**: they record who tagged what, when, and why.
+- **Do not rely on short ids in anything that outlives a conversation.**
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={objectExercise}>
+  Compute Git object ids yourself. The tests include the empty blob and the empty tree, two ids every Git user meets
+  sooner or later.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Git stores four kinds of objects (blob, tree, commit, annotated tag), each named by the SHA-1 of a typed header
+  and its content.
+- Blobs hold content only; names and modes live in trees; commits name one root tree and their parents.
+- Identical content is stored once, and changing anything in a commit changes its id and every id after it.
+- Branches and HEAD are small files that hold an id or a branch name.
+
+Next: [Branches, HEAD and switching](#/learn/git/branching/branches-head).
+
+</Section>

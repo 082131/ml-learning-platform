@@ -1,0 +1,167 @@
+import { basics, gitignore, messages, setup, statusDemo } from './code';
+import { questions, statusExercise } from './quiz';
+
+<Section kind="intuition" title="Save points for a whole project">
+
+Most people invent version control by accident: `train_final.py`, `train_final_v2.py`,
+`train_final_v2_REALLY.py`. It works until someone asks which file produced last month's model, or two people edit
+the same notebook and email it back and forth.
+
+<Term id="version-control">Version control</Term> replaces the copies with a history. Each time the project is in a
+state worth keeping, you save a snapshot with a short note on why. You can compare any two snapshots, go back to
+one, or work on an experiment without disturbing the version that works. Git does this for a whole folder, called a
+<Term id="repository">repository</Term>, and keeps the full history on every machine that has a copy.
+
+For ML work this matters twice over. A model is the product of code, data, configuration and environment; if the
+code is not versioned, no result can be reproduced, and a <Term id="reproducibility">reproducible</Term> result is
+the only kind a team can build on.
+
+</Section>
+
+<Section kind="technical" title="Working tree, staging area, repository">
+
+Git keeps three versions of your files apart:
+
+| Area | What it is | Commands that move changes |
+| ---- | ---------- | -------------------------- |
+| <Term id="working-tree">Working tree</Term> | The files on disk that you edit | `echo`, your editor, `git restore` |
+| <Term id="staging-area">Staging area</Term> (the index) | The exact snapshot the next commit will contain | `git add`, `git restore --staged` |
+| Repository (`.git`) | All <Term id="commit">commits</Term>, each a full snapshot with a message | `git commit` |
+
+The staging area is what makes Git different from "save". You can change five files and commit two of them, so
+each commit holds one logical change. A commit records the staged snapshot of **every** tracked file, not just the
+changed ones; unchanged files point to content already stored, so a commit costs only what changed.
+
+`git status --short` prints two letters per file. The left letter compares the staging area with the last commit
+(HEAD); the right letter compares the working tree with the staging area:
+
+| Code | Meaning |
+| ---- | ------- |
+| `??` | Untracked: in the working tree only |
+| `A ` | New file, staged |
+| ` M` | Modified, not staged |
+| `M ` | Modified and staged |
+| `MM` | Staged, then modified again: the commit gets the staged version |
+
+Files you never want in the repository (data, checkpoints, secrets) go in a <Term id="gitignore">.gitignore</Term>.
+Ignoring only affects untracked files: once a file is committed, it is in history for good.
+
+</Section>
+
+<Section kind="visual" title="Try it: your first commits">
+
+The sandbox below runs a small Git in your browser. Type commands, or press **Next step** to follow the guided path.
+The graph and the table update after every command. The commit ids are real: the sandbox hashes your files, the
+author (Ada Lovelace), a clock that starts at 2026-01-01 00:00 UTC and moves one minute per command, and your
+message, exactly as Git does. Real Git with the same author and dates prints the same ids.
+
+<Experiment def={basics} title="Git sandbox: a new repository">
+  <GitSandbox />
+  <GitAreas />
+  <GitGraph />
+  <Readout title="What the sandbox computed" />
+</Experiment>
+
+Things to notice:
+
+- After `git add README.md`, the file appears in the staging area column but HEAD is still empty: nothing is saved
+  until you commit.
+- Step 7 stages only `train.py`. The commit that follows contains the new `train.py` and the **old** README:
+  the README change stays in the working tree, marked ` M`.
+- `git commit -am` stages changes to tracked files and commits in one step. It does not add untracked files.
+- Try `git commit -m "again"` when nothing is staged: Git refuses, and nothing changes.
+
+<Callout kind="simplification">
+  The sandbox supports the commands this track uses, with simple file edits (`echo "text" > file`,
+  `echo "text" >> file`, `cat`, `rm`). It prints `git status` in the short format and shortens some messages. It
+  keeps no packfiles and shows no diffs; real Git does both.
+</Callout>
+
+</Section>
+
+<Section kind="code" title="Setting up, ignoring files, writing messages">
+
+Once per machine, tell Git who you are, then create a repository:
+
+<Code example={setup} title="setup.sh" />
+
+A `.gitignore` for an ML project. Commit it first, before `git add .` can pick up a dataset:
+
+<Code example={gitignore} title=".gitignore" />
+
+What Git reports with that file in place, from a real run:
+
+<Code example={statusDemo} title="checking what is ignored" />
+
+A commit message is for the person reading `git log` later, often you:
+
+<Code example={messages} title="commit messages" />
+
+</Section>
+
+<Section kind="mistakes" title="Things that end up in history by accident">
+
+<CommonMistake
+  title="Committing a dataset or a checkpoint"
+  wrong={'git add .\ngit commit -m "Add training code"   # data/train.csv (2 GB) came along'}
+  error="(no error) every clone now downloads 2 GB, forever, even after you delete the file"
+  cause="git add . stages every untracked file that is not ignored. Removing the file later leaves it in the old commit."
+  fix={'echo "data/" >> .gitignore   # before the first git add .\ngit add .gitignore train.py\ngit commit -m "Add training code"'}
+/>
+
+<CommonMistake
+  title="Committing secrets"
+  wrong={'echo "OPENAI_API_KEY=sk-..." > .env\ngit add .env && git commit -m "Add config"'}
+  error="(no error) the key is readable by anyone with a clone, and automated scanners find public keys within minutes"
+  cause=".env was not ignored. Deleting it in a later commit does not remove it from history."
+  fix="Rotate the key immediately. Then add .env to .gitignore, keep a .env.example with placeholder values, and read secrets from the environment."
+/>
+
+<CommonMistake
+  title="Expecting git commit to include unstaged edits"
+  wrong={'git add train.py\n# ... more edits to train.py ...\ngit commit -m "Tune learning rate"'}
+  error="(no error) the commit has the first edit only; git status still shows train.py as modified"
+  cause="Commit saves the staging area. The second edit happened after git add."
+  fix={'git add train.py && git commit -m "Tune learning rate"   # or: git commit -am "..."'}
+/>
+
+</Section>
+
+<Section kind="practice" title="Habits that keep history useful">
+
+- **One logical change per commit.** "Add stratified split" and "Rename variables" are two commits. Small commits
+  are easier to review, revert and bisect.
+- **Run `git status` before every commit**, and `git diff --staged` to read exactly what will be saved.
+- **Commit `.gitignore` first** in a new project, with data, checkpoints, caches and `.env` in it.
+- **Write the message for a stranger:** a 50-character imperative summary, then why the change was needed.
+- **Never commit secrets.** Use environment variables or a secret manager, and turn on secret scanning on GitHub.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={statusExercise}>
+  Turn `git status --short` lines into lists of staged, unstaged and untracked files, the way an editor or a
+  pre-commit script would.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Version control keeps a history of snapshots of a whole project, each with an author, a date and a reason.
+- Git has three areas: working tree (your files), staging area (the next commit) and repository (all commits).
+  `git add` moves changes into the staging area; `git commit` saves it.
+- `git status --short`: left letter = staged, right letter = unstaged, `??` = untracked.
+- `.gitignore` keeps data, checkpoints and secrets out, but only for files that are not tracked yet.
+
+Next: [Inside .git: objects and hashes](#/learn/git/foundations/objects-hashes) shows what a commit is made of, and
+why its id changes when anything about it changes.
+
+</Section>

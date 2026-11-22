@@ -1,0 +1,149 @@
+import { branchCommands, branching, detachedShell, rangesShell } from './code';
+import { aheadExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Sticky notes on a family tree">
+
+Picture the commits as a family tree: each commit knows its parents, never its children. A
+<Term id="branch">branch</Term> is a sticky note with a name on it, stuck to one commit. When you commit on a
+branch, Git writes the new commit and moves the note forward to it. Nothing else changes.
+
+That is all a branch is, which is why Git users make them freely: one for every experiment, bug fix or feature.
+Trying a new loss function on a branch costs nothing, leaves `main` untouched, and can be thrown away or merged
+later.
+
+<Term id="head-ref">HEAD</Term> is one more note, saying "you are here". Normally it points at a branch, not at a
+commit, so committing moves that branch.
+
+</Section>
+
+<Section kind="technical" title="Branches, HEAD and ancestry">
+
+| Name | Stored as | Moves when |
+| ---- | --------- | ---------- |
+| Branch `main` | `.git/refs/heads/main`, one commit id | you commit, merge, reset or pull while on it |
+| `HEAD` | `.git/HEAD`, normally `ref: refs/heads/main` | you switch branches |
+| Tag `v1.0.0` | `.git/refs/tags/v1.0.0` | never, unless you delete and recreate it |
+| `origin/main` | `.git/refs/remotes/origin/main` | you fetch, pull or push |
+
+`git switch <branch>` points HEAD at another branch and rewrites the working tree and index to that branch's
+snapshot. Uncommitted changes come along if they do not clash with the files being changed; if they would be
+overwritten, Git refuses.
+
+If HEAD points straight at a commit instead of a branch, you have a <Term id="detached-head">detached HEAD</Term>.
+It happens when you switch to a tag, a remote branch or an old commit to look at it. You can commit there, but no
+branch moves, so the commits are easy to lose.
+
+<Term id="commit-ancestry">Ancestry</Term> gives names to related commits:
+
+| Expression | Means |
+| ---------- | ----- |
+| `HEAD~1`, `HEAD~3` | the parent; the great-grandparent (following first parents) |
+| `M^2` | the second parent of merge commit M (the branch that was merged in) |
+| `main..feature` | commits reachable from feature but not from main |
+| `main...feature` | commits on either side but not both |
+
+</Section>
+
+<Section kind="visual" title="Try it: branch, diverge, detach">
+
+The sandbox starts with two commits on `main`. Follow the guided path to create `feature`, commit on both
+branches, and visit a commit with a detached HEAD.
+
+<Experiment def={branching} title="Git sandbox: branches">
+  <GitSandbox />
+  <GitGraph />
+  <GitAreas />
+  <Readout title="What the sandbox computed" />
+</Experiment>
+
+Things to notice:
+
+- `git branch feature` adds a label to the graph and nothing else. No commit, no file changes.
+- After switching back to `main`, `train.py` loses the `epochs` line: the working tree always shows the snapshot
+  of the commit HEAD points to.
+- After the commits on both branches, each has one the other lacks. The graph forks: the branches have diverged.
+- `git switch --detach HEAD~1` labels HEAD with no branch. Try committing there, then switch to `main`, then run
+  `git reflog` to find the commit again.
+
+</Section>
+
+<Section kind="code" title="Working with branches">
+
+The everyday commands:
+
+<Code example={branchCommands} title="branches.sh" />
+
+Reading ranges in a real repository with the same history:
+
+<Code example={rangesShell} title="ranges" />
+
+Leaving a commit behind on a detached HEAD, and rescuing it:
+
+<Code example={detachedShell} title="detached HEAD" />
+
+</Section>
+
+<Section kind="mistakes" title="Branch mix-ups">
+
+<CommonMistake
+  title="Committing on the wrong branch"
+  wrong={'# meant to be on feature, but still on main\ngit commit -am "Try focal loss"'}
+  error="(no error) main now has an experimental commit"
+  cause="HEAD was still attached to main. Check the branch with git status or your prompt before committing."
+  fix={'git branch try-focal          # name the new commit\ngit reset --hard HEAD~1       # move main back (only if not pushed)\ngit switch try-focal'}
+/>
+
+<CommonMistake
+  title="Switching with uncommitted changes that clash"
+  wrong={'echo "lr = 0.1" >> train.py\ngit switch feature'}
+  error={'error: Your local changes to the following files would be overwritten by checkout:\n\ttrain.py'}
+  cause="feature has a different train.py, so switching would replace your unsaved edit."
+  fix="Commit the change, or put it aside with git stash, then switch. (Changes to files the two branches agree on simply come along.)"
+/>
+
+<CommonMistake
+  title="Losing work on a detached HEAD"
+  wrong={'git switch --detach v1.0.0\n# ... fix a bug and commit ...\ngit switch main'}
+  error="Warning: you are leaving 1 commit behind, not connected to any of your branches"
+  cause="No branch moved when you committed, so nothing names the fix."
+  fix={'git switch -c hotfix-1.0.1 v1.0.0   # create the branch before committing\n# or afterwards: git branch hotfix-1.0.1 <id from the warning or git reflog>'}
+/>
+
+</Section>
+
+<Section kind="practice" title="Branch habits">
+
+- **Never commit straight to `main`** in a shared repository: branch, then merge through a pull request.
+- **Name branches for their purpose**: `fix/null-ages`, `feat/focal-loss`, `exp/lr-sweep`. Short, lowercase,
+  hyphens.
+- **Keep branches short-lived.** The longer a branch lives, the further it drifts from `main` and the harder the
+  merge.
+- **Delete merged branches** (`git branch -d`, and the setting "Automatically delete head branches" on GitHub).
+- **Show the branch in your shell prompt**, so you always know where HEAD is.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={aheadExercise}>
+  Compute the "ahead" and "behind" counts that git status shows, from nothing but each commit's parents.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A branch is a name for one commit; committing moves the branch HEAD points to.
+- HEAD normally names a branch. Detached, it names a commit, and new commits belong to no branch.
+- `X~n` walks back first parents, `M^2` is a merge's second parent, `A..B` lists what B has that A lacks.
+- Branches are cheap: make one for every piece of work and delete it once merged.
+
+Next: [Merge, rebase, squash and cherry-pick](#/learn/git/branching/merge-rebase) joins diverged branches.
+
+</Section>

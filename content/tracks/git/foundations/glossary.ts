@@ -1,0 +1,80 @@
+import type { GlossaryTerm } from '@/lib/types';
+
+// Glossary terms for the git/foundations chapter (merged into the glossary by content/index.ts).
+export default [
+  {
+    id: 'version-control',
+    term: 'Version control',
+    short: 'A system that records changes to a set of files over time so you can see who changed what, when and why, and return to any earlier state.',
+    long: 'Git is a distributed version control system: every clone holds the full history. Others include Mercurial and Subversion.',
+    introducedIn: 'git/foundations/why-version-control',
+    aliases: ['VCS', 'source control', 'revision control'],
+  },
+  {
+    id: 'repository',
+    term: 'Repository',
+    short: 'A project folder under version control: the files plus the full history, which Git keeps in the hidden .git folder.',
+    introducedIn: 'git/foundations/why-version-control',
+    aliases: ['repo'],
+  },
+  {
+    id: 'working-tree',
+    term: 'Working tree',
+    short: 'The files you see and edit on disk: one checked-out version of the project, plus any changes you have not committed.',
+    introducedIn: 'git/foundations/why-version-control',
+    aliases: ['working directory', 'workspace'],
+  },
+  {
+    id: 'staging-area',
+    term: 'Staging area',
+    short: 'The snapshot Git will save as the next commit. git add copies a file’s current content into it.',
+    long: 'Also called the index (the file .git/index). It lists every tracked file with the id of its staged content, so a commit can contain some changes and leave others for later.',
+    introducedIn: 'git/foundations/why-version-control',
+    aliases: ['index', 'cache'],
+  },
+  {
+    id: 'commit',
+    term: 'Commit',
+    short: 'A saved snapshot of the whole project, with its parent commit(s), author, committer, dates and message. Identified by a hash of that content.',
+    introducedIn: 'git/foundations/why-version-control',
+    aliases: ['revision', 'changeset'],
+  },
+  {
+    id: 'gitignore',
+    term: '.gitignore',
+    short: 'A file of patterns for untracked files Git should not offer to add, such as data, checkpoints and secrets.',
+    long: 'It has no effect on files that are already tracked. git check-ignore -v <path> shows which pattern matches a path.',
+    introducedIn: 'git/foundations/why-version-control',
+    aliases: ['ignore file'],
+  },
+  {
+    id: 'git-object',
+    term: 'Git object',
+    short: 'One entry in Git’s content-addressed database: a blob (file content), tree (folder listing), commit, or annotated tag.',
+    long: 'Each object is named by the SHA-1 of a header ("<type> <size>\\0") plus its content. Objects are immutable: changing anything gives a new object with a new id.',
+    introducedIn: 'git/foundations/objects-hashes',
+    aliases: ['object'],
+  },
+  {
+    id: 'blob',
+    term: 'Blob',
+    short: 'A Git object holding one file’s content, without its name or permissions. Identical content anywhere in history is stored once.',
+    introducedIn: 'git/foundations/objects-hashes',
+    aliases: ['blob object'],
+  },
+  {
+    id: 'tree-object',
+    term: 'Tree',
+    short: 'A Git object listing one folder: for each entry, its mode, type, object id and name. A commit points to one root tree.',
+    introducedIn: 'git/foundations/objects-hashes',
+    aliases: ['tree object'],
+  },
+  {
+    id: 'object-id',
+    term: 'Object id',
+    short: 'The 40-hex-digit SHA-1 hash that names a Git object, such as a commit. Any unique prefix (usually 7 digits) can stand for it.',
+    long: 'Git can also use SHA-256 (64 digits) in repositories created with --object-format=sha256; most hosts still use SHA-1.',
+    introducedIn: 'git/foundations/objects-hashes',
+    aliases: ['commit hash', 'SHA', 'OID'],
+  },
+] satisfies GlossaryTerm[];

@@ -1,0 +1,150 @@
+import { mergeRebase, mergeShell, rebaseShell, strategies } from './code';
+import { mergeBaseExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Two ways to join diverged work">
+
+You branched `feature` off `main` to add an evaluation script. Meanwhile a teammate added a results section to
+`main`. Each branch now has a commit the other lacks. To bring the work together there are two broad options.
+
+**Merge** keeps history as it happened. A new commit with two parents ties the branches together, like a road
+junction. Nothing is rewritten, and the graph shows that two lines of work ran in parallel.
+
+**Rebase** rewrites history as if it had happened in order. Your feature commits are replayed one by one on top of
+the new `main`, as if you had started the branch today. The result is a straight line, but the replayed commits
+are new commits with new ids.
+
+Both give the same files at the end. They differ in the history they leave, and in whether they rewrite commits
+other people may already have.
+
+</Section>
+
+<Section kind="technical" title="Merge base, three-way merge, rebase">
+
+Every integration starts from the <Term id="merge-base">merge base</Term>: the newest commit both branches share.
+
+- If the current branch **is** the merge base, it has nothing the other lacks. Git simply moves it forward: a
+  <Term id="fast-forward">fast-forward</Term>.
+- Otherwise Git runs a <Term id="three-way-merge">three-way merge</Term> of base, ours and theirs. For each file
+  and each region: changed on one side only, take that side; changed identically on both, take it; changed
+  differently on both, it is a conflict (next lesson). The result becomes a
+  <Term id="merge-commit">merge commit</Term> with two parents.
+
+A <Term id="rebase">rebase</Term> of `feature` onto `main` takes the commits in `main..feature`, and re-applies each
+one's change on top of `main`, oldest first. Each re-applied commit keeps its message and author, but has a new
+parent and committer date, so it has a new id. The branch name moves to the last new commit. The old commits stay
+in the object database, reachable only from the reflog.
+
+Two more tools copy changes rather than history:
+
+| Command | Result | Typical use |
+| ------- | ------ | ----------- |
+| <Term id="squash-merge">`git merge --squash`</Term> + commit | One new ordinary commit with the branch's combined change | One commit per pull request on `main` |
+| <Term id="cherry-pick">`git cherry-pick X`</Term> | A copy of commit X's change, with a new id, on the current branch | Carry a fix to a release branch |
+
+GitHub's merge button offers the same three choices: **Create a merge commit** (`--no-ff`), **Squash and merge**,
+and **Rebase and merge**.
+
+</Section>
+
+<Section kind="visual" title="Try it: rebase, then fast-forward">
+
+The two branches have diverged. The guided path rebases `feature` onto `main`, then merges it with a fast-forward.
+Watch the graph: the feature commits move to the end of the line with new ids, and the old ones get a dashed outline: no branch reaches them any more.
+
+<Experiment def={mergeRebase} title="Git sandbox: merge and rebase">
+  <GitSandbox />
+  <GitGraph />
+  <Readout title="What the sandbox computed" />
+</Experiment>
+
+Things to notice:
+
+- After `git rebase main`, compare the ids in `git log --oneline --all` with those before. Same messages, new ids.
+- `git merge feature` on `main` prints a fast-forward: no new commit.
+- `git reflog` still lists the pre-rebase commits. They are recoverable until garbage collection removes them.
+- Press **Reset** and try the alternatives on the original history: `git merge feature` (a merge commit with two
+  parents), `git merge --squash feature` then `git commit -m "Add evaluation"`, or `git cherry-pick feature~1`.
+
+</Section>
+
+<Section kind="code" title="The same history in real Git">
+
+A merge commit, from a real run on the same history:
+
+<Code example={mergeShell} title="merge" />
+
+The rebase alternative:
+
+<Code example={rebaseShell} title="rebase" />
+
+All the ways to integrate, side by side:
+
+<Code example={strategies} title="integration options" />
+
+</Section>
+
+<Section kind="mistakes" title="Where integration goes wrong">
+
+<CommonMistake
+  title="Rebasing a branch others have pulled"
+  wrong={'git switch shared-feature\ngit rebase main\ngit push --force'}
+  error="(on a teammate's machine) their next pull shows duplicate commits and conflicts with themselves"
+  cause="Rebase replaced the commits they built on with new ones."
+  fix="Rebase only your own unpublished commits. On a shared branch, merge main into it instead, or agree on a rebase and use git push --force-with-lease."
+/>
+
+<CommonMistake
+  title="Merging in the wrong direction"
+  wrong={'git switch feature\ngit merge main   # meant: bring feature into main'}
+  error="(no error) feature now contains main; main is unchanged"
+  cause="git merge X brings X into the branch you are on."
+  fix={'git switch main\ngit merge feature'}
+/>
+
+<CommonMistake
+  title="Cherry-picking instead of merging a whole branch"
+  wrong={'git cherry-pick a1b2c3d e4f5a6b 0c9d8e7   # most of feature, by hand'}
+  error="(no error, later) the same changes exist twice with different ids, and the next merge of feature conflicts with them"
+  cause="Picked commits are copies. Git cannot tell they are the same work when it merges the originals."
+  fix="Merge or rebase the branch. Keep cherry-pick for single fixes that must go to another branch."
+/>
+
+</Section>
+
+<Section kind="practice" title="Choosing a strategy">
+
+- **Pick one convention per repository** and set it in GitHub (Settings → General → Pull Requests). Squash merging
+  is a common default: one commit per pull request on `main`, easy to revert.
+- **Rebase your own branch on `main` before asking for review**, so reviewers and CI see the code that will land.
+- **Never rewrite `main`** or any branch others build on.
+- **Use `--force-with-lease`, never `--force`**, after rebasing a branch you pushed: it refuses if someone else
+  pushed in the meantime.
+- **Keep merge commits meaningful**: one per pull request, with the PR number in the message.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={mergeBaseExercise}>
+  Find the merge base of two commits: the starting point of every three-way merge and every rebase.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- The merge base is the newest commit two branches share. If it equals the current branch, merging fast-forwards.
+- A merge commit has two parents and keeps history as it happened. Rebase replays commits onto a new base, giving
+  them new ids and a straight history.
+- Squash merging makes one new commit from a branch; cherry-pick copies a single commit.
+- Rewrite (rebase, amend, force-push) only commits nobody else has.
+
+Next: [Merge conflicts](#/learn/git/branching/merge-conflicts), for when both sides changed the same lines.
+
+</Section>
