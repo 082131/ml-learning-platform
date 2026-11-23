@@ -10,26 +10,28 @@ const SIDES = [
   { key: 'theirs', label: 'tune-lr (theirs)' },
 ] as const;
 
+/** Labels each merged line as clean, a conflict marker, or inside the ours/theirs half of a conflict. */
+function markZones(lines: string[]): { l: string; kind: string }[] {
+  const out: { l: string; kind: string }[] = [];
+  let zone: 'ours' | 'theirs' | undefined;
+  for (const l of lines) {
+    if (l.startsWith('<<<<<<<')) zone = 'ours';
+    else if (l === '=======' && zone) zone = 'theirs';
+    else if (l.startsWith('>>>>>>>')) zone = undefined;
+    else {
+      out.push({ l, kind: zone ?? 'clean' });
+      continue;
+    }
+    out.push({ l, kind: 'marker' });
+  }
+  return out;
+}
+
 /** Three editable versions of params.yaml and the file git merge would write. */
 export function MergeLab() {
   const { state, result: r, update } = useExperimentContext<MergeLabState, MergeResult>('MergeLab');
   const lines = r.text.replace(/\n$/, '').split('\n');
-  let zone: 'ours' | 'theirs' | undefined;
-  const marked = lines.map((l) => {
-    if (l.startsWith('<<<<<<<')) {
-      zone = 'ours';
-      return { l, kind: 'marker' };
-    }
-    if (l === '=======' && zone) {
-      zone = 'theirs';
-      return { l, kind: 'marker' };
-    }
-    if (l.startsWith('>>>>>>>')) {
-      zone = undefined;
-      return { l, kind: 'marker' };
-    }
-    return { l, kind: zone ?? 'clean' };
-  });
+  const marked = markZones(lines);
   return (
     <VizFrame
       title="Three-way merge of params.yaml"
