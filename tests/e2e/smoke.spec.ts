@@ -70,7 +70,7 @@ test('opens a lesson, follows a prerequisite, marks complete and keeps it after 
     page
       .getByRole('region', { name: 'Progress by track' })
       .getByRole('link', { name: /Machine Learning Engineer/ }),
-  ).toContainText(/T\.01\s*1 of [1-9]\d*\s*written/);
+  ).toContainText(/T\.01\s*Machine Learning Engineer\s*1 of [1-9]\d*\s*written/);
   await expect(page.getByRole('region', { name: 'Bookmarks and recent lessons' })).toContainText(
     'What AI, ML',
   );

@@ -6,11 +6,26 @@ import { PixelProgressGrid } from '@/components/layout/PixelProgressGrid';
 import { LessonCard } from '@/components/learning/LessonCard';
 import grid from '@/components/learning/LessonGrid.module.css';
 import { Card, SectionLabel } from '@/components/ui';
-import { nextUp, trackStats } from '@/lib/progress/recommend';
+import { recommendForTrack, trackStats } from '@/lib/progress/recommend';
 import { LessonLinkList } from './LessonLinkList';
 import s from './Dashboard.module.css';
 
 const SECTIONS = 4;
+const NUMBER_WORDS = [
+  'No',
+  'One',
+  'Two',
+  'Three',
+  'Four',
+  'Five',
+  'Six',
+  'Seven',
+  'Eight',
+  'Nine',
+  'Ten',
+  'Eleven',
+  'Twelve',
+];
 
 export default function Dashboard() {
   const progress = useProgress();
@@ -23,8 +38,8 @@ export default function Dashboard() {
     <>
       <PageHeader code="00" label="Dashboard" title="Your learning">
         <p className={s.lead}>
-          Four tracks, one lesson at a time. Progress is saved in this browser (
-          <Link to="/settings">details</Link>). Getting ready to apply? Try{' '}
+          {NUMBER_WORDS[tracks.length] ?? tracks.length} tracks, one lesson at a time. Progress is saved in
+          this browser (<Link to="/settings">details</Link>). Getting ready to apply? Try{' '}
           <Link to="/interview">interview prep</Link>: questions with model answers and timed coding screens.
         </p>
       </PageHeader>
@@ -57,27 +72,44 @@ export default function Dashboard() {
             Next up in each track
           </h2>
           <p className={s.note}>
-            The first written lesson you haven’t completed whose prerequisites are done.
+            The first written lesson you haven’t completed whose prerequisites are done. Where a track builds
+            on another one, its first lesson is shown with what to finish first.
           </p>
           <ul className={grid.grid}>
             {tracks.map((t) => {
-              const ref = nextUp(t, statusById, metas, progress);
-              const lesson = ref && curriculum.getLesson(ref.id);
-              const stats = trackStats(t, progress);
+              const rec = recommendForTrack(t, statusById, metas, progress);
+              const lesson = 'ref' in rec ? curriculum.getLesson(rec.ref.id) : undefined;
               return (
-                <li key={t.id}>
+                <li key={t.id} className={s.nextItem} aria-label={t.title}>
+                  <Link to={`/learn/${t.id}`} className={s.trackLink}>
+                    <span className={s.cardCode}>{t.code}</span> {t.title}
+                  </Link>
                   {lesson ? (
                     <LessonCard lesson={lesson} progress={progress} />
                   ) : (
                     <Card>
-                      <p className={s.cardCode}>{t.code}</p>
-                      <h3 className={s.cardTitle}>{t.title}</h3>
                       <p className={s.note}>
-                        {stats.written === 0
+                        {rec.kind === 'none-written'
                           ? 'No lessons are written yet. Outlines are on the track page.'
                           : 'Every written lesson is complete.'}
                       </p>
                     </Card>
+                  )}
+                  {rec.kind === 'needs-prerequisites' && rec.missing.length > 0 && (
+                    <p className={s.needs}>
+                      Finish first:{' '}
+                      {rec.missing.map((id, i) => {
+                        const pre = curriculum.getLesson(id);
+                        return (
+                          <span key={id}>
+                            {i > 0 && ', '}
+                            <Link to={`/learn/${id}`}>
+                              {pre ? `${pre.track.code} ${pre.meta.title}` : id}
+                            </Link>
+                          </span>
+                        );
+                      })}
+                    </p>
                   )}
                 </li>
               );
@@ -97,13 +129,12 @@ export default function Dashboard() {
                 <li key={t.id}>
                   <Link to={`/learn/${t.id}`} className={s.stat}>
                     <span className={s.cardCode}>{t.code}</span>
+                    <span className={s.statName}>{t.title}</span>
                     <span className={s.statValue}>
                       {st.completedWritten} of {st.written}
                     </span>
                     <span className={s.statLabel}>written lessons complete</span>
-                    <span className={s.statTitle}>
-                      {t.title} · {st.total} lessons outlined
-                    </span>
+                    <span className={s.statTitle}>{st.total} lessons in the track</span>
                   </Link>
                 </li>
               );

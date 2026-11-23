@@ -12,7 +12,7 @@ import {
 } from './actions';
 import { BACKUP_KIND, exportBackup, exportProgress, importBackup, importProgress } from './io';
 import { migrate } from './migrate';
-import { lessonProgress, nextUp, trackLessons, trackStats } from './recommend';
+import { lessonProgress, nextUp, recommendForTrack, trackLessons, trackStats } from './recommend';
 import { BACKUP_KEY, emptyState, RECENT_LIMIT, STORAGE_KEY } from './schema';
 import { createProgressStore } from './store';
 
@@ -142,8 +142,12 @@ describe('import and export', () => {
     expect(importBackup(exportProgress(progress))).toEqual({ ok: true, backup: { progress } });
   });
   it('rejects a backup from a newer version or with broken progress', () => {
-    expect(importBackup(JSON.stringify({ kind: BACKUP_KIND, version: 99, progress: {} }))).toMatchObject({ ok: false });
-    expect(importBackup(JSON.stringify({ kind: BACKUP_KIND, version: 1, progress: 5 }))).toMatchObject({ ok: false });
+    expect(importBackup(JSON.stringify({ kind: BACKUP_KIND, version: 99, progress: {} }))).toMatchObject({
+      ok: false,
+    });
+    expect(importBackup(JSON.stringify({ kind: BACKUP_KIND, version: 1, progress: 5 }))).toMatchObject({
+      ok: false,
+    });
   });
 });
 
@@ -285,6 +289,33 @@ describe('recommendations', () => {
     let s = emptyState();
     for (const id of ['ml/c/a', 'ml/c/b', 'ml/c/c']) s = setComplete(s, id, true, NOW);
     expect(nextUp(track, status, metas, s)).toBeUndefined();
+  });
+  it('recommendForTrack: ready, blocked by another track, complete, and none written', () => {
+    expect(recommendForTrack(track, status, metas, emptyState())).toEqual({
+      kind: 'ready',
+      ref: { id: 'ml/c/a', status: 'written' },
+    });
+    // 'a' needs a lesson from another track: point at it anyway and name the missing prerequisite.
+    const crossTrack = {
+      ...metas,
+      'ml/c/a': meta('ml/c/a', ['data/x/y']),
+      'ml/c/b': meta('ml/c/b', ['ml/c/a']),
+      'ml/c/c': meta('ml/c/c', ['ml/c/a']),
+    };
+    const st = { ...status, 'data/x/y': 'written' as const };
+    expect(recommendForTrack(track, st, crossTrack, emptyState())).toEqual({
+      kind: 'needs-prerequisites',
+      ref: { id: 'ml/c/a', status: 'written' },
+      missing: ['data/x/y'],
+    });
+    let done = emptyState();
+    for (const id of ['ml/c/a', 'ml/c/b', 'ml/c/c']) done = setComplete(done, id, true, NOW);
+    expect(recommendForTrack(track, status, metas, done)).toEqual({ kind: 'complete' });
+    const outlineOnly = {
+      ...track,
+      chapters: [{ ...track.chapters[0]!, lessons: [{ id: 'ml/c/o', status: 'outline' as const }] }],
+    };
+    expect(recommendForTrack(outlineOnly, status, metas, emptyState())).toEqual({ kind: 'none-written' });
   });
   it('computes track stats and per-lesson progress', () => {
     const s = recordView(setComplete(emptyState(), 'ml/c/a', true, NOW), 'ml/c/b');
