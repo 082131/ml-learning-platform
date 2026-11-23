@@ -1,0 +1,161 @@
+import { delivery, receiverCode, signCode, signature, verifyDemo } from './code';
+import { questions, signatureExercise } from './quiz';
+
+<Section kind="intuition" title="Don't ask every minute; get told">
+
+Schedules are the right trigger when work belongs to a time: the nightly report, the weekly retrain. Many automations
+are triggered by *events* instead: a push to `main`, a new labelled batch in a bucket, a model registered, a payment
+failed, a form submitted. Polling for those ("has anything changed?" every minute) wastes calls and still reacts
+late.
+
+A <Term id="webhook">webhook</Term> turns it around: the service sends an HTTP request to your URL when the event
+happens. That URL is public, though, so anyone can call it; the sender may retry and deliver the same event twice;
+and it will give up if you are slow. A good receiver handles all three.
+
+</Section>
+
+<Section kind="technical" title="Verify, deduplicate, answer fast">
+
+**Verify the signature.** Providers sign each delivery with a secret you share. GitHub sends
+`X-Hub-Signature-256: sha256=<hex>`, the <Term id="hmac">HMAC</Term>-SHA256 of the **raw request body** keyed with the
+secret. Recompute it over the exact bytes you received, before any JSON parsing, and compare with
+`hmac.compare_digest`. A mismatch means the request did not come from the secret holder, or was changed: answer 401
+and do nothing.
+
+**Answer fast; work later.** Senders wait only briefly. GitHub records a delivery as failed if your server takes more
+than 10 seconds, and does not redeliver failed deliveries automatically (you can redeliver deliveries from the past 3
+days by hand or through the API). Stripe retries failed deliveries for days. So the handler should validate, put the
+event on a <Term id="message-queue">message queue</Term>, and return `202 Accepted`; a worker does the slow work.
+
+**Deduplicate.** Delivery is <Term id="at-least-once-delivery">at least once</Term>: retries, redeliveries and your
+own timeouts produce repeats. Record each event or delivery id when you accept it, atomically, and skip ids you have
+seen. The work itself should also be <Term id="idempotent">idempotent</Term> where possible.
+
+**Events, schedules and workflow tools.**
+
+| Trigger | Fits | Watch out for |
+| --- | --- | --- |
+| Schedule (cron) | work tied to time | latency up to one period |
+| Polling | sources with no events | wasted calls, rate limits |
+| Webhook / event notification | rare or urgent events | security, duplicates, lost events |
+| GitHub Actions events (`push`, `release`, `repository_dispatch`) | repository-centred automation | runner limits, secrets on forks |
+| No-code workflow tools (n8n, Zapier, Make) | glue between SaaS apps (forms, sheets, chat) | logic hidden from code review, per-task pricing |
+
+Workflow tools are good for business glue ("new row in the sheet → post in the channel"). Keep model training,
+data pipelines and anything that needs tests and review in code.
+
+</Section>
+
+<Section kind="visual" title="Try it: sign and verify">
+
+Edit the secret or the body. The sender's header and the receiver's recomputed signature are computed live with
+SHA-256 in your browser.
+
+<Experiment def={signature} title="Webhook signature">
+  <SignatureView />
+  <Readout title="Receiver" />
+</Experiment>
+
+Things to try:
+
+- Change one character of the body: the signature changes completely.
+- **Parsed and re-serialised JSON**: same data, different bytes (spaces), so verification fails. Always verify the
+  raw body.
+- **Changed in transit**: the attacker can change the body but cannot recompute the signature without the secret.
+
+Now the delivery side: a sender that waits 10 seconds and retries failed deliveries (like Stripe), three events, and
+a handler that starts a retraining job for each event.
+
+<Experiment def={delivery} title="Deliveries">
+  <DeliveryView />
+  <Readout title="Outcome" />
+</Experiment>
+
+- **Do the work, then answer** with 25 seconds of work: every attempt times out, the sender retries, and each retry
+  starts the job again. 9 jobs for 3 events.
+- Turn on **deduplicate**: the retries are answered at once, and each job starts once.
+- **Enqueue and answer 202**: no timeouts, no retries, no duplicates, even without deduplication.
+
+</Section>
+
+<Section kind="code" title="Verifying and receiving">
+
+Verification with the standard library, checked against GitHub's published example:
+
+<PythonRunner example={verifyDemo} title="verify_demo.py" />
+
+The same computation, with the secret and body from the explorer:
+
+<Experiment def={signature} title="sign.py, linked to the explorer" controls={false}>
+  <Code example={signCode} title="sign.py" />
+  <Readout title="Receiver" />
+</Experiment>
+
+A receiver that verifies, deduplicates, enqueues and answers within the limit:
+
+<Code example={receiverCode} title="app.py (FastAPI)" />
+
+</Section>
+
+<Section kind="mistakes" title="Webhook receivers that get abused or double-fire">
+
+<CommonMistake
+  title="Trusting the request"
+  wrong={'@app.post("/hooks/github")\nasync def hook(payload: dict):\n    if payload["ref"] == "refs/heads/main":\n        deploy()'}
+  error="(no error) anyone who finds the URL can trigger a deploy with a hand-written JSON body"
+  cause="No signature check: the URL is public."
+  fix="Verify X-Hub-Signature-256 over the raw body with the shared secret before reading anything."
+/>
+
+<CommonMistake
+  title="Doing the work in the request"
+  wrong={'def hook(req):\n    train_model(req.json())   # 4 minutes\n    return "ok"'}
+  error="(sender) Delivery failed: timed out. (Your side) the model trained; with a retrying sender, it trains again."
+  cause="The sender gave up waiting and recorded a failure."
+  fix="Enqueue and return 202 immediately; a worker trains. Deduplicate by event id."
+/>
+
+<CommonMistake
+  title="Comparing signatures with =="
+  wrong={'if signature(secret, body) == header:'}
+  error="(no error) the comparison can leak timing information"
+  cause="== may stop at the first differing character."
+  fix="hmac.compare_digest(expected, header)."
+/>
+
+</Section>
+
+<Section kind="practice" title="Receiving events safely">
+
+- **Verify** every delivery over the raw body; keep the secret in the environment; rotate it if it leaks.
+- **Respond in well under the sender's timeout** with 2xx; queue the work.
+- **Deduplicate** by event or delivery id; make handlers idempotent.
+- **Reconcile**: a scheduled sweep that catches events that never arrived.
+- **Log deliveries** (id, event type, result) so redeliveries can be investigated.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={signatureExercise}>
+  Build the core of a webhook receiver: authenticate, deduplicate, enqueue.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Webhooks push events to you; use them for rare or urgent triggers, schedules for time-based work.
+- Verify HMAC-SHA256 over the raw body with compare_digest; reject anything else.
+- Answer fast (queue the work) and deduplicate: delivery is at least once.
+- Workflow tools are fine for SaaS glue; keep ML pipelines in reviewed code.
+
+Next: [AI agents with guardrails](#/learn/automation/events/agent-guardrails).
+
+</Section>

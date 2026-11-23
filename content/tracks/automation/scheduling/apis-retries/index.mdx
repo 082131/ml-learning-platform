@@ -1,0 +1,154 @@
+import { idempotencyCode, policyCode, retry, retryDemo, urllib3Code } from './code';
+import { backoffExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Networks fail; good clients expect it">
+
+Most automations talk to something over the network: a data API, a model endpoint, a cloud bucket, a chat webhook.
+Networks and services fail in small ways all the time. A load balancer restarts, a rate limit kicks in, a request
+times out. A script that treats every hiccup as fatal fails most nights; a script that retries carelessly can turn a
+small outage into a big one, or start the same training job three times.
+
+A reliable client does four things: it gives up on a request that hangs, it retries only failures that might go
+away, it waits longer after each failure (with some randomness), and it makes repeated requests harmless.
+
+</Section>
+
+<Section kind="technical" title="What to retry, how long to wait">
+
+**Transient or permanent?** A <Term id="transient-error">transient error</Term> may not happen next time:
+
+| Retry (transient) | Do not retry (permanent) |
+| --- | --- |
+| connection errors, timeouts | 400 Bad Request, 422: the request is wrong |
+| 408 Request Timeout | 401, 403: credentials or permissions |
+| 429 Too Many Requests | 404 Not Found |
+| 500, 502, 503, 504 | anything your own code raised |
+
+**Timeouts first.** A request with no timeout can hang forever, and a hung request never fails, so it is never
+retried. `requests` has no default timeout; always pass `timeout=`.
+
+**Exponential backoff.** <Term id="exponential-backoff">Exponential backoff</Term> waits base, 2×base, 4×base, ...
+after successive failures, up to a cap, and stops after a maximum number of attempts. The growing wait gives a
+struggling service room to recover.
+
+**Jitter.** If many clients fail together (a database restart), identical backoff schedules make them retry
+together too: a <Term id="thundering-herd">thundering herd</Term> that hits the service in synchronised bursts.
+<Term id="jitter">Jitter</Term> randomises the waits. "Full jitter" draws each wait uniformly from 0 to the
+exponential value. In the AWS Architecture Blog's simulations, jittered backoff needed far fewer calls and finished
+sooner than plain exponential backoff.
+
+**Respect the server.** With a 429 or 503, servers often send a <Term id="retry-after">Retry-After</Term> header:
+wait at least that long. Paginated and <Term id="rate-limit">rate-limited</Term> APIs reward a steady pace over bursts.
+
+**Make retries safe.** Reads (GET) are naturally <Term id="idempotent">idempotent</Term>. A request that changes
+something (POST: start a job, charge a card) may have succeeded even though you got a timeout. Send an
+<Term id="idempotency-key">idempotency key</Term>, a unique id reused for every retry of the same operation, so the
+server can return the first result instead of doing the work again.
+
+</Section>
+
+<Section kind="visual" title="Try it: retries over time">
+
+Choose how the server behaves and a retry strategy. The left panel shows one client's attempts; the right panel
+shows 200 clients that all failed at time 0, assuming every retry keeps failing until the burst passes.
+
+<Experiment def={retry} title="Retry explorer">
+  <RetryView />
+  <Readout title="This run" />
+</Experiment>
+
+Things to try:
+
+- **503, 503, then 200** with exponential backoff: waits of 1 s and 2 s, success after 3 s.
+- **429 with Retry-After: 8**: the client waits 8 s instead of 1 s. Turn "respect Retry-After" off to see the rude
+  version.
+- **400 Bad Request**: one attempt, then failure, whatever the strategy.
+- Compare **exponential** and **exponential + full jitter** in the right panel: 200 requests in the same second
+  becomes a spread-out trickle. Change the seed to see other random draws.
+
+</Section>
+
+<Section kind="code" title="Retries in Python">
+
+A retry loop with full jitter and an injectable sleep, so the demo runs instantly:
+
+<PythonRunner example={retryDemo} title="retry_demo.py" />
+
+The explorer's policy as a [tenacity](https://tenacity.readthedocs.io/) decorator (the literals follow the controls above):
+
+<Experiment def={retry} title="retry policy, linked to the explorer" controls={false}>
+  <Code example={policyCode} title="fetch.py (tenacity)" />
+</Experiment>
+
+Or at the transport level with `requests` and urllib3, which also honours Retry-After:
+
+<Code example={urllib3Code} title="session.py (urllib3 Retry)" />
+
+And a POST that is safe to retry:
+
+<Code example={idempotencyCode} title="launch_job.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Retries that make things worse">
+
+<CommonMistake
+  title="Retrying everything, forever"
+  wrong={'while True:\n    try:\n        return requests.get(url).json()\n    except Exception:\n        time.sleep(1)'}
+  error="(no error) a typo in the URL (404) or an expired token (401) loops all night; the job never fails, so nobody is alerted"
+  cause="No attempt limit, no distinction between transient and permanent errors, no timeout."
+  fix="Retry only transient errors, cap the attempts, set timeout=, and re-raise after the last attempt so the job exits non-zero."
+/>
+
+<CommonMistake
+  title="Retrying a POST without a key"
+  wrong={'for _ in range(3):\n    try:\n        return requests.post(jobs_url, json=cfg, timeout=10)\n    except requests.Timeout:\n        pass'}
+  error="(no error) three identical training jobs running on three GPUs"
+  cause="The first request reached the server and started the job; only the response was slow."
+  fix="Send an Idempotency-Key (if the API supports it), or check whether the job exists before retrying."
+/>
+
+<CommonMistake
+  title="Ignoring Retry-After"
+  wrong={'except HTTPError as e:\n    if e.response.status_code == 429:\n        time.sleep(1)   # server said Retry-After: 60'}
+  error="HTTP 429 Too Many Requests ... (then) 403 Forbidden: client blocked for abuse"
+  cause="Hammering an API that told you to wait looks like abuse."
+  fix="Read Retry-After (seconds or an HTTP date) and wait at least that long; slow your overall request rate."
+/>
+
+</Section>
+
+<Section kind="practice" title="A reliable client">
+
+- **Timeouts on every request** (connect and read).
+- **Retry only transient errors**, with exponential backoff, full jitter, a cap and a maximum number of attempts.
+- **Honour Retry-After and rate limits**; pace bulk work instead of bursting.
+- **Idempotency keys for writes**, or design writes as upserts.
+- **Log each retry** with the attempt number and the reason, and fail loudly after the last.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={backoffExercise}>
+  Compute a backoff schedule, including the cap and the server's Retry-After.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Retry transient errors (timeouts, 408, 429, 5xx); fail fast on 4xx client errors.
+- Exponential backoff with a cap and an attempt limit; add full jitter so clients spread out.
+- Always set a timeout; honour Retry-After.
+- Make retried writes safe with idempotency keys.
+
+Next: [Jobs that are safe to rerun](#/learn/automation/scheduling/rerun-safe-jobs).
+
+</Section>

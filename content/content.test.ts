@@ -28,6 +28,7 @@ describe('content validation', () => {
       count('dataops'),
       count('deploy'),
       count('git'),
-    ]).toEqual([55, 12, 13, 14, 9, 9, 14]);
+      count('automation'),
+    ]).toEqual([55, 12, 13, 14, 9, 9, 14, 12]);
   });
 });

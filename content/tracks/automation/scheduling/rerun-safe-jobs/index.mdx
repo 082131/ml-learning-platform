@@ -1,0 +1,142 @@
+import { atomicWrite, lockCode, rerun, rerunDemo } from './code';
+import { questions, rerunExercise } from './quiz';
+
+<Section kind="intuition" title="Every job runs twice eventually">
+
+A scheduled job will be run more than once on the same input. It crashes halfway and someone reruns it. The
+scheduler retries it after a timeout. A backfill reprocesses last month. Two runs overlap because yesterday's was
+slow. The question is not whether this happens but what your output looks like when it does.
+
+A job that appends rows blindly doubles a customer's purchases after a rerun. A job that writes its output file in
+place leaves a half-written file when it is killed, and the next step happily reads it. A job designed to be rerun
+gives the same result however many times it runs, and picks up where it stopped.
+
+</Section>
+
+<Section kind="technical" title="Idempotent writes, checkpoints, atomic files, locks">
+
+**Idempotent writes.** A job is <Term id="idempotent">idempotent</Term> if running it twice gives the same result as
+running it once. Three standard ways to get there:
+
+| Technique | How | Typical use |
+| --- | --- | --- |
+| <Term id="upsert">Upsert</Term> by key | `INSERT ... ON CONFLICT (key) DO UPDATE` or `MERGE` | rows with a natural key: customer, day |
+| Partition overwrite | each run replaces its own partition, such as `day=2026-11-22/` | daily batch outputs, backfills |
+| Delete-then-insert in one transaction | `DELETE WHERE day = ?; INSERT ...; COMMIT` | warehouses without upsert |
+
+**Checkpoints.** A <Term id="job-checkpoint">job checkpoint</Term> records how far the job got, so a rerun resumes
+instead of starting over. The catch: if data and checkpoint are saved separately, the data saved after the last
+checkpoint is written again on resume. Either make the writes idempotent (upsert), or commit each chunk of data
+together with its checkpoint in one transaction.
+
+**Atomic files.** Readers must never see half a file. An <Term id="atomic-write">atomic write</Term> writes to a
+temporary file in the same folder, flushes it, then renames it over the target with `os.replace`, which is atomic
+within one file system.
+
+**One run at a time.** <Term id="job-overlap">Overlapping runs</Term> both read the same checkpoint and both write
+the same rows. Take an exclusive lock (`flock`, a lock row, an orchestrator's `max_active_runs=1`) and decide what a
+second start should do: skip quietly, wait, or fail loudly.
+
+</Section>
+
+<Section kind="visual" title="Try it: crash, then rerun">
+
+A batch job writes 12 items to a table. The first run crashes; the second finishes the job. Each cell is one item's
+key, with the number of rows it ends up with.
+
+<Experiment def={rerun} title="Rerun lab">
+  <RerunView />
+  <Readout title="After the rerun" />
+</Experiment>
+
+Things to try:
+
+- **Append, rerun from the start**, crash after 8: items 1 to 8 appear twice. 20 rows for 12 items.
+- **Upsert, rerun from the start**: correct (12 rows) but all 8 items are processed again.
+- **Append, resume from checkpoint** with a checkpoint every 5: only items 6 to 8 are duplicated, the ones written
+  after the last checkpoint. Set the checkpoint to every 1 item: no duplicates, because data and checkpoint no
+  longer drift apart.
+- **Upsert, resume from checkpoint**: correct, and only items 6 to 8 are redone.
+
+</Section>
+
+<Section kind="code" title="The same crash in SQLite">
+
+Three strategies against a real database: plain inserts with per-row commits, upserts, and rows committed together
+with their checkpoint. Each crashes after 8 rows and is rerun.
+
+<PythonRunner example={rerunDemo} title="rerun_demo.py" />
+
+Writing a file so readers never see half of it, into a partition the run owns:
+
+<Code example={atomicWrite} title="write_atomically.py" />
+
+Making sure only one run is active:
+
+<Code example={lockCode} title="lock.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Reruns that corrupt data">
+
+<CommonMistake
+  title="Appending on every run"
+  wrong={'df.to_sql("daily_revenue", engine, if_exists="append")'}
+  error="(no error) after a retry, yesterday's revenue is counted twice in the dashboard"
+  cause="The retry appended the same day's rows a second time."
+  fix="Upsert by (day, store), or delete the day's rows and insert them in one transaction, or overwrite the day's partition."
+/>
+
+<CommonMistake
+  title="Writing the output in place"
+  wrong={'df.to_parquet("features/latest.parquet")   # killed halfway by the OOM killer'}
+  error="pyarrow.lib.ArrowInvalid: Parquet magic bytes not found in footer. Either the file is corrupted or this is not a parquet file."
+  cause="The next step read a file the previous step had only half written."
+  fix="Write to a temporary name in the same folder, then os.replace() it into place, or write a dated partition and point readers at it when complete."
+/>
+
+<CommonMistake
+  title="Using now() inside a batch job"
+  wrong={'since = datetime.now() - timedelta(days=1)\nrows = fetch_orders(since=since)'}
+  error="(no error) rerunning Monday's job on Wednesday processes Tuesday's orders"
+  cause="The job's input depends on when it runs, not on which day it is for."
+  fix="Pass the day to process as an argument (the scheduler's logical date) and derive everything from it. The pipeline chapter builds on this."
+/>
+
+</Section>
+
+<Section kind="practice" title="Rerun-safe by design">
+
+- **Parameterise by the period** being processed, never by "now".
+- **Write idempotently**: upsert by key, or overwrite the period's partition.
+- **Commit data and progress together**, or make the writes idempotent so the order does not matter.
+- **Write files atomically**; publish outputs only when complete (a `_SUCCESS` marker or a rename).
+- **One active run** per job and period, with a lock or a concurrency limit.
+- **Test the rerun**: run the job twice in a test and assert the output did not change.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={rerunExercise}>
+  Build a resumable job: crash it halfway, rerun it, and prove nothing was processed twice.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Jobs get rerun: crashes, retries, backfills, overlaps. Design for it.
+- Idempotent writes (upsert, partition overwrite) make a rerun harmless; checkpoints make it cheap.
+- Commit data and its checkpoint together, write files atomically, and allow one run at a time.
+- Derive the job's input from the period it processes, not from the clock.
+
+Next: [CI pipelines for ML projects](#/learn/automation/cicd/ml-ci-pipelines).
+
+</Section>

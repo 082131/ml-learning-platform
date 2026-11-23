@@ -1,0 +1,161 @@
+import { cron, crontab, ghSchedule, systemdTimer } from './code';
+import { cronExercise, questions } from './quiz';
+
+<Section kind="intuition" title="A timetable for your scripts">
+
+Once a script works from the command line, the next question is "can it run without me?". Most recurring work
+runs on a timetable: export the features every night, check the endpoint every 15 minutes in working hours, retrain
+on the first of the month. For fifty years the standard way to write such a timetable has been a
+<Term id="cron-expression">cron expression</Term>: five fields that say which minutes, hours, days and months a job
+runs in.
+
+The syntax is small but full of traps. A schedule can look right and run on the wrong days, in the wrong time zone,
+twice at once, or not at all without anyone noticing. This lesson covers the syntax and the traps.
+
+</Section>
+
+<Section kind="technical" title="Five fields, one surprising rule">
+
+`0 2 * * *` means minute 0, hour 2, every day of the month, every month, every day of the week:
+
+| Position | Field | Values |
+| --- | --- | --- |
+| 1 | minute | 0-59 |
+| 2 | hour | 0-23 |
+| 3 | day of month | 1-31 |
+| 4 | month | 1-12 or JAN-DEC |
+| 5 | day of week | 0-7 or SUN-SAT (0 and 7 are both Sunday) |
+
+Each field takes `*` (every value), a number, a range `1-5`, a list `1,15`, or a step `*/15` or `9-17/2` (every
+second value in the range). Shortcuts like `@daily` (`0 0 * * *`) and `@hourly` exist in most implementations.
+
+**The day rule.** If day of month and day of week are *both* restricted, a day matches when **either** matches:
+`0 0 13 * 5` runs on every 13th *and* every Friday. If either field starts with `*`, both must match. In Vixie cron
+and cronie, the cron on most Linux systems, a field like `*/2` counts as starting with `*`; some libraries (croniter,
+for example) treat it as restricted, so the same expression can behave differently. Avoid combining both day fields;
+check the date inside the script when you need "Friday the 13th".
+
+**Where schedules run.**
+
+| Scheduler | Time zone | Missed runs | Overlap |
+| --- | --- | --- | --- |
+| crontab (cronie) | system zone, or `CRON_TZ` | skipped | allowed: add `flock` |
+| systemd timer | per timer (`OnCalendar=... UTC`) | `Persistent=true` runs once on boot | one unit at a time |
+| GitHub Actions `schedule` | always UTC | may be delayed under load | add `concurrency:` |
+| Orchestrators (Airflow, Prefect, Dagster) | configurable | catchup and backfills | `max_active_runs` |
+
+**What goes wrong.**
+
+- **Time zones and daylight saving time.** In a zone with DST, local times between 02:00 and 03:00 are skipped or
+  repeated on changeover nights. Schedule in UTC and convert in your head (or in the docs).
+- **A different environment.** cron gives jobs a tiny `PATH`, no shell profile and a different working directory.
+  Use absolute paths and the virtual environment's own `python`.
+- **<Term id="job-overlap">Overlapping runs</Term>.** cron starts a new run on time even if the last one is still
+  going. Take a lock (`flock -n`) or limit concurrency.
+- **Silent non-starts.** A job that never starts writes no error and has no <Term id="exit-code">exit code</Term>.
+  Only a <Term id="heartbeat-monitor">heartbeat monitor</Term>, which alerts when an expected "I finished" ping does
+  not arrive, catches it.
+
+</Section>
+
+<Section kind="visual" title="Try it: when does it run?">
+
+Pick a preset or type an expression. The explorer parses it like cronie and lists the next six run times in UTC,
+counted from Monday 2026-11-23 14:00 UTC.
+
+<Experiment def={cron} title="Cron explorer">
+  <CronView />
+  <Readout title="Schedule" />
+</Experiment>
+
+Things to try:
+
+- `0 0 13 * 5`: the 13th **or** Friday. Then `0 0 */2 * 1`: the `*` makes it odd days that are **also** Mondays.
+- `0 0 30 2 *`: February 30th never comes. cron accepts it and the job never runs.
+- Type `0 25 * * *` or `0 9 * *` and read the error: the explorer checks fields like `crontab -e` does.
+
+</Section>
+
+<Section kind="code" title="Three ways to schedule the same job">
+
+A crontab with the safety habits: UTC, a full `PATH`, a lock against overlap, a log file, and a heartbeat ping.
+
+<Code example={crontab} title="crontab" />
+
+The same idea in GitHub Actions. The schedule below is whatever is in the explorer above:
+
+<Experiment def={cron} title="nightly.yml, linked to the explorer" controls={false}>
+  <Code example={ghSchedule} title=".github/workflows/nightly.yml" />
+  <Readout title="This schedule" />
+</Experiment>
+
+And a systemd timer, which can catch up on a run missed while the machine was off:
+
+<Code example={systemdTimer} title="export-features.timer" />
+
+</Section>
+
+<Section kind="mistakes" title="Schedules that lie">
+
+<CommonMistake
+  title="Local time on a server with daylight saving"
+  wrong={'30 2 * * *  python backup.py   # server in Europe/Berlin'}
+  error="(no error) on the last Sunday of March the clock jumps from 02:00 to 03:00, so 02:30 never happens that night"
+  cause="What happens next depends on the scheduler: cronie runs such fixed-time jobs late, just after the jump; others skip them; in the repeated hour in October some schedulers run a job twice."
+  fix="Run servers and schedules in UTC (CRON_TZ=UTC, or the scheduler's timezone setting) and convert to local time for humans."
+/>
+
+<CommonMistake
+  title="It works in my terminal"
+  wrong={'0 2 * * *  python train.py'}
+  error="/bin/sh: 1: python: not found   (or ModuleNotFoundError: No module named 'pandas')"
+  cause="cron's PATH does not include your virtual environment, and the working directory is your home folder."
+  fix="Use absolute paths: cd /srv/ml && /srv/ml/.venv/bin/python train.py, and redirect output to a log file."
+/>
+
+<CommonMistake
+  title="A slow job that piles up"
+  wrong={'*/10 * * * *  python sync.py   # usually 3 minutes, 25 when the API is slow'}
+  error="(no error) three copies run at once, all writing the same table"
+  cause="cron starts a new run every 10 minutes regardless of the last one."
+  fix="flock -n /tmp/sync.lock python sync.py, a concurrency group in CI, or max_active_runs=1 in an orchestrator."
+/>
+
+</Section>
+
+<Section kind="practice" title="Scheduling checklist">
+
+- **UTC everywhere**, with the local time in a comment.
+- **Absolute paths, explicit environment**, output to a log.
+- **One run at a time**: a lock or a concurrency limit.
+- **Alert on failure and on silence**: non-zero exit codes for the first, a heartbeat for the second.
+- **A manual trigger** (`workflow_dispatch`, `airflow dags trigger`) to rerun after a fix.
+- **Outgrow cron** when jobs depend on each other, need retries, or must catch up on missed days: that is what the
+  pipeline chapter's orchestrators are for.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={cronExercise}>
+  Implement the field expansion at the heart of every cron parser.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Five fields: minute, hour, day of month, month, day of week. `*`, lists, ranges and steps in each.
+- Both day fields restricted means OR. A leading `*` in either means AND.
+- Schedule in UTC; cron jobs get a minimal environment; prevent overlaps with a lock.
+- Alert on failures *and* on silence (heartbeats).
+
+Next: [Calling APIs reliably: retries, backoff and rate limits](#/learn/automation/scheduling/apis-retries).
+
+</Section>

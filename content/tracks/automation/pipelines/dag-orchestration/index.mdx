@@ -1,0 +1,151 @@
+import { airflowDag, dag, dagDemo, prefectFlow } from './code';
+import { questions, topoExercise } from './quiz';
+
+<Section kind="intuition" title="When cron jobs start depending on each other">
+
+Cron runs jobs at times. Pipelines need jobs to run in an order: extract the data, then validate it and build
+features, then train, then evaluate, then tell someone. With cron you guess: extract at 02:00, train at 03:00 "because
+extract usually takes 40 minutes". On the night extract takes 70, training reads yesterday's data and nobody notices.
+
+An <Term id="orchestrator">orchestrator</Term> (Airflow, Prefect, Dagster, Kubeflow Pipelines) replaces guessed times
+with declared dependencies. You describe the pipeline as a <Term id="dag">DAG</Term>, a directed graph without
+cycles: tasks, and which tasks must finish before which. The orchestrator starts each task as soon as its inputs are
+ready, retries failures, records every run, and lets you rerun one failed step instead of the whole night.
+
+</Section>
+
+<Section kind="technical" title="Order, slots, retries and trigger rules">
+
+**Order.** Any <Term id="topological-order">topological order</Term> of the DAG is a valid serial order. With enough
+workers, the run takes as long as the <Term id="critical-path">critical path</Term>, the longest chain of dependent
+tasks. With fewer workers (an Airflow pool, a Kubernetes quota), tasks wait for a free slot and the run stretches
+toward the total work.
+
+**Retries.** A task that fails is retried after `retry_delay`, up to `retries` times. Retries absorb transient
+failures (a flaky API, a pre-empted spot instance); they are only safe if the task is
+<Term id="idempotent">idempotent</Term>, because a retry reruns work that may have partly happened.
+
+**Trigger rules.** A <Term id="trigger-rule">trigger rule</Term> says when a task may start. The default,
+`all_success`, needs every upstream task to succeed; when one fails, downstream tasks become
+<Term id="upstream-failed">upstream_failed</Term> and never start. `all_done` starts once upstream tasks have finished
+in any state, which suits notifications and clean-up.
+
+**Run state.** Airflow decides a DAG run's state from its **leaf** tasks (those with no downstream): success if every
+leaf succeeded or was skipped, failed if any leaf failed or is upstream_failed. A leaf with `all_done` can therefore
+make a run look successful even though training failed.
+
+**Tools at a glance.**
+
+| | Airflow | Prefect | Dagster |
+| --- | --- | --- | --- |
+| Unit of work | task in a DAG | task in a flow | asset (a table, a model) and ops |
+| Graph defined | when the DAG file is parsed | while the flow runs (plain Python) | from asset dependencies |
+| Strength | scheduling, backfills, huge ecosystem | low ceremony, dynamic flows | lineage and data-aware scheduling |
+
+</Section>
+
+<Section kind="visual" title="Try it: one DAG run, minute by minute">
+
+The nightly retraining DAG: extract (4 min) feeds validate (2), features (5) and labels (3); train (8) needs all
+three; evaluate (3) follows train; report (2) follows validate; notify (1) needs evaluate and report. The features
+task is flaky.
+
+<Experiment def={dag} title="DAG scheduler">
+  <DagGantt />
+  <Readout title="This run" />
+</Experiment>
+
+Things to try:
+
+- **features succeeds on attempt 1** with 4 worker slots: 21 minutes, the critical path. With 1 slot: 28 minutes,
+  the total work.
+- The default, **attempt 2** with retries 2 and a 3-minute delay: the failed attempt plus the delay add 8 minutes.
+- **never (broken)**: after the last retry, train, evaluate and notify become upstream_failed and the run fails.
+  Now set notify's trigger rule to **all_done**: notify runs, and the run is marked **success**. That is the leaf
+  rule at work.
+- **retries 0** with a flaky task: one transient error fails the whole night.
+
+</Section>
+
+<Section kind="code" title="The same DAG in code">
+
+The graph itself, with the standard library: a topological order, the critical path, and what a cycle looks like.
+
+<PythonRunner example={dagDemo} title="dag_demo.py" />
+
+In Airflow 3, with the retries, delay and trigger rule from the explorer:
+
+<Experiment def={dag} title="nightly_retrain.py, linked to the explorer" controls={false}>
+  <Code example={airflowDag} title="dags/nightly_retrain.py (Airflow 3)" />
+  <Readout title="This run" />
+</Experiment>
+
+And the shape of the same pipeline in Prefect 3:
+
+<Code example={prefectFlow} title="flows/nightly_retrain.py (Prefect 3)" />
+
+</Section>
+
+<Section kind="mistakes" title="Pipelines that fail in confusing ways">
+
+<CommonMistake
+  title="Passing data, not references, between tasks"
+  wrong={'@task\ndef features(raw):\n    return pd.read_parquet(raw)   # a 2 GB DataFrame as the return value'}
+  error="(Airflow) XCom size limit errors, or a metadata database that grows by gigabytes a night"
+  cause="Task results are serialised and stored so other workers can read them."
+  fix="Write data to storage (a partition per run) and return its path. Pass references, not payloads."
+/>
+
+<CommonMistake
+  title="A notification that hides failures"
+  wrong={'@task(trigger_rule="all_done")\ndef notify(...): ...   # the only leaf'}
+  error="(no error) the DAG run is green for a week while training fails every night"
+  cause="Airflow sets the run state from its leaf tasks; the all_done leaf succeeded."
+  fix="Keep leaves all_success, add a final check task that fails if anything upstream failed, or send the notification from a callback (on_failure_callback)."
+/>
+
+<CommonMistake
+  title="Top-level work in the DAG file"
+  wrong={'# dags/nightly.py\nTABLES = requests.get(CATALOG_URL).json()   # runs on every parse'}
+  error="(slow scheduler) DAG files take seconds to parse; the scheduler falls behind"
+  cause="Airflow re-parses DAG files continuously; top-level code runs every time."
+  fix="Keep DAG files declarative. Do I/O inside tasks, and read configuration from files in the repository."
+/>
+
+</Section>
+
+<Section kind="practice" title="Orchestration habits">
+
+- **Small, idempotent tasks** with clear inputs and outputs, so retries and partial reruns are safe.
+- **Retries for transient failures only**, with a delay; fail fast on bad data.
+- **Pass references** (paths, table partitions), not data.
+- **Leaves that reflect the truth**: the run's state must mean what it says.
+- **One active run** where tasks write shared state (`max_active_runs=1`).
+- **Alert on failure and on lateness** (SLAs or a heartbeat), as with cron.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={topoExercise}>
+  Implement Kahn's algorithm, the topological sort every orchestrator runs before scheduling anything.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A DAG declares what must finish before what; the orchestrator schedules, retries and records.
+- Run time is bounded below by the critical path and above by the total work; worker slots decide where in between.
+- Default trigger rule all_success; failed upstream tasks make downstream tasks upstream_failed.
+- Airflow judges a run by its leaves, so an all_done leaf can hide failures.
+
+Next: [Schedules, catchup and backfills](#/learn/automation/pipelines/schedules-backfills).
+
+</Section>
