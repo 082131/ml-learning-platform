@@ -1,10 +1,12 @@
 import { useRef, useState } from 'react';
 import { useProgress, useProgressStore } from '@/app/progress';
 import { useSyncStatus } from '@/app/sync';
+import { appExamStore } from '@/components/exam/useExamStore';
+import { appInterviewStore } from '@/components/interview/useInterviewStore';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui';
 import { resetProgress, setTheme } from '@/lib/progress/actions';
-import { exportProgress, importProgress } from '@/lib/progress/io';
+import { exportBackup, importBackup } from '@/lib/progress/io';
 import type { SyncStatus } from '@/lib/sync/engine';
 import type { ThemePreference } from '@/lib/progress/schema';
 import { THEME_LABEL } from '@/lib/theme';
@@ -23,7 +25,7 @@ function download(filename: string, text: string) {
 }
 
 const SYNC_OFF: Partial<Record<SyncStatus['phase'], string>> = {
-  off: 'Sync across devices works when this site is opened in Claude while signed in.',
+  off: 'Automatic sync across devices only works when this site is opened inside Claude while signed in.',
   connecting: 'Checking whether sync is available.',
   'read-only': 'Your access to this page does not allow saving to your Claude account.',
 };
@@ -55,10 +57,17 @@ export default function SettingsPage() {
 
   const onImport = async (file: File | undefined) => {
     if (!file) return;
-    const result = importProgress(await file.text());
+    const result = importBackup(await file.text());
     if (result.ok) {
-      store.update(() => result.state);
-      setMessage(`Imported progress: ${Object.keys(result.state.completed).length} completed lessons.`);
+      const { progress: next, exams, interview } = result.backup;
+      store.update(() => next);
+      if (exams) appExamStore.update(() => exams);
+      if (interview) appInterviewStore.update(() => interview);
+      const extras = [exams && 'exam results', interview && 'interview practice'].filter(Boolean);
+      setMessage(
+        `Imported progress: ${Object.keys(next.completed).length} completed lessons` +
+          (extras.length ? `, plus ${extras.join(' and ')}.` : '.'),
+      );
     } else {
       setMessage(`Import failed. ${result.error}`);
     }
@@ -105,18 +114,30 @@ export default function SettingsPage() {
           ) : (
             <>
               <p>
-                Progress, quiz results, bookmarks and your theme are saved in this browser only, under one
-                storage key (<code>mlp:v1</code>). {SYNC_OFF[sync.phase] ?? ''}
+                Lesson progress, quiz results, bookmarks, exam results, interview practice and your theme are
+                saved in this browser only. {SYNC_OFF[sync.phase] ?? ''}
               </p>
               <ul>
-                <li>Progress is not synced to your other browsers or devices from here.</li>
+                <li>Your other browsers and devices do not see it on their own.</li>
                 <li>Clearing this site’s data, or browsing in a private window, loses it.</li>
-                <li>To move or back it up, export it as a JSON file and import it elsewhere.</li>
+                <li>
+                  To back it up or continue on another device, export a progress file here, then import it on the
+                  other device.
+                </li>
               </ul>
             </>
           )}
           <div className={s.row}>
-            <Button onClick={() => download('ml-learning-progress.json', exportProgress(progress))}>
+            <Button onClick={() =>
+                download(
+                  `ml-learning-progress-${new Date().toISOString().slice(0, 10)}.json`,
+                  exportBackup({
+                    progress,
+                    exams: appExamStore.getState(),
+                    interview: appInterviewStore.getState(),
+                  }),
+                )
+              }>
               Export progress
             </Button>
             <Button onClick={() => fileInput.current?.click()}>Import progress</Button>

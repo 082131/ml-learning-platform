@@ -10,7 +10,7 @@ import {
   setTheme,
   toggleBookmark,
 } from './actions';
-import { exportProgress, importProgress } from './io';
+import { BACKUP_KIND, exportBackup, exportProgress, importBackup, importProgress } from './io';
 import { migrate } from './migrate';
 import { lessonProgress, nextUp, trackLessons, trackStats } from './recommend';
 import { BACKUP_KEY, emptyState, RECENT_LIMIT, STORAGE_KEY } from './schema';
@@ -127,6 +127,23 @@ describe('import and export', () => {
   it('explains invalid files', () => {
     expect(importProgress('{oops')).toEqual({ ok: false, error: 'The file is not valid JSON.' });
     expect(importProgress('[1,2]')).toMatchObject({ ok: false });
+  });
+  it('round-trips a full backup with exams and interview practice', () => {
+    const progress = setComplete(emptyState(), 'b', true, NOW);
+    const exams = { attempts: {}, history: { ml: [] }, tasks: {} };
+    const interview = { ratings: {}, sittings: {}, history: {} };
+    const text = exportBackup({ progress, exams, interview }, new Date(NOW));
+    expect(JSON.parse(text)).toMatchObject({ kind: BACKUP_KIND, version: 1 });
+    expect(importBackup(text)).toEqual({ ok: true, backup: { progress, exams, interview } });
+    expect(importProgress(text)).toEqual({ ok: true, state: progress });
+  });
+  it('reads an old progress-only export without touching exams or interview practice', () => {
+    const progress = toggleBookmark(emptyState(), 'a');
+    expect(importBackup(exportProgress(progress))).toEqual({ ok: true, backup: { progress } });
+  });
+  it('rejects a backup from a newer version or with broken progress', () => {
+    expect(importBackup(JSON.stringify({ kind: BACKUP_KIND, version: 99, progress: {} }))).toMatchObject({ ok: false });
+    expect(importBackup(JSON.stringify({ kind: BACKUP_KIND, version: 1, progress: 5 }))).toMatchObject({ ok: false });
   });
 });
 
