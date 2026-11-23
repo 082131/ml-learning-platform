@@ -106,3 +106,12 @@
     padding: 0 var(--s-3) 0 var(--s-4);
   }
 }
+
+/* Between the phone menu and wide screens the track chips need the room: keep the logo mark (the link keeps its
+   aria-label) and drop the wordmark and the shortcut hint. */
+@media (min-width: 1080px) and (max-width: 1439px) {
+  .wordmark,
+  .kbd {
+    display: none;
+  }
+}

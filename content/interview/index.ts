@@ -1,5 +1,6 @@
 import type { InterviewQuestion, InterviewSource, RoleInfo } from '@/lib/interview/types';
 import { aiQuestions } from './questions/ai';
+import { automationQuestions } from './questions/automation';
 import { behavioralQuestions } from './questions/behavioral';
 import { dataQuestions } from './questions/data';
 import { dataopsQuestions } from './questions/dataops';
@@ -62,6 +63,12 @@ export const roles: RoleInfo[] = [
     loop: 'Asked in project deep dives and "how do you work in a team" rounds of every engineering loop, and directly in MLOps and platform interviews.',
   },
   {
+    id: 'automation',
+    chip: 'Automation',
+    title: 'Automation for ML and AI engineers',
+    loop: 'Asked in MLOps, ML platform and data engineering loops: scheduling, retries and idempotency, CI/CD for models, orchestration, webhooks and agent safety.',
+  },
+  {
     id: 'behavioral',
     chip: 'Behavioral',
     title: 'Behavioral round',
@@ -78,6 +85,7 @@ export const questions: InterviewQuestion[] = [
   ...dataopsQuestions,
   ...deployQuestions,
   ...gitQuestions,
+  ...automationQuestions,
   ...behavioralQuestions,
 ];
 
