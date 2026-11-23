@@ -10,14 +10,46 @@ const COL = 74;
 const LANE = 66;
 const PAD_X = 60;
 const PAD_TOP = 40;
+/** Approximate width of one character of an 11px monospace ref label. */
+const CHAR_W = 7;
+
+/**
+ * Stacks ref labels above their commits so labels of neighbouring commits never overlap: each label takes the
+ * lowest row (in its lane) whose previous label ends before this one starts.
+ */
+function labelRows(nodes: { id: string; col: number; lane: number; refs: string[] }[]): Map<string, number[]> {
+  const ends = new Map<number, number[]>();
+  const out = new Map<string, number[]>();
+  for (const n of [...nodes].sort((a, b) => a.col - b.col)) {
+    const rowEnds = ends.get(n.lane) ?? [];
+    ends.set(n.lane, rowEnds);
+    const x = PAD_X + n.col * COL;
+    const used = new Set<number>();
+    out.set(
+      n.id,
+      n.refs.map((ref) => {
+        const half = (ref.length * CHAR_W) / 2;
+        let row = 0;
+        while (used.has(row) || (rowEnds[row] ?? -Infinity) > x - half - 6) row++;
+        used.add(row);
+        rowEnds[row] = x + half;
+        return row;
+      }),
+    );
+  }
+  return out;
+}
 
 /** The commit graph of the sandbox: commits left to right in the order they were made, one lane per branch. */
 export function GitGraph() {
   const { result } = useExperimentContext<SandboxState, SandboxResult>('GitGraph');
   const g = layoutGraph(result.repo);
-  const top = PAD_TOP + 13 * Math.max(0, Math.max(0, ...g.nodes.filter((n) => n.lane === 0).map((n) => n.refs.length)) - 2);
+  const rows = labelRows(g.nodes);
+  const lane0Rows = Math.max(0, ...g.nodes.filter((n) => n.lane === 0).flatMap((n) => rows.get(n.id)!.map((r) => r + 1)));
+  const top = PAD_TOP + 13 * Math.max(0, lane0Rows - 2);
   const pos = new Map(g.nodes.map((n) => [n.id, { x: PAD_X + n.col * COL, y: top + n.lane * LANE }]));
-  const width = Math.max(320, PAD_X * 2 + Math.max(0, g.nodes.length - 1) * COL);
+  const labelRight = Math.max(0, ...g.nodes.flatMap((n) => n.refs.map((ref) => PAD_X + n.col * COL + (ref.length * CHAR_W) / 2)));
+  const width = Math.max(320, PAD_X * 2 + Math.max(0, g.nodes.length - 1) * COL, Math.ceil(labelRight) + 8);
   const height = top + (g.lanes - 1) * LANE + 34;
   const orphans = g.nodes.filter((n) => !n.reachable);
   const remote = result.repo.remote;
@@ -81,7 +113,7 @@ export function GitGraph() {
                     {n.short}
                   </text>
                   {n.refs.map((ref, i) => (
-                    <text key={ref} x={p.x} y={p.y - 16 - i * 13} className={ref.startsWith('HEAD') ? s.refHead : ref.startsWith('tag:') ? s.refTag : s.ref} textAnchor="middle">
+                    <text key={ref} x={p.x} y={p.y - 16 - rows.get(n.id)![i]! * 13} className={ref.startsWith('HEAD') ? s.refHead : ref.startsWith('tag:') ? s.refTag : s.ref} textAnchor="middle">
                       {ref}
                     </text>
                   ))}
