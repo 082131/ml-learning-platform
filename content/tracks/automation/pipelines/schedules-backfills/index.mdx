@@ -1,0 +1,149 @@
+import { backfillCli, backfillDemo, intervalDag, intervals } from './code';
+import { intervalExercise, questions } from './quiz';
+
+<Section kind="intuition" title="The day a run is for, and the day it runs">
+
+A nightly revenue job that runs at 00:10 on November 23 is not computing November 23's revenue; that day has only
+just started. It is computing November 22. Most scheduled data work has this shape: the run happens *after* the
+period it covers. Keeping "when it runs" separate from "what it is for" is what makes reruns, late data and
+backfills manageable.
+
+Orchestrators make the distinction explicit. Each run has a <Term id="logical-date">logical date</Term> and often a
+<Term id="data-interval">data interval</Term>: the period it processes. Rerun November 22 next month and the task
+still processes November 22. A <Term id="backfill">backfill</Term> is then just a batch of runs for past logical
+dates.
+
+</Section>
+
+<Section kind="technical" title="Timetables, catchup and backfills (Airflow 3)">
+
+**Two timetables for a cron schedule.**
+
+| | Trigger timetable (Airflow 3 default) | Data-interval timetable (Airflow 2 default) |
+| --- | --- | --- |
+| Class | `CronTriggerTimetable` | `CronDataIntervalTimetable` |
+| A run happens | at each tick | when its interval ends |
+| Logical date | the tick | the interval's start |
+| Data interval | the single instant (start = end) | [start, end), one schedule period |
+| Daily run for Nov 22 | starts Nov 22 00:00 | covers Nov 22, starts Nov 23 00:00 |
+
+In Airflow 3 a bare cron string uses the trigger timetable unless `[scheduler] create_cron_data_intervals` is set to
+True. A job that processes a period should either ask for the data-interval timetable explicitly or compute its
+period from the logical date.
+
+**<Term id="catchup">Catchup</Term>.** When a DAG with a past `start_date` is switched on, `catchup=True` creates a
+run for every period since `start_date`; `catchup=False` (the default in Airflow 3) creates one run for the most
+recent tick or the most recently completed interval. `max_active_runs` limits how many run at once.
+
+**Backfills.** `airflow backfill create --dag-id ... --from-date ... --to-date ...` creates runs for an inclusive
+window of past logical dates. `--reprocess-behavior` chooses which existing runs to redo: `none` (default, only
+missing runs), `failed`, or `completed` (all). Backfills have their own `--max-active-runs`.
+
+**What makes all this safe** is the task design from the rerun lesson: read exactly the run's interval, never
+`now()`, and overwrite the interval's partition, so any day can be run any number of times.
+
+</Section>
+
+<Section kind="visual" title="Try it: switching a DAG on">
+
+It is 2026-11-23 14:00 UTC. Choose the timetable, the schedule, how far back `start_date` is, `catchup`, and
+`max_active_runs`. The list shows the runs the scheduler creates right now.
+
+<Experiment def={intervals} title="Run planner">
+  <IntervalRuns />
+  <Readout title="Runs" />
+</Experiment>
+
+Things to try:
+
+- The default (trigger timetable, daily, 5 days back, catchup False): one run, for today's 00:00 tick.
+- Switch to the **data-interval** timetable: one run for **2026-11-22**, covering the whole of the 22nd. Today's
+  interval is not complete yet.
+- Turn **catchup** on: five interval runs (Nov 18 to 22) or six trigger runs (Nov 18 to 23). With
+  `max_active_runs` 2 they run in three waves.
+- **Hourly**, 12 periods back, catchup on: 12 interval runs, or 13 trigger runs. Imagine that with a start date a year ago.
+
+</Section>
+
+<Section kind="code" title="Interval-aware tasks and backfills">
+
+A backfill and a late-data rerun against a partitioned, idempotent job. Run it, then change the late order:
+
+<PythonRunner example={backfillDemo} title="backfill_demo.py" />
+
+The DAG reads its interval and overwrites that partition. The schedule, catchup and `max_active_runs` follow the
+planner:
+
+<Experiment def={intervals} title="daily_revenue.py, linked to the planner" controls={false}>
+  <Code example={intervalDag} title="dags/daily_revenue.py (Airflow 3)" />
+  <Readout title="Runs" />
+</Experiment>
+
+Reprocessing a week after a bug fix:
+
+<Code example={backfillCli} title="backfill" />
+
+</Section>
+
+<Section kind="mistakes" title="Time bugs in scheduled pipelines">
+
+<CommonMistake
+  title="Reading the clock inside a task"
+  wrong={'day = date.today() - timedelta(days=1)\nrows = read_orders(day)'}
+  error="(no error) a backfill of November 1-7 writes November 19's data into all seven partitions"
+  cause="The task computes its period from when it runs, not from the run it belongs to."
+  fix="Use data_interval_start / data_interval_end (or the logical date) passed in by the orchestrator."
+/>
+
+<CommonMistake
+  title="catchup=True with an old start_date"
+  wrong={'@dag(schedule="@hourly", start_date=pendulum.datetime(2025, 1, 1, tz="UTC"), catchup=True)'}
+  error="(no error) switching the DAG on queues about 16,000 hourly runs against the production database"
+  cause="Catchup creates a run for every missed period since start_date."
+  fix="Use catchup=False and backfill the range you actually need, with --max-active-runs, when you need it."
+/>
+
+<CommonMistake
+  title="Expecting a trigger run to have an interval"
+  wrong={'@dag(schedule="0 0 * * *", ...)   # Airflow 3\n# task: read_orders(start=data_interval_start, end=data_interval_end)'}
+  error="(no error) every run reads zero rows"
+  cause="Airflow 3's default trigger timetable gives each run a single instant: start equals end."
+  fix="Use CronDataIntervalTimetable for interval jobs, or derive the period from logical_date (for example the previous day)."
+/>
+
+</Section>
+
+<Section kind="practice" title="Time-safe pipelines">
+
+- **Every run is for a period**; tasks read the period from the run, never from the clock.
+- **Partition by period and overwrite**, so reruns and backfills are idempotent.
+- **catchup=False by default**; backfill deliberately, with `--dry-run` first and a concurrency limit.
+- **Handle late data** by rerunning the affected periods (or by reprocessing a trailing window every night).
+- **Write times in UTC** and state the timetable in the DAG, so readers know when runs happen.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={intervalExercise}>
+  Compute the runs a data-interval scheduler creates, with and without catchup.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A run's logical date and data interval say what it is for; the run itself usually happens afterwards.
+- Airflow 3 defaults to the trigger timetable and catchup=False; ask for data intervals when a job processes a period.
+- Backfills are runs for past logical dates: choose the reprocess behaviour and limit concurrency.
+- Idempotent, partitioned, clock-free tasks make reruns and backfills safe.
+
+Next: [Webhooks and event-driven automation](#/learn/automation/events/webhooks).
+
+</Section>

@@ -618,4 +618,66 @@ export const tracks: Track[] = [
       },
     ],
   },
+  {
+    id: 'automation',
+    title: 'Automation for ML and AI Engineers',
+    code: 'T.09',
+    summary:
+      'Make the computer do the repetitive work: Python scripts and command-line tools, cron schedules, API calls that survive failures, jobs that are safe to rerun, CI/CD for models, pipeline orchestration with Airflow-style DAGs and backfills, webhooks, and AI agents with guardrails.',
+    chapters: [
+      {
+        id: 'scripting',
+        title: 'Scripting everyday tasks',
+        level: 'beginner',
+        lessons: [
+          { id: 'automation/scripting/what-to-automate', status: 'written' },
+          { id: 'automation/scripting/cli-scripts', status: 'written' },
+        ],
+      },
+      {
+        id: 'scheduling',
+        title: 'Schedules, APIs and reliable jobs',
+        level: 'intermediate',
+        lessons: [
+          { id: 'automation/scheduling/cron-schedules', status: 'written' },
+          { id: 'automation/scheduling/apis-retries', status: 'written' },
+          { id: 'automation/scheduling/rerun-safe-jobs', status: 'written' },
+        ],
+      },
+      {
+        id: 'cicd',
+        title: 'CI/CD for ML',
+        level: 'intermediate',
+        lessons: [
+          { id: 'automation/cicd/ml-ci-pipelines', status: 'written' },
+          { id: 'automation/cicd/model-delivery', status: 'written' },
+        ],
+      },
+      {
+        id: 'pipelines',
+        title: 'Pipeline orchestration',
+        level: 'advanced',
+        lessons: [
+          { id: 'automation/pipelines/dag-orchestration', status: 'written' },
+          { id: 'automation/pipelines/schedules-backfills', status: 'written' },
+        ],
+      },
+      {
+        id: 'events',
+        title: 'Webhooks and AI agents',
+        level: 'advanced',
+        lessons: [
+          { id: 'automation/events/webhooks', status: 'written' },
+          { id: 'automation/events/agent-guardrails', status: 'written' },
+        ],
+      },
+      {
+        id: 'capstone',
+        title: 'Capstone',
+        level: 'advanced',
+        project: 'automation/capstone/nightly-pipeline',
+        lessons: [{ id: 'automation/capstone/nightly-pipeline', status: 'written' }],
+      },
+    ],
+  },
 ];

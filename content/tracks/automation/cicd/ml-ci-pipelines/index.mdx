@@ -1,0 +1,144 @@
+import { mlTests, mlWorkflow, workflow } from './code';
+import { questions, workflowExercise } from './quiz';
+
+<Section kind="intuition" title="A safety net that runs on every change">
+
+The Git track's [GitHub Actions lesson](#/learn/git/github/actions-ci) introduced
+<Term id="continuous-integration">continuous integration</Term>: every pull request is built and tested on a clean
+machine before it merges. For an ML repository, "tested" means more than unit tests. A change can pass every unit
+test and still break training: a renamed column, a feature that now leaks the label, a preprocessing step that
+silently drops half the rows.
+
+A good ML CI pipeline is a small automated version of the whole project: check the code, check the data contract,
+train on a tiny sample, check the model is not nonsense, and package it. It must also be fast, because a pipeline
+that takes an hour gets skipped.
+
+</Section>
+
+<Section kind="technical" title="Jobs, dependencies and what gets skipped">
+
+A workflow is a graph of jobs. Jobs without <Term id="job-needs">`needs:`</Term> start in parallel; a job with
+`needs:` waits for those jobs. Each job runs on a fresh machine, so files move between jobs only as uploaded
+artifacts.
+
+**Which jobs run** follows three documented rules:
+
+1. A job's default condition is `success()`: every job it needs succeeded.
+2. If a needed job **fails or is skipped**, the job is skipped too, and the skip cascades down the graph, unless the
+   job's `if:` uses a status function such as `always()` or `failure()`.
+3. An `if:` without a status function (say, "only on pushes to main") gets `success()` added implicitly.
+
+**Whether the workflow runs at all** is decided by its triggers. A <Term id="path-filter">path filter</Term>
+(`paths-ignore: ["docs/**", "**.md"]`) skips docs-only changes. The trap: a workflow that does not run reports no
+<Term id="status-check">status check</Term>, so if that check is required, the pull request waits forever.
+
+**What to test in ML CI.** The ML Test Score rubric from Google lists tests for data, model and infrastructure. In CI,
+the cheap and valuable ones are:
+
+| Layer | Example | Catches |
+| --- | --- | --- |
+| Code | lint, unit tests | bugs in feature functions |
+| Data contract | schema, keys unique, value ranges on fixtures | upstream changes, bad joins |
+| <Term id="smoke-test">Smoke training</Term> | train on 2,000 rows, then evaluate | broken pipelines, shape mismatches |
+| Minimum bar | beats a trivial baseline, metric above a floor | a model that learned nothing |
+| Behaviour | invariance and direction tests | models right for the wrong reasons |
+
+Full training, hyperparameter search and the real release decision do not belong in the pull request workflow. They
+run in a scheduled or manually triggered pipeline (next lesson and the pipeline chapter).
+
+</Section>
+
+<Section kind="visual" title="Try it: which jobs run?">
+
+The workflow below has the jobs of the YAML further down. Choose the event, what changed, and which job fails.
+
+<Experiment def={workflow} title="Workflow simulator">
+  <WorkflowView />
+  <Readout title="This run" />
+</Experiment>
+
+Things to try:
+
+- **pull_request**, nothing fails: `deploy-staging` is skipped by its `if:`, and `report` still runs (`always()`).
+- Make **data-checks** fail: `train-smoke`, `evaluate`, `build-image` and `deploy-staging` are skipped; `lint` and
+  `unit-tests` still finish; `report` runs.
+- **docs only** with paths-ignore on: no jobs, no checks. Turn paths-ignore off and every job runs for a README typo.
+- **push to main**: `deploy-staging` runs. Follow the critical path in the timeline: the longest chain of `needs`
+  sets the wall-clock time, not the sum of all jobs.
+
+</Section>
+
+<Section kind="code" title="The workflow and its tests">
+
+<Code example={mlWorkflow} title=".github/workflows/ml-ci.yml" />
+
+The kinds of tests the `unit-tests`, `data-checks` and `evaluate` jobs run, in plain Python so they run here
+(in a repository they would be pytest functions):
+
+<PythonRunner example={mlTests} title="ml_tests.py" />
+
+</Section>
+
+<Section kind="mistakes" title="CI that misses ML bugs, or blocks for no reason">
+
+<CommonMistake
+  title="Only unit tests"
+  wrong={'- run: pytest tests/unit   # all green'}
+  error="(no error in CI) the nightly training run fails: KeyError: 'tenure_months'"
+  cause="Upstream renamed a column. No test exercised the real data contract or the end-to-end path."
+  fix="Add data-contract tests on fixtures and a smoke training run that goes from raw input to a saved model."
+/>
+
+<CommonMistake
+  title="Required check behind a path filter"
+  wrong={'on:\n  pull_request:\n    paths-ignore: ["**.md"]   # and "test" is a required check'}
+  error="Some checks haven't completed yet: test Expected — Waiting for status to be reported"
+  cause="The workflow never ran for a docs-only PR, so the required check never reported."
+  fix="Run the workflow always and skip work inside it (a job-level changed-files check that ends in success), or do not make that check required."
+/>
+
+<CommonMistake
+  title="always() on the wrong job"
+  wrong={'deploy:\n  needs: [test]\n  if: always()'}
+  error="(no error) a build whose tests failed is deployed to staging"
+  cause="always() ignores the result of the needed jobs."
+  fix="Use always() only for reporting and clean-up. For deploys, combine conditions with success(): if: success() && github.ref == 'refs/heads/main'."
+/>
+
+</Section>
+
+<Section kind="practice" title="ML CI that people trust">
+
+- **Under 10 minutes** for the pull request workflow; parallel jobs, cached dependencies.
+- **Fail fast and cheap first**: lint and data checks before training.
+- **Smoke-train end to end** on a fixed sample with a fixed seed; check a floor and a baseline.
+- **Pass artifacts**, do not rebuild them; evaluate exactly what you trained.
+- **Required checks that always report**: avoid workflow-level path filters on them.
+- **Least privilege**: `permissions: contents: read` by default; secrets only in trusted runs.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={workflowExercise}>
+  Implement GitHub's job conditions: needs, success() and always(), with skips that cascade.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- ML CI checks code, the data contract, a smoke training run and a minimum model bar, in minutes.
+- Jobs run in parallel unless they `need` each other; failures and skips cascade unless `always()`.
+- Path filters skip whole workflows, and skipped workflows report no checks.
+- Full training and release decisions belong in pipelines, not in the pull request run.
+
+Next: [Continuous delivery of models](#/learn/automation/cicd/model-delivery).
+
+</Section>

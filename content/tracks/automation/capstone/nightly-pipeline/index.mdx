@@ -1,0 +1,82 @@
+import { brief, capstoneDag, capstoneGate, layout } from './code';
+import { heartbeatExercise, questions } from './quiz';
+
+<Section kind="intuition" title="One automation, every lesson">
+
+Each lesson in this track solved one problem: deciding what to automate, scripts with honest exit codes, schedules,
+retries, rerun-safe writes, CI, release gates, DAGs, backfills, webhooks and agents. Real automations need all of them
+at once. This capstone puts them together around a churn model: score every customer every night, retrain every
+week, release only better models, and make sure that when anything goes wrong someone knows within minutes, and can
+fix it by rerunning a step.
+
+</Section>
+
+<Section kind="technical" title="The system you will build">
+
+| Piece | What it does | Lesson |
+| --- | --- | --- |
+| CLIs with `--day` and `--dry-run` | each step runnable by hand and by machines | [CLI scripts](#/learn/automation/scripting/cli-scripts) |
+| Retries, timeouts | survive a flaky source API | [APIs and retries](#/learn/automation/scheduling/apis-retries) |
+| Day partitions, atomic writes | reruns and backfills are harmless | [Rerun-safe jobs](#/learn/automation/scheduling/rerun-safe-jobs) |
+| Nightly DAG | order, retries, one run at a time | [DAGs](#/learn/automation/pipelines/dag-orchestration) |
+| Data intervals, backfills | reprocess any past week | [Backfills](#/learn/automation/pipelines/schedules-backfills) |
+| CI workflow | every change tested, smoke-trained | [ML CI](#/learn/automation/cicd/ml-ci-pipelines) |
+| Delivery workflow and gate | better models only, with approval | [Model delivery](#/learn/automation/cicd/model-delivery) |
+| Alerts, heartbeat, runbook | failures and silence are noticed | [Cron](#/learn/automation/scheduling/cron-schedules) |
+| Optional on-call agent | summarises failures, read-only | [Agents](#/learn/automation/events/agent-guardrails) |
+
+</Section>
+
+<Section kind="visual" title="Rehearse the two critical moments">
+
+**The nightly run.** Rehearse a bad night before you have one: make the features step flaky or broken, change the
+retries, and check that the run's final state tells the truth.
+
+<Experiment def={capstoneDag} title="Nightly DAG rehearsal">
+  <DagGantt />
+  <Readout title="This run" />
+</Experiment>
+
+**The weekly release.** Check that your gate blocks the candidates it should.
+
+<Experiment def={capstoneGate} title="Weekly release gate">
+  <GateView />
+  <Readout title="Decision" />
+</Experiment>
+
+</Section>
+
+<Section kind="code" title="A suggested layout">
+
+<Code example={layout} title="churn-automation/" />
+
+</Section>
+
+<Section kind="practice" title="The brief">
+
+<Project brief={brief} />
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={heartbeatExercise}>
+  Write the heartbeat check that catches the nightly run that never started.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Real automations combine every lesson: CLIs, retries, idempotent writes, orchestration, CI, gates and alerts.
+- Build bottom up: scripts you trust by hand, then schedules, then delivery.
+- Prove it with drills: rerun a night, backfill a week, break the source, skip a night.
+- The track's [certification exam](#/exam/automation) tests all of it.
+
+</Section>

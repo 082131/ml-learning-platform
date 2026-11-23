@@ -1,0 +1,150 @@
+import { cdWorkflow, gate, promoteCode } from './code';
+import { gateExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Ready to ship, every week">
+
+CI tells you the code is sound. It does not tell you whether the model you trained last night should replace the one
+customers use today. That is a different question, asked on a different schedule, with different evidence: is the
+new model better on the same data, worse for no group of users, fast enough, and does it work once deployed?
+
+<Term id="continuous-delivery">Continuous delivery</Term> automates everything around that decision. A retraining
+pipeline produces a candidate; automated gates compare it with production; it moves through staging; a person
+approves; it reaches customers gradually, with a rollback ready. The release becomes a routine button press instead
+of a nervous afternoon.
+
+</Section>
+
+<Section kind="technical" title="Gates, environments and gradual release">
+
+**Champion and challenger.** The model in production is the champion; a newly trained one is the challenger
+(<Term id="champion-challenger">champion and challenger</Term>). Retraining is usually triggered on a schedule or by
+drift (see the DataOps track's [retraining triggers](#/learn/dataops/pipelines/retraining-triggers)); this lesson is
+about what happens after a challenger exists.
+
+**The release gate.** A <Term id="release-gate">release gate</Term> is code that blocks promotion unless every rule
+holds. A typical set:
+
+| Gate | Rule | Why |
+| --- | --- | --- |
+| Data | the training data passed validation | a model trained on broken data is broken |
+| Better | challenger AUC − champion AUC ≥ minimum gain, **on the same evaluation set** | small "wins" are often noise; different data is not a comparison |
+| No slice regresses | no important slice drops by more than a tolerance | averages hide harm to a group |
+| Latency | p95 within the serving budget | a better model that times out is worse |
+| Human | a reviewer approves production | judgment, accountability, timing |
+
+The automatic gates run in the pipeline and fail it with a non-zero exit code. The last gate is a
+<Term id="deployment-environment">deployment environment</Term> with required reviewers: the job pauses until
+someone approves.
+
+**Promote by reference.** Register every candidate in a <Term id="model-registry">model registry</Term> with its data
+version and metrics, and deploy by alias (`models:/churn@champion`). Promotion and
+<Term id="rollback">rollback</Term> become moving an alias.
+
+**Release gradually.** Staging first (does it load, does it answer, is the input schema right?), then a
+<Term id="canary-release">canary</Term> with a small share of traffic, watched against error and latency limits,
+then the full rollout. The [Deploy track](#/learn/deploy/kubernetes/autoscaling-rollouts) covers rollout mechanics in
+Kubernetes.
+
+**Credentials.** Prefer <Term id="oidc-federation">OIDC federation</Term> over cloud keys stored as secrets: the job
+gets short-lived credentials scoped to the repository and environment.
+
+</Section>
+
+<Section kind="visual" title="Try it: does the challenger ship?">
+
+Choose a retrained candidate and the gate settings. The production model has AUC 0.900, p95 72 ms and slice AUCs
+0.91, 0.89 and 0.86. The latency budget is 100 ms and each slice may drop by at most 0.02.
+
+<Experiment def={gate} title="Release gate">
+  <GateView />
+  <Readout title="Decision" />
+</Experiment>
+
+Things to try:
+
+- **Better everywhere**: passes every automatic gate and waits in staging for an approval. Approve it.
+- **Better on average, worse on slice 3**: AUC +0.015, but slice 3 drops 0.04. Blocked.
+- **Better but slower**: the best AUC, but p95 131 ms breaks the 100 ms budget.
+- **About the same** (+0.002): set the minimum gain to 0 and it passes. Is a release worth the risk for that?
+
+</Section>
+
+<Section kind="code" title="The gate and the delivery workflow">
+
+The gate the pipeline runs after evaluation. Its literals follow the experiment above:
+
+<Experiment def={gate} title="promote.py, linked to the experiment" controls={false}>
+  <Code example={promoteCode} title="promote.py" />
+  <Readout title="Gate decision" />
+</Experiment>
+
+A weekly retrain-and-deliver workflow: train and gate on a GPU runner, deploy to staging, wait for approval, canary,
+roll back automatically if the canary misbehaves.
+
+<Code example={cdWorkflow} title=".github/workflows/retrain-and-deliver.yml" />
+
+</Section>
+
+<Section kind="mistakes" title="Releases that go wrong quietly">
+
+<CommonMistake
+  title="Comparing against a stale number"
+  wrong={'if new_auc > registry.get("churn", "production").metrics["auc"]:\n    promote()'}
+  error="(no error) a worse model ships because this month's data is easier than launch month's"
+  cause="The champion's metric was measured on different data."
+  fix="Score both models on the same, current evaluation set inside the pipeline, then compare."
+/>
+
+<CommonMistake
+  title="Auto-deploying straight to production"
+  wrong={'- run: python train.py && ./deploy.sh production'}
+  error="(no error) a model with a broken preprocessing step serves every customer for six hours"
+  cause="No staging check, no canary, no approval and no rollback path."
+  fix="Gate, deploy to staging with a smoke check, require approval for production, canary with automatic rollback."
+/>
+
+<CommonMistake
+  title="Cloud keys in repository secrets"
+  wrong={'env:\n  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_KEY }}\n  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET }}'}
+  error="(no error until) a leaked log or a compromised action exposes keys that work forever"
+  cause="Long-lived credentials are valid long after the job ends."
+  fix="Use OIDC (permissions: id-token: write) and a cloud role that trusts only your repository and environment."
+/>
+
+</Section>
+
+<Section kind="practice" title="Delivery checklist">
+
+- **Gates as code** in the repository, reviewed like any other change.
+- **Same evaluation data** for champion and challenger, with slices that matter to the business.
+- **Registry and aliases** so every deploy names an exact, traceable model version.
+- **Staging, approval, canary, rollback**, all automated except the approval.
+- **Short-lived credentials** through OIDC; least-privilege permissions per job.
+- **Record the decision**: who approved, which gates passed, which data version.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={gateExercise}>
+  Implement the release gate's decision, including the approval step.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- CI checks code; CD decides whether a trained model is releasable, and makes releasing routine.
+- Gate the challenger against the champion on the same data: better, no slice regressions, fast enough.
+- Environments with required reviewers keep a human decision; OIDC avoids long-lived keys.
+- Release through staging and a canary, with an automatic rollback.
+
+Next: [Orchestrating pipelines as DAGs](#/learn/automation/pipelines/dag-orchestration).
+
+</Section>

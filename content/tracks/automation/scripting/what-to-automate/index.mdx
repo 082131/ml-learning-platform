@@ -1,0 +1,155 @@
+import { toilLog, worth, worthCode } from './code';
+import { questions, toilExercise } from './quiz';
+
+<Section kind="intuition" title="Let the computer do the boring part">
+
+Every engineer has chores: download the export, rename the files, rerun the notebook, paste the chart into the
+slides, check that last night's training run finished. Each one takes a few minutes. Together they take hours every
+month, and they are exactly the kind of work people do badly when tired: a skipped step, the wrong file, a check
+forgotten on a Friday.
+
+Automation means writing down the procedure precisely enough that a computer can do it, then letting it. Done well,
+it gives you the time back and does the job the same way every time. Done badly, it breaks quietly, costs more to
+maintain than it saves, or does the wrong thing very fast. This lesson is about telling the two apart before you
+write any code.
+
+</Section>
+
+<Section kind="technical" title="Toil, payback and the automation ladder">
+
+**Toil.** Google's Site Reliability Engineering book calls this kind of work <Term id="toil">toil</Term>: manual,
+repetitive, automatable, without lasting value, and growing with the system. Two tests separate toil from real work:
+
+- **Does it need judgment?** Choosing which model ships, deciding how to label an ambiguous ticket, or reading an
+  incident is not toil. Automate the steps around a decision (gather the evidence, prepare the report), not the
+  decision.
+- **Does it repeat on a rule?** "Every weekday at 7, copy yesterday's export" is a rule. "Whenever it seems useful"
+  is not, yet.
+
+**Payback.** An automation costs time to build and time to maintain, and saves time on every run. The monthly
+saving is
+
+$$
+\text{saved per month} = \frac{(\text{manual minutes} - \text{minutes still spent}) \times \text{runs per week} \times \tfrac{52}{12}}{60}\ \text{hours.}
+$$
+
+Subtract the maintenance hours per month to get the net. The <Term id="break-even-point">break-even point</Term> is
+the month in which the cumulative net reaches the build cost. Two inputs are routinely forgotten: the minutes a
+person *still* spends per run (reading the report, handling the odd failure), and maintenance (APIs change, paths
+move, credentials expire).
+
+**The ladder.** Automation is rarely all or nothing. Most good automations climb these rungs one at a time:
+
+| Rung | What exists | You can now |
+| --- | --- | --- |
+| 1. <Term id="runbook">Runbook</Term> | Written steps | hand the task to anyone |
+| 2. Script | Code that does the steps when someone runs it | do it in seconds, the same way every time |
+| 3. Scheduled job | The script runs on a timer, and alerts when it fails | stop remembering to do it |
+| 4. Pipeline | Steps with dependencies, retries, checks and gates | trust it with important work |
+| 5. Self-service | Others trigger it safely, with guardrails | stop being the bottleneck |
+
+**Properties every automation needs.** Whatever the rung, an automation should be
+<Term id="idempotent">idempotent</Term> (running it twice is the same as running it once, so retries are safe),
+**observable** (it logs what it did and says loudly when it fails), and **safe to stop** halfway (a crash does not
+leave half-written output that looks complete). The scheduling and pipeline chapters build these in.
+
+</Section>
+
+<Section kind="visual" title="Try it: does this automation pay back?">
+
+Set the minutes, the frequency, the build cost and the maintenance. The chart shows the cumulative hours won (or
+still owed) at the end of each month of the first year.
+
+<Experiment def={worth} title="Automation payback">
+  <WorthChart />
+  <Readout title="Payback" />
+</Experiment>
+
+Things to try:
+
+- The default: a 20-minute daily chore that keeps 2 minutes of checking, 12 hours to build, 1.5 hours a month of
+  upkeep. It pays back in month 3.
+- Set maintenance to 6 hours a month: a flaky automation never pays back, however much it "saves".
+- Set runs per week to 0.25 (once a month): rare chores rarely justify a big build. Write a runbook instead.
+
+</Section>
+
+<Section kind="code" title="The same estimate in Python">
+
+The code reads the experiment's current values; change a slider above and the literals change here.
+
+<Experiment def={worth} title="worth.py, linked to the experiment" controls={false}>
+  <Code example={worthCode} title="worth.py" />
+  <Readout title="What it prints" />
+</Experiment>
+
+Before automating, log a week of chores. Sorting them by hours per month shows where to start:
+
+<PythonRunner example={toilLog} title="toil_log.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Automation that costs more than it saves">
+
+<CommonMistake
+  title="Automating a process nobody wrote down"
+  wrong={'# "I know the steps, I\'ll just script them"\nsubprocess.run(["bash", "-c", "cp exports/* data/ && python clean.py && ..."])'}
+  error="(two weeks later) nobody, including the author, knows why step 3 exists or what to do when it fails"
+  cause="The script encodes one person's memory of the procedure, including its accidents."
+  fix="Write the runbook first: steps, inputs, what 'done' looks like, what to do on failure. Then script the runbook, one step at a time."
+/>
+
+<CommonMistake
+  title="Counting the savings, forgetting the upkeep"
+  wrong={'saved = minutes_per_run * runs_per_month / 60   # "6.5 hours a month!"'}
+  error="(no error) the scraper breaks whenever the site changes; fixing it takes 8 hours a month"
+  cause="Maintenance and the minutes a person still spends per run were left out of the estimate."
+  fix="Estimate maintenance honestly, and prefer stable interfaces (official APIs, exports) over brittle ones (scraping, clicking through UIs)."
+/>
+
+<CommonMistake
+  title="Automating the judgment call"
+  wrong={'if new_auc > old_auc:\n    deploy(new_model)   # any improvement ships, automatically'}
+  error="(no error) a model that is 0.001 better on average and much worse for one customer segment ships at 3 a.m."
+  cause="'Should this ship?' is a decision with trade-offs, not a rule."
+  fix="Automate the evidence and the gates (see the model delivery lesson) and keep a person's approval for production."
+/>
+
+</Section>
+
+<Section kind="practice" title="How teams decide">
+
+- **Log before you automate.** A week of real chores, with minutes and frequency, beats intuition.
+- **Climb the ladder.** Runbook, then script, then schedule. Each rung is useful on its own and makes the next one
+  cheaper.
+- **Budget for upkeep.** Count maintenance as part of the cost, and retire automations that lose time.
+- **Make it boringly safe:** idempotent, logged, alerting on failure, and with a dry-run mode for anything that
+  moves, deletes or sends.
+- **Keep decisions human** until the rule behind them is written down and agreed.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={toilExercise}>
+  Turn the payback estimate into a function you can reuse when someone asks "should we automate this?".
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Automate toil: repetitive, rule-based, judgment-free work. Automate the evidence around decisions, not the decisions.
+- Payback = build cost against (saved − maintenance) per month. Forgetting upkeep is the classic error.
+- Climb the ladder: runbook, script, scheduled job, pipeline, self-service.
+- Every automation should be idempotent, observable and safe to stop.
+
+Next: [Command-line scripts with argparse, pathlib and logging](#/learn/automation/scripting/cli-scripts).
+
+</Section>

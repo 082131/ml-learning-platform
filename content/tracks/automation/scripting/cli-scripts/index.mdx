@@ -1,0 +1,134 @@
+import { organize, organizeScript, shellUse } from './code';
+import { planExercise, questions } from './quiz';
+
+<Section kind="intuition" title="From a notebook cell to a tool">
+
+Most automations start as a notebook cell: a path hard-coded at the top, a loop that moves files, a `print` at the
+end. It works once, for you, on your laptop. To run it every night, or on someone else's folder, it needs three
+things a notebook cell lacks: inputs you pass in rather than edit, a way to see what it *would* do before it does
+it, and a clear signal of success or failure that another program can read.
+
+That is what a <Term id="cli">command-line interface</Term> gives you. The same script then works by hand, in a
+shell one-liner, in a scheduled job or in CI, without changes.
+
+</Section>
+
+<Section kind="technical" title="Arguments, paths, logs and exit codes">
+
+Four standard-library modules cover almost every automation script:
+
+| Module | Job | The habit that matters |
+| --- | --- | --- |
+| `argparse` | Read arguments and options; write `--help` | Every input that might change is an argument, not a constant |
+| `pathlib` | Paths and file operations | Build paths with `/`, check before you overwrite, create folders with `exist_ok=True` |
+| `logging` | Say what happened, with a level | `INFO` for actions, `WARNING` for skipped work, `ERROR` for failure |
+| `sys` / `return` from `main` | The <Term id="exit-code">exit code</Term> | `0` success, non-zero failure; argparse uses `2` for bad arguments |
+
+**Plan, then act.** Split the script into a function that *decides* (returns the list of moves) and code that
+*applies* the decision. A <Term id="dry-run">dry run</Term> is then just "print the plan", and it shows exactly what
+the real run will do, because both use the same decision logic.
+
+**Never destroy data by accident.** `Path.rename` replaces an existing file without asking on Linux and macOS.
+Check `dst.exists()` first and report a conflict instead. Make every step <Term id="idempotent">idempotent</Term>:
+the second run should find nothing to do, not crash or duplicate.
+
+**Exit codes are the contract.** Schedulers, CI and shell chains (`&&`, `||`) only see the exit code. A script that
+catches every error and exits 0 makes failures invisible. Exit non-zero when the job did not fully succeed.
+
+</Section>
+
+<Section kind="visual" title="Try it: the organizer's dry run">
+
+The organizer sorts files by extension into `data/`, `code/` and `figures/`. Pick a folder and see the plan.
+
+<Experiment def={organize} title="File organizer">
+  <OrganizePlan />
+  <Readout title="Plan summary" />
+</Experiment>
+
+Things to try:
+
+- **Second run:** the folder after the first run. Nothing moves: the plan is idempotent.
+- **Name clashes:** `sales.csv` would land on an existing `data/sales.csv`. The script reports a conflict.
+- Turn **overwrite** on with the clashes: two older files are destroyed without a warning. This is what a bare
+  `rename` does.
+
+</Section>
+
+<Section kind="code" title="organize.py">
+
+The full script, run three times on a temporary folder: a dry run, the real run, and a second real run. It runs
+here in your browser (Pyodide gives Python an in-memory file system), so you can change it and run it again.
+
+<PythonRunner example={organizeScript} title="organize.py" />
+
+From a terminal:
+
+<Code example={shellUse} title="using it from the shell" />
+
+</Section>
+
+<Section kind="mistakes" title="Scripts that fail silently or destroy files">
+
+<CommonMistake
+  title="Swallowing every error"
+  wrong={'try:\n    main()\nexcept Exception as e:\n    print("oops", e)   # exits 0'}
+  error="(no error) the scheduler records success every night while the export has been missing for a week"
+  cause="Catching the exception and ending normally gives exit code 0."
+  fix="Log the error with logging.exception(...) and exit non-zero (sys.exit(1)), or let the exception propagate: Python exits with 1 and prints the traceback."
+/>
+
+<CommonMistake
+  title="Paths relative to wherever you happen to be"
+  wrong={'open("config.yaml")   # works in the repo, fails from cron'}
+  error="FileNotFoundError: [Errno 2] No such file or directory: 'config.yaml'"
+  cause="Relative paths resolve against the current working directory. cron and CI start in a different one."
+  fix="Take paths as arguments, or build them from the script's location: Path(__file__).resolve().parent / 'config.yaml'."
+/>
+
+<CommonMistake
+  title="Moving without checking"
+  wrong={'for f in folder.glob("*.csv"):\n    f.rename(folder / "data" / f.name)'}
+  error="(no error on Linux) data/sales.csv, last month's file, is replaced by this month's"
+  cause="rename() replaces an existing target silently on Unix (and raises FileExistsError on Windows)."
+  fix="Check dst.exists() and skip or rename with a suffix, log a warning, and exit non-zero so someone looks."
+/>
+
+</Section>
+
+<Section kind="practice" title="Script habits">
+
+- **`main(argv=None)` returns an exit code**, and the bottom of the file is `if __name__ == "__main__": sys.exit(main())`.
+  Tests call `main([...])` directly.
+- **`--dry-run` for anything that moves, deletes, sends or spends.**
+- **Log to stdout or stderr, not to `print`**, with levels and timestamps (`%(asctime)s`) when it runs unattended.
+- **Make it rerunnable**: skip work that is already done, never overwrite silently.
+- **Keep secrets out of arguments** (they show up in process lists and shell history). Read them from the
+  environment.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={planExercise}>
+  Write the organizer's decision function as a pure function: no file system, easy to test.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A CLI makes a script reusable: argparse for inputs and `--help`, pathlib for files, logging for reports.
+- Plan first, then act: the dry run prints the same plan the real run applies.
+- Never overwrite silently; make every step idempotent.
+- Exit codes are how schedulers, CI and shells know whether the job worked.
+
+Next: [Scheduling with cron](#/learn/automation/scheduling/cron-schedules).
+
+</Section>
