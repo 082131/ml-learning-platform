@@ -44,3 +44,33 @@ export function nextUp(
       l.status === 'written' && !(l.id in s.completed) && (metas[l.id]?.prerequisites ?? []).every(satisfied),
   );
 }
+
+export type TrackRecommendation =
+  | { kind: 'ready'; ref: LessonRef }
+  /** No lesson in this track is unlocked yet; `ref` is its first incomplete written lesson and `missing` its unmet prerequisites. */
+  | { kind: 'needs-prerequisites'; ref: LessonRef; missing: string[] }
+  | { kind: 'complete' }
+  | { kind: 'none-written' };
+
+/**
+ * What the dashboard shows for a track. Prefers `nextUp`. When prerequisites in other tracks block every
+ * lesson, it still points at the track's first incomplete written lesson, so a track is never shown as
+ * "complete" when nothing in it has been done.
+ */
+export function recommendForTrack(
+  track: Track,
+  statusById: Record<string, LessonRef['status']>,
+  metas: Record<string, LessonMeta>,
+  s: ProgressState,
+): TrackRecommendation {
+  const ready = nextUp(track, statusById, metas, s);
+  if (ready) return { kind: 'ready', ref: ready };
+  const written = trackLessons(track).filter((l) => l.status === 'written');
+  if (written.length === 0) return { kind: 'none-written' };
+  const first = written.find((l) => !(l.id in s.completed));
+  if (!first) return { kind: 'complete' };
+  const missing = (metas[first.id]?.prerequisites ?? []).filter(
+    (id) => !(id in s.completed) && statusById[id] === 'written',
+  );
+  return { kind: 'needs-prerequisites', ref: first, missing };
+}

@@ -47,8 +47,27 @@ describe('routes', () => {
     expect(await screen.findByRole('heading', { name: 'Your learning' })).toBeInTheDocument();
     const nextUp = screen.getByRole('region', { name: 'Next up in each track' });
     expect(
-      within(nextUp).getByRole('link', { name: /What AI, ML and deep learning actually mean/ }),
+      within(within(nextUp).getByRole('listitem', { name: 'Machine Learning Engineer' })).getByRole('link', {
+        name: /What AI, ML and deep learning actually mean/,
+      }),
     ).toBeInTheDocument();
+  });
+
+  it('dashboard lists every track in the registry, in next up and in progress', async () => {
+    renderWithApp(<AppRoutes />, { route: '/' });
+    await screen.findByRole('heading', { name: 'Your learning' });
+    const nextUp = screen.getByRole('region', { name: 'Next up in each track' });
+    const byTrack = screen.getByRole('region', { name: 'Progress by track' });
+    for (const t of tracks) {
+      expect(
+        within(nextUp).getByRole('link', {
+          name: new RegExp(`${t.code} ${t.title.replace(/[&]/g, '\\$&')}`),
+        }),
+      ).toHaveAttribute('href', `/learn/${t.id}`);
+      expect(within(byTrack).getByText(t.title)).toBeInTheDocument();
+    }
+    // A track blocked only by another track's prerequisites must not claim it is complete.
+    expect(within(nextUp).queryByText('Every written lesson is complete.')).not.toBeInTheDocument();
   });
 
   it('track page lists every chapter and lesson card', async () => {

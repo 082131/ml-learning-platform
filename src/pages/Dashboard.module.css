@@ -96,3 +96,34 @@
     font-size: var(--fs-20);
   }
 }
+.statName {
+  font-size: var(--fs-20);
+  line-height: 1.25;
+  margin-bottom: var(--s-2);
+}
+.nextItem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+.nextItem > :nth-child(2) {
+  flex: 1;
+}
+.trackLink {
+  font-size: var(--fs-15);
+  color: var(--ink);
+  text-decoration: none;
+}
+.trackLink:hover {
+  text-decoration: underline;
+}
+.needs {
+  margin: 0;
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}
+/* The lesson grid stretches every child of an item; only the card should grow. */
+.nextItem > .trackLink,
+.nextItem > .needs {
+  flex: none;
+}
