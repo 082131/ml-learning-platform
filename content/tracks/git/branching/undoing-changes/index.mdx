@@ -1,0 +1,153 @@
+import { reflogShell, revertShell, stashShell, undo, undoTable } from './code';
+import { questions, resetExercise } from './quiz';
+
+<Section kind="intuition" title="Almost everything can be undone">
+
+Git's reputation for being scary comes mostly from undo. There are several commands, they sound alike, and a few
+of them really do throw work away. The way through is to ask two questions before you pick one:
+
+1. **Where is the change?** Only in the working tree, staged, in a local commit, or in a commit others already have?
+2. **Should history show the undo?** On a shared branch, yes: add a commit that reverses the change. On your own
+   unpushed branch, you may simply rewrite it.
+
+And one rule makes the rest less frightening: **anything that was ever committed can be found again for weeks**,
+through the <Term id="reflog">reflog</Term>. Uncommitted edits are the only thing Git cannot bring back.
+
+</Section>
+
+<Section kind="technical" title="Which command for which situation">
+
+| The change is ... | To undo it | Command |
+| ----------------- | ---------- | ------- |
+| Edited, not staged | Discard the edit | `git restore <file>` (destructive) |
+| Staged | Unstage, keep the edit | `git restore --staged <file>` |
+| In the last commit, not pushed | Fix the commit | `git commit --amend` (<Term id="amend">amend</Term>) |
+| In local commits, not pushed | Remove the commits | `git reset` with `--soft`, `--mixed` or `--hard` |
+| In a pushed commit | Add an inverse commit | `git revert <id>` |
+| Unfinished, and you need a clean tree now | Set it aside | `git stash`, later `git stash pop` |
+
+<Term id="git-reset">`git reset <commit>`</Term> always moves the current branch to `<commit>`. The mode says how far
+the change spreads:
+
+| Mode | Branch (HEAD) | Staging area | Working tree |
+| ---- | ------------- | ------------ | ------------ |
+| `--soft` | moved | kept | kept |
+| `--mixed` (default) | moved | reset to the commit | kept |
+| `--hard` | moved | reset to the commit | reset to the commit |
+
+<Term id="git-revert">`git revert X`</Term> does not remove X. It computes the opposite change and commits it, so the
+history reads "did X, then undid X". That is the only safe undo on a branch other people have pulled.
+
+<Term id="stash">`git stash`</Term> saves staged and unstaged changes to tracked files as hidden commits and cleans the
+working tree, so you can switch branches; `git stash pop` reapplies them.
+
+</Section>
+
+<Section kind="visual" title="Try it: clean up a bad commit">
+
+The last commit added a file with an API key, and there is an unstaged edit. Follow the guided path. Watch the
+table: each command changes a different column.
+
+<Experiment def={undo} title="Git sandbox: undoing things">
+  <GitSandbox />
+  <GitAreas />
+  <GitGraph />
+  <Readout title="What the sandbox computed" />
+</Experiment>
+
+Things to notice:
+
+- `git restore train.py` changes only the working tree column. The edit is gone for good.
+- `git reset --soft HEAD~1` moves `main` back; `config.py` is still staged. The "Add config" commit gets a dashed
+  outline: no branch reaches it, but it still exists.
+- `git revert HEAD` adds a commit instead of removing one.
+- In `git reflog`, the commit with the key is still listed. Here that is a reason to rotate the key: if it had been
+  pushed, deleting it locally would not help.
+- Press **Reset** and try `git stash`, `git stash list`, a commit, then `git stash pop`.
+
+</Section>
+
+<Section kind="code" title="The undo commands in real Git">
+
+A cheat sheet, from least to most drastic:
+
+<Code example={undoTable} title="undo.sh" />
+
+Reverting a commit adds a new one:
+
+<Code example={revertShell} title="git revert" />
+
+Recovering from a reset that went too far:
+
+<Code example={reflogShell} title="git reflog" />
+
+Setting work aside:
+
+<Code example={stashShell} title="git stash" />
+
+</Section>
+
+<Section kind="mistakes" title="Undo that makes things worse">
+
+<CommonMistake
+  title="Resetting a pushed branch"
+  wrong={'git reset --hard HEAD~1\ngit push --force'}
+  error="(for teammates) their next push reintroduces the commit, or their pull fails with diverged branches"
+  cause="Other clones still have the old commit and build on it."
+  fix={'git revert <id>\ngit push'}
+/>
+
+<CommonMistake
+  title="Using --hard to unstage"
+  wrong={'git add train.py   # oops, not ready\ngit reset --hard'}
+  error="(no error) every uncommitted edit in the repository is gone"
+  cause="--hard resets the working tree too. Unstaging only needs the index."
+  fix={'git restore --staged train.py   # or: git reset train.py'}
+/>
+
+<CommonMistake
+  title="Forgetting a stash"
+  wrong={'git stash\n# ... two weeks later ...\ngit stash list   # stash@{0} to stash@{6}, which one was it?'}
+  error="(no error) work sits in an anonymous stash and conflicts when finally popped"
+  cause="Stashes have no branch and vague names."
+  fix={'git stash push -m "focal loss idea"   # name it\n# or better: git switch -c wip/focal-loss && git commit -am "WIP"'}
+/>
+
+</Section>
+
+<Section kind="practice" title="Undo habits">
+
+- **Commit early on a branch.** Committed work is recoverable; uncommitted work is not.
+- **Revert on shared branches, reset only on your own.**
+- **Before `--hard` or `restore`, run `git status`** and read what will be lost. `git stash` first if unsure.
+- **Keep the reflog in mind** after a bad reset, rebase or amend: `git reflog`, then `git reset --hard HEAD@{n}`.
+- **Leaked a secret? Rotate it first**, then clean history if needed. Undoing a commit does not unpublish it.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={resetExercise}>
+  Model the three reset modes on a toy repository of snapshots, so the soft/mixed/hard table is something you have
+  built rather than memorized.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Pick the undo by where the change is: working tree (`restore`), index (`restore --staged`), last commit
+  (`--amend`), local commits (`reset`), pushed commits (`revert`).
+- `reset` moves the branch; `--mixed` also resets the index; `--hard` also resets the files.
+- `revert` adds an inverse commit and is safe on shared branches.
+- The reflog finds every commit HEAD has been on. Uncommitted edits are the only thing Git cannot recover.
+
+Next: [Remotes, fetch, pull and push](#/learn/git/github/remotes) takes the repository online.
+
+</Section>

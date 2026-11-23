@@ -1,0 +1,143 @@
+import { connectShell, forceShell, rejectShell, remote } from './code';
+import { pushExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Every clone is a full repository">
+
+Git has no central server built in. Your laptop holds the complete history, and so does every teammate's. GitHub
+is one more copy that everybody agrees to treat as the meeting point. A <Term id="remote">remote</Term> is simply a
+named URL of another copy, usually called `origin`.
+
+Copies do not stay in sync by themselves. You **push** to send your new commits to the remote, and **fetch** to
+download commits others pushed. Because each copy can move on independently, the same questions as with branches
+come back: has the other side moved since I last looked, and how do I combine its work with mine?
+
+</Section>
+
+<Section kind="technical" title="Remote-tracking branches, upstreams and the push rule">
+
+After a fetch, your clone records where each remote branch was in a
+<Term id="remote-tracking-branch">remote-tracking branch</Term> such as `origin/main`. It is read-only and moves
+only when you talk to the remote. It is a snapshot of the past: Git never polls GitHub.
+
+Your local `main` usually has `origin/main` as its <Term id="upstream-branch">upstream</Term> (set by `git clone` or
+`git push -u`). Then `git status` compares the two:
+
+| Status | Meaning | What to do |
+| ------ | ------- | ---------- |
+| up to date | same commit (as of the last fetch) | nothing |
+| ahead 2 | you have 2 commits origin lacks | `git push` |
+| behind 3 | origin has 3 commits you lack | `git pull` (a fast-forward) |
+| ahead 2, behind 3 | diverged | integrate (rebase or merge), then push |
+
+| Command | Changes |
+| ------- | ------- |
+| `git fetch` | downloads objects, moves `origin/*`; never your branches or files |
+| `git pull` | `git fetch`, then merges (or with `--rebase`, rebases) the upstream into the current branch |
+| `git push` | uploads commits and moves the remote branch, **only if that is a fast-forward** |
+
+The push rule is what keeps shared history safe: a normal push may only add commits. A
+<Term id="force-push">force push</Term> skips the check and can erase other people's commits. If you must force
+(after rebasing your own branch), use `--force-with-lease`, which refuses if the remote moved since your last fetch.
+
+</Section>
+
+<Section kind="visual" title="Try it: a rejected push">
+
+You and Grace both work on `main`. She pushed a commit you have not fetched. Follow the guided path: commit, see the
+push rejected, fetch, rebase, push. The line under the graph shows where `origin` is.
+
+<Experiment def={remote} title="Git sandbox: working with origin">
+  <GitSandbox />
+  <GitGraph />
+  <Readout title="What the sandbox computed" />
+</Experiment>
+
+Things to notice:
+
+- Before `git fetch`, `git status` says you are up to date: it has not seen Grace's commit.
+- The rejected push changes nothing anywhere.
+- After the fetch, `origin/main` appears on Grace's commit and status shows ahead 1, behind 1.
+- `git pull --rebase` gives your commit a new id, on top of hers, and then `git push` is accepted.
+- Press **Reset** and try `git pull --no-rebase` instead: a merge commit joins the two lines.
+
+</Section>
+
+<Section kind="code" title="Remotes in real Git">
+
+Connecting a local repository to GitHub, from a real run:
+
+<Code example={connectShell} title="git remote and push -u" />
+
+A rejected push and how to recover:
+
+<Code example={rejectShell} title="rejected push" />
+
+Force pushing safely, and two settings worth having:
+
+<Code example={forceShell} title="force-with-lease" />
+
+</Section>
+
+<Section kind="mistakes" title="Remote mistakes">
+
+<CommonMistake
+  title="Force-pushing a shared branch"
+  wrong={'git push --force origin main'}
+  error="(no error) a teammate's commits disappear from main on GitHub"
+  cause="--force replaces the remote branch with yours, whatever it contained."
+  fix={'git pull --rebase && git push   # integrate instead\n# and protect main on GitHub so force pushes are refused'}
+/>
+
+<CommonMistake
+  title="Pulling with uncommitted changes"
+  wrong={'# train.py edited, not committed\ngit pull'}
+  error={'error: Your local changes to the following files would be overwritten by merge:\n\ttrain.py'}
+  cause="The incoming commits change a file you have edited."
+  fix={'git stash && git pull && git stash pop   # or commit first, then pull --rebase'}
+/>
+
+<CommonMistake
+  title="Reading origin/main as the live state"
+  wrong={'git log origin/main -1   # "nobody has pushed since this morning"'}
+  error="(no error) the answer is only as new as your last fetch"
+  cause="Remote-tracking branches move only when you fetch, pull or push."
+  fix={'git fetch && git log --oneline main..origin/main'}
+/>
+
+</Section>
+
+<Section kind="practice" title="Syncing habits">
+
+- **Fetch before you decide.** `git fetch`, then read `main..origin/main`, then integrate.
+- **Set `pull.rebase true`** (or `pull.ff only`) so `git pull` never makes surprise merge commits.
+- **Push your branch early** (`git push -u origin my-branch`): it is a backup and lets others see the work.
+- **Use `--force-with-lease`** after rebasing your own branch; never force-push `main`.
+- **Authenticate with SSH keys or a credential manager**, never a password or token pasted into the URL.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={pushExercise}>
+  Decide whether a push is accepted with a normal push, --force, and --force-with-lease.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- A remote is a named URL of another copy; `origin/main` is your last-fetched view of its `main`.
+- `fetch` downloads and moves `origin/*` only; `pull` = fetch + merge or rebase; `push` uploads and must be a
+  fast-forward.
+- "Ahead n, behind m" compares your branch with its upstream as of the last fetch.
+- Integrate (preferably `pull --rebase`) instead of forcing. If you must force, `--force-with-lease`.
+
+Next: [Pull requests and code review](#/learn/git/github/pull-requests).
+
+</Section>

@@ -1,0 +1,162 @@
+import { conflict, conflictShell, mergeLab, notebookTools, resolveCommands, zdiff3Shell } from './code';
+import { questions, resolveExercise } from './quiz';
+
+<Section kind="intuition" title="When Git has to ask you">
+
+A three-way merge compares each branch with the merge base and takes every change from the side that made it.
+That works as long as the two branches changed different parts of a file. When both changed the **same** lines in
+different ways, there is no rule that could pick the right answer: one person lowered the learning rate, the other
+raised it. Git does not guess. It writes both versions into the file, marks them, and stops so that a person can
+decide.
+
+That is a <Term id="merge-conflict">merge conflict</Term>. It is not an error and nothing is lost: the merge is
+paused, half done. You finish it by writing the file you want, or call it off with `--abort`.
+
+</Section>
+
+<Section kind="technical" title="How conflicts are found and shown">
+
+Git diffs the base against each side and lines the changed regions up:
+
+| Since the merge base | Result |
+| -------------------- | ------ |
+| Region changed on one side only | Take that side's version |
+| Changed identically on both sides | Take it once |
+| Changed differently on both sides, or the changes touch (adjacent lines) | Conflict |
+| File deleted on one side, modified on the other | Conflict (modify/delete) |
+
+For a content conflict, Git writes <Term id="conflict-markers">conflict markers</Term> into the working tree file
+and records three versions in the index (stages 1, 2, 3: base, ours, theirs). `git status` shows the file as
+`UU` (both modified). The operation stays in progress until you `git add` every conflicted file and run
+`git commit` (for a merge) or `git rebase --continue` / `git cherry-pick --continue`.
+
+"Ours" and "theirs" depend on the operation:
+
+| Operation | `HEAD` / ours | theirs |
+| --------- | ------------- | ------ |
+| `git merge feature` on main | main | feature |
+| `git rebase main` on feature | main, plus your commits replayed so far | the commit of yours being replayed |
+| `git cherry-pick X` | the current branch | commit X |
+
+</Section>
+
+<Section kind="visual" title="Try it: make and resolve conflicts">
+
+First, see when Git conflicts. Edit any of the three versions of `params.yaml` or pick an example. The result is
+what `git merge` would leave in the working tree:
+
+<Experiment def={mergeLab} title="Three-way merge lab">
+  <MergeLab />
+  <Readout title="What the merge computed" />
+</Experiment>
+
+Try the examples in order. "Different lines" merges cleanly. "Neighbouring lines" conflicts even though no single
+line was changed twice: Git treats changes that touch as one region, because it cannot be sure they are
+independent. "Both added a line at the end" conflicts too, since both insertions are at the same place.
+
+Now resolve a conflict in a repository. Both branches changed the learning rate:
+
+<Experiment def={conflict} title="Git sandbox: a merge conflict">
+  <GitSandbox />
+  <GitAreas />
+  <GitGraph />
+  <Readout title="What the sandbox computed" />
+</Experiment>
+
+Things to notice:
+
+- `git merge tune-lr` fails and leaves `params.yaml` with markers; the graph has no new commit yet.
+- The areas table shows the file as unmerged until `git add`.
+- The merge commit has two parents, like any merge. Its message lists the conflicted file in a comment.
+- Press **Reset** and try `git merge tune-lr` then `git merge --abort`: everything is back as it was.
+
+</Section>
+
+<Section kind="code" title="Conflicts in real Git">
+
+The same conflict in Git 2.43:
+
+<Code example={conflictShell} title="a conflict" />
+
+The `zdiff3` style adds the merge base's version, which usually makes the right resolution obvious. Turn it on
+once:
+
+<Code example={zdiff3Shell} title="merge.conflictStyle zdiff3" />
+
+The commands you need while resolving:
+
+<Code example={resolveCommands} title="resolving" />
+
+Notebooks deserve special tools:
+
+<Code example={notebookTools} title="notebooks" />
+
+</Section>
+
+<Section kind="mistakes" title="Resolutions that go wrong">
+
+<CommonMistake
+  title="Committing conflict markers"
+  wrong={'git add .\ngit commit --no-edit'}
+  error={"yaml.scanner.ScannerError: while scanning a simple key ... could not find expected ':'   (in the next training run)"}
+  cause="git add marks a file resolved whatever it contains. A marker was left in params.yaml."
+  fix={'git grep -n "^<<<<<<<\\|^>>>>>>>"   # before adding\n# and add a pre-commit hook: check-merge-conflict from pre-commit-hooks'}
+/>
+
+<CommonMistake
+  title="Picking one side without reading the other"
+  wrong={'git checkout --ours train.py   # "mine is right"'}
+  error="(no error) a teammate's bug fix in the same function silently disappears"
+  cause="Taking one side for a whole file drops every change the other side made to it, not only the conflicting lines."
+  fix="Read both sides (zdiff3 helps), combine them by hand, and run the tests before git add."
+/>
+
+<CommonMistake
+  title="Merging notebooks as text"
+  wrong={'git merge feature   # analysis.ipynb changed on both branches'}
+  error="CONFLICT (content): Merge conflict in analysis.ipynb, and the file no longer opens in Jupyter"
+  cause="Markers inside JSON make it invalid, and outputs and execution counts conflict even when the code does not."
+  fix="Use nbdime as the merge driver, strip outputs with nbstripout, and keep reusable code in .py modules."
+/>
+
+</Section>
+
+<Section kind="practice" title="Fewer, smaller conflicts">
+
+- **Merge or rebase from `main` often.** A conflict with one day of changes is small; one with a month is a
+  project.
+- **Keep pull requests small and short-lived.**
+- **Set `merge.conflictStyle zdiff3`** so you always see the base.
+- **Never hand-merge generated files** (lock files, compiled outputs): take one side and regenerate
+  (`uv lock`, `npm install`).
+- **One setting per line in configs**, sorted where order does not matter, so unrelated edits do not touch.
+- **Run the tests after resolving.** A merge without textual conflicts can still be wrong, for example when one
+  branch renames a function the other starts calling.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={resolveExercise}>
+  Resolve every conflict in a file in favour of one side, like git checkout --ours or --theirs.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Git conflicts when both sides changed the same or touching lines since the merge base. Everything else merges
+  automatically.
+- Markers show ours (HEAD) and theirs; zdiff3 adds the base. In a rebase, ours is the branch you replay onto.
+- Resolve by editing, then `git add` and `git commit` (or `--continue`). `--abort` undoes the whole attempt.
+- `git add` does not check for leftover markers: search for them and run the tests.
+
+Next: [Undoing changes](#/learn/git/branching/undoing-changes).
+
+</Section>

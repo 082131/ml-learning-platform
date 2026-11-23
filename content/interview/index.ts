@@ -4,6 +4,7 @@ import { behavioralQuestions } from './questions/behavioral';
 import { dataQuestions } from './questions/data';
 import { dataopsQuestions } from './questions/dataops';
 import { deployQuestions } from './questions/deploy';
+import { gitQuestions } from './questions/git';
 import { inferenceQuestions } from './questions/inference';
 import { mlQuestions } from './questions/ml';
 import { pythonQuestions } from './questions/python';
@@ -55,6 +56,12 @@ export const roles: RoleInfo[] = [
     loop: 'Typical loop: Kubernetes and containers, CI/CD for models, rollout and scaling scenarios, platform design, behavioral.',
   },
   {
+    id: 'git',
+    chip: 'Git',
+    title: 'Git, GitHub and documentation',
+    loop: 'Asked in project deep dives and "how do you work in a team" rounds of every engineering loop, and directly in MLOps and platform interviews.',
+  },
+  {
     id: 'behavioral',
     chip: 'Behavioral',
     title: 'Behavioral round',
@@ -70,6 +77,7 @@ export const questions: InterviewQuestion[] = [
   ...inferenceQuestions,
   ...dataopsQuestions,
   ...deployQuestions,
+  ...gitQuestions,
   ...behavioralQuestions,
 ];
 

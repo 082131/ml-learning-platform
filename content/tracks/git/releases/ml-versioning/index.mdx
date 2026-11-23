@@ -1,0 +1,138 @@
+import { dvcShell, lfsShell, lineageJson, pointerRunner, storage } from './code';
+import { pointerExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Code is small; data and models are not">
+
+Git was designed for source code: many small text files whose changes diff well. An ML project also has datasets
+of gigabytes and model weights that change completely every time you retrain. Put those in Git and every version
+stays in history forever, so every clone downloads all of them.
+
+The answer used by Git LFS and DVC is the trick Git itself uses inside: name content by its hash. Instead of the
+2 GB file, Git stores a few lines of text, a <Term id="pointer-file">pointer file</Term>, saying "the content with
+this hash, of this size". The real bytes live in storage built for big files. Checking out an old commit gets you
+the old pointer, and the tool fetches exactly that version.
+
+A model is only reproducible if four things are pinned together: the code, the data, the parameters and the
+environment. Git pins the code. This lesson shows how to pin the rest to the same commit.
+
+</Section>
+
+<Section kind="technical" title="Git LFS, DVC and registries">
+
+| Tool | What goes into Git | Where the big files go | Extra |
+| ---- | ------------------ | ---------------------- | ----- |
+| Plain Git | the files themselves | Git history | GitHub rejects files over 100 MiB |
+| <Term id="git-lfs">Git LFS</Term> | pointer (sha256 + size), chosen by `.gitattributes` patterns | the Git host's LFS storage | transparent for `git add`/`checkout`; storage and bandwidth quotas |
+| <Term id="dvc">DVC</Term> | `.dvc` files, `dvc.yaml` pipelines, `dvc.lock` hashes | your remote: S3, GCS, Azure, SSH, a shared drive | pipelines, parameters and metrics tracked per commit |
+| Table formats (Delta, Iceberg) and lakeFS | nothing, or a snapshot id in config | the data lake | time travel on tables; see [Data snapshots, branches and time travel](#/learn/dataops/versioning/data-snapshots) |
+| <Term id="model-registry">Model registry</Term> (MLflow, cloud registries) | nothing; the registry stores the commit id | the registry's artifact store | stages and aliases (staging, production), approvals |
+
+The record that ties them together is the model's <Term id="data-lineage">lineage</Term>: commit id, data hash,
+parameters, environment lock and metrics, written at training time and stored with the model. The ML track's
+[Dataset and model versioning](#/learn/ml/practice/versioning) lesson covers tracking runs and registering models
+in depth; this lesson is about how those pieces hang off Git.
+
+</Section>
+
+<Section kind="visual" title="Try it: what a clone costs">
+
+Choose a model size and a number of releases. Plain Git keeps every version in every clone; with LFS or DVC a
+checkout downloads one version, while the server still stores them all.
+
+<Experiment def={storage} title="Storing model versions">
+  <StorageView />
+  <Readout title="What each approach stores" />
+</Experiment>
+
+The model assumes each retraining changes every weight, which is typical: Git's delta compression cannot shrink
+them. Anything above 0.1 GB per file would be refused by GitHub in plain Git anyway.
+
+</Section>
+
+<Section kind="code" title="Pointers, LFS, DVC and lineage">
+
+What LFS and DVC actually commit. The LFS pointer below is identical to what `git lfs pointer` prints for the same
+file:
+
+<PythonRunner example={pointerRunner} title="pointers.py" />
+
+Using Git LFS for model files:
+
+<Code example={lfsShell} title="git lfs" />
+
+Using DVC for a dataset and a pipeline:
+
+<Code example={dvcShell} title="dvc" />
+
+A lineage record to save next to every trained model, for example as an MLflow run's tags or a registry entry:
+
+<Code example={lineageJson} title="model.json" />
+
+</Section>
+
+<Section kind="mistakes" title="Versioning mistakes">
+
+<CommonMistake
+  title="Tracking with LFS after the file was committed"
+  wrong={'git add model.pt && git commit -m "Add model"\ngit lfs track "*.pt"   # afterwards'}
+  error="remote: error: File model.pt is 812.00 MB; this exceeds GitHub's file size limit of 100.00 MB"
+  cause="The pattern only affects files added after it exists. model.pt is already a plain Git blob in history."
+  fix={'git lfs migrate import --include="*.pt" --everything   # rewrites history: coordinate with the team\n# next time: git lfs track first, commit .gitattributes, then add the files'}
+/>
+
+<CommonMistake
+  title="git push without dvc push"
+  wrong={'dvc add data/customers.parquet\ngit commit -am "New snapshot" && git push'}
+  error="ERROR: failed to pull data from the cloud - Checkout failed for following targets: data/customers.parquet"
+  cause="The pointer reached GitHub, but the data never reached the DVC remote."
+  fix="dvc push after every dvc add or dvc repro, or install DVC's Git hooks (dvc install) so git push runs it."
+/>
+
+<CommonMistake
+  title="Models named by hand"
+  wrong={'models/churn_final.pkl\nmodels/churn_final_v2.pkl\nmodels/churn_final_v2_fixed.pkl'}
+  error="(no error) nobody can say which code and data produced the model in production"
+  cause="Names carry no lineage, and they drift from what they describe."
+  fix="Register each model with its commit id, data hash, parameters and metrics; refer to versions by registry version or tag."
+/>
+
+</Section>
+
+<Section kind="practice" title="Versioning ML work">
+
+- **Commit `.gitattributes` and `.gitignore` before any data or model file.**
+- **Small, stable reference files** (a 50 KB test fixture) can stay in plain Git. Large or frequently changing
+  files go to LFS or DVC.
+- **Record lineage automatically** at training time: `git rev-parse HEAD`, data hashes, parameters, lock file hash.
+  Refuse to train from a dirty working tree for any run you might deploy.
+- **Tag model releases in Git** (`model-v1.3.0`) so code, pointers and the changelog line up.
+- **Know your quotas**: LFS storage and bandwidth on the Git host, or bucket costs for DVC.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={pointerExercise}>
+  Check a downloaded file against its Git LFS pointer, the integrity check LFS performs on every download.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- Large, frequently changing binaries do not belong in plain Git history: every clone downloads every version.
+- Git LFS and DVC commit small pointer files (a hash and a size) and keep the bytes elsewhere; DVC adds pipelines
+  and parameters.
+- A reproducible model pins code (commit), data (hash), parameters and environment together; a registry stores
+  that lineage.
+- Track large files before adding them, and push both Git and the data store.
+
+Next: [READMEs, docstrings and API documentation](#/learn/git/docs/readmes-docstrings).
+
+</Section>

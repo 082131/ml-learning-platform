@@ -1,0 +1,96 @@
+import type { GlossaryTerm } from '@/lib/types';
+
+// Glossary terms for the git/github chapter (merged into the glossary by content/index.ts).
+export default [
+  {
+    id: 'remote',
+    term: 'Remote',
+    short: 'A named URL of another copy of the repository, such as origin on GitHub. fetch downloads from it; push uploads to it.',
+    introducedIn: 'git/github/remotes',
+    aliases: ['origin'],
+  },
+  {
+    id: 'remote-tracking-branch',
+    term: 'Remote-tracking branch',
+    short: 'A local, read-only record of where a branch was on a remote at the last fetch, such as origin/main.',
+    introducedIn: 'git/github/remotes',
+    aliases: ['origin/main'],
+  },
+  {
+    id: 'upstream-branch',
+    term: 'Upstream branch',
+    short: 'The remote branch a local branch tracks: what plain git pull and git push use, and what git status compares with (ahead/behind).',
+    introducedIn: 'git/github/remotes',
+    aliases: ['tracking branch'],
+  },
+  {
+    id: 'force-push',
+    term: 'Force push',
+    short: 'Pushing a branch that does not contain the remote’s commits, replacing them. --force-with-lease refuses if the remote moved since your last fetch.',
+    introducedIn: 'git/github/remotes',
+    aliases: ['--force', '--force-with-lease'],
+  },
+  {
+    id: 'pull-request',
+    term: 'Pull request',
+    short: 'A GitHub request to merge one branch into another, with the diff, a discussion, reviews and status checks in one place.',
+    introducedIn: 'git/github/pull-requests',
+    aliases: ['PR', 'merge request'],
+  },
+  {
+    id: 'code-review',
+    term: 'Code review',
+    short: 'Reading a teammate’s change before it merges to catch bugs, share knowledge and keep the code consistent.',
+    introducedIn: 'git/github/pull-requests',
+    aliases: ['review'],
+  },
+  {
+    id: 'branch-protection',
+    term: 'Branch protection',
+    short: 'Repository rules for a branch such as main: require pull requests, approvals, passing status checks or linear history, and block force pushes.',
+    introducedIn: 'git/github/pull-requests',
+    aliases: ['protected branch', 'rulesets'],
+  },
+  {
+    id: 'codeowners',
+    term: 'CODEOWNERS',
+    short: 'A file mapping path patterns to the people or teams who own them. GitHub requests their review automatically; the last matching pattern wins.',
+    introducedIn: 'git/github/pull-requests',
+    aliases: ['code owners'],
+  },
+  {
+    id: 'workflow-strategy',
+    term: 'Branching workflow',
+    short: 'A team’s agreement on how branches are used: GitHub flow (short branches off main), trunk-based development, or Git Flow (develop and release branches).',
+    introducedIn: 'git/github/pull-requests',
+    aliases: ['GitHub flow', 'trunk-based development', 'Git Flow'],
+  },
+  {
+    id: 'continuous-integration',
+    term: 'Continuous integration',
+    short: 'Building and testing every change automatically, on every push or pull request, so problems surface before merging.',
+    introducedIn: 'git/github/actions-ci',
+    aliases: ['CI'],
+  },
+  {
+    id: 'github-actions',
+    term: 'GitHub Actions',
+    short: 'GitHub’s automation service: YAML workflows in .github/workflows run jobs on hosted or self-hosted runners when events such as push or pull_request happen.',
+    introducedIn: 'git/github/actions-ci',
+    aliases: ['workflow', 'Actions'],
+  },
+  {
+    id: 'build-matrix',
+    term: 'Build matrix',
+    short: 'A strategy that runs one job once per combination of variables, such as each Python version on each operating system.',
+    introducedIn: 'git/github/actions-ci',
+    aliases: ['matrix'],
+  },
+  {
+    id: 'status-check',
+    term: 'Status check',
+    short: 'A pass or fail result that CI reports on a commit. Branch protection can require named checks to pass before merging.',
+    introducedIn: 'git/github/actions-ci',
+    aliases: ['required check', 'check run'],
+  },
+] satisfies GlossaryTerm[];

@@ -1,6 +1,6 @@
 // Content types shared by every thread. Change only additively (see data-model.md).
 
-export type TrackId = 'ml' | 'data' | 'ai' | 'inference' | 'python' | 'dataops' | 'deploy';
+export type TrackId = 'ml' | 'data' | 'ai' | 'inference' | 'python' | 'dataops' | 'deploy' | 'git';
 export type Level = 'beginner' | 'intermediate' | 'advanced';
 export type LessonStatus = 'written' | 'outline';
 
@@ -59,7 +59,8 @@ export interface Annotation {
 
 export interface CodeExample {
   id: string;
-  language: 'python' | 'sql' | 'bash' | 'json' | 'typescript' | 'yaml';
+  // 'markdown', 'toml' and 'diff' were added for the Git and documentation track (T.08).
+  language: 'python' | 'sql' | 'bash' | 'json' | 'typescript' | 'yaml' | 'markdown' | 'toml' | 'diff';
   source: string;
   slots?: Record<string, (state: unknown) => string>;
   annotations: Annotation[];

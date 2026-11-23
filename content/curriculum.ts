@@ -554,4 +554,68 @@ export const tracks: Track[] = [
       },
     ],
   },
+  {
+    id: 'git',
+    title: 'Git, GitHub and Documentation',
+    code: 'T.08',
+    summary:
+      'Version control from the inside out: commits, branches, merging and rebasing, GitHub pull requests and CI, semantic versioning and releases, versioning data and models, and writing documentation people use.',
+    chapters: [
+      {
+        id: 'foundations',
+        title: 'Git foundations',
+        level: 'beginner',
+        lessons: [
+          { id: 'git/foundations/why-version-control', status: 'written' },
+          { id: 'git/foundations/objects-hashes', status: 'written' },
+        ],
+      },
+      {
+        id: 'branching',
+        title: 'Branching and history',
+        level: 'intermediate',
+        lessons: [
+          { id: 'git/branching/branches-head', status: 'written' },
+          { id: 'git/branching/merge-rebase', status: 'written' },
+          { id: 'git/branching/merge-conflicts', status: 'written' },
+          { id: 'git/branching/undoing-changes', status: 'written' },
+        ],
+      },
+      {
+        id: 'github',
+        title: 'Collaborating on GitHub',
+        level: 'intermediate',
+        lessons: [
+          { id: 'git/github/remotes', status: 'written' },
+          { id: 'git/github/pull-requests', status: 'written' },
+          { id: 'git/github/actions-ci', status: 'written' },
+        ],
+      },
+      {
+        id: 'releases',
+        title: 'Releases and versioning',
+        level: 'advanced',
+        lessons: [
+          { id: 'git/releases/semver-releases', status: 'written' },
+          { id: 'git/releases/ml-versioning', status: 'written' },
+        ],
+      },
+      {
+        id: 'docs',
+        title: 'Documentation',
+        level: 'intermediate',
+        lessons: [
+          { id: 'git/docs/readmes-docstrings', status: 'written' },
+          { id: 'git/docs/docs-sites', status: 'written' },
+        ],
+      },
+      {
+        id: 'capstone',
+        title: 'Capstone',
+        level: 'advanced',
+        project: 'git/capstone/release-ml-repo',
+        lessons: [{ id: 'git/capstone/release-ml-repo', status: 'written' }],
+      },
+    ],
+  },
 ];

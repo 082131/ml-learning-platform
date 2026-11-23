@@ -1,0 +1,145 @@
+import { ciWorkflow, matrix, matrixYaml, secretsYaml } from './code';
+import { matrixExercise, questions } from './quiz';
+
+<Section kind="intuition" title="A robot that tries every change">
+
+"It works on my machine" is the oldest excuse in software, and ML adds new versions of it: a different library
+version, a GPU, a cached dataset. <Term id="continuous-integration">Continuous integration</Term> (CI) answers it by
+building and testing every change on a clean machine, automatically, before it merges.
+
+On GitHub that robot is <Term id="github-actions">GitHub Actions</Term>. You describe the steps in a YAML file in
+the repository; GitHub runs them on a fresh virtual machine for every push and pull request, and reports the result
+on the PR as a <Term id="status-check">status check</Term>. Combined with branch protection, a red check means the
+change cannot merge.
+
+</Section>
+
+<Section kind="technical" title="Workflows, jobs, steps, runners">
+
+| Concept | What it is |
+| ------- | ---------- |
+| Workflow | A YAML file in `.github/workflows/`. Has triggers (`on:`) and jobs |
+| Trigger | An event: `push`, `pull_request`, `schedule` (cron), `workflow_dispatch` (a button), `release`, ... |
+| Job | A set of steps on one runner. Jobs run in parallel unless one `needs:` another |
+| Step | A shell command (`run:`) or a published action (`uses: owner/repo@version`) |
+| Runner | The machine: `ubuntu-latest`, `windows-latest`, `macos-latest`, or your own (for GPUs) |
+
+A <Term id="build-matrix">build matrix</Term> runs the same job for several values: Python versions, operating
+systems, library versions. GitHub expands it in three steps:
+
+1. The cross product of all variables (the first one varies slowest).
+2. `exclude` removes each combination that matches all key/value pairs of an entry.
+3. Each `include` entry is merged into every original combination it does not contradict. If it fits none, it
+   becomes a new job.
+
+A few things decide whether CI is trustworthy:
+
+- **Required checks.** Only checks marked required in branch protection block the merge.
+- **Caching** of dependencies, keyed on a hash of the lock or requirements file.
+- **Secrets** live in repository settings and reach jobs as environment variables. Pull requests from forks get
+  none.
+- **Least privilege:** set `permissions:` so the job's token can only do what the job needs.
+
+</Section>
+
+<Section kind="visual" title="Try it: expand a build matrix">
+
+Choose Python versions and operating systems, add an exclude and an include, and set `max-parallel`. The view shows
+the YAML, the jobs GitHub would create, and the time they would take.
+
+<Experiment def={matrix} title="Build matrix">
+  <MatrixView />
+  <Readout title="What the matrix creates" />
+</Experiment>
+
+Things to try:
+
+- Three Pythons on three operating systems: 9 jobs. Exclude Windows with 3.11: 8.
+- Turn on the 3.14 include: it contradicts every combination's Python value, so it becomes a new job instead.
+- Lower `max-parallel` to 2 and watch the wall-clock time grow while runner minutes stay the same. Windows and
+  macOS runners also bill more per minute than Linux on private repositories.
+
+</Section>
+
+<Section kind="code" title="A CI workflow for an ML project">
+
+Lint, test on three Python versions, and run the pipeline on a tiny sample, on every pull request:
+
+<Code example={ciWorkflow} title=".github/workflows/ci.yml" />
+
+A matrix with both kinds of include:
+
+<Code example={matrixYaml} title="matrix with include and exclude" />
+
+Using a secret safely:
+
+<Code example={secretsYaml} title="secrets" />
+
+To make the checks block merging, add them as required status checks in the branch protection rule for `main`.
+
+</Section>
+
+<Section kind="mistakes" title="CI that gives false confidence">
+
+<CommonMistake
+  title="Training the real model in CI"
+  wrong={'- run: python train.py   # full dataset, 3 hours, needs a GPU'}
+  error="Error: The job running on runner GitHub Actions 12 has exceeded the maximum execution time of 360 minutes."
+  cause="CI is for fast feedback on every change, not for producing models."
+  fix="Run a smoke test on a small sample in CI (seconds to minutes). Run full training in a separate scheduled or manual workflow, on runners with the right hardware."
+/>
+
+<CommonMistake
+  title="Unpinned dependencies"
+  wrong={'- run: pip install pandas scikit-learn'}
+  error="(next month) AttributeError: 'DataFrame' object has no attribute 'append' (CI breaks with no code change)"
+  cause="Each run installs the newest versions, so CI tests different software every week."
+  fix="Install from a lock file (uv.lock, requirements.txt with exact versions) and update it in its own PR, which CI then tests."
+/>
+
+<CommonMistake
+  title="Printing secrets"
+  wrong={'- run: echo "token is ${{ secrets.API_KEY }}" | base64'}
+  error="(no error) the encoded value is not masked and is readable in the log"
+  cause="Masking matches the literal secret string. Transformed values slip through."
+  fix="Never print secrets or values derived from them. Pass them through env: and let the program read them."
+/>
+
+</Section>
+
+<Section kind="practice" title="CI habits">
+
+- **Keep the PR workflow under about 10 minutes.** Slow CI gets skipped or ignored.
+- **Make the checks required**, and treat a red `main` as the team's top priority.
+- **Test what can break silently in ML**: data schemas, shapes, a metric on a fixed tiny sample, determinism with a
+  seed.
+- **Cache dependencies; pin versions; pin third-party actions to a commit SHA.**
+- **Give workflows the least permissions** they need, and keep secrets out of PR workflows.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={matrixExercise}>
+  Implement GitHub's matrix expansion, including the tricky include rule, and check it against the example from
+  GitHub's documentation.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+- CI runs every change on a clean machine; GitHub Actions does it from YAML workflows in `.github/workflows/`.
+- Workflows have triggers and jobs; jobs have steps and run on runners; a matrix multiplies a job.
+- Matrix: cross product, then exclude, then include (merge into fitting jobs, or add a new one).
+- Make checks required, cache dependencies, pin versions, use secrets only in trusted runs.
+
+Next: [Semantic versioning, tags and releases](#/learn/git/releases/semver-releases).
+
+</Section>

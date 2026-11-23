@@ -1,0 +1,471 @@
+/* Git track visualizations: the sandbox terminal, commit graph, three areas and objects. Colors come from tokens. */
+.terminal {
+  display: grid;
+  gap: var(--s-2);
+  min-width: 0;
+}
+.log {
+  max-height: 320px;
+  margin: 0;
+  padding: var(--s-2) var(--s-3);
+  overflow: auto;
+  list-style: none;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+}
+.log > li + li {
+  margin-top: var(--s-2);
+}
+.prompt {
+  display: block;
+  color: var(--ink);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.log > li[data-ok='false'] .prompt {
+  color: var(--err);
+}
+.out {
+  margin: 2px 0 0;
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.refused {
+  display: block;
+  margin-top: 2px;
+  color: var(--err);
+  font-size: 12px;
+}
+.hint {
+  color: var(--ink-2);
+}
+.inputRow {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 0;
+}
+.promptLabel {
+  font-family: var(--font-mono);
+  color: var(--ink-2);
+}
+.input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: var(--fs-15);
+}
+.input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.guide {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2) var(--s-3);
+}
+.guide code {
+  font-family: var(--font-mono);
+  text-transform: none;
+  letter-spacing: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+.guide button {
+  max-width: 100%;
+  height: auto;
+  min-height: 32px;
+}
+.why {
+  flex: 1 1 260px;
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+}
+.guideTools {
+  margin-left: auto;
+}
+.empty {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+}
+
+/* Commit graph */
+.graphScroll {
+  width: 100%;
+  overflow-x: auto;
+  max-width: 100%;
+}
+.graph {
+  display: block;
+}
+.edge,
+.edge2 {
+  fill: none;
+  stroke: var(--ink-2);
+  stroke-width: 1.5;
+}
+.edge2 {
+  stroke-dasharray: 5 3;
+}
+.arrowHead {
+  fill: var(--ink-2);
+}
+.node {
+  fill: var(--surface);
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+.nodeHead {
+  fill: var(--accent);
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+.nodeGone {
+  fill: var(--surface);
+  stroke: var(--ink-2);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 2;
+}
+.mergeDot {
+  fill: var(--ink);
+}
+.nodeHead + .mergeDot {
+  fill: var(--accent-ink);
+}
+.nodeId {
+  fill: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.ref,
+.refHead,
+.refTag {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  fill: var(--ink);
+}
+.refHead {
+  fill: var(--accent);
+}
+.refTag {
+  fill: var(--ink-2);
+  font-style: italic;
+}
+.remoteLine {
+  margin: var(--s-2) 0 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+.remoteName {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* Three areas */
+.areasScroll {
+  width: 100%;
+  overflow-x: auto;
+}
+.areas {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-13);
+  table-layout: fixed;
+  min-width: 480px;
+}
+.areas th,
+.areas td {
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+.areas thead th {
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.areas td[data-changed] {
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.path {
+  display: block;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.code {
+  display: block;
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 400;
+}
+.cellPre {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.absent {
+  color: var(--ink-2);
+  font-style: italic;
+}
+
+/* Objects */
+.objects {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--s-2);
+}
+.object {
+  min-width: 0;
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.object[data-kind='commit'] {
+  border-color: var(--accent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.objectHead {
+  margin: 0 0 var(--s-1);
+  font-size: var(--fs-13);
+  font-weight: 600;
+}
+.objectHead code {
+  font-family: var(--font-mono);
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+.objectBody {
+  margin: 0;
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Shared panels for the other Git track visuals */
+.panel {
+  min-width: 0;
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.panelHead {
+  margin: 0 0 var(--s-1);
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.grid2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--s-2);
+}
+.verdict {
+  margin: 0;
+  font-weight: 600;
+}
+.verdict[data-ok='true'] {
+  color: var(--ok);
+}
+.verdict[data-ok='false'] {
+  color: var(--err);
+}
+.list {
+  margin: 0;
+  padding-left: 1.2em;
+  font-size: var(--fs-13);
+}
+.list li[data-ok='false'] {
+  color: var(--err);
+}
+.mono {
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  overflow-wrap: anywhere;
+}
+.pre {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.chip {
+  padding: 2px 8px;
+  border: 1px solid var(--line-strong);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.chip[data-on='true'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.bars {
+  display: grid;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.barRow {
+  display: grid;
+  grid-template-columns: minmax(90px, 140px) 1fr minmax(70px, auto);
+  align-items: center;
+  gap: var(--s-2);
+  font-size: var(--fs-13);
+}
+.barTrack {
+  height: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+.barFill {
+  height: 100%;
+  background: var(--accent);
+}
+
+/* CODEOWNERS lines */
+.codeLines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+}
+.codeLines li {
+  display: flex;
+  gap: var(--s-2);
+  align-items: baseline;
+  padding: 2px 4px;
+  overflow-wrap: anywhere;
+}
+.codeLines li[data-hit] {
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.codeLines code {
+  white-space: pre-wrap;
+  min-width: 0;
+}
+.lineNo {
+  min-width: 2ch;
+  color: var(--ink-2);
+  text-align: right;
+}
+.hitLabel {
+  margin-left: auto;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Docs */
+.sorter {
+  display: grid;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sorter p {
+  margin: 0 0 var(--s-2);
+}
+.kindButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.feedback {
+  margin: var(--s-2) 0 0 !important;
+  font-size: var(--fs-13);
+}
+.feedback[data-ok='true'] {
+  color: var(--ok);
+}
+.feedback[data-ok='false'] {
+  color: var(--err);
+}
+.checks {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-13);
+}
+
+/* Three-way merge lab */
+.mergeInputs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--s-2);
+  margin-bottom: var(--s-2);
+}
+.mergeField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  min-width: 0;
+}
+.textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  resize: vertical;
+}
+.textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.codeLines li[data-zone='marker'] code {
+  color: var(--err);
+  font-weight: 600;
+}
+.codeLines li[data-zone='ours'] {
+  border-left: 3px solid var(--accent);
+}
+.codeLines li[data-zone='theirs'] {
+  border-left: 3px solid var(--ok);
+}
