@@ -4,19 +4,10 @@ import { curriculum } from '@/app/content';
 import { Button, Sheet } from '@/components/ui';
 import { Logo } from './Logo';
 import { ThemeToggle } from './ThemeToggle';
+import { TrackMenu } from './TrackMenu';
+import { trackChip } from './trackChips';
 import s from './TopNav.module.css';
 
-const TRACK_CHIP: Record<string, string> = {
-  ml: 'ML',
-  data: 'Data',
-  ai: 'AI',
-  inference: 'Inference',
-  python: 'Python',
-  dataops: 'DataOps',
-  deploy: 'Deploy',
-  git: 'Git',
-  automation: 'Automation',
-};
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
 interface NavItem {
@@ -27,14 +18,12 @@ interface NavItem {
   end?: boolean;
 }
 
-const LINKS: NavItem[] = [
-  { to: '/', label: 'Home', end: true },
-  ...curriculum.tracks.map((t) => ({
-    to: `/learn/${t.id}`,
-    label: TRACK_CHIP[t.id] ?? t.id,
-    title: t.title,
-  })),
-];
+const HOME: NavItem = { to: '/', label: 'Home', end: true };
+const TRACK_LINKS: NavItem[] = curriculum.tracks.map((t) => ({
+  to: `/learn/${t.id}`,
+  label: trackChip(t.id),
+  title: t.title,
+}));
 const UTIL_LINKS: NavItem[] = [
   { to: '/interview', label: 'Interview', title: 'Interview prep' },
   { to: '/glossary', label: 'Glossary' },
@@ -42,17 +31,59 @@ const UTIL_LINKS: NavItem[] = [
   { to: '/settings', label: 'Settings' },
 ];
 
-function Chips({ onNavigate, vertical }: { onNavigate?: () => void; vertical?: boolean }) {
+function Chip({
+  item,
+  vertical,
+  onNavigate,
+}: {
+  item: NavItem;
+  vertical?: boolean;
+  onNavigate?: () => void;
+}) {
   return (
-    <ul className={vertical ? s.chipsVertical : s.chips}>
-      {[...LINKS, ...UTIL_LINKS].map((l) => (
-        <li key={l.to}>
-          <NavLink to={l.to} end={l.end} className={s.chip} title={l.title} onClick={onNavigate}>
-            {vertical ? (l.title ?? l.label) : l.label}
-          </NavLink>
-        </li>
+    <li>
+      <NavLink to={item.to} end={item.end} className={s.chip} title={item.title} onClick={onNavigate}>
+        {vertical ? (item.title ?? item.label) : item.label}
+      </NavLink>
+    </li>
+  );
+}
+
+/** Desktop: Home, one Tracks menu, then the study tools. The bar keeps its width as tracks are added. */
+function DesktopChips() {
+  return (
+    <ul className={s.chips}>
+      <Chip item={HOME} />
+      <li>
+        <TrackMenu />
+      </li>
+      {UTIL_LINKS.map((l) => (
+        <Chip key={l.to} item={l} />
       ))}
     </ul>
+  );
+}
+
+/** Phone menu: every link with its full name, tracks grouped under a heading. */
+function MenuChips({ onNavigate }: { onNavigate: () => void }) {
+  return (
+    <>
+      <ul className={s.chipsVertical}>
+        <Chip item={HOME} vertical onNavigate={onNavigate} />
+      </ul>
+      <h2 className={s.menuHeading}>Tracks</h2>
+      <ul className={s.chipsVertical}>
+        {TRACK_LINKS.map((l) => (
+          <Chip key={l.to} item={l} vertical onNavigate={onNavigate} />
+        ))}
+      </ul>
+      <h2 className={s.menuHeading}>Study tools</h2>
+      <ul className={s.chipsVertical}>
+        {UTIL_LINKS.map((l) => (
+          <Chip key={l.to} item={l} vertical onNavigate={onNavigate} />
+        ))}
+      </ul>
+    </>
   );
 }
 
@@ -62,7 +93,7 @@ export function TopNav({ onSearch }: { onSearch: () => void }) {
     <header className={s.bar}>
       <Logo />
       <nav aria-label="Main" className={s.desktopOnly}>
-        <Chips />
+        <DesktopChips />
       </nav>
       <div className={s.actions}>
         <Button
@@ -88,7 +119,7 @@ export function TopNav({ onSearch }: { onSearch: () => void }) {
       </div>
       <Sheet open={menuOpen} onClose={() => setMenuOpen(false)} title="Menu" side="left">
         <nav aria-label="Main">
-          <Chips vertical onNavigate={() => setMenuOpen(false)} />
+          <MenuChips onNavigate={() => setMenuOpen(false)} />
         </nav>
         <div className={s.menuTheme}>
           <ThemeToggle />
