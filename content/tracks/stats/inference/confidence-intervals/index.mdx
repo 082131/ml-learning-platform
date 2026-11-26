@@ -1,0 +1,224 @@
+import { ci, coverCode, intervalRunner } from './code';
+import { ciExercise, questions } from './quiz';
+
+<Section kind="intuition" title="A net, not a dart">
+
+Twelve recent orders average $39.44. Is the true average order value $39.44? Almost certainly not exactly: a
+different twelve orders would have given a different average. The last chapter told us how much the average
+wobbles from sample to sample (the standard error). Now we use that to say something useful: **a range of values
+that the true average plausibly lies in.** That range is a confidence interval.
+
+Think of the true average as a fish you cannot see, and the sample mean as where you throw a net. A single number
+is like throwing a dart: you will essentially never hit the exact spot. A net with some width has a good chance of
+catching the fish, and the wider the net, the better the chance. A confidence interval is a net whose width is
+chosen so that it catches the true value in, say, 95% of throws.
+
+This is what you report whenever an estimate matters: not "conversion is 5.6%" but "conversion is 5.6%, give or take
+0.4 points". The interval says how much the number can be trusted, which is exactly what the person deciding needs to
+know.
+
+</Section>
+
+<Section kind="technical" title="Building the interval, step by step">
+
+### Step 1: turn the CLT around
+
+The central limit theorem told us where the sample mean lands relative to the true mean $\mu$: in 95% of samples,
+within about 1.96 standard errors.
+
+$$
+P\left(\mu - 1.96\,\mathrm{SE} \;\le\; \bar x \;\le\; \mu + 1.96\,\mathrm{SE}\right) \approx 0.95
+$$
+
+Now read the same statement from the sample's point of view. "$\bar x$ is within 1.96 SE of $\mu$" is the same as
+"$\mu$ is within 1.96 SE of $\bar x$". Distance is symmetric. So if we draw a range of ±1.96 SE around whatever
+$\bar x$ we got, that range contains $\mu$ in 95% of samples:
+
+$$
+\bar x \;\pm\; 1.96 \cdot \mathrm{SE}
+$$
+
+That is a 95% <Term id="confidence-interval">confidence interval</Term>. Every interval you will meet has the same
+three-part shape:
+
+$$
+\text{estimate} \;\pm\; \underbrace{\text{critical value}}_{\text{how many SEs}} \times \underbrace{\text{standard error}}_{\text{how much the estimate wobbles}}
+$$
+
+The product, critical value × SE, is the <Term id="margin-of-error">margin of error</Term>, the "give or take".
+
+### Step 2: choose the confidence level
+
+The critical value comes from the normal curve: it is the z with the chosen central share between $-z$ and $z$.
+
+| Confidence | Critical value z |
+| --- | --- |
+| 80% | 1.282 |
+| 90% | 1.645 |
+| 95% | 1.960 |
+| 99% | 2.576 |
+
+More confidence means a wider net. There is no free lunch: on the same data, a 99% interval is about $2.58/1.96
+\approx 1.3$ times as wide as a 95% one. Only more data (a smaller SE) makes an interval both narrow and confident.
+
+### What "95% confident" means, precisely
+
+This is the part people most often get wrong, so it deserves its own paragraph. The true mean is a fixed number. Our
+interval is random, because it was built from a random sample. "95% confidence" is a statement about the
+**procedure**: if we repeated the whole study many times, 95% of the intervals built this way would contain the true
+mean, and 5% would miss it. For the one interval we actually have, $\mu$ is either inside or not; we just do not know
+which. The explorer below makes this literal: it builds 1,000 intervals and counts the misses.
+
+### Step 3: when σ is unknown, use t
+
+The SE is $\sigma / \sqrt n$, but we do not know $\sigma$. We plug in the sample SD $s$. With large samples that is
+fine. With small ones, $s$ itself is uncertain and is often too small, so intervals built with 1.96 are often too
+narrow and catch $\mu$ less than 95% of the time.
+
+The fix is to use a wider critical value from the <Term id="t-distribution">t distribution</Term>. It looks like the
+normal curve with heavier tails, and how heavy depends on the
+<Term id="degrees-of-freedom">degrees of freedom</Term>, here $n - 1$ (the number of independent pieces of
+information left in the sample after we used it to compute the mean). The fewer the degrees of freedom, the less we
+trust $s$ and the wider t makes the interval:
+
+| n | degrees of freedom | 95% t critical value |
+| --- | --- | --- |
+| 3 | 2 | 4.303 |
+| 10 | 9 | 2.262 |
+| 30 | 29 | 2.045 |
+| 100 | 99 | 1.984 |
+| very large | | 1.960 (the normal) |
+
+So the interval for a mean with estimated SD is
+
+$$
+\bar x \;\pm\; t_{n-1} \cdot \frac{s}{\sqrt n}
+$$
+
+For the twelve orders: $\bar x = 39.44$, $s = 18.16$, $\mathrm{SE} = 18.16 / \sqrt{12} = 5.24$, and $t_{11} = 2.201$,
+giving $39.44 \pm 11.54$, or $27.90$ to $50.98$ dollars.
+
+### What controls the width
+
+Putting it together, the margin of error is $t \cdot s / \sqrt n$, so:
+
+- **More data** shrinks it like $1/\sqrt n$: four times the data halves the width.
+- **More variable data** (bigger $s$) widen it in proportion.
+- **More confidence** widens it through the critical value.
+
+Turned around, this lets you plan: to get a margin of $m$ you need about $n = (z \cdot s / m)^2$ observations.
+
+</Section>
+
+<Section kind="visual" title="Try it: 1,000 nets">
+
+Each horizontal line is a 95% interval from a fresh sample. The vertical line is the true mean. Thick red lines are
+the intervals that missed. The verdict counts all 1,000.
+
+<Experiment def={ci} title="Confidence interval explorer">
+  <IntervalsView />
+  <Readout title="Coverage" />
+</Experiment>
+
+Things to try:
+
+- **Heights, n = 10, t interval**: about 95% catch μ, and a few of the 50 drawn miss. The misses are not mistakes;
+  they are the 5% the procedure allows.
+- **Switch to "z interval with the sample SD", then lower n to 3**: coverage falls to around 82%. With three values,
+  $s$ is unreliable and 1.96 is far too small. Switch back to t: the intervals become very wide (t = 4.30) and
+  coverage returns to 95%.
+- **Confidence 80% vs 99%**: the lines get shorter or longer, and the misses go up or down to match.
+- **Wait times, n = 5**: even the t interval only catches μ about 89% of the time. The t interval assumes roughly
+  normal data; with skewed data and tiny samples it is too optimistic. At n = 100 coverage comes back close to 95%:
+  the CLT at work.
+
+</Section>
+
+<Section kind="code" title="Coverage in code, and a real interval">
+
+The explorer's coverage experiment in plain Python. The critical value and the SD line change with the controls.
+
+<Experiment def={ci} title="coverage.py, linked to the explorer" controls={false}>
+  <Code example={coverCode} title="coverage.py" />
+  <Readout title="Compare" />
+</Experiment>
+
+And a real interval for the twelve orders: the t interval, the (too narrow) z interval, and a bootstrap interval,
+which resamples the sample itself instead of using a formula.
+
+<PythonRunner example={intervalRunner} title="order_value_ci.py" />
+
+The bootstrap is useful for statistics with no simple SE formula (a median, a ratio, a percentile), but it is not
+magic: with only twelve values it is about as narrow as the z interval, and for the same reason. It cannot know
+about spread it has not seen.
+
+</Section>
+
+<Section kind="mistakes" title="Intervals read wrongly">
+
+<CommonMistake
+  title="'95% probability that μ is in this interval'"
+  wrong={'"There is a 95% chance the true conversion rate is between 5.2% and 6.0%."'}
+  error="(no error) a frequentist interval makes no probability statement about this one interval"
+  cause="The 95% belongs to the method: it catches μ in 95% of repeated samples. μ is fixed; the interval is what varies."
+  fix="Say 'we are 95% confident', meaning the method works 95% of the time. If you want a probability for μ itself, use a Bayesian credible interval (last chapter)."
+/>
+
+<CommonMistake
+  title="z critical values for small samples"
+  wrong={'half = 1.96 * statistics.stdev(sample) / len(sample) ** 0.5   # n = 6'}
+  error="(no error) the interval catches μ about 89% of the time, not 95%"
+  cause="With σ estimated from 6 values, the right critical value is t with 5 degrees of freedom, 2.571."
+  fix="Use the t critical value (scipy.stats.t.ppf(0.975, n - 1)). For n above about 100 the difference no longer matters."
+/>
+
+<CommonMistake
+  title="Comparing two groups by checking whether their intervals overlap"
+  wrong={'significant = a_hi < b_lo     # "no overlap means different"'}
+  error="(no error) misses real differences: intervals can overlap while B − A is clearly above 0"
+  cause="The SE of a difference is √(SE_A² + SE_B²), smaller than SE_A + SE_B. Overlap is a much stricter test than the right one."
+  fix="Build the interval for the difference directly (the A/B testing chapter does this), or run a two-sample test."
+/>
+
+</Section>
+
+<Section kind="practice" title="Where you will use this">
+
+- **Reporting any metric from a sample**: average latency from a load test, accuracy on a test set, a survey result.
+  The interval tells readers how far to trust the number.
+- **Model comparisons**: an accuracy of 91.2% ± 1.8 points on 1,000 examples does not beat 90.5% ± 1.8. Reporting
+  intervals prevents leaderboard over-reading.
+- **Sizing data collection**: $n = (z \cdot s / m)^2$ before you label, survey or test.
+- **A/B tests**: the interval for the difference between groups is the most useful single output of an experiment.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={ciExercise}>
+  Build a confidence interval from a sample, then plan the sample size for a target margin of error.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+We started from the central limit theorem, which says a sample mean lands within about 1.96 standard errors of the
+truth in 95% of samples, and turned it around: a range of ±1.96 SE around the sample mean catches the truth in 95%
+of samples. That gave the general shape, estimate ± critical value × SE, where the critical value sets the
+confidence and the SE carries the data's spread and size. "95%" describes how often the method works, not a
+probability for one interval. When σ has to be estimated from a small sample, the t distribution's larger critical
+values widen the interval enough to keep that promise.
+
+A confidence interval asks "which values are plausible?". Often we have a specific value in mind and want to know
+whether the data rule it out: "is the new model really better than the old 70%?". That is a hypothesis test, and it
+turns out to be the same reasoning from another angle:
+[Hypothesis tests and p-values](#/learn/stats/inference/hypothesis-tests).
+
+</Section>

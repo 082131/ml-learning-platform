@@ -1,7 +1,7 @@
 import { useExperimentContext } from '@/components/experiment/ExperimentContext';
 import { Badge } from '@/components/ui';
 import { normalPdf } from '@/lib/stats/dist';
-import { CI_REPS, CI_SHOWN, SAMPLE_REPS, type CiResult, type CiState, type SamplingResult, type SamplingState } from '@/lib/stats/experiments';
+import { CI_REPS, CI_SHOWN, coverageOk, SAMPLE_REPS, type CiResult, type CiState, type SamplingResult, type SamplingState } from '@/lib/stats/experiments';
 import { getPopulation, histogram } from '@/lib/stats/sim';
 import { VizFrame, VizTable } from '../VizFrame/VizFrame';
 import { Bars, Curve, Legend, Plot, sampleCurve, VLine } from './Plot';
@@ -96,9 +96,9 @@ export function IntervalsView() {
       table={<VizTable caption="The drawn intervals" columns={['#', 'sample mean', 'low', 'high', 'contains μ']} rows={r.shown.map((iv, k) => [k + 1, iv.mean.toFixed(2), iv.lo.toFixed(2), iv.hi.toFixed(2), iv.covers ? 'yes' : 'no'])} />}
     >
       <div data-coverage={r.coverage.toFixed(3)} data-misses={r.shownMisses}>
-        <p className={s.verdict} data-ok={Math.abs(r.coverage - state.confidence) <= 0.02}>
+        <p className={s.verdict} data-ok={coverageOk(r.coverage, state.confidence)}>
           Coverage {(100 * r.coverage).toFixed(1)}% vs the promised {(100 * state.confidence).toFixed(0)}%
-          {Math.abs(r.coverage - state.confidence) <= 0.02 ? ': the promise holds.' : ': the promise is broken.'}
+          {coverageOk(r.coverage, state.confidence) ? ': the promise holds (within simulation noise).' : ': the promise is broken.'}
         </p>
         <Plot label="Confidence intervals against the true mean" xDomain={[lo, hi]} yDomain={[0, CI_SHOWN + 1]} xLabel="value" yLabel="interval #" height={height} format={(v) => String(Number(v.toPrecision(4)))}>
           {(x, y) => (

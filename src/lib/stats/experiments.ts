@@ -447,6 +447,13 @@ export interface CiState {
   seed: number;
 }
 
+/**
+ * Whether a simulated coverage is consistent with the promised level: within 3 Monte Carlo standard errors,
+ * 3·√(c(1 − c) / CI_REPS), about ±2 points at 95%. Anything further is very unlikely to be simulation noise.
+ */
+export const coverageOk = (coverage: number, confidence: number) =>
+  Math.abs(coverage - confidence) <= 3 * Math.sqrt((confidence * (1 - confidence)) / CI_REPS);
+
 export interface CiResult {
   shown: Interval[];
   covered: number;
@@ -483,7 +490,7 @@ export function ciExperiment(id: string): ExperimentDef<CiState, CiResult> {
     ],
     compute: ciResult,
     readout: (s, r) => [
-      { label: `Intervals that contain μ = ${r.trueMean}`, value: `${r.covered} of ${CI_REPS} = ${pct(r.coverage)}`, status: Math.abs(r.coverage - s.confidence) <= 0.02 ? 'ok' : 'error' },
+      { label: `Intervals that contain μ = ${r.trueMean}`, value: `${r.covered} of ${CI_REPS} = ${pct(r.coverage)}`, status: coverageOk(r.coverage, s.confidence) ? 'ok' : 'error' },
       { label: 'Promised', value: pct(s.confidence, 0) },
       { label: `Misses among the ${CI_SHOWN} drawn`, value: String(r.shownMisses) },
       { label: 'Average width', value: r.avgWidth.toFixed(2) },

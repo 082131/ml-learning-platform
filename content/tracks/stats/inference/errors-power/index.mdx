@@ -1,0 +1,198 @@
+import { power, powerCode, powerRunner } from './code';
+import { powerExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Two ways to be wrong">
+
+A smoke alarm can fail in two ways. It can go off when there is no fire (a false alarm), or stay silent when there
+is one (a miss). You can make false alarms rarer by making the alarm less sensitive, but then it misses more real
+fires. Making it better at both at once needs a better sensor.
+
+A hypothesis test is an alarm for effects, and it has exactly the same two failure modes:
+
+- **A false alarm**: we declare "the new page is faster" when it is not. That is a Type I error.
+- **A miss**: the new page really is faster, but the test says "no evidence". That is a Type II error.
+
+The last lesson set the false alarm rate: $\alpha = 0.05$. But a test that never rejects anything would have a false
+alarm rate of zero and be useless. What we also need is the chance of **catching** a real effect when there is one.
+That is called power, and this lesson is about what controls it. The answer, mostly, is sample size, which is why
+every well-run experiment starts with a power calculation before any data are collected.
+
+</Section>
+
+<Section kind="technical" title="Errors, power and what moves them">
+
+### The four possible outcomes
+
+The truth is either "no effect" ($H_0$ true) or "an effect" ($H_1$ true), and the test either rejects $H_0$ or not.
+That makes four cells:
+
+| | $H_0$ true (no effect) | $H_1$ true (real effect) |
+| --- | --- | --- |
+| **Reject $H_0$** | <Term id="type-i-error">Type I error</Term> (false alarm), rate $\alpha$ | correct: detected, rate $1 - \beta$ = **power** |
+| **Keep $H_0$** | correct, rate $1 - \alpha$ | <Term id="type-ii-error">Type II error</Term> (miss), rate $\beta$ |
+
+Notice each rate is about a column. $\alpha$ is how often we cry wolf **in worlds without an effect**. $\beta$ is how
+often we miss **in worlds with an effect**. <Term id="statistical-power">Power</Term>, $1 - \beta$, is how often we
+catch it.
+
+### Two curves on one axis
+
+To see power, we draw the test statistic's distribution in both worlds. Take a test of whether a new page reduces
+latency, with a one-sided z-test on $n$ requests.
+
+1. **If $H_0$ is true** (no gain), $z$ follows the standard normal, centred at 0. We reject when $z > 1.645$, so the
+   area of this curve beyond 1.645, 5%, is $\alpha$.
+2. **If the gain is real**, the sample mean is centred at the true gain instead of 0, so $z$ is centred somewhere to
+   the right. Where exactly? $z$ is (sample mean − 0) / SE, and the SE is $\sigma/\sqrt n$. If the true gain is $d$
+   standard deviations of one request ($d$ is the <Term id="effect-size">effect size</Term>), then $z$ is centred at
+
+$$
+\text{shift} = \frac{d\,\sigma}{\sigma / \sqrt n} = d \sqrt n
+$$
+
+3. **Power is the area of this second curve beyond the same line**:
+
+$$
+\text{power} = P(z > 1.645 \mid H_1) = 1 - \Phi(1.645 - d\sqrt n)
+$$
+
+With a gain of 30 ms, an SD of 100 ms ($d = 0.3$) and 50 requests, the shift is $0.3 \times \sqrt{50} = 2.12$, and power
+is $1 - \Phi(1.645 - 2.12) = 1 - \Phi(-0.48) \approx 0.68$. So this experiment would miss a real 30 ms gain about one
+time in three.
+
+### What moves power
+
+The whole story is in "how far apart are the two curves, compared with where the line is":
+
+- **Bigger effect $d$**: the H1 curve moves right; more of it passes the line.
+- **Bigger $n$**: the shift $d\sqrt n$ grows, so the curves separate. This is the lever you control.
+- **Smaller $\alpha$**: the line moves right; fewer false alarms, but also less power. The trade-off from the smoke
+  alarm.
+- **Two-sided tests**: the line sits at 1.96 instead of 1.645 (α is split over two tails), so a little less power for
+  the same $n$.
+
+### Sample size for a target power
+
+Turning the formula around gives the $n$ needed. Power is 80% when the shift puts the line at the H1 curve's 20th
+percentile, which is 0.842 SDs below its centre. So we need $d\sqrt n = z_{\text{crit}} + 0.842$:
+
+$$
+n = \left(\frac{z_{\text{crit}} + z_{\text{power}}}{d}\right)^2
+$$
+
+For $d = 0.3$, one-sided α = 0.05: $n = ((1.645 + 0.842)/0.3)^2 = 68.7$, so 69. Because $d$ is squared in the
+denominator, **halving the effect you want to detect quadruples the sample you need**. Small effects are expensive.
+The A/B chapter applies exactly this formula to conversion rates.
+
+### Why low power hurts twice
+
+An underpowered study obviously misses real effects. Less obviously, when it does find one, the estimate is usually
+too big. With low power, a result only crosses the line if the noise happened to push it well above the true effect.
+If you only report the "winners", you report the lucky overestimates. This is called the winner's curse (or a Type M,
+magnitude, error), and it is one reason that effects from small studies often shrink when someone repeats them.
+
+</Section>
+
+<Section kind="visual" title="Try it: pull the curves apart">
+
+Dashed: the z statistic if there is no effect. Solid: if the effect is real. The red area is α, the yellow area is β
+(a missed effect), the green area is power.
+
+<Experiment def={power} title="Power explorer">
+  <PowerView />
+  <Readout title="Error rates" />
+</Experiment>
+
+Things to try:
+
+- **d = 0.3, n = 50**: power 68%. Slide n up to 69: 80%. Up to 200: over 99%. Same effect, bigger test, far fewer
+  misses.
+- **d = 0.15** (half the effect): at n = 50 power falls to 28%. The readout says 275 for 80%, four times 69.
+- **α = 0.01**: the line jumps right. The red area shrinks, the yellow area grows. Nothing is free.
+- **d = 0**: the solid curve sits on top of the dashed one, and "power" equals α. With no effect, the only rejections
+  are false alarms.
+
+</Section>
+
+<Section kind="code" title="The formula and a simulation">
+
+Power and the 80% sample size in code, for the settings above:
+
+<Experiment def={power} title="power.py, linked to the explorer" controls={false}>
+  <Code example={powerCode} title="power.py" />
+  <Readout title="Result" />
+</Experiment>
+
+A simulation of 20,000 experiments in each of four worlds. With no real gain, H0 is rejected about 5% of the time,
+which is α. With real gains, the rejection rate is the power, and it matches the formula.
+
+<PythonRunner example={powerRunner} title="power_sim.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Forgetting the second error">
+
+<CommonMistake
+  title="Running a test with no power calculation"
+  wrong={'# "Let\'s just run it for a week and see."\nresult = run_ab_test(days=7)'}
+  error="(no error) a week of traffic gives 25% power for the effect that matters, and the test 'finds nothing'"
+  cause="Without a power calculation you do not know whether 'not significant' means 'no effect' or 'too little data'."
+  fix="Before starting, choose the smallest effect worth detecting, α and power (usually 80%), and compute n. If you cannot get that n, rethink the test."
+/>
+
+<CommonMistake
+  title="Computing power after the fact from the observed effect"
+  wrong={'observed_d = 0.12\npost_hoc_power = power(observed_d, n=50)   # "power was only 19%, so the null result is fine"'}
+  error="(no error) 'observed power' is just the p-value in disguise and adds no information"
+  cause="Plugging the observed effect into the power formula gives a number that is fully determined by p. A non-significant result always has low 'observed power'."
+  fix="Use power to plan with the effect you care about. After the test, report a confidence interval for the effect instead."
+/>
+
+<CommonMistake
+  title="Trusting the size of a significant effect from a small study"
+  wrong={'# n = 20 per group, p = 0.04, lift +18%\nforecast_revenue(lift=0.18)'}
+  error="(no error) the real lift turns out to be a third of that"
+  cause="In an underpowered study, only overestimates cross the significance line (the winner's curse)."
+  fix="Size tests properly, report the interval rather than the point estimate, and expect shrinkage when you repeat a surprising result."
+/>
+
+</Section>
+
+<Section kind="practice" title="Where you will use this">
+
+- **Planning A/B tests**: the sample size calculator in the next lesson is this formula for conversion rates.
+- **Benchmarking**: to detect a 2% latency regression with run-to-run noise of 5%, $d = 0.4$ and you need about 39
+  runs per version for 80% power (one-sided). Three runs each will miss most regressions.
+- **Evaluating models**: telling 90% from 91% accuracy on independent test sets needs thousands of examples; a few
+  hundred gives low power, which is why small benchmark gains so often fail to replicate.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={powerExercise}>
+  Compute the power of a z-test and the sample size that reaches a target power.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+A test can be wrong in two ways: a false alarm when there is no effect (Type I, rate α) and a miss when there is one
+(Type II, rate β). Drawing the test statistic's distribution in both worlds made power visible as the area of the
+"effect is real" curve beyond the rejection line. That curve sits $d\sqrt n$ to the right of the null curve, so power
+grows with the effect size and with the square root of the sample size, and falls when α is made stricter. Solving for
+$n$ gave the planning formula, where halving the effect quadruples the sample. And low power does double damage: it
+misses real effects and exaggerates the ones it catches.
+
+We now have every piece an experiment needs: a hypothesis, a test, an interval and a sample size. The next chapter
+puts them together for the most common experiment in tech, comparing two versions of a product:
+[Designing an A/B test](#/learn/stats/experiments/ab-test-design).
+
+</Section>

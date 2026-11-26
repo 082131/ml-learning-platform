@@ -1,0 +1,202 @@
+import { exactCode, test, testRunner } from './code';
+import { questions, testExercise } from './quiz';
+
+<Section kind="intuition" title="Innocent until the data say otherwise">
+
+Your ticket-routing model labels support tickets correctly 70% of the time. A colleague trains a new one and runs it
+on 100 fresh tickets: 78 correct. Is the new model better? It did score higher, but even a model that is exactly as
+good as the old one would sometimes score 78 on a lucky set of tickets, just as a fair coin sometimes lands heads 7
+times out of 10. The question is whether 78 is a result that luck alone **plausibly** produces.
+
+A hypothesis test answers that with a clever reversal. Instead of trying to prove the new model is better, we
+**assume it is not**, and ask: in that world, how often would we see a score as high as 78? If the answer is "all the
+time", the score is no evidence of improvement. If it is "hardly ever", then either we were very unlucky or the
+assumption is wrong, and we start to believe the new model really is better.
+
+It works like a trial: the defendant (no improvement) is presumed innocent, and we only convict if the evidence would
+be very unlikely under innocence. This lesson builds that procedure step by step, names its parts, and spends a
+good while on what its result, the p-value, does and does not mean, because it is the most misread number in data
+work.
+
+</Section>
+
+<Section kind="technical" title="The four steps of a test">
+
+Here is the whole flow before the details: **state the "nothing happened" hypothesis → work out what results would
+look like if it were true → see where our result falls → if it falls somewhere very unusual, reject the
+hypothesis.**
+
+### Step 1: two hypotheses
+
+- The <Term id="null-hypothesis">null hypothesis</Term>, $H_0$, is the boring explanation: no effect, no difference,
+  nothing new. Here: the new model's true accuracy is 70%, the same as the old one.
+- The <Term id="alternative-hypothesis">alternative hypothesis</Term>, $H_1$, is what we suspect instead. Here: the
+  true accuracy is **more** than 70% (a one-sided alternative). If we only suspected it was **different**, better or
+  worse, the alternative would be two-sided.
+
+We test $H_0$, not $H_1$, because $H_0$ is specific enough to compute with. "Accuracy is 70%" pins down a whole
+distribution; "accuracy is more than 70%" does not.
+
+### Step 2: what would results look like under $H_0$?
+
+If the true accuracy were 70%, the number correct out of 100 independent tickets would follow a binomial
+distribution with $n = 100$, $p = 0.7$ (from the distributions chapter). Its mean is 70 and its SD is
+$\sqrt{100 \cdot 0.7 \cdot 0.3} \approx 4.58$. That distribution is the **null distribution**: the full range of
+scores a no-better model would produce, and how often each.
+
+The number we compare against it is the <Term id="test-statistic">test statistic</Term>, a single number that
+summarises the data in the direction we care about. Here it is simply the count correct, 78. Often it is a z-score:
+$(78 - 70)/4.58 = 1.75$, "1.75 SDs above what the null predicts".
+
+### Step 3: the p-value
+
+The <Term id="p-value">p-value</Term> is **the probability, if $H_0$ is true, of a result at least as extreme as the
+one we got.** For our one-sided alternative, "at least as extreme" means 78 or more correct:
+
+$$
+p = P(X \ge 78 \mid p = 0.7) = \sum_{i=78}^{100} \binom{100}{i} 0.7^i\, 0.3^{100-i} \approx 0.048
+$$
+
+So a model that is truly no better would score 78 or more on about 4.8% of test sets. That is the bars highlighted in
+the explorer below, added up. For a two-sided alternative we also count results just as unusual on the low side,
+which roughly doubles it here, to 0.082.
+
+### Step 4: decide, using a threshold chosen in advance
+
+We reject $H_0$ when $p$ is below a threshold called the <Term id="significance-level">significance level</Term>,
+$\alpha$ (alpha), usually 0.05. Here $0.048 < 0.05$, so with a one-sided test we reject the null and say the
+improvement is statistically significant. With a two-sided test ($p = 0.082$) we would not.
+
+What does $\alpha$ buy us? If we always reject when $p < 0.05$, then in all the situations where $H_0$ is really true
+we wrongly reject it 5% of the time. $\alpha$ is the false alarm rate we agree to tolerate. The next lesson looks at
+this error, and the opposite one, in detail.
+
+### What a p-value is not
+
+Each of these misreadings is common, and each is wrong:
+
+1. **"$p$ is the probability that $H_0$ is true."** No. The p-value was computed by *assuming* $H_0$ is true. It is
+   $P(\text{data this extreme} \mid H_0)$, not $P(H_0 \mid \text{data})$, the same reversal as fraud flags in the
+   conditional probability lesson. Getting $P(H_0 \mid \text{data})$ needs a prior: the Bayesian chapter.
+2. **"Not significant means no effect."** No. A large p-value means the data are compatible with no effect, which is
+   not the same as showing there is none. A real 4-point improvement on only 100 tickets often gives $p > 0.05$.
+3. **"A smaller p means a bigger effect."** No. The p-value mixes effect size with sample size. 78% on 400 tickets
+   gives $p \approx 0.0002$; 78% on 100 gives 0.048. Same effect, different evidence.
+
+### Tests and intervals are two views of one thing
+
+A 95% confidence interval contains exactly the values that a two-sided test at $\alpha = 0.05$ would **not** reject.
+So "is 70% inside the 95% interval for the new model's accuracy?" and "is the two-sided p-value above 0.05?" are the
+same question. The interval is usually more informative: it also shows how big the effect could plausibly be.
+
+</Section>
+
+<Section kind="visual" title="Try it: where does the result fall?">
+
+The bars are the null distribution: how many tickets a 70%-accurate model gets right out of $n$, and how often.
+Red bars are the outcomes at least as extreme as the observed one. Their total is the p-value.
+
+<Experiment def={test} title="Binomial test explorer">
+  <NullView />
+  <Readout title="The test" />
+</Experiment>
+
+Things to try:
+
+- **n = 100, k = 78, one-sided**: p ≈ 0.048, just under 0.05. **Switch to two-sided**: red bars appear on the low side
+  too and p ≈ 0.082. The data did not change; the question did.
+- **k = 74**: p ≈ 0.22. Is the model no better? We cannot tell; 100 tickets is too few to separate 74% from 70%.
+- **n = 400, k = 312** (still 78%): p ≈ 0.0002. The bars bunch up around 280 and 312 is far out in the tail. Same
+  accuracy, much stronger evidence.
+- **k = 70**: p is about 0.55 one-sided. A score exactly at the null's expectation is the least surprising result
+  there is.
+
+</Section>
+
+<Section kind="code" title="The exact test, a simulation and the z shortcut">
+
+The explorer's test in code. The "extreme" rule changes with the alternative.
+
+<Experiment def={test} title="binomial_test.py, linked to the explorer" controls={false}>
+  <Code example={exactCode} title="binomial_test.py" />
+  <Readout title="Result" />
+</Experiment>
+
+Three ways to get the same p-value: the exact sum, a brute-force simulation of the null world, and the normal (z)
+approximation that the CLT allows for large samples.
+
+<PythonRunner example={testRunner} title="three_ways.py" />
+
+The z approximation is what most A/B testing tools use, because with thousands of users it is accurate and quick.
+With 100 tickets it is a little off (0.040 vs 0.048), which is why exact tests exist for small counts. In your own
+Python, `scipy.stats.binomtest(78, 100, 0.7, alternative="greater")` gives the exact value.
+
+</Section>
+
+<Section kind="mistakes" title="How tests go wrong">
+
+<CommonMistake
+  title="Reading p as the probability the null is true"
+  wrong={'"p = 0.03, so there is only a 3% chance the new model is no better."'}
+  error="(no error) a statement the p-value cannot support"
+  cause="p = P(data at least this extreme | H0). The claim needs P(H0 | data), which also depends on how likely improvement was to begin with (a prior)."
+  fix="Say: 'if the model were no better, a result this good would happen 3% of the time'. For P(H0 | data), use a Bayesian analysis."
+/>
+
+<CommonMistake
+  title="Choosing one-sided after seeing the data"
+  wrong={'p_two = 0.08   # not significant...\np_one = p_two / 2   # "the effect is obviously positive", so 0.04'}
+  error="(no error) the real false positive rate of this habit is 10%, not 5%"
+  cause="Picking the side the data went is a second chance to win. The test's error rate assumes the hypothesis was fixed in advance."
+  fix="Write down the hypotheses, the test and α before collecting data. Use one-sided only when the other direction would not change any decision."
+/>
+
+<CommonMistake
+  title="Treating 'not significant' as 'no difference'"
+  wrong={'if p > 0.05:\n    print("The new model is the same as the old one.")'}
+  error="(no error) a real but small improvement gets thrown away because the test set was small"
+  cause="A large p-value means the data cannot rule out no effect. With little data it cannot rule out a sizeable effect either."
+  fix="Report the confidence interval: '74% (95% CI 64% to 82%)' shows how big the improvement might still be. Plan the test size in advance (next lesson)."
+/>
+
+</Section>
+
+<Section kind="practice" title="Where you will use this">
+
+- **Model evaluation**: "is the new model's accuracy better than the baseline's on this test set?" is exactly this
+  test. For two models on the **same** examples, a paired test (McNemar's) is the right version.
+- **Data validation**: "is today's share of null emails higher than the usual 2%?" is a one-sample test of a
+  proportion; drift detectors run tests like this every day.
+- **A/B tests**: the two-proportion z-test in the A/B chapter is this lesson with two groups instead of one fixed
+  baseline.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={testExercise}>
+  Write an exact binomial test with all three alternatives, and check it against SciPy's numbers.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+To decide whether 78 of 100 is a real improvement over 70%, we assumed it was not (the null hypothesis) and worked out
+the full distribution of scores a no-better model would produce. The p-value measured how far into the tail of that
+distribution our result fell: the probability, under the null, of a result at least as extreme. Rejecting when it is
+below a pre-chosen α means accepting a false alarm rate of α. Along the way we kept the p-value in its place: it is
+not the probability the null is true, a large one is not proof of no effect, and it mixes effect size with sample
+size. Confidence intervals and tests are two views of one calculation, and the interval usually tells you more.
+
+Every decision rule can go wrong in two ways: crying wolf when nothing changed, and missing a real change. The next
+lesson measures both and shows how sample size trades one against the other:
+[Type I and II errors, power and sample size](#/learn/stats/inference/errors-power).
+
+</Section>
