@@ -1,0 +1,204 @@
+import { load, loaderCode, shardsDemo } from './code';
+import { questions, shardExercise } from './quiz';
+
+<Section kind="intuition" title="A warehouse with a slow front desk">
+
+Almost every ML dataset in the cloud lives in **object storage**: Amazon S3 or Google Cloud Storage. Think of it as
+an enormous warehouse with a front desk. You hand over a name ("datasets/train/img_0042.jpg"), a clerk walks off,
+and a moment later comes back with the whole box. The warehouse never runs out of space, it keeps your boxes safe
+across several buildings, and it costs a couple of cents per gigabyte per month.
+
+The catch is the walk. Each request has a fixed delay before the first byte arrives, tens of milliseconds, whether
+you ask for a tiny box or a huge one. For one file that is nothing. For a training job that wants millions of small
+images per epoch, the GPUs spend most of their time waiting for clerks to walk back and forth.
+
+This lesson is about that delay: how to measure its effect on a training job, and the one trick (fewer, bigger
+boxes) that fixes it. The [Data Engineering track](#/learn/data/cloud/storage-permissions-cost) covers storage
+classes and storage costs in detail; here the focus is speed for training.
+
+</Section>
+
+<Section kind="technical" title="What object storage is, and why small files are slow">
+
+**The big picture.** We start from what one request costs in time → combine requests running in parallel to get
+throughput → compare that throughput with what the GPUs consume → and that comparison tells us whether the GPUs are
+busy or waiting. Each step below answers one of those.
+
+### Objects, not files
+
+<Term id="object-storage">Object storage</Term> holds **objects**: a key (the name), the bytes, and some metadata,
+inside a **bucket**. It looks like a file system because keys contain slashes, but there are no real folders and no
+partial writes. You read a whole object (or a byte range of it) and you replace a whole object. What you get in
+return is near-unlimited size, very high durability (S3 is designed for eleven nines of durability: losing an object
+is far less likely than losing a disk), and strong read-after-write consistency: once a write succeeds, every
+reader sees the new version.
+
+### Step 1: the time one request takes
+
+Every GET pays a fixed cost before data flows, the <Term id="time-to-first-byte">time to first byte</Term>, then
+streams at the speed of one connection. So
+
+$$
+t_{\text{request}} = \text{latency} + \frac{\text{object size}}{\text{per-connection rate}} .
+$$
+
+With a 20 ms latency and 80 MB/s per connection (typical values; measure your own), a 100 KB image takes
+0.020 + 0.1/80 = 0.02125 s. Look at the two parts: 20 ms of waiting, 1.25 ms of actual data. A 256 MB shard takes
+0.020 + 256/80 = 3.22 s, of which the waiting is under 1%.
+
+### Step 2: from one request to throughput
+
+A data loader keeps several requests in flight (DataLoader workers, or async requests inside each worker). With
+*parallel* requests in flight, each delivering one object per request time, the throughput is
+
+$$
+\text{throughput} = \min\!\left(\frac{\text{parallel} \times \text{object size}}{t_{\text{request}}},\ \text{network card}\right).
+$$
+
+The minimum is there because the instance's network card has a hard limit (25 Gbit/s ≈ 3,125 MB/s, at 125 MB/s per
+Gbit/s). With 16 parallel requests: small images give 16 × 0.1 / 0.02125 ≈ **75 MB/s**; 256 MB shards give
+16 × 256 / 3.22 ≈ **1,272 MB/s**. Same bucket, same instance, seventeen times faster, only because each request
+carries more data.
+
+### Step 3: is that enough for the GPUs?
+
+Now compare with demand. If eight GPUs consume 600 MB/s of images, the fraction of time they have data is
+min(1, throughput / need). Small images: 75 / 600 = **12.5%** busy, so you pay for eight GPUs and use one. Shards:
+100% busy. This is the number that matters, because the GPUs are by far the most expensive part of the job.
+
+### Two more costs of small files
+
+- **Request charges.** S3 Standard charges $0.0004 per 1,000 GET requests (US East). A 500 GB dataset of 100 KB
+  images is 5 million objects: $2 per epoch in requests alone, against less than a tenth of a cent for 1,954 shards.
+- **Request-rate limits.** S3 supports at least 5,500 GET requests per second per
+  <Term id="request-rate-prefix">prefix</Term> (the part of the key before the object name) and scales by
+  partitioning busy prefixes. A very parallel small-file loader can hit that and get `503 Slow Down` until S3
+  scales; spreading keys across prefixes, or using fewer bigger objects, avoids it.
+
+### The fix: shards
+
+A <Term id="data-shard">shard</Term> is one large object holding many samples back to back, usually a tar file
+(WebDataset), a TFRecord file or a similar format, sized from about 64 MB to 1 GB. Reading a shard is one request
+followed by a long sequential stream, which is exactly what object storage is fast at. The cost is that you can no
+longer read sample 4,182 on its own cheaply, so shuffling happens in two levels: shuffle the order of shards, then
+shuffle samples within a buffer in memory.
+
+<Callout kind="simplification">
+The model treats latency and per-connection speed as constants. Real latency varies (the slowest 1% of requests
+can take several times longer), throughput per connection depends on the instance and the object size, and
+decoding images can make the CPU, not the network, the bottleneck. For very small, latency-critical datasets, S3
+Express One Zone (single-digit-millisecond latency, in one zone) and caching layers such as Mountpoint for Amazon
+S3's cache or a shared file system are options. The next lesson compares those.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Try it: feed the GPUs">
+
+The lab starts with 500 GB of 100 KB images, 16 parallel requests and GPUs that need 600 MB/s.
+
+<Experiment def={load} title="Object storage loader">
+  <LoadView />
+  <Readout title="This loader" />
+</Experiment>
+
+Things to try:
+
+- **The start**: the request bar is almost all waiting. 75 MB/s, GPUs 13% busy, an epoch takes 1.8 hours.
+- **Raise parallel requests to 128**: about 600 MB/s. It works, but you now need 128 requests in flight and
+  6,000 GET/s, above the 5,500 per-prefix figure, and paying for 5 million requests per epoch.
+- **Set parallel back to 16 and the object size to 64 MB**: about 1,250 MB/s and 100% busy with the same 16 workers.
+  The waiting share of each request falls to about 2%.
+- **Choose 256 MB and 100 Gbit/s, then raise the need to 3,000 MB/s**: now bandwidth per connection limits you,
+  and more parallelism helps again. Each change moves the bottleneck somewhere else.
+
+</Section>
+
+<Section kind="code" title="Shards in Python">
+
+The throughput formula for several object sizes, then 1,000 small samples packed into tar shards with the standard
+library:
+
+<PythonRunner example={shardsDemo} title="shards.py" />
+
+A real training loader reading shards straight from S3 with WebDataset and PyTorch. The worker count follows the
+lab's parallelism slider.
+
+<Experiment def={load} title="loader.py, linked to the lab" controls={false}>
+  <Code example={loaderCode} title="loader.py (needs PyTorch and webdataset; not run here)" />
+  <Readout title="What the lab estimates" />
+</Experiment>
+
+</Section>
+
+<Section kind="mistakes" title="Storage mistakes that starve GPUs">
+
+<CommonMistake
+  title="One object per sample, read one at a time"
+  wrong={'def __getitem__(self, i):\n    obj = s3.get_object(Bucket="acme-ml", Key=self.keys[i])\n    return decode(obj["Body"].read())'}
+  error="(no error) nvidia-smi shows the GPUs at 10 to 20% utilization; the epoch takes hours"
+  cause="Each sample pays the full time to first byte, and with few workers the waits dominate."
+  fix="Pack samples into 64 MB to 1 GB shards (WebDataset, TFRecord) and stream them, or at least raise num_workers and use a parallel reader."
+/>
+
+<CommonMistake
+  title="Listing a huge bucket at the start of every epoch"
+  wrong={'keys = [o.key for o in bucket.objects.filter(Prefix="datasets/train/")]   # 5 million objects'}
+  error="(no error) training starts 10 minutes late; LIST requests cost 12.5 times more than GETs"
+  cause="Listing returns at most 1,000 keys per request, so 5 million objects need 5,000 sequential LIST calls."
+  fix="Write a manifest (a file listing the shards) when you build the dataset, and read that instead. Numbered shard names make the manifest trivial."
+/>
+
+<CommonMistake
+  title="Treating a bucket as a shared file system"
+  wrong={'# several jobs append lines to s3://acme-ml/logs/metrics.csv'}
+  error="(no error) lines go missing: each writer replaced the whole object with its own version"
+  cause="Objects are written whole. There is no append and no locking across writers."
+  fix="Give each writer its own object (metrics/run-17/part-003.csv), or write to a database or a logging service."
+/>
+
+</Section>
+
+<Section kind="practice" title="Datasets that train fast">
+
+- **Shard early**: convert raw samples into 64 MB to 1 GB shards once, when you build the dataset version.
+- **Keep data and GPUs in the same region**, ideally reading through a VPC endpoint (previous lesson).
+- **Write a manifest** of shard keys with the dataset; never list millions of objects at training time.
+- **Measure GPU utilization** in the first minutes of every new run. Below 80% usually means the input pipeline is
+  the bottleneck.
+- **Tune parallelism** (workers, prefetch) after sharding, and watch for decode-bound CPUs.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={shardExercise}>
+  Compute what a loader can deliver and how big the shards must be.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+Object storage is a huge, durable, cheap warehouse that hands back whole objects, each after a fixed wait. That
+wait is the key to training speed: one request costs latency plus size over connection speed, so for small objects
+nearly all of it is waiting.
+
+Parallel requests overlap the waits, giving throughput of parallel × size / request time, capped by the network
+card. Comparing that throughput with what the GPUs consume tells you how busy they are, and with millions of small
+files they mostly wait, while you also pay for millions of requests. Packing samples into large shards makes each
+request carry far more data for the same wait, which is why it is the standard fix, with two-level shuffling to
+keep training random.
+
+The next question is where the data and the GPUs should be relative to each other, and what moving data between
+them costs.
+
+Next: [Moving data: regions, egress and caching](#/learn/cloud/storage/moving-data).
+
+</Section>

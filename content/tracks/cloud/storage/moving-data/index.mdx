@@ -1,0 +1,194 @@
+import { moveDemo, syncCode, transfer } from './code';
+import { moveExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Data is heavy; computers are light">
+
+Starting a GPU machine in another region takes two minutes. Moving 40 TB of training data to that region takes a
+day and costs hundreds of dollars, and if you do it again every week, it never stops costing. That asymmetry has a
+name: <Term id="data-gravity">data gravity</Term>. Big datasets pull compute toward them, because moving the
+computer is cheap and moving the data is not.
+
+So the first question for any training setup is not "which GPU?" but "where is the data, and how many times will
+the job read it?". The answer decides two things: how long the job waits for data, and what you pay to move it. The
+previous lesson made each read fast; this one makes sure you are not paying to move the same bytes over and over.
+
+</Section>
+
+<Section kind="technical" title="Routes, prices, and where to keep the copy you read">
+
+**The big picture.** For each training setup, work out: how many GB cross a priced boundary per month (dataset size
+× number of full reads, or × 1 if you copy once) → multiply by the price of that route to get the bill → divide the
+bits by the link speed to get the time. Then pick the storage the GPUs read from.
+
+### Step 1: what crosses a boundary costs money
+
+Cloud providers charge for data by the route it takes. With AWS's US East list prices as the running example:
+
+| Route | Price per GB |
+| --- | --- |
+| Into the cloud from the internet | free |
+| From S3 to an instance in the same region | free |
+| Between two instances in different zones of one region | $0.01 each way |
+| Between regions | $0.02 (varies by region pair) |
+| Out to the internet (<Term id="egress">egress</Term>), first 10 TB a month | $0.09 |
+
+The shape matters more than the cents: getting data *in* is free, keeping it *next to* the compute is free, and
+every hop *away* costs more. Google Cloud's network pricing has the same shape with its own numbers. So the cost of
+a setup is simply
+
+$$
+\text{monthly cost} = \text{GB moved per month} \times \text{price per GB on that route}.
+$$
+
+### Step 2: how many GB actually move
+
+This is where the expensive mistake hides. Training reads the whole dataset once per epoch, and a team runs several
+experiments a month. A 2 TB dataset read for 10 epochs in 2 runs is 20 full reads: **40 TB** moved, not 2. Across
+regions at $0.02 that is $800 a month; out of another cloud at $0.09 it is $3,600.
+
+If instead you **copy once** to storage next to the GPUs, only 2 TB crosses the boundary ($40 or $180), and the 20
+reads happen locally for free. Same training, the bill divided by the number of reads.
+
+### Step 3: how long it takes
+
+Storage is measured in **bytes**, links in **bits** per second, and 1 byte = 8 bits. So
+
+$$
+\text{hours} = \frac{\text{GB} \times 8}{\text{Gbit/s} \times \text{efficiency}} \div 3600 .
+$$
+
+The efficiency factor (often 0.7 to 0.9) accounts for protocol overhead and the fact that one copy rarely fills a
+link. 100 TB over a 1 Gbit/s office link at 80% efficiency is 100,000 × 8 / 0.8 / 3600 ≈ 278 hours: **11.6 days**.
+That is why providers sell physical transfer devices (AWS Snowball, Google Transfer Appliance) for very large
+one-time migrations: shipping a box can be faster than the network.
+
+### Step 4: where the GPUs read from
+
+Once the data is in the right region, there are four places the job can read it from. Each solves a different
+problem:
+
+| Storage | What it is | Good for | Watch out for |
+| --- | --- | --- | --- |
+| Object storage (S3, Cloud Storage) | the warehouse from the last lesson | the source of truth for datasets and models | small-file latency |
+| <Term id="block-storage">Block disk</Term> (EBS, Persistent Disk) | a network disk attached to one VM | the OS, environments, a working copy for one machine | one VM at a time (mostly); you pay for provisioned size |
+| <Term id="shared-file-system">Shared file system</Term> (EFS, Filestore, FSx for Lustre) | a POSIX file system many VMs mount | many nodes reading the same files; code expecting real paths | cost per GB-month is higher; throughput is provisioned |
+| <Term id="instance-store">Local NVMe</Term> (instance store) | disks physically inside the GPU host | the fastest per-epoch cache | erased when the instance stops |
+
+A common, effective pattern combines them: **shards in S3 as the source of truth → copied once to local NVMe at job
+start → every epoch reads locally.** For multi-node training on huge datasets, FSx for Lustre linked to an S3 bucket
+plays the same caching role for all nodes at once. Mountpoint for Amazon S3 and Cloud Storage FUSE let code that
+expects file paths read objects directly, with optional local caching.
+
+<Callout kind="simplification">
+Prices here are list prices for one region and change over time; inter-region prices differ by pair, and committed
+or private connectivity (Direct Connect, Interconnect) changes egress rates. Moving data out of a cloud for good can
+also qualify for free egress under some providers' migration programs. Always check the pricing pages for your
+regions.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Try it: where should the data live?">
+
+The lab starts with a 2 TB dataset in another region, read 20 times a month, straight from there.
+
+<Experiment def={transfer} title="Data placement">
+  <TransferView />
+  <Readout title="This month" />
+</Experiment>
+
+Things to try:
+
+- **The start**: 40,000 GB moved, $800 a month, and 18 hours of transfer time spread over the month's runs.
+- **Turn on "copy once"**: 2,000 GB moved, $40, and each later read comes from fast local storage.
+- **Move the data outside the cloud**: the same 20 reads cost $3,600. Copying once costs $180.
+- **Put the data in the GPUs' region**: $0 either way. Caching still helps speed, but no longer the bill.
+- **Raise reads to 60** with the data remote: the bill triples, which is the data gravity argument in one slider.
+
+</Section>
+
+<Section kind="code" title="Estimates and the copy-once pattern">
+
+The cost and time arithmetic for each route, plus the "100 TB over different links" table:
+
+<PythonRunner example={moveDemo} title="move.py" />
+
+The commands behind "copy once": a bucket-to-bucket copy into the GPUs' region, then a local NVMe cache on the
+training machine. The comment line follows the lab's settings.
+
+<Experiment def={transfer} title="sync.sh, linked to the lab" controls={false}>
+  <Code example={syncCode} title="sync.sh (not run here)" />
+  <Readout title="What the lab estimates" />
+</Experiment>
+
+</Section>
+
+<Section kind="mistakes" title="Transfer mistakes that show up on the bill">
+
+<CommonMistake
+  title="Forgetting the 8"
+  wrong={'hours = 10_000 / 10 / 3600   # 10 TB over 10 Gbit/s: "17 minutes"'}
+  error="(no error) the copy takes over 2 hours; the job that waited for it starts late"
+  cause="GB are bytes and Gbit/s are bits. The estimate divided bytes by bits."
+  fix="Multiply GB by 8 before dividing by Gbit/s, and assume 70 to 90% efficiency: 10,000 × 8 / (10 × 0.8) / 3600 ≈ 2.8 h."
+/>
+
+<CommonMistake
+  title="Training in one region from a bucket in another"
+  wrong={'# GPUs in us-east-1, DataLoader reads s3://acme-ml-eu/... every epoch'}
+  error="(no error) a 'Data transfer, inter-region' line larger than the GPU line"
+  cause="Each epoch moved the whole dataset across regions again."
+  fix="Copy the dataset version once to a bucket in the GPUs' region (or train where the data is), and cache to local NVMe."
+/>
+
+<CommonMistake
+  title="Serving model downloads straight from a bucket to the internet"
+  wrong={'# public link to s3://acme-ml/models/llama-8b.gguf in the README (16 GB)'}
+  error="(no error) 5,000 downloads a month: 80 TB of internet egress"
+  cause="Every download is egress, charged per GB."
+  fix="Put a CDN in front (cheaper per GB, cached near users), use a model hub, or require requester-pays for large public datasets."
+/>
+
+</Section>
+
+<Section kind="practice" title="Placement rules that keep bills flat">
+
+- **Compute goes to the data** for training; serve close to users; keep both in one region when you can.
+- **Count reads, not datasets**: estimate GB moved as size × epochs × runs before choosing a layout.
+- **Copy once, read locally**: version the dataset in object storage, sync it to the GPU region, cache on NVMe.
+- **Use endpoints and same-zone placement** for heavy VM-to-VM traffic (distributed training across zones costs
+  per GB and adds latency; keep a training cluster in one zone).
+- **Check the bill's data transfer lines** monthly; they are the most commonly surprising ones.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={moveExercise}>
+  Turn the three steps into a function that compares reading remotely with copying once.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+Data is heavy and computers are light, so compute usually goes to the data. Every byte that crosses a boundary
+(between zones, between regions, out to the internet) is charged per GB, while getting data in and reading it
+within a region are free.
+
+The bill is GB moved × price per GB, and the number that matters is GB *moved*: dataset size × full reads per
+month. Copying the dataset once to storage next to the GPUs turns many paid crossings into one, and local NVMe or a
+linked file system then makes every epoch fast as well. Time follows the same chain, as long as you remember that
+links are measured in bits: GB × 8 / Gbit/s.
+
+The data is now in the right place. The next chapter chooses the computers that read it.
+
+Next: [Compute options: VMs, containers and serverless](#/learn/cloud/compute/compute-options).
+
+</Section>
