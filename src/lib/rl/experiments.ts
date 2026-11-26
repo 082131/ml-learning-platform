@@ -71,9 +71,9 @@ export function playGrid(s: PlayState): PlayResult {
 }
 
 const STEP_REWARDS = opts([
-  ['-0.04', '−0.04 per move (a small cost)'],
-  ['0', '0 (moves are free)'],
-  ['-0.5', '−0.5 per move (moves are expensive)'],
+  ['-0.04', '−0.04 (small cost)'],
+  ['0', '0 (free)'],
+  ['-0.5', '−0.5 (expensive)'],
 ]);
 
 export function playExperiment(id: string): ExperimentDef<PlayState, PlayResult> {

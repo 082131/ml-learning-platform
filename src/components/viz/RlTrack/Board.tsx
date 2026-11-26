@@ -59,6 +59,7 @@ export function Board({ grid: g, values, arrows, mismatch, agent, path, path2, l
         if (describe) name.push(describe(i));
         const kt = kindText(g, i);
         if (kt && (!compact || k !== 'empty')) parts.push(<span key="k" className={s.cellKind}>{compact && k === 'cliff' ? '' : kt}</span>);
+        if (i === agent) parts.push(<span key="me" className={s.agentMark}>agent</span>);
         if (arrow) parts.push(<span key="a" className={s.arrow} aria-hidden="true">{ACTION_ARROW[arrow]}</span>);
         if (showValue) parts.push(<span key="v" className={s.value}>{fmtValue(values[i]!)}</span>);
         if (label) parts.push(<span key="l" className={s.prob}>{label}</span>);

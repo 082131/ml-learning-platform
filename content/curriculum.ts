@@ -693,8 +693,8 @@ export const tracks: Track[] = [
         level: 'beginner',
         lessons: [
           { id: 'rl/foundations/agents-rewards', status: 'written' },
-          { id: 'rl/foundations/returns-discounting', status: 'written' },
-          { id: 'rl/foundations/bandits-exploration', status: 'written' },
+          { id: 'rl/foundations/returns-discounting', status: 'outline' },
+          { id: 'rl/foundations/bandits-exploration', status: 'outline' },
         ],
       },
       {
@@ -702,9 +702,9 @@ export const tracks: Track[] = [
         title: 'Planning with a model: MDPs',
         level: 'intermediate',
         lessons: [
-          { id: 'rl/mdp/markov-decision-processes', status: 'written' },
-          { id: 'rl/mdp/value-functions', status: 'written' },
-          { id: 'rl/mdp/value-iteration', status: 'written' },
+          { id: 'rl/mdp/markov-decision-processes', status: 'outline' },
+          { id: 'rl/mdp/value-functions', status: 'outline' },
+          { id: 'rl/mdp/value-iteration', status: 'outline' },
         ],
       },
       {
@@ -712,9 +712,9 @@ export const tracks: Track[] = [
         title: 'Learning from experience',
         level: 'intermediate',
         lessons: [
-          { id: 'rl/learning/monte-carlo-td', status: 'written' },
-          { id: 'rl/learning/q-learning', status: 'written' },
-          { id: 'rl/learning/sarsa-vs-q-learning', status: 'written' },
+          { id: 'rl/learning/monte-carlo-td', status: 'outline' },
+          { id: 'rl/learning/q-learning', status: 'outline' },
+          { id: 'rl/learning/sarsa-vs-q-learning', status: 'outline' },
         ],
       },
       {
@@ -722,22 +722,22 @@ export const tracks: Track[] = [
         title: 'Policy gradients and deep RL',
         level: 'advanced',
         lessons: [
-          { id: 'rl/deep/policy-gradients', status: 'written' },
-          { id: 'rl/deep/deep-rl', status: 'written' },
+          { id: 'rl/deep/policy-gradients', status: 'outline' },
+          { id: 'rl/deep/deep-rl', status: 'outline' },
         ],
       },
       {
         id: 'llms',
         title: 'RL for language models',
         level: 'advanced',
-        lessons: [{ id: 'rl/llms/rl-for-llms', status: 'written' }],
+        lessons: [{ id: 'rl/llms/rl-for-llms', status: 'outline' }],
       },
       {
         id: 'capstone',
         title: 'Capstone',
         level: 'advanced',
         project: 'rl/capstone/gridworld-agent',
-        lessons: [{ id: 'rl/capstone/gridworld-agent', status: 'written' }],
+        lessons: [{ id: 'rl/capstone/gridworld-agent', status: 'outline' }],
       },
     ],
   },
