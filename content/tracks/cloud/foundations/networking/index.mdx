@@ -1,0 +1,210 @@
+import { net, sgCode, subnetsDemo } from './code';
+import { questions, subnetExercise } from './quiz';
+
+<Section kind="intuition" title="A gated campus with one road in and one road out">
+
+IAM answered "is this principal allowed to do this?". Networking answers an earlier question: "can these two
+machines even reach each other?". Both have to say yes. A request with perfect permissions still fails if there is
+no road between the two computers, and a machine with no road in from the internet cannot be attacked from the
+internet, whatever its permissions.
+
+Picture your cloud network as a gated campus. Inside, buildings talk freely over private roads. Some buildings
+face the street (anyone can drive up to them), most are deep inside (nobody from outside can reach them, but they
+can still send a courier out to fetch things). Your training machines belong deep inside: they need to *fetch*
+packages and data, but nobody outside should be able to *reach* them.
+
+This lesson gives you the vocabulary for that campus and a way to trace any connection hop by hop, so that when
+something "cannot connect" you can say exactly where the road ends.
+
+</Section>
+
+<Section kind="technical" title="The pieces of a cloud network">
+
+**The big picture.** A connection succeeds only if every hop on its path allows it: the machine's firewall (security
+group) → its subnet's route table → a gateway out of or into the network → the destination. You build a network by
+deciding which of those hops exist.
+
+### The VPC and its addresses
+
+A <Term id="vpc">VPC</Term> (virtual private cloud) is your own private network inside a region. Machines in it get
+private IP addresses that mean nothing outside it. You give the VPC an address range written as a
+<Term id="cidr-block">CIDR block</Term>, such as `10.0.0.0/16`.
+
+To read CIDR, remember that an IPv4 address is 32 bits. The number after the slash says how many leading bits are
+*fixed*; the rest are free to vary. So `/16` fixes 16 bits and leaves 16 free, which gives 2¹⁶ = 65,536 addresses
+(10.0.0.0 to 10.0.255.255). Every extra bit of prefix halves the range: `/24` leaves 8 free bits, 256 addresses.
+The formula is simply
+
+$$
+\text{addresses} = 2^{\,32 - \text{prefix}} .
+$$
+
+The natural next question is "why not just make everything huge?". Because a VPC's range cannot overlap with
+networks you might later connect it to (another VPC, the office network). Plan ranges once, leave gaps, and you
+avoid painful renumbering later.
+
+### Subnets: public and private
+
+You split the VPC into <Term id="subnet">subnets</Term>, smaller CIDR blocks. On AWS each subnet lives in exactly
+one zone, so spreading across zones (the first lesson) means one subnet per zone for each tier. AWS keeps five
+addresses of every subnet for itself, so a `/24` has 251 usable addresses.
+
+A subnet is not public or private because of a setting called "public". It is public because of **where its route
+table sends internet traffic**:
+
+- A **public subnet** has a route `0.0.0.0/0 → internet gateway`. Machines in it that also have a public IP address
+  can talk to the internet directly, and the internet can talk to them (if their firewall allows).
+- A **private subnet** has no route to the internet gateway. Nothing on the internet can start a connection to a
+  machine there. That is exactly what you want for training instances and model servers behind a load balancer.
+
+### Getting out of a private subnet: NAT and endpoints
+
+A training instance in a private subnet still needs to `pip install` packages and read data. Two pieces give it
+roads *out* without giving anyone a road *in*:
+
+1. A <Term id="nat-gateway">NAT gateway</Term> sits in a public subnet. The private subnet's route table sends
+   `0.0.0.0/0` to it; it forwards outgoing connections using its own public address and lets only the *replies*
+   back in. Outbound works, inbound stays impossible. NAT gateways charge per hour and per GB processed, so heavy
+   traffic through them adds up.
+2. A <Term id="vpc-endpoint">VPC endpoint</Term> is a private road to one cloud service. A *gateway endpoint* for S3
+   adds a route for S3's address ranges, so reads from S3 stay on the provider's network, need no NAT, and avoid
+   its per-GB charge. On Google Cloud, *Private Google Access* does the same for Cloud Storage.
+
+This is why the standard layout for ML is: training and serving in private subnets, a NAT gateway for packages, an
+S3 (or Cloud Storage) endpoint for the heavy data traffic.
+
+### The firewall on each machine
+
+Routes decide whether a road *exists*. A <Term id="security-group">security group</Term> decides who may *use* it to
+reach a specific machine. It is a list of allowed inbound traffic (protocol, port, source range); everything else
+inbound is dropped. It is *stateful*: if the machine starts a connection out, the reply is allowed back in
+automatically. That is why a private training instance can have zero inbound rules and still download everything.
+
+Google Cloud uses VPC firewall rules (applied to instances by tags or service accounts) for the same job.
+
+### Tracing a connection
+
+Now you can answer "can this connect?" as a chain instead of a guess. For "a stranger on the internet opens Jupyter
+on port 8888", every one of these must be true: the subnet routes to an internet gateway, the instance has a public
+IP, and the security group allows port 8888 from the stranger's address. Remove any one and the connection is
+impossible. The lab below checks four such paths at once.
+
+<Callout kind="simplification">
+Real VPCs also have network ACLs (stateless subnet-level filters), load balancers, VPC peering and transit
+gateways, VPNs, and IPv6 (which has no NAT; AWS uses an *egress-only internet gateway* for outbound-only IPv6). The
+reasoning is the same: list the hops, and check each one.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Try it: which traffic gets through?">
+
+The lab starts with a common beginner setup: a GPU instance in a public subnet, with a public IP and port 8888
+open to the world so the team can reach Jupyter. Fix it.
+
+<Experiment def={net} title="VPC path checker">
+  <NetworkView />
+  <Readout title="This network" />
+</Experiment>
+
+Things to try:
+
+- **The starting setup**: everything works, including the stranger. That is the problem: one path behaves wrongly.
+- **Restrict the security group to the office range**: the stranger is blocked, but the machine is still on the
+  internet. One mistake in a rule re-opens it.
+- **Move the instance to a private subnet with no public IP**: now nothing reaches it, but it also cannot install
+  packages or read S3. Two paths broke in the other direction.
+- **Add the NAT gateway**: packages work again. **Add the S3 endpoint**: data now flows over the private road
+  instead of through the NAT. Zero problems.
+- Notice that reaching Jupyter "from the office" now fails. In a private design you reach it through a VPN, a
+  bastion host, or port forwarding (AWS Systems Manager Session Manager, Google Cloud IAP), which needs no open port.
+- **Change the VPC CIDR and the prefix slider** to see how many subnets of what size you get.
+
+</Section>
+
+<Section kind="code" title="Subnet arithmetic and a firewall rule">
+
+Python's standard `ipaddress` module does CIDR arithmetic. This plans the public/private, two-zone layout:
+
+<PythonRunner example={subnetsDemo} title="subnets.py" />
+
+And the security group rule behind the lab's inbound setting. It follows the lab: pick another source above and
+the CIDR changes.
+
+<Experiment def={net} title="sg_rule.py, linked to the lab" controls={false}>
+  <Code example={sgCode} title="sg_rule.py (boto3, not run here)" />
+  <Readout title="What the lab finds" />
+</Experiment>
+
+</Section>
+
+<Section kind="mistakes" title="Network mistakes that expose or block ML work">
+
+<CommonMistake
+  title="Opening Jupyter to the world"
+  wrong={'IpRanges=[{"CidrIp": "0.0.0.0/0"}]   # port 8888, "just for today"'}
+  error="(no error) scanners find the notebook server; it can run any code with the instance's role"
+  cause="A public subnet, a public IP and a 0.0.0.0/0 rule together make the machine reachable by everyone."
+  fix="Keep the instance private and use port forwarding through Session Manager or IAP, or a managed notebook service. No inbound rule is needed."
+/>
+
+<CommonMistake
+  title="A private subnet that cannot install anything"
+  wrong={'$ pip install torch\nWARNING: Retrying ... ConnectTimeoutError ... Connection to pypi.org timed out'}
+  error="pip retries and times out; the job hangs at its setup step"
+  cause="The private subnet has no route to a NAT gateway (or a package mirror), so outbound connections have nowhere to go."
+  fix="Add a NAT gateway route, or serve packages from an internal mirror reachable through an endpoint. Better still, bake dependencies into the container image."
+/>
+
+<CommonMistake
+  title="Paying NAT charges for S3 traffic"
+  wrong={'# 40 TB of training reads per month from S3, through the NAT gateway'}
+  error="(no error) the NAT gateway's per-GB processing charge appears as a large line on the bill"
+  cause="Without an endpoint, S3 traffic from a private subnet takes the NAT road like any other internet traffic."
+  fix="Add a gateway endpoint for S3 to the private route tables. Gateway endpoints for S3 have no hourly or per-GB charge."
+/>
+
+</Section>
+
+<Section kind="practice" title="A sensible default network for ML">
+
+- **One VPC per environment** (dev, prod), with non-overlapping CIDR ranges planned up front.
+- **Private subnets in two or more zones** for training, notebooks and model servers; public subnets only for load
+  balancers and NAT gateways.
+- **An S3 or Cloud Storage endpoint** for data traffic; a NAT gateway (or a package mirror) for everything else.
+- **No inbound rules from 0.0.0.0/0** except on a load balancer, and only on 443.
+- **Port forwarding or managed notebooks** instead of public notebook servers.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={subnetExercise}>
+  Plan subnets from a VPC range with the standard library, the way you would before writing any infrastructure code.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+A cloud network is a private VPC whose address range you choose as a CIDR block, where the prefix fixes bits and
+2^(32 − prefix) gives the size. You split it into subnets, one per zone per tier, and a subnet is public only
+because its route table points at an internet gateway.
+
+Training machines belong in private subnets: nothing outside can start a connection to them. They still get out
+through a NAT gateway (outbound only, replies allowed back) and reach S3 through an endpoint (a private road with no
+NAT charge). On each machine, a stateful security group lists the few inbound connections allowed. A connection
+works only if every hop on its path allows it, so "cannot connect" always has an answer: find the first hop that
+says no.
+
+With permissions and roads in place, the next chapter turns to the data that travels on them.
+
+Next: [Object storage that keeps GPUs fed](#/learn/cloud/storage/object-storage-training).
+
+</Section>

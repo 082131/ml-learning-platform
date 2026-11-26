@@ -1,0 +1,215 @@
+import { bucketPolicy, decideDemo, iam, simulateCode, trainPolicy } from './code';
+import { decideExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Every request shows an ID card at the door">
+
+Imagine an office building where every door has a guard. Whenever someone wants to open a door, the guard asks two
+things: *who are you?* and *are you on the list for this door?* Nobody gets in just because the door exists.
+
+A cloud account works exactly like that. Every single action, whether it is reading one file from a bucket,
+starting a GPU machine or deleting a model, is an API request, and every request is checked before it runs. The
+system that does the checking is called **IAM**, for identity and access management. It is the most important
+security control you have in the cloud, because almost every real cloud breach comes down to someone (or some
+leaked key) being allowed to do more than they needed.
+
+For ML work this matters in a very practical way. A training job needs to read the training data and write a model.
+If it could also delete every model in the company, a single bug in your training script could do that. IAM is how
+you make that bug harmless.
+
+</Section>
+
+<Section kind="technical" title="How a request is decided">
+
+**The big picture.** Every request carries three facts: *who* is asking (the principal), *what* they want to do
+(the action) and *on what* (the resource). The cloud collects every policy that applies and answers in a fixed order:
+any explicit Deny → refuse; outside the organization's guardrails → refuse; any Allow → permit; nothing matched →
+refuse. The rest of this section builds up those pieces one by one.
+
+### Who is asking: principals, users and roles
+
+A <Term id="iam-principal">principal</Term> is whoever makes the request. There are two kinds you will meet daily,
+and the difference between them is the most important habit in this lesson.
+
+- An **IAM user** is a long-lived identity, often with **access keys**: a key id and a secret that work until
+  someone deletes them. If they leak (pasted into a notebook, committed to Git, left on a laptop), they keep working
+  for an attacker indefinitely.
+- An <Term id="iam-role">IAM role</Term> has permissions but no password and no permanent keys. A training job, a
+  VM or a person *assumes* the role and receives <Term id="temporary-credentials">temporary credentials</Term> that
+  expire on their own, typically within an hour, and are renewed automatically while the work runs.
+
+So the rule is: **people sign in through single sign-on; jobs and machines use roles.** A SageMaker training job
+runs with an *execution role*; an EC2 VM gets a role through an *instance profile*; on Google Cloud the same idea is
+a *service account* attached to the VM or job. Your code then calls `boto3.client("s3")` without any keys at all,
+and the SDK picks up the role's credentials from the environment.
+
+### What they may do: policies
+
+An <Term id="iam-policy">IAM policy</Term> is a JSON document made of statements. Each statement says three things:
+an **Effect** (Allow or Deny), the **Actions** it covers (API calls such as `s3:GetObject`), and the **Resources**
+it covers (written as ARNs, Amazon Resource Names, which may end in a `*` wildcard). Here is the policy for the
+training job in the lab below:
+
+<Code example={trainPolicy} title="train-job-policy.json" />
+
+Read it as a sentence: "this role may read objects under `datasets/` and write objects under `models/`". Everything
+else is refused. That leads to the rule that surprises beginners most.
+
+### The default answer is no
+
+If no statement allows a request, it is refused. This is called an <Term id="implicit-deny">implicit deny</Term>:
+nobody wrote "deny", there simply was no "allow". It means permissions start at zero and you add exactly what a job
+needs. This is <Term id="least-privilege">least privilege</Term>, and the implicit deny is what makes it the natural
+way to work rather than extra effort.
+
+### Explicit deny: rules that beat every allow
+
+Sometimes you need a rule that must hold even if someone later attaches a very broad policy (an administrator role,
+a copy-pasted `"Action": "*"`). An <Term id="explicit-deny">explicit deny</Term> does that: if a Deny statement
+matches, the request is refused no matter how many Allows also match. Here the bucket itself carries a policy (a
+*resource policy*, attached to the bucket rather than to a role) that protects released models:
+
+<Code example={bucketPolicy} title="acme-ml bucket policy" />
+
+The condition carves out one exception: only the CI pipeline's role may delete models, so deletion always goes
+through a reviewed pipeline.
+
+### Guardrails above the account
+
+Large organizations add one more layer. On AWS a <Term id="service-control-policy">service control policy</Term> is
+attached to a whole account by the organization. It *grants nothing*; it sets the outer limit of what anyone in the
+account can ever do, even administrators. A request must be inside the guardrail *and* allowed by an IAM policy. On
+Google Cloud, organization policies and IAM deny policies play the same role.
+
+### The whole order, once more
+
+Now the four steps from the big picture make sense as a chain, because each one exists for a reason:
+
+1. **Is there a matching explicit Deny?** Then refuse. (Guardrails you set on purpose must always win.)
+2. **Is the action outside the organization guardrail?** Then refuse. (The account may never do it.)
+3. **Does any identity or resource policy Allow it?** Then permit.
+4. **Otherwise**, refuse by default (implicit deny).
+
+<Callout kind="simplification">
+This is the evaluation inside one account. The full AWS logic also has permissions boundaries, session policies,
+cross-account rules (both accounts must allow) and conditions on tags, IP ranges or time. Google Cloud IAM is built
+differently on the surface: you **bind** a principal to a **role** (a named bundle of permissions, such as
+`roles/storage.objectViewer`) on a resource, and bindings are inherited from organization to folder to project to
+resource. The ideas carry over: start from nothing, grant narrowly, and use deny policies for guardrails.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Try it: is this request allowed?">
+
+Three roles share one bucket, `s3://acme-ml`, with `datasets/`, `models/` and `scratch/` prefixes. Pick who asks,
+what they want and on which object. The view walks through the four steps and marks every statement that matched.
+
+<Experiment def={iam} title="IAM policy lab">
+  <IamView />
+  <Readout title="Decision" />
+</Experiment>
+
+Things to try:
+
+- **train-job reads `datasets/train.parquet`**: allowed by `ReadDatasets`.
+- **train-job puts an object in `datasets/`**: refused, and *no statement matched*. That is an implicit deny; the
+  fix, if it were needed, would be to add a permission.
+- **data-scientist deletes `models/v3/model.tar.gz`**: refused by the bucket's explicit Deny. Switch the bucket
+  policy off and try again: still refused, now implicitly, because that role was never allowed to delete there.
+- **ci-deploy deletes the model**: allowed, because the Deny's condition exempts the CI role.
+- **ci-deploy calls `iam:CreateAccessKey`**: allowed, by the over-broad `TooBroad` statement. Now turn on the
+  organization guardrail: refused, because the account may only use S3, SageMaker and logs. The guardrail caught a
+  mistake in a policy.
+
+</Section>
+
+<Section kind="code" title="The decision in code, and asking IAM before you deploy">
+
+The four-step logic fits in a dozen lines. This version handles Allow, Deny and wildcards with Python's `fnmatch`:
+
+<PythonRunner example={decideDemo} title="decide.py" />
+
+On a real account you should not guess: the IAM policy simulator evaluates a role's policies for you. The call
+below follows the lab's current choice; change the role or action above and it changes too.
+
+<Experiment def={iam} title="simulate.py, linked to the lab" controls={false}>
+  <Code example={simulateCode} title="simulate.py (boto3, not run here)" />
+  <Readout title="What the lab decides" />
+</Experiment>
+
+</Section>
+
+<Section kind="mistakes" title="Permission mistakes that become incidents">
+
+<CommonMistake
+  title="Access keys in a notebook or a repository"
+  wrong={'s3 = boto3.client(\n    "s3",\n    aws_access_key_id="AKIA...",\n    aws_secret_access_key="wJalr...",\n)'}
+  error="(no error) the notebook is pushed to a public repo; automated scanners find the key within minutes and start GPU miners on your bill"
+  cause="Long-lived keys work for whoever holds them, for as long as they exist."
+  fix="Delete the key at once. Run jobs with roles (execution role, instance profile, service account) and call boto3.client(\"s3\") with no keys; people sign in with SSO."
+/>
+
+<CommonMistake
+  title="Fixing AccessDenied with a wildcard"
+  wrong={'{"Effect": "Allow", "Action": "s3:*", "Resource": "*"}'}
+  error="(no error) the training role can now delete every bucket in the account"
+  cause="The real problem was one missing action on one prefix; the fix granted thousands."
+  fix="Read the denied action and resource in the error (or CloudTrail), and add exactly that: s3:PutObject on arn:aws:s3:::acme-ml/models/*."
+/>
+
+<CommonMistake
+  title="Forgetting that one role is shared by everything"
+  wrong={'# one "ml-role" used by notebooks, training jobs, the API and CI'}
+  error="(no error) a bug in a notebook overwrites the production model, because the role allows it"
+  cause="A shared role must hold the union of everyone's permissions, so every user of it gets all of them."
+  fix="One role per workload (training, serving, CI, people), each with only its own permissions."
+/>
+
+</Section>
+
+<Section kind="practice" title="Permissions the way security reviews expect">
+
+- **Roles for workloads, SSO for people, no long-lived keys.** If a key must exist, rotate it and store it in a
+  secrets manager, never in code.
+- **One role per job type**, granting exact actions on exact prefixes. Start with nothing and add what the error
+  messages ask for.
+- **Explicit denies for the rules that must never break**: no public buckets, no deleting released models outside
+  CI, no leaving the approved regions.
+- **Test permissions before running long jobs**, with the policy simulator or a short dry run that touches each
+  resource once.
+- **Review unused permissions**: AWS IAM Access Analyzer and Google Cloud's IAM recommender list permissions a
+  role has not used, which are safe candidates to remove.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={decideExercise}>
+  Build the evaluator yourself, including the organization guardrail.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+Every cloud request is a principal asking to perform an action on a resource, and nothing runs until IAM says yes.
+Jobs should be roles that receive temporary credentials, so there is no long-lived key to leak.
+
+What a role may do is written in policies: statements of Allow or Deny over actions and resource patterns. Because
+the default answer is no (implicit deny), you build permissions up from zero, which is least privilege. When a rule
+must survive any future Allow, you write an explicit Deny, and organizations put guardrails above whole accounts. So
+the decision is one chain: explicit deny wins, then the guardrail must permit, then some Allow must match, and
+otherwise the answer stays no.
+
+Permissions decide *who* may talk to a resource. The next lesson decides *which network paths* exist for that
+conversation at all.
+
+Next: [Networking basics for ML workloads](#/learn/cloud/foundations/networking).
+
+</Section>
