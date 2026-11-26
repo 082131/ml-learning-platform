@@ -141,7 +141,7 @@ export function returnsExperiment(id: string): ExperimentDef<ReturnState, Return
     initial: { scenario: 'goal', gamma: 0.9 },
     controls: [
       { kind: 'select', id: 'scenario', label: 'Reward sequence', options: opts([['goal', 'Walk to the goal'], ['now-later', '1 now, or 10 later'], ['forever', 'A reward that never stops']]), get: (s) => s.scenario, set: (s, v) => ({ ...s, scenario: v as ReturnScenario }) },
-      { kind: 'slider', id: 'gamma', label: 'Discount factor γ', min: 0, max: 1, step: 0.01, get: (s) => s.gamma, set: (s, v) => ({ ...s, gamma: v }), format: (v) => v.toFixed(2) },
+      { kind: 'slider', id: 'gamma', label: 'Discount factor gamma', min: 0, max: 1, step: 0.01, get: (s) => s.gamma, set: (s, v) => ({ ...s, gamma: v }), format: (v) => v.toFixed(2) },
     ],
     compute: returnsResult,
     readout: (_s, r) => [
@@ -175,7 +175,7 @@ export function banditExperiment(id: string): ExperimentDef<BanditState, BanditR
     initial: { strategy: 'epsilon', epsilon: 0.1, c: 1, initial: 0, seed: 1 },
     controls: [
       { kind: 'select', id: 'strategy', label: 'Strategy', options: opts([['greedy', 'greedy (always the best so far)'], ['epsilon', 'ε-greedy'], ['ucb', 'UCB (optimism about the unknown)']]), get: (s) => s.strategy, set: (s, v) => ({ ...s, strategy: v as BanditStrategy }) },
-      { kind: 'slider', id: 'epsilon', label: 'ε (share of random pulls)', min: 0, max: 0.5, step: 0.01, get: (s) => s.epsilon, set: (s, v) => ({ ...s, epsilon: v }), format: (v) => v.toFixed(2) },
+      { kind: 'slider', id: 'epsilon', label: 'Epsilon (share of random pulls)', min: 0, max: 0.5, step: 0.01, get: (s) => s.epsilon, set: (s, v) => ({ ...s, epsilon: v }), format: (v) => v.toFixed(2) },
       { kind: 'slider', id: 'c', label: 'UCB strength c', min: 0, max: 3, step: 0.1, get: (s) => s.c, set: (s, v) => ({ ...s, c: v }), format: (v) => v.toFixed(1) },
       { kind: 'select', id: 'initial', label: 'Starting estimate', options: opts([['0', '0 (pessimistic)'], ['1', '1 (optimistic)']]), get: (s) => String(s.initial), set: (s, v) => ({ ...s, initial: Number(v) }) },
       { kind: 'slider', id: 'seed', label: 'Random seed', min: 1, max: 20, step: 1, get: (s) => s.seed, set: (s, v) => ({ ...s, seed: v }) },
@@ -293,7 +293,7 @@ export function evaluationExperiment(id: string): ExperimentDef<EvalState, EvalR
       { kind: 'select', id: 'policy', label: 'Policy to evaluate', options: opts([['safe', 'safe route (left column)'], ['shortcut', 'shortcut (next to the pit)'], ['random', 'random (each move 1/4)']]), get: (s) => s.policy, set: (s, v) => ({ ...s, policy: v as PolicyName }) },
       { kind: 'slider', id: 'sweeps', label: 'Sweeps done', min: 0, max: MAX_SWEEPS, step: 1, get: (s) => s.sweeps, set: (s, v) => ({ ...s, sweeps: v }) },
       { kind: 'select', id: 'cell', label: 'Cell to explain', options: cellOptions, get: (s) => String(s.cell), set: (s, v) => ({ ...s, cell: Number(v) }) },
-      { kind: 'slider', id: 'gamma', label: 'Discount factor γ', min: 0.5, max: 1, step: 0.01, get: (s) => s.gamma, set: (s, v) => ({ ...s, gamma: v }), format: (v) => v.toFixed(2) },
+      { kind: 'slider', id: 'gamma', label: 'Discount factor gamma', min: 0.5, max: 1, step: 0.01, get: (s) => s.gamma, set: (s, v) => ({ ...s, gamma: v }), format: (v) => v.toFixed(2) },
       { kind: 'slider', id: 'slip', label: 'Slip probability', min: 0, max: 0.6, step: 0.05, get: (s) => s.slip, set: (s, v) => ({ ...s, slip: v }), format: (v) => v.toFixed(2) },
     ],
     compute: evalResult,
@@ -346,7 +346,7 @@ export function viExperiment(id: string): ExperimentDef<ViState, ViResult> {
     controls: [
       { kind: 'slider', id: 'sweeps', label: 'Sweeps done', min: 0, max: MAX_SWEEPS, step: 1, get: (s) => s.sweeps, set: (s, v) => ({ ...s, sweeps: v }) },
       { kind: 'select', id: 'step', label: 'Reward for each move', options: STEP_REWARD_OPTIONS, get: (s) => String(s.stepReward), set: (s, v) => ({ ...s, stepReward: Number(v) }) },
-      { kind: 'slider', id: 'gamma', label: 'Discount factor γ', min: 0.5, max: 1, step: 0.01, get: (s) => s.gamma, set: (s, v) => ({ ...s, gamma: v }), format: (v) => v.toFixed(2) },
+      { kind: 'slider', id: 'gamma', label: 'Discount factor gamma', min: 0.5, max: 1, step: 0.01, get: (s) => s.gamma, set: (s, v) => ({ ...s, gamma: v }), format: (v) => v.toFixed(2) },
       { kind: 'slider', id: 'slip', label: 'Slip probability', min: 0, max: 0.6, step: 0.05, get: (s) => s.slip, set: (s, v) => ({ ...s, slip: v }), format: (v) => v.toFixed(2) },
     ],
     compute: viResult,
@@ -375,7 +375,7 @@ export function walkExperiment(id: string): ExperimentDef<WalkState, WalkResult>
     id,
     initial: { alpha: 0.1, episodes: 100 },
     controls: [
-      { kind: 'slider', id: 'alpha', label: 'Step size α', min: 0.01, max: 0.5, step: 0.01, get: (s) => s.alpha, set: (s, v) => ({ ...s, alpha: v }), format: (v) => v.toFixed(2) },
+      { kind: 'slider', id: 'alpha', label: 'Step size alpha', min: 0.01, max: 0.5, step: 0.01, get: (s) => s.alpha, set: (s, v) => ({ ...s, alpha: v }), format: (v) => v.toFixed(2) },
       { kind: 'slider', id: 'episodes', label: 'Episodes', min: 1, max: 200, step: 1, get: (s) => s.episodes, set: (s, v) => ({ ...s, episodes: v }) },
     ],
     compute: (s) => compareMcTd({ ...s, runs: WALK_RUNS, seed: 3 }),
@@ -431,8 +431,8 @@ function sameValue(g: Grid, V: number[], s: number, a?: Action, b?: Action) {
 function qControls<S extends QState>(): Control<S>[] {
   return [
     { kind: 'slider', id: 'episodes', label: 'Episodes of practice', min: 1, max: 1000, step: 1, get: (s) => s.episodes, set: (s, v) => ({ ...s, episodes: v }) },
-    { kind: 'slider', id: 'alpha', label: 'Learning rate α', min: 0.01, max: 1, step: 0.01, get: (s) => s.alpha, set: (s, v) => ({ ...s, alpha: v }), format: (v) => v.toFixed(2) },
-    { kind: 'slider', id: 'epsilon', label: 'Exploration ε', min: 0, max: 1, step: 0.01, get: (s) => s.epsilon, set: (s, v) => ({ ...s, epsilon: v }), format: (v) => v.toFixed(2) },
+    { kind: 'slider', id: 'alpha', label: 'Learning rate alpha', min: 0.01, max: 1, step: 0.01, get: (s) => s.alpha, set: (s, v) => ({ ...s, alpha: v }), format: (v) => v.toFixed(2) },
+    { kind: 'slider', id: 'epsilon', label: 'Exploration rate epsilon', min: 0, max: 1, step: 0.01, get: (s) => s.epsilon, set: (s, v) => ({ ...s, epsilon: v }), format: (v) => v.toFixed(2) },
     { kind: 'slider', id: 'slip', label: 'Slip probability', min: 0, max: 0.6, step: 0.05, get: (s) => s.slip, set: (s, v) => ({ ...s, slip: v }), format: (v) => v.toFixed(2) },
     { kind: 'slider', id: 'seed', label: 'Random seed', min: 1, max: 20, step: 1, get: (s) => s.seed, set: (s, v) => ({ ...s, seed: v }) },
   ];
@@ -487,8 +487,8 @@ export function cliffExperiment(id: string): ExperimentDef<CliffState, CliffResu
     id,
     initial: { epsilon: 0.1, alpha: 0.5, episodes: 300 },
     controls: [
-      { kind: 'slider', id: 'epsilon', label: 'Exploration ε', min: 0, max: 0.3, step: 0.01, get: (s) => s.epsilon, set: (s, v) => ({ ...s, epsilon: v }), format: (v) => v.toFixed(2) },
-      { kind: 'slider', id: 'alpha', label: 'Learning rate α', min: 0.05, max: 1, step: 0.05, get: (s) => s.alpha, set: (s, v) => ({ ...s, alpha: v }), format: (v) => v.toFixed(2) },
+      { kind: 'slider', id: 'epsilon', label: 'Exploration rate epsilon', min: 0, max: 0.3, step: 0.01, get: (s) => s.epsilon, set: (s, v) => ({ ...s, epsilon: v }), format: (v) => v.toFixed(2) },
+      { kind: 'slider', id: 'alpha', label: 'Learning rate alpha', min: 0.05, max: 1, step: 0.05, get: (s) => s.alpha, set: (s, v) => ({ ...s, alpha: v }), format: (v) => v.toFixed(2) },
       { kind: 'slider', id: 'episodes', label: 'Episodes', min: 20, max: 500, step: 10, get: (s) => s.episodes, set: (s, v) => ({ ...s, episodes: v }) },
     ],
     compute: cliffResult,
@@ -528,7 +528,7 @@ export function pgExperiment(id: string): ExperimentDef<PgState, PgCompare> {
     id,
     initial: { alpha: 0.1, offset: 0 },
     controls: [
-      { kind: 'slider', id: 'alpha', label: 'Step size α', min: 0.01, max: 0.5, step: 0.01, get: (s) => s.alpha, set: (s, v) => ({ ...s, alpha: v }), format: (v) => v.toFixed(2) },
+      { kind: 'slider', id: 'alpha', label: 'Step size alpha', min: 0.01, max: 0.5, step: 0.01, get: (s) => s.alpha, set: (s, v) => ({ ...s, alpha: v }), format: (v) => v.toFixed(2) },
       { kind: 'select', id: 'offset', label: 'Added to every reward', options: opts([['0', '0 (rewards near 0)'], ['5', '+5'], ['10', '+10 (all rewards large)'], ['-5', '−5 (all rewards negative)']]), get: (s) => String(s.offset), set: (s, v) => ({ ...s, offset: Number(v) }) },
     ],
     compute: pgCompare,
@@ -568,9 +568,9 @@ export function ppoExperiment(id: string): ExperimentDef<PpoState, PpoResult> {
     id,
     initial: { eps: 0.2, advantage: 1, ratio: 1.3 },
     controls: [
-      { kind: 'slider', id: 'ratio', label: 'Probability ratio π_new / π_old', min: 0, max: 2, step: 0.05, get: (s) => s.ratio, set: (s, v) => ({ ...s, ratio: v }), format: (v) => v.toFixed(2) },
+      { kind: 'slider', id: 'ratio', label: 'Probability ratio new / old', min: 0, max: 2, step: 0.05, get: (s) => s.ratio, set: (s, v) => ({ ...s, ratio: v }), format: (v) => v.toFixed(2) },
       { kind: 'select', id: 'adv', label: 'Advantage A', options: opts([['1', '+1 (better than expected)'], ['-1', '−1 (worse than expected)']]), get: (s) => String(s.advantage), set: (s, v) => ({ ...s, advantage: Number(v) }) },
-      { kind: 'slider', id: 'eps', label: 'Clip range ε', min: 0.05, max: 0.5, step: 0.05, get: (s) => s.eps, set: (s, v) => ({ ...s, eps: v }), format: (v) => v.toFixed(2) },
+      { kind: 'slider', id: 'eps', label: 'Clip range epsilon', min: 0.05, max: 0.5, step: 0.05, get: (s) => s.eps, set: (s, v) => ({ ...s, eps: v }), format: (v) => v.toFixed(2) },
     ],
     compute: ppoResult,
     readout: (s, r) => [
@@ -626,7 +626,7 @@ export function rlhfExperiment(id: string): ExperimentDef<RlhfState, RlhfResult>
     id,
     initial: { beta: 1 },
     controls: [
-      { kind: 'slider', id: 'beta', label: 'KL penalty strength β', min: 0.05, max: 5, step: 0.05, get: (s) => s.beta, set: (s, v) => ({ ...s, beta: v }), format: (v) => v.toFixed(2) },
+      { kind: 'slider', id: 'beta', label: 'KL penalty strength beta', min: 0.05, max: 5, step: 0.05, get: (s) => s.beta, set: (s, v) => ({ ...s, beta: v }), format: (v) => v.toFixed(2) },
     ],
     compute: rlhfResult,
     readout: (_s, r) => [

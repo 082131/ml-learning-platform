@@ -1,0 +1,202 @@
+import { returns, returnsPy, yourReturn } from './code';
+import { questions, returnsExercise } from './quiz';
+
+<Section kind="intuition" title="One number for a whole future">
+
+In the last lesson the agent got a reward after every move: −0.04, −0.04, −0.04, −0.04, then +0.96. To decide
+whether a move was good, the agent cannot just look at the reward of that one move. Every move earned the same
+−0.04, including the moves that led straight to the goal. What made the early moves good is what came *after* them.
+
+So the agent needs a way to answer: "from this moment on, how much reward am I going to collect in total?" That total
+is called the <Term id="rl-return">return</Term>. It is the single number an RL agent tries to make as large as
+possible. Not the next reward: the whole future of rewards, added up.
+
+There is one twist. When we add up the future, we usually count far-away rewards a bit less than near ones, the same
+way 100 euros today is worth more to you than 100 euros promised in ten years. That shrinking is called
+**discounting**, and the rest of this lesson explains why it exists, how to compute it, and how it changes what an
+agent prefers.
+
+</Section>
+
+<Section kind="technical" title="From a list of rewards to a return">
+
+### The big picture first
+
+We start with **a list of rewards**, one per step → we **shrink each reward** according to how far in the future it
+is → we **add them up** to get the return → the agent **prefers actions that lead to a larger return**. Each step
+below explains one arrow of that chain.
+
+### Step 1: the plain sum, and its two problems
+
+The simplest return is the plain sum: $G = r_1 + r_2 + r_3 + \ldots$. For our five-move route that is
+$-0.04 \times 4 + 0.96 = 0.80$, which is the "total" from the last lesson. It works well for short tasks that always
+end. But it breaks in two situations:
+
+- **Tasks that never end.** A thermostat or a recommendation system runs forever. If it earns +1 every step, the
+  plain sum is infinite, and so is the plain sum of a policy that earns +2 every step. Two infinities cannot be
+  compared, so the agent cannot tell a good policy from a better one.
+- **Uncertain futures.** A reward promised 50 steps from now might never arrive: the episode might end, the world
+  might change, the agent's own predictions might be wrong. Counting it exactly like a reward right now ignores that
+  risk.
+
+### Step 2: discounting with γ
+
+The fix is to multiply each reward by a factor that shrinks with delay. We pick a number $\gamma$ (the Greek letter
+gamma) between 0 and 1, called the <Term id="discount-factor">discount factor</Term>. A reward that arrives one step
+later is worth $\gamma$ times as much; two steps later, $\gamma \times \gamma = \gamma^2$ times as much; and so on.
+
+$$
+G_t = r_{t+1} + \gamma\, r_{t+2} + \gamma^2 r_{t+3} + \ldots = \sum_{k=0}^{\infty} \gamma^k\, r_{t+k+1}
+$$
+
+Read it part by part:
+
+- $G_t$ is the return **from time step $t$ onward**: everything the agent will still collect from that moment.
+- $r_{t+1}$ is the very next reward. It is multiplied by $\gamma^0 = 1$, so it counts in full.
+- $\gamma^k$ is the shrink factor for a reward $k$ steps further away. With $\gamma = 0.9$: 1, 0.9, 0.81, 0.729, …
+- The big $\Sigma$ just means "add all of these up".
+
+A concrete example with $\gamma = 0.9$ and rewards $[1, 0, 2]$: $1 + 0.9 \times 0 + 0.81 \times 2 = 2.62$. The 2
+at the end still matters, but it counts as 1.62.
+
+### Step 3: what γ means, in plain words
+
+$\gamma$ answers the question "how much do I care about the future?":
+
+- $\gamma = 0$: only the very next reward matters. The agent is completely short-sighted.
+- $\gamma = 0.9$: a reward 10 steps away still counts about a third ($0.9^{10} \approx 0.35$). Rewards 50 steps away
+  barely count ($0.9^{50} \approx 0.005$).
+- $\gamma = 1$: no discounting at all. Fine for tasks that always end, like our grid, but not for endless ones.
+
+A handy rule of thumb is the **effective horizon** $1/(1-\gamma)$, roughly how many steps ahead the agent looks.
+$\gamma = 0.9$ gives 10 steps; $\gamma = 0.99$ gives 100.
+
+Why does that formula appear? Because it is the return of a reward of 1 that never stops. Adding
+$1 + \gamma + \gamma^2 + \ldots$ is a geometric series, and it sums to exactly $1/(1-\gamma)$. With $\gamma = 0.9$,
+earning 1 forever is worth 10. This also answers problem 1: an endless +1 is now worth a finite 10 and an endless +2
+is worth 20, so the agent can compare them again.
+
+There is a second, equally useful reading of $\gamma$: imagine that after every step there is a chance $1-\gamma$
+that the episode simply stops. Then a reward $k$ steps away is collected only with probability $\gamma^k$, and the
+discounted return is the **expected** total. This is why discounting is a sensible way to handle uncertain futures
+(problem 2), not just impatience.
+
+### Step 4: the backward trick
+
+The formula above computes one return by looking forward. But an agent usually wants the return from *every* step of
+an episode, because each step's action deserves its own credit. Look at what $G_t$ and $G_{t+1}$ have in common:
+
+$$
+G_t = r_{t+1} + \gamma \left( r_{t+2} + \gamma\, r_{t+3} + \ldots \right) = r_{t+1} + \gamma\, G_{t+1}
+$$
+
+In words: **the return from now = the next reward + γ × the return from the next step**. So you can start at the
+end of the episode (where the return is 0, because nothing is left) and walk backwards, one multiplication and one
+addition per step. This small identity is the most important equation in RL. In lesson 5 it becomes the
+Bellman equation, where "the return from the next step" is replaced by an estimate of it.
+
+### How this solves credit assignment
+
+Working out which earlier actions deserve credit for a later reward is called
+<Term id="credit-assignment">credit assignment</Term>. Returns are the first tool for it. With $\gamma = 0.9$, the
+return from each step of the goal route is 0.492, 0.591, 0.702, 0.824, 0.96. Every step now gets a positive score,
+because each one led to the goal, and steps closer to the goal get more, because the reward is nearer and the route
+ahead is shorter. The single +1 at the end has been spread backwards over the moves that earned it.
+
+</Section>
+
+<Section kind="visual" title="Try it: what the future is worth today">
+
+Each bar is one time step, step 0 on the left. The dashed outline is the reward as received, the filled bar is what
+it is worth today ($\gamma^t$ times the reward). The return is the sum of the filled bars.
+
+<Experiment def={returns} title="Discounting explorer">
+  <RlReturnBars />
+  <Readout title="Returns" />
+</Experiment>
+
+Things to try:
+
+- **Walk to the goal** with γ = 1: return 0.80, the plain sum. Lower γ to 0.5 and the return becomes slightly
+  negative ($-0.015$): the +0.96 is four steps away and shrinks to $0.5^4 \times 0.96 = 0.06$, less than the four
+  costs paid on the way. A very short-sighted agent barely sees the goal.
+- **1 now, or 10 later**: at γ = 0.7 the 10 is worth $0.7^9 \times 10 \approx 0.40$, less than 1, so a short-sighted
+  agent grabs the 1. Push γ above 0.774 and waiting wins. The readout shows that switch point, where
+  $\gamma^9 \times 10 = 1$.
+- **A reward that never stops**: the return approaches $1/(1-\gamma)$. At γ = 0.9 it is close to 10 (the 60 bars
+  shown give 9.98). Move γ toward 1 and watch the return grow without limit.
+
+</Section>
+
+<Section kind="code" title="Returns in Python">
+
+Both ways of computing a return: forwards with powers of γ, and backwards with the recursion. Run it and compare the
+"from each step" lists with the explanation above.
+
+<PythonRunner example={returnsPy} title="returns.py" />
+
+The sequence and γ you chose in the explorer, as code:
+
+<Experiment def={returns} title="your return as code" controls={false}>
+  <Code example={yourReturn} title="your_return.py" />
+</Experiment>
+
+</Section>
+
+<Section kind="mistakes" title="Common slips with returns">
+
+<CommonMistake
+  title="Discounting the first reward"
+  wrong={'G = sum(gamma ** (t + 1) * r for t, r in enumerate(rewards))'}
+  error="(no error) every return is γ times too small: 0.443 instead of 0.492 for the goal route at γ = 0.9"
+  cause="The next reward is not delayed, so its factor is γ⁰ = 1. Starting the powers at 1 discounts everything once too often."
+  fix="Use gamma ** t with t starting at 0, or the backward recursion, which gets this right automatically."
+/>
+
+<CommonMistake
+  title="Using γ = 1 in a task that never ends"
+  wrong={'gamma = 1.0   # "I care about the whole future"'}
+  error="(no error) returns grow without limit and every policy that keeps earning looks equally good"
+  cause="Without discounting, the sum of an endless stream of rewards is infinite."
+  fix="Use γ < 1 for continuing tasks (0.99 is common), or cut episodes to a fixed length."
+/>
+
+<CommonMistake
+  title="Treating γ as a detail"
+  wrong="gamma = 0.5  # any value works"
+  error="(no error) the agent ignores a goal that is more than a few steps away"
+  cause="γ decides how far ahead the agent looks. With 0.5 the effective horizon is 2 steps."
+  fix="Choose γ so that 1/(1−γ) is at least as long as the delay between an action and its consequence."
+/>
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={returnsExercise}>
+  Compute the return from every step with the backward recursion.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+The chain of this lesson: a single reward cannot tell the agent whether a move was good, so we add up **all the
+rewards that follow it** into a **return**. Adding them plainly breaks for endless or uncertain futures, so each
+reward is **shrunk by γ per step of delay**, which makes endless returns finite (a reward of 1 forever is worth
+$1/(1-\gamma)$) and can be read as "the episode might stop at any step". Because the return from now is the next
+reward plus γ times the return from the next step, we can compute returns backwards in one pass, and that spreads the
+credit for a late reward over the moves that led to it.
+
+The agent now knows what it is maximising. But to maximise it, it must try actions to see what they return, and
+trying a bad action costs reward. The next lesson studies that tension in the simplest possible setting.
+
+Next: [Exploration vs exploitation: multi-armed bandits](#/learn/rl/foundations/bandits-exploration).
+
+</Section>

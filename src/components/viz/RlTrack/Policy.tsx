@@ -65,7 +65,7 @@ export function RlKlPolicy() {
   return (
     <div className={s.stack}>
       <VizFrame
-        title={`The best policy for β = ${state.beta.toFixed(2)}`}
+        title={`The best policy for beta = ${state.beta.toFixed(2)}`}
         badge={<Badge tone="simulated">Toy numbers</Badge>}
         caption={`Reference model vs tuned policy: ${SKY_ANSWERS.map((a, i) => `${a.label} ${Math.round(a.ref * 100)}% → ${Math.round(r.policy[i]! * 100)}%`).join('; ')}. KL from the reference: ${r.kl.toFixed(3)} nats.`}
         table={<VizTable caption="Answers" columns={['answer', 'reference π_ref', 'reward model score', 'true quality', 'tuned π*']} rows={SKY_ANSWERS.map((a, i) => [a.label, a.ref.toFixed(2), a.reward.toFixed(1), a.quality.toFixed(1), r.policy[i]!.toFixed(3)])} />}
@@ -87,7 +87,7 @@ export function RlKlPolicy() {
         <p className={s.muted}>Thin grey bar: the reference model's probability. Thick bar: the tuned policy's (red for the reward hack).</p>
       </VizFrame>
       <LineChart
-        title="Reward-model score and true quality as β changes"
+        title="Reward-model score and true quality as beta changes"
         xLabel="β"
         yLabel="average over answers"
         xDomain={[0, 5]}
