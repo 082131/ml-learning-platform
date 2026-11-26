@@ -1,0 +1,196 @@
+import { gridworld, gymnasiumCode, play, yourEpisode } from './code';
+import { episodeExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Learning by trying, with a score instead of answers">
+
+Think about how you learned to ride a bike. Nobody handed you a table of "in this exact wobble, turn the handlebar
+4 degrees left". You tried something, you either stayed up or fell, and over many tries your body worked out what
+to do. The only feedback was a rough score: staying up felt good, falling hurt.
+
+<Term id="reinforcement-learning">Reinforcement learning</Term> (RL) is that idea turned into a program. A
+learner, called the <Term id="rl-agent">agent</Term>, tries actions in some world, called the
+<Term id="rl-environment">environment</Term>. After each action the environment answers with two things: what the
+situation looks like now, and a number that says how good that step was. That number is the
+<Term id="rl-reward">reward</Term>. The agent's job is to discover, from experience alone, which actions lead to the
+most reward over time.
+
+So the simplest mental model is a loop: **look, act, get a score, repeat**. Everything in this track, from grid
+worlds to fine-tuning large language models, is a smarter way of running that loop and learning from it.
+
+</Section>
+
+<Section kind="technical" title="The pieces of the loop, and why each one exists">
+
+### Why we need a new kind of learning
+
+In supervised learning (which you met in the ML track) every training example comes with the right answer: this
+photo is a cat, this house sold for 300,000. The model compares its guess with the answer and corrects itself.
+
+Many problems do not come with right answers. What is the "correct" move in a game, at this exact moment? Nobody
+knows. We only find out much later whether the game was won. RL exists for problems like that: we can **score
+outcomes**, but we cannot **label the right action**. The agent has to find good actions by trying them.
+
+### The five words you need
+
+1. A <Term id="rl-state">state</Term> is a description of the current situation, the information the agent looks at
+   before it acts. In a grid world the state is simply which cell the agent stands on, written as (row, column).
+2. An <Term id="rl-action">action</Term> is one of the choices available in that state. In our grid: up, right,
+   down or left.
+3. The **environment** takes the state and the action and decides what happens next: the next state and the reward.
+   The agent does not control this part. It can only choose actions.
+4. The **reward** is a single number per step. Positive means "good", negative means "bad", and its size says how
+   much.
+5. An <Term id="rl-episode">episode</Term> is one complete attempt, from the start until a
+   <Term id="terminal-state">terminal state</Term> (a state that ends the episode, like reaching the goal or falling
+   into a pit).
+
+### How the pieces connect
+
+The loop runs like a conversation, one step at a time:
+
+- The agent is in state $s_0$ and chooses action $a_0$.
+- The environment answers with a reward $r_1$ and a new state $s_1$.
+- Now the agent is in $s_1$, so it chooses $a_1$, and gets $r_2$ and $s_2$. And so on.
+
+Written out, one episode is a chain $s_0, a_0, r_1, s_1, a_1, r_2, s_2, \ldots$ until a terminal state. That chain is
+called a <Term id="trajectory">trajectory</Term>. Notice the numbering: the reward for the action taken at time $t$
+arrives together with the next state, so it carries the index $t+1$. This is the convention in Sutton and Barto's
+textbook, and it reminds you that a reward is a *consequence* of an action.
+
+The rule the agent uses to choose actions is its <Term id="rl-policy">policy</Term>, written $\pi$ (the Greek
+letter pi). A policy answers one question: "in this state, what do I do?" Learning, in RL, means improving the
+policy so that it collects more reward.
+
+### Reward is not the same as the goal
+
+This is the most important idea of the lesson, so it deserves its own paragraph. You, the designer, have a goal in
+mind: "reach the goal cell quickly without falling in the pit". The agent never sees that sentence. It only sees
+rewards. So the reward has to be designed so that **collecting a lot of it is the same as achieving your goal**.
+
+Our grid shows how that works. Reaching the goal gives +1, the pit gives −1, and every move costs a little:
+−0.04. That small cost is doing real work. Without it, a long wandering route and a short direct route would earn
+the same +1, and the agent would have no reason to prefer the short one. With it, every extra step lowers the
+total, so "be quick" is built into the score. The agent will learn to hurry without ever being told to.
+
+The flip side: if the reward does not match the goal, the agent will happily achieve the reward instead of the goal.
+A cleaning robot rewarded "+1 per piece of dirt picked up" may learn to tip dirt out and pick it up again. We will
+come back to this problem, called reward hacking, when we look at language models.
+
+### What makes RL hard
+
+Two things make this loop harder than supervised learning, and the rest of the track is about solving them:
+
+- **Delayed consequences.** The +1 arrives only on the last step, but the earlier moves made it possible. The agent
+  has to work out which earlier actions deserve credit. The next lesson starts on this.
+- **Learning from its own choices.** The agent only sees results for the actions it actually tried. If it never
+  tries going right, it never learns what going right does. Lesson 3 is about this trade-off between trying new
+  things and using what already works.
+
+</Section>
+
+<Section kind="visual" title="Try it: be the agent">
+
+This is the grid world the whole track uses (it is the classic 4×3 world from Russell and Norvig's AI textbook).
+Row 0 is the top row. You start bottom left at (2,0). The goal at (0,3) ends the episode with +1, the pit at (1,3)
+ends it with −1, and (1,1) is a wall. Every move earns the "reward for each move" you choose below. In this first
+lesson moves always go where you point; later lessons add slipping.
+
+<Experiment def={play} title="Play one episode">
+  <RlPlayGrid />
+  <Readout title="This episode" />
+</Experiment>
+
+Things to try:
+
+- **The direct route**: up, up, right, right, right. That is 5 moves: four at −0.04 and the last at −0.04 + 1, so
+  the total is $1 - 5 \times 0.04 = 0.80$.
+- **A wandering route** to the same goal, say with three extra bumps into the wall. Same +1 at the end, but the total
+  drops by 0.04 per extra move. This is how a step cost turns "get there" into "get there quickly".
+- **Set the step reward to 0** and repeat. Now every route to the goal scores exactly 1, so the score no longer
+  tells a short route from a long one.
+- **Set it to −0.5**. Now five moves cost 2.5, more than the goal is worth. Walking into the pit as fast as possible
+  (3 moves along the bottom, then up) gives $-1 - 4 \times 0.5 = -3$... and the direct route to the goal gives
+  $1 - 2.5 = -1.5$. Still better, but you can feel the reward starting to push the agent toward ending things fast.
+  In lesson 6 you will find the step cost where the best policy really does jump into the pit.
+
+</Section>
+
+<Section kind="code" title="The same loop in Python">
+
+Here the environment is one function, `step`. It takes the state and the action and returns the next state, the
+reward and whether the episode is over. The loop below plays the direct route and prints the experience after every
+step, exactly like the log in the visual. Press Run to check the numbers.
+
+<PythonRunner example={gridworld} title="gridworld.py" />
+
+The episode you played above, expressed with the same function. The list follows your button presses:
+
+<Experiment def={play} title="your episode as code" controls={false}>
+  <Code example={yourEpisode} title="your_episode.py" />
+</Experiment>
+
+Real projects rarely write the environment by hand. [Gymnasium](https://gymnasium.farama.org/) (the maintained
+successor of OpenAI Gym) gives hundreds of environments behind the same two calls, `reset` and `step`. This snippet
+was run with gymnasium 1.4.0; it does not run in the browser.
+
+<Code example={gymnasiumCode} title="gymnasium_loop.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Rewards that teach the wrong thing">
+
+<CommonMistake
+  title="Rewarding the steps you imagine, not the outcome you want"
+  wrong={'# reward the agent for moving toward the goal\nreward = 0.1 if moved_closer else 0.0'}
+  error="(no error) the agent learns to step toward the goal and back, forever, collecting +0.1 every other step"
+  cause="The reward pays for a behaviour you thought would lead to the goal, so the agent farms that behaviour instead of finishing."
+  fix="Reward the outcome (reaching the goal) and keep any extra guidance small and impossible to farm. Lesson 12 shows the same failure in language models."
+/>
+
+<CommonMistake
+  title="Forgetting that the episode must end"
+  wrong={'while True:\n    state, reward, done = step(state, choose(state))\n    total += reward'}
+  error="(no error) the loop never stops once the agent reaches the goal, and the goal keeps paying"
+  cause="The done flag was ignored, so the agent keeps acting after a terminal state."
+  fix="Stop the episode when done is True, and in real environments also stop after a step limit (Gymnasium's truncated flag)."
+/>
+
+<CommonMistake
+  title="Calling the reward the label"
+  wrong="The reward of −0.04 tells the agent that moving up was wrong."
+  error="(misconception) the agent cannot tell from −0.04 alone whether up was a good or bad choice"
+  cause="A reward scores the outcome of one step. It does not say what the right action would have been: every move costs −0.04, including the best one."
+  fix="Read rewards as evidence, not answers. Only by comparing totals over many episodes does the agent learn which actions were good."
+/>
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={episodeExercise}>
+  Write the loop that plays one episode, using the step function from the lesson.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+The flow of this lesson in one chain: an **agent** in a **state** picks an **action**; the **environment** answers
+with a **reward** and the next state; repeating that until a **terminal state** gives one **episode**. The agent
+never sees the right answer, only rewards, so the reward has to be designed so that "collect a lot of reward" means
+the same as "do what we want", which is why a tiny step cost makes the agent hurry. The rule the agent follows is
+its **policy**, and improving the policy from rewards is what "learning" means here.
+
+Two problems are now on the table: rewards arrive late (which earlier moves deserve the credit?), and the agent
+only learns about actions it tries. The next lesson tackles the first one by turning a whole stream of future
+rewards into one number.
+
+Next: [Returns and discounting](#/learn/rl/foundations/returns-discounting).
+
+</Section>

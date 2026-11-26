@@ -1,0 +1,279 @@
+/* Reinforcement learning track visualizations. Colors come from tokens; every status also has a text label. */
+.stack {
+  display: grid;
+  gap: var(--s-3);
+  min-width: 0;
+}
+.grid2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--s-3);
+  align-items: start;
+}
+.panel {
+  min-width: 0;
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.panelHead {
+  margin: 0 0 var(--s-1);
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.mono {
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  overflow-wrap: anywhere;
+}
+.muted {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+}
+.list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--s-2);
+  padding: 3px 0;
+  border-bottom: 1px dashed var(--line);
+  font-size: var(--fs-13);
+}
+.row:last-child {
+  border-bottom: 0;
+}
+.tag {
+  padding: 1px 6px;
+  border: 1px solid var(--line-strong);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.tag[data-tone='ok'] {
+  border-color: var(--ok);
+  color: var(--ok);
+}
+.tag[data-tone='err'] {
+  border-color: var(--err);
+  color: var(--err);
+}
+.verdict {
+  margin: 0;
+  font-weight: 600;
+}
+.verdict[data-ok='true'] {
+  color: var(--ok);
+}
+.verdict[data-ok='false'] {
+  color: var(--err);
+}
+
+/* ---------- the grid board ---------- */
+.board {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+}
+.board[data-wide] {
+  max-width: 100%;
+  gap: 2px;
+}
+.cell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  min-width: 0;
+  padding: 2px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink);
+  text-align: center;
+  line-height: 1.15;
+}
+.cell[data-kind='wall'] {
+  background: repeating-linear-gradient(45deg, var(--line-strong) 0 4px, var(--surface-2) 4px 8px);
+}
+.cell[data-kind='goal'] {
+  border: 2px solid var(--ok);
+}
+.cell[data-kind='pit'],
+.cell[data-kind='cliff'] {
+  border: 2px solid var(--err);
+}
+.cell[data-agent] {
+  outline: 3px solid var(--accent);
+  outline-offset: -3px;
+}
+.cell[data-on-path]::after {
+  content: '';
+  position: absolute;
+  inset: 30%;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  pointer-events: none;
+}
+.cell[data-on-path='second']::after {
+  inset: 22%;
+  border-style: dashed;
+  border-color: var(--ink-2);
+}
+.cell[data-target] {
+  background: var(--accent-soft);
+}
+.cellKind {
+  font-size: 11px;
+  color: var(--ink-2);
+}
+.cell[data-kind='goal'] .cellKind {
+  color: var(--ok);
+  font-weight: 600;
+}
+.cell[data-kind='pit'] .cellKind,
+.cell[data-kind='cliff'] .cellKind {
+  color: var(--err);
+  font-weight: 600;
+}
+.arrow {
+  font-size: 18px;
+  line-height: 1;
+}
+.board[data-wide] .arrow {
+  font-size: 13px;
+}
+.cell[data-mismatch] .arrow {
+  color: var(--err);
+}
+.value {
+  font-size: 12px;
+}
+.prob {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+/* ---------- buttons and logs ---------- */
+.pad {
+  display: grid;
+  grid-template-columns: repeat(3, 44px);
+  grid-template-rows: repeat(2, 36px);
+  gap: 4px;
+  justify-content: center;
+}
+.pad > :nth-child(1) {
+  grid-column: 2;
+}
+.pad > :nth-child(2) {
+  grid-column: 1;
+  grid-row: 2;
+}
+.pad > :nth-child(3) {
+  grid-column: 2;
+  grid-row: 2;
+}
+.pad > :nth-child(4) {
+  grid-column: 3;
+  grid-row: 2;
+}
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  justify-content: center;
+}
+.log {
+  max-height: 220px;
+  overflow: auto;
+}
+
+/* ---------- bars ---------- */
+.bars {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  height: 150px;
+}
+.bar {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  display: grid;
+  grid-template-rows: 2fr 1fr;
+}
+.barUp,
+.barDown {
+  position: relative;
+}
+.barUp {
+  border-bottom: 1px solid var(--ink-2);
+}
+.fill,
+.ghost {
+  position: absolute;
+  left: 10%;
+  right: 10%;
+}
+.barUp .fill,
+.barUp .ghost {
+  bottom: 0;
+}
+.barDown .fill,
+.barDown .ghost {
+  top: 0;
+}
+.ghost {
+  border: 1px dashed var(--ink-2);
+}
+.fill {
+  background: var(--accent);
+}
+.barDown .fill {
+  background: var(--err);
+}
+.hbar {
+  display: grid;
+  grid-template-columns: minmax(90px, 1.2fr) 2fr auto;
+  gap: var(--s-2);
+  align-items: center;
+  font-size: var(--fs-13);
+}
+.hbarTrack {
+  position: relative;
+  height: 18px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+}
+.hbarRef,
+.hbarNew {
+  position: absolute;
+  left: 0;
+}
+.hbarRef {
+  top: 0;
+  height: 6px;
+  background: var(--ink-2);
+}
+.hbarNew {
+  bottom: 0;
+  height: 10px;
+  background: var(--accent);
+}
+.hbar[data-hack] .hbarNew {
+  background: var(--err);
+}

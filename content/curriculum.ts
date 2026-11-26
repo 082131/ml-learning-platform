@@ -680,4 +680,65 @@ export const tracks: Track[] = [
       },
     ],
   },
+  {
+    id: 'rl',
+    title: 'Reinforcement Learning Basics',
+    code: 'T.15',
+    summary:
+      'Learn how an agent learns by trial and error: rewards and returns, exploration with bandits, Markov decision processes, value functions and the Bellman equation, value iteration, Monte Carlo and TD learning, Q-learning and SARSA, policy gradients, deep RL (DQN, actor-critic, PPO), and how RL tunes large language models (RLHF, DPO, GRPO). Interactive grid worlds throughout.',
+    chapters: [
+      {
+        id: 'foundations',
+        title: 'Agents, rewards and exploration',
+        level: 'beginner',
+        lessons: [
+          { id: 'rl/foundations/agents-rewards', status: 'written' },
+          { id: 'rl/foundations/returns-discounting', status: 'written' },
+          { id: 'rl/foundations/bandits-exploration', status: 'written' },
+        ],
+      },
+      {
+        id: 'mdp',
+        title: 'Planning with a model: MDPs',
+        level: 'intermediate',
+        lessons: [
+          { id: 'rl/mdp/markov-decision-processes', status: 'written' },
+          { id: 'rl/mdp/value-functions', status: 'written' },
+          { id: 'rl/mdp/value-iteration', status: 'written' },
+        ],
+      },
+      {
+        id: 'learning',
+        title: 'Learning from experience',
+        level: 'intermediate',
+        lessons: [
+          { id: 'rl/learning/monte-carlo-td', status: 'written' },
+          { id: 'rl/learning/q-learning', status: 'written' },
+          { id: 'rl/learning/sarsa-vs-q-learning', status: 'written' },
+        ],
+      },
+      {
+        id: 'deep',
+        title: 'Policy gradients and deep RL',
+        level: 'advanced',
+        lessons: [
+          { id: 'rl/deep/policy-gradients', status: 'written' },
+          { id: 'rl/deep/deep-rl', status: 'written' },
+        ],
+      },
+      {
+        id: 'llms',
+        title: 'RL for language models',
+        level: 'advanced',
+        lessons: [{ id: 'rl/llms/rl-for-llms', status: 'written' }],
+      },
+      {
+        id: 'capstone',
+        title: 'Capstone',
+        level: 'advanced',
+        project: 'rl/capstone/gridworld-agent',
+        lessons: [{ id: 'rl/capstone/gridworld-agent', status: 'written' }],
+      },
+    ],
+  },
 ];

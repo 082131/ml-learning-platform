@@ -1,0 +1,120 @@
+import type { GlossaryTerm } from '@/lib/types';
+
+// Glossary terms for the rl/foundations chapter (merged into the glossary by content/index.ts).
+export default [
+  {
+    id: 'rl-agent',
+    term: 'Agent (RL)',
+    short: 'The learner and decision maker in reinforcement learning: it looks at the situation, picks an action, and improves its choices from the rewards it gets.',
+    long: 'Not the same as an LLM agent that calls tools, although an LLM agent can be trained with RL. In RL the agent is whatever chooses actions: a game player, a robot controller, a recommender, a language model.',
+    introducedIn: 'rl/foundations/agents-rewards',
+  },
+  {
+    id: 'rl-environment',
+    term: 'Environment',
+    short: 'Everything outside the agent. It receives the agent’s action and answers with the next situation and a reward.',
+    introducedIn: 'rl/foundations/agents-rewards',
+  },
+  {
+    id: 'rl-state',
+    term: 'State',
+    short: 'A description of the current situation that the agent uses to choose its action, such as which cell of a grid it stands on.',
+    introducedIn: 'rl/foundations/agents-rewards',
+  },
+  {
+    id: 'rl-action',
+    term: 'Action',
+    short: 'One of the choices the agent can make in a state, such as moving up, right, down or left.',
+    introducedIn: 'rl/foundations/agents-rewards',
+  },
+  {
+    id: 'rl-reward',
+    term: 'Reward',
+    short: 'A single number the environment sends after each action, saying how good that step was. The agent’s only feedback.',
+    long: 'Rewards say how good an outcome was, not which action would have been right. That is the main difference from a label in supervised learning.',
+    introducedIn: 'rl/foundations/agents-rewards',
+  },
+  {
+    id: 'rl-episode',
+    term: 'Episode',
+    short: 'One run of the agent–environment loop from a starting state to an end, such as one game or one walk from the start cell to the goal.',
+    introducedIn: 'rl/foundations/agents-rewards',
+  },
+  {
+    id: 'terminal-state',
+    term: 'Terminal state',
+    short: 'A state that ends the episode, such as the goal or a pit. Nothing more can be collected after it.',
+    introducedIn: 'rl/foundations/agents-rewards',
+  },
+  {
+    id: 'rl-policy',
+    term: 'Policy',
+    short: 'The agent’s rule for choosing actions: for every state, which action to take (or the probability of each action). Learning in RL means improving the policy.',
+    introducedIn: 'rl/foundations/agents-rewards',
+    aliases: ['π'],
+  },
+  {
+    id: 'trajectory',
+    term: 'Trajectory',
+    short: 'The record of one episode: state, action, reward, next state, action, reward, and so on.',
+    introducedIn: 'rl/foundations/agents-rewards',
+    aliases: ['rollout'],
+  },
+  {
+    id: 'rl-return',
+    term: 'Return',
+    short: 'The total reward collected from a time step onward, usually discounted: G = r₁ + γ·r₂ + γ²·r₃ + …. The number the agent tries to make large.',
+    introducedIn: 'rl/foundations/returns-discounting',
+  },
+  {
+    id: 'discount-factor',
+    term: 'Discount factor (γ)',
+    short: 'A number between 0 and 1 that says how much a reward one step later is worth compared with the same reward now. γ = 0.9 means "a reward next step is worth 90% of one now".',
+    introducedIn: 'rl/foundations/returns-discounting',
+    aliases: ['gamma'],
+  },
+  {
+    id: 'credit-assignment',
+    term: 'Credit assignment',
+    short: 'Working out which earlier actions deserve the credit (or blame) for a reward that arrives later.',
+    introducedIn: 'rl/foundations/returns-discounting',
+  },
+  {
+    id: 'multi-armed-bandit',
+    term: 'Multi-armed bandit',
+    short: 'The simplest RL problem: one situation, several actions ("arms") with unknown average rewards. Named after a row of slot machines.',
+    introducedIn: 'rl/foundations/bandits-exploration',
+  },
+  {
+    id: 'exploration-exploitation',
+    term: 'Exploration vs exploitation',
+    short: 'The trade-off between trying actions to learn more about them (exploring) and using the action that currently looks best (exploiting).',
+    introducedIn: 'rl/foundations/bandits-exploration',
+  },
+  {
+    id: 'epsilon-greedy',
+    term: 'ε-greedy',
+    short: 'Pick the best-looking action most of the time, but with probability ε pick a random action instead, so every action keeps getting tried.',
+    introducedIn: 'rl/foundations/bandits-exploration',
+    aliases: ['epsilon-greedy'],
+  },
+  {
+    id: 'ucb',
+    term: 'Upper confidence bound (UCB)',
+    short: 'Choose the action with the highest "estimate plus uncertainty bonus". Actions tried only a few times get a big bonus, so the agent explores them on purpose.',
+    introducedIn: 'rl/foundations/bandits-exploration',
+    aliases: ['UCB1'],
+  },
+  {
+    id: 'regret',
+    term: 'Regret',
+    short: 'How much reward an agent lost compared with always choosing the best action. Good exploration keeps regret growing slowly.',
+    introducedIn: 'rl/foundations/bandits-exploration',
+  },
+  {
+    id: 'incremental-mean',
+    term: 'Incremental mean',
+    short: 'Updating an average one sample at a time: new = old + (sample − old) / n. The same "step toward the target" shape appears in every RL update.',
+    introducedIn: 'rl/foundations/bandits-exploration',
+  },
+] satisfies GlossaryTerm[];
