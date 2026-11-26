@@ -1,5 +1,6 @@
 // Experiment definitions for the SQL track's visualizations. Logic lives in the pure modules they call.
 import type { ExperimentDef } from '../types';
+import { NULL_CONDITIONS, nullFilter, type NullFilterResult } from './nulls';
 import { groupedPipeline, groupedSql, plainPipeline, plainSql, type PipelineState, type Stage } from './pipeline';
 
 export interface PipelineResult {
@@ -21,5 +22,27 @@ export function pipelineExperiment(id: string, grouped: boolean): ExperimentDef<
     ],
     compute: (s) => ({ stages: grouped ? groupedPipeline(s) : plainPipeline(s), sql: grouped ? groupedSql(s) : plainSql(s), grouped }),
     readout: (_s, r) => r.stages.map((st) => ({ label: `Rows after ${st.clause}`, value: String(st.out) })),
+  };
+}
+
+export function nullExperiment(id: string): ExperimentDef<{ condition: string }, NullFilterResult> {
+  return {
+    id,
+    initial: { condition: 'ne' },
+    controls: [
+      {
+        kind: 'select',
+        id: 'condition',
+        label: 'WHERE',
+        options: NULL_CONDITIONS.map((c) => ({ value: c.id, label: c.sql })),
+        get: (s) => s.condition,
+        set: (_s, v) => ({ condition: v }),
+      },
+    ],
+    compute: (s) => nullFilter(s.condition),
+    readout: (_s, r) => [
+      { label: 'Rows kept (TRUE)', value: `${r.kept} of ${r.rows.length}` },
+      { label: 'Rows where the test is UNKNOWN', value: String(r.unknown), status: r.unknown ? 'error' : 'ok' },
+    ],
   };
 }

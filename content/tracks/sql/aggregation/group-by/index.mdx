@@ -1,0 +1,200 @@
+import { avgAndNull, bareColumn, countKinds, grouped, groupedSql, monthlyPivot, orderTotals, ordersPerCustomer, whereVsHaving } from './code';
+import { exercise, questions } from './quiz';
+
+<Section kind="intuition" title="Sorting receipts into piles">
+
+Imagine a shoebox of receipts and a question from your manager: "how much did each customer spend?". You would
+not read the receipts one by one and shout out numbers. You would sort them into piles, one pile per customer,
+and then add up each pile. At the end you hand over one number per pile.
+
+That is exactly what <Term id="group-by">GROUP BY</Term> does. It sorts rows into buckets that share a value
+(the same customer, the same month, the same product category), and then an
+<Term id="aggregate-function">aggregate function</Term> such as SUM or COUNT turns each bucket into a single
+number. The important shift is in what a result row means. Before GROUP BY, one row was one receipt. After it,
+one row is one pile.
+
+Why do we need this? Almost every business question is a summary: revenue per month, orders per customer,
+average price per category, how many customers per city. The raw tables hold individual events, and GROUP BY is
+the bridge from events to the numbers people make decisions with. It is also the step where most wrong numbers in
+dashboards are born, so this lesson pays attention to the traps as well as the mechanics.
+
+</Section>
+
+<Section kind="technical" title="Buckets, aggregates, and two kinds of filter">
+
+**Grain: what one row stands for.** Before summarising, ask what a single row of the table means. This is its
+<Term id="table-grain">grain</Term>. In `orders`, one row is one order. In `order_items`, one row is one product
+inside one order, so an order with two products has two rows. The grain decides what `COUNT(*)` counts: counting
+`order_items` rows counts order lines, not orders.
+
+**From lines to orders.** Here `order_items` is grouped by `order_id`, which changes the grain from "one product
+in an order" to "one order". Order 101 had two lines (2 notebooks at 4.00 and a pen set at 6.50), so it becomes one
+row with 2 lines, 3 units and a total of 2 × 4.00 + 1 × 6.50 = 14.50.
+
+<SqlRunner example={orderTotals} title="order_totals.sql" />
+
+**The aggregates.** Each one answers a different question about a bucket:
+
+| Function | Question it answers | NULLs |
+| --- | --- | --- |
+| `COUNT(*)` | how many rows are in the bucket? | counted, it counts rows |
+| `COUNT(col)` | how many rows have a value in `col`? | skipped |
+| `COUNT(DISTINCT col)` | how many different values does `col` take? | skipped |
+| `SUM(col)`, `AVG(col)` | total, and total divided by how many values | skipped |
+| `MIN(col)`, `MAX(col)` | smallest and largest value (also works on text and dates) | skipped |
+
+The three counts look alike but answer different questions, and the customers table shows all three at once: 8
+rows, 7 of them with a city, and 3 different cities.
+
+<SqlRunner example={countKinds} title="three_counts.sql" />
+
+"Skipped" matters most for AVG. AVG adds the values that exist and divides by how many exist, so missing values
+are left out rather than treated as zero. With ratings 10, 20, NULL and 30, AVG is (10 + 20 + 30) / 3 = 20. If a
+missing rating really meant zero, the answer would be 60 / 4 = 15. Neither is "right" in general; they answer
+different questions, and you should know which one your dashboard shows.
+
+<SqlRunner example={avgAndNull} title="avg_and_null.sql" />
+
+**One bucket per value, including NULL.** `GROUP BY customer_id` on `orders` makes one bucket per customer who
+ordered. The guest order 109 has no customer, and it still gets a bucket: GROUP BY puts all NULLs together. This
+is one of the few places where SQL treats NULLs as equal to each other (DISTINCT is another).
+
+<SqlRunner example={ordersPerCustomer} title="orders_per_customer.sql" />
+
+**WHERE filters rows, HAVING filters buckets.** Now the logical order from the first lesson pays off. WHERE runs
+before GROUP BY, so it sees individual rows and can test their columns, but no bucket exists yet. The
+<Term id="having-clause">HAVING</Term> clause runs after GROUP BY, so it sees buckets and can test their
+aggregates. A question like "customers with at least 2 shipped orders" needs both: "shipped" is a fact about each
+order (WHERE), and "at least 2" is a fact about each customer's bucket (HAVING).
+
+<SqlRunner example={whereVsHaving} title="where_vs_having.sql" />
+
+Only Ada (3 shipped) and Dana (2 shipped) qualify. Ben has 2 orders, but one was returned, so WHERE removes it
+and his bucket has only 1 row. Chen also has 2 orders, but one was cancelled. Swap the filter into HAVING and you
+cannot express it at all, because "status" is not a single value for a whole bucket.
+
+</Section>
+
+<Section kind="visual" title="Watch the buckets form">
+
+The same query pipeline as in the first lesson, now with GROUP BY and HAVING between WHERE and SELECT. Select the
+GROUP BY stage to see the rows collected into buckets, and the HAVING stage to see whole buckets kept or removed.
+
+<Experiment def={grouped} title="Grouped query pipeline">
+  <QueryPipeline />
+  <Code example={groupedSql} title="by_category.sql" />
+  <Readout title="Rows after each stage" />
+</Experiment>
+
+Things to try:
+
+- **Start at price >= 5 and HAVING COUNT(*) >= 2.** WHERE drops only the Notebook (4.00), leaving 6 products.
+  GROUP BY makes 3 buckets: electronics (2 products), home (3) and stationery (1, the Pen set). HAVING drops
+  stationery. SELECT computes home's average as (32 + 9 + 12) / 3 = 17.67 and electronics' as (59 + 19) / 2 = 39.
+- **Set price >= 0.** The Notebook comes back, stationery now has 2 products, and it survives HAVING. A row filter
+  changed which groups exist, because WHERE runs first.
+- **Set HAVING COUNT(*) >= 3.** Only home survives. HAVING never looks at single products, only at bucket sizes.
+
+A useful way to predict the number of result rows: it equals the number of different values of the GROUP BY
+columns among the rows that survive WHERE, minus the buckets HAVING removes.
+
+</Section>
+
+<Section kind="code" title="Conditional aggregation: categories as columns">
+
+Often you want several counts side by side for each bucket: total orders and shipped orders per month, for
+example. A second GROUP BY would give a second result. <Term id="conditional-aggregation">Conditional
+aggregation</Term> does it in one pass: put a CASE inside the aggregate. `CASE WHEN status = 'shipped' THEN 1
+ELSE 0 END` turns each row into a 1 or a 0, so summing it counts the shipped rows in the bucket.
+
+<SqlRunner example={monthlyPivot} title="monthly_pivot.sql" />
+
+Read the February row as a chain. GROUP BY month put 6 orders in the February bucket. The CASE marked 4 of them
+(105, 107, 108 and 109) as shipped, so the SUM is 4. Dividing by COUNT(*), with 100.0 to keep decimals, gives
+66.7 percent. The same pattern turns any category into columns: one SUM(CASE ...) per category you want to see.
+
+**The bare-column trap.** In the query below, `order_date` is neither in GROUP BY nor inside an aggregate, so
+each bucket has several dates and SQL has to pick one. PostgreSQL and SQL Server refuse with an error. SQLite (and
+MySQL in some modes) runs it and shows the date of an arbitrary row of each bucket, which looks like an answer but
+is not one. The fix is to say which date you mean, for example MIN for the first order and MAX for the latest.
+
+<SqlRunner example={bareColumn} title="bare_column.sql" />
+
+</Section>
+
+<Section kind="mistakes" title="Summaries that look right and are not">
+
+<CommonMistake
+  title="Counting the wrong grain"
+  wrong={'SELECT COUNT(*) AS orders FROM order_items;'}
+  error="(no error) 17 'orders' reported; there are 12"
+  cause="order_items has one row per product in an order, so orders with two products are counted twice."
+  fix="COUNT(DISTINCT order_id), or count from the orders table."
+/>
+
+<CommonMistake
+  title="An aggregate in WHERE"
+  wrong={'SELECT customer_id FROM orders WHERE COUNT(*) >= 2 GROUP BY customer_id;'}
+  error="misuse of aggregate: COUNT()"
+  cause="WHERE runs before GROUP BY; there are no groups to count yet."
+  fix="Move the test to HAVING COUNT(*) >= 2."
+/>
+
+<CommonMistake
+  title="Averaging an average"
+  wrong={'SELECT AVG(avg_order) FROM (SELECT customer_id, AVG(total) AS avg_order FROM ... GROUP BY customer_id);'}
+  error="(no error) the result weights a customer with 1 order the same as one with 300"
+  cause="An average of group averages is not the overall average unless every group has the same size."
+  fix="Compute SUM(total) / COUNT(*) over all orders, or weight each group's average by its count."
+/>
+
+<CommonMistake
+  title="Selecting a column that is not grouped"
+  wrong={'SELECT customer_id, order_date, COUNT(*) FROM orders GROUP BY customer_id;'}
+  error='ERROR: column "orders.order_date" must appear in the GROUP BY clause or be used in an aggregate function  (PostgreSQL; SQLite returns an arbitrary date)'
+  cause="Each bucket has many dates; SQL does not know which one you want."
+  fix="Aggregate it (MIN, MAX) or add it to GROUP BY if you really want one row per customer and date."
+/>
+
+</Section>
+
+<Section kind="practice" title="Habits for every summary">
+
+- **State the grain** of the input and of the result before writing GROUP BY: "one row per order line, summarised
+  to one row per customer".
+- **Row conditions in WHERE, group conditions in HAVING.** WHERE also makes the query cheaper.
+- **Every selected column is grouped or aggregated**, even when SQLite lets you skip it.
+- **Decide what NULL means** for each aggregate, and say so next to the number.
+- **Reconcile totals**: the sum of a grouped column should equal the ungrouped total.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<SqlExercise exercise={exercise}>
+  For every customer with at least 2 orders that were not cancelled, return `customer_id`, the number of those
+  orders as `orders`, and the date of the latest one as `last_order`. Put the busiest customers first and break
+  ties by `customer_id`.
+</SqlExercise>
+
+</Section>
+
+<Section kind="summary">
+
+GROUP BY changes what a row means: rows that share a value go into one bucket, and each bucket becomes one result
+row, with aggregates (COUNT, SUM, AVG, MIN, MAX) summarising its rows and skipping NULLs (except COUNT(*)).
+Because WHERE runs before grouping and HAVING after, row conditions go in WHERE and conditions on aggregates go in
+HAVING. Conditional aggregation, an aggregate around a CASE, counts several subsets per bucket in one pass. Before
+trusting a number, check the grain you are counting and that every selected column is grouped or aggregated.
+
+So far every question used one table. The next chapter connects tables, which is where most real questions live.
+
+Next: [Join types and where filters go](#/learn/sql/joins/join-types).
+
+</Section>

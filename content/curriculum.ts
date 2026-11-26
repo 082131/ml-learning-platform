@@ -693,14 +693,14 @@ export const tracks: Track[] = [
         level: 'beginner',
         lessons: [
           { id: 'sql/foundations/select-basics', status: 'written' },
-          { id: 'sql/foundations/nulls-logic', status: 'outline' },
+          { id: 'sql/foundations/nulls-logic', status: 'written' },
         ],
       },
       {
         id: 'aggregation',
         title: 'Summarising with GROUP BY',
         level: 'beginner',
-        lessons: [{ id: 'sql/aggregation/group-by', status: 'outline' }],
+        lessons: [{ id: 'sql/aggregation/group-by', status: 'written' }],
       },
       {
         id: 'joins',

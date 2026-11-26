@@ -67,6 +67,23 @@ const claims: Record<string, (sets: SqlValue[][][]) => void> = {
     expect(top!.map((r) => r[0])).toEqual(['Headphones', 'Desk lamp', 'Charger']);
     expect(where!.map((r) => r[0])).toEqual(['Desk lamp', 'Headphones']);
   },
+  'null-arithmetic': ([rows]) => expect(rows).toEqual([[null, null, 1, null, null]]),
+  'city-counts': ([rows]) => expect(rows).toEqual([[3, 4, 1, 8]]),
+  'not-london': ([rows]) => expect(rows!.map((r) => r[0])).toEqual(['Ben', 'Dana', 'Eli', 'Fay', 'Gus']),
+  'price-bands': ([rows]) => expect(rows!.map((r) => r[2])).toEqual(['premium', 'premium', 'mid', 'mid', 'budget', 'budget', 'budget']),
+  'case-order': ([rows]) => expect(rows!.slice(0, 2).map((r) => r[2])).toEqual(['mid', 'mid']),
+  'case-null': ([rows]) => expect(rows![5]).toEqual(['Fay', 'EU', 'missing']),
+  'number-traps': ([rows]) => expect(rows).toEqual([[3, 3.5, 3.5, null, null, 1, 0]]),
+  'order-totals': ([rows]) => {
+    expect(rows![0]).toEqual([101, 2, 3, 14.5]);
+    expect(rows!.length).toBe(12);
+  },
+  'count-kinds': ([rows]) => expect(rows).toEqual([[8, 7, 3]]),
+  'avg-and-null': ([rows]) => expect(rows).toEqual([[20, 15, 3, 4]]),
+  'orders-per-customer': ([rows]) => expect(rows![0]).toEqual([null, 1]),
+  'where-vs-having': ([rows]) => expect(rows).toEqual([[1, 3], [4, 2]]),
+  'monthly-pivot': ([rows]) => expect(rows![1]).toEqual(['2026-02', 6, 4, 66.7]),
+  'bare-column': ([, fixed]) => expect(fixed![0]).toEqual([1, '2026-01-06', '2026-02-22', 3]),
 };
 
 describe('claims in the lesson prose', () => {

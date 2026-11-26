@@ -1,4 +1,5 @@
 import { CteSteps } from './CteSteps';
+import { NullFilter } from './NullFilter';
 import { QueryPipeline } from './QueryPipeline';
 import { SqlExercise } from './SqlExercise';
 import { SqlRunner } from './SqlRunner';
@@ -9,4 +10,5 @@ export default {
   CteSteps,
   SqlExercise,
   QueryPipeline,
+  NullFilter,
 };

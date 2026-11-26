@@ -1,0 +1,211 @@
+import { caseNull, caseOrder, cityCounts, notLondon, nullArithmetic, nullLab, numberTraps, priceBands } from './code';
+import { exercise, questions } from './quiz';
+
+<Section kind="intuition" title="A blank on the form is not a zero">
+
+When Fay signed up she skipped the "city" field. The database cannot write "nowhere" (that would be a lie) and
+it cannot write an empty string (that would claim we know her city is a word with no letters). So it records
+<Term id="sql-null">NULL</Term>, which means "there is a value in the real world, but we do not know it".
+
+Now ask a simple question: "is Fay in London?". The honest answer is not yes and not no. It is "I don't know".
+SQL takes that honesty seriously. Any comparison with an unknown value gives a third answer, UNKNOWN, next to
+TRUE and FALSE. This is called <Term id="three-valued-logic">three-valued logic</Term>, and it is the reason a
+perfectly reasonable query can quietly lose rows.
+
+Here is the problem in one sentence. WHERE keeps a row only when its condition is TRUE. FALSE rows are dropped,
+which you expect, but UNKNOWN rows are dropped too, and nothing tells you. So "customers in London" plus
+"customers not in London" does not add up to "all customers": Fay is in neither list. This lesson shows why that
+happens, how to spot it, and the three tools that fix it: IS NULL, IS DISTINCT FROM and COALESCE. Then it uses
+CASE, SQL's if/else, which has its own NULL trap.
+
+</Section>
+
+<Section kind="technical" title="UNKNOWN, and how each operator treats it">
+
+**The core rule: NULL compared with anything is UNKNOWN.** If Fay's city is unknown, then "city = 'London'" is
+unknown, and so is "city <> 'London'". Even NULL = NULL is UNKNOWN, which sounds strange until you read it as
+"is one unknown value equal to another unknown value?". Nobody can say. SQLite shows TRUE as 1, FALSE as 0 and
+UNKNOWN as NULL:
+
+<SqlRunner example={nullArithmetic} title="null_basics.sql" />
+
+Arithmetic and text follow the same idea: if one input is unknown, the result is unknown, so `1 + NULL` is NULL
+and `'Fay lives in ' || NULL` is NULL (the `||` operator joins text). This is how one missing price can turn an
+order total into NULL.
+
+**AND, OR and NOT.** These are where intuition helps. Ask yourself "could the unknown value change the answer?".
+
+| A | B | A AND B | A OR B |
+| --- | --- | --- | --- |
+| TRUE | UNKNOWN | UNKNOWN | TRUE |
+| FALSE | UNKNOWN | FALSE | UNKNOWN |
+| UNKNOWN | UNKNOWN | UNKNOWN | UNKNOWN |
+
+- TRUE OR anything is TRUE: one TRUE side settles an OR, whatever the unknown turns out to be.
+- FALSE AND anything is FALSE: one FALSE side settles an AND.
+- Otherwise the unknown side could still swing the answer, so the result stays UNKNOWN.
+- NOT UNKNOWN is UNKNOWN. "It is not the case that I don't know" is still "I don't know".
+
+**Why the counts do not add up.** Each WHERE below tests every customer. London matches 3, "not London" matches 4,
+and the 8th customer, Fay, is UNKNOWN for both tests and so appears in neither. The `IS NULL` test is the only one
+that finds her.
+
+<SqlRunner example={cityCounts} title="city_counts.sql" />
+
+**The tools that treat NULL as a value.** Plain `=` asks "are these equal?", which has no answer when one side is
+unknown. Sometimes you want a different question, "is this value missing?" or "is this value different, counting
+missing as different?". SQL has an operator for each:
+
+- `city IS NULL` and `city IS NOT NULL` are always TRUE or FALSE. Use them to find or exclude missing values.
+  Writing `city = NULL` instead is a classic bug: it is UNKNOWN for every row and returns nothing.
+- `city IS DISTINCT FROM 'London'` treats NULL as an ordinary value: it is TRUE for Fay (missing is different
+  from London) and FALSE only for real Londoners. `IS NOT DISTINCT FROM` is the NULL-safe version of `=`.
+  SQLite (3.39 and later) and PostgreSQL support this standard spelling; SQLite also accepts the shorter
+  `city IS NOT 'London'`.
+- <Term id="coalesce">COALESCE</Term>`(city, 'unknown')` returns the first of its arguments that is not NULL. It
+  replaces a missing value with a default, which is useful for display and for grouping missing values under a
+  readable label.
+
+<SqlRunner example={notLondon} title="not_london.sql" />
+
+The next question is natural: should I always use COALESCE in comparisons? Not as a habit. COALESCE invents a
+value, and if the invented value collides with real data (`COALESCE(city, 'London')`), you get wrong answers.
+Use IS DISTINCT FROM when you mean "different, with missing counted as different", and COALESCE when you
+genuinely want a default value in the output.
+
+</Section>
+
+<Section kind="visual" title="Try it: which customers does each WHERE keep?">
+
+Pick a condition. Each row shows the value of the test for that customer and what WHERE does with it. Watch
+Fay's row: it is the only one whose fate changes from condition to condition.
+
+<Experiment def={nullLab} title="NULL explorer">
+  <NullFilter />
+  <Readout title="This WHERE" />
+</Experiment>
+
+Things to try:
+
+- **`city = 'London'` and then `city <> 'London'`.** 3 rows, then 4. Fay is UNKNOWN both times, so 3 + 4 = 7, not 8.
+- **`NOT (city = 'London')`.** Same 4 rows as `<>`. NOT turns TRUE into FALSE and FALSE into TRUE, but leaves
+  UNKNOWN alone, so negating a condition does not bring Fay back.
+- **`city <> 'London' OR city IS NULL`** and **`city IS DISTINCT FROM 'London'`.** Both keep 5 rows. The first is
+  the long-hand fix you will see in older code; the second says the same thing in one test.
+- **`city = NULL`.** Every row is UNKNOWN. Not one customer is kept, not even Fay.
+- **`city NOT IN ('London', NULL)`.** No rows. NOT IN means "not equal to each item", and "not equal to NULL" is
+  UNKNOWN for everyone. This is the most dangerous form, because the NULL is usually hiding inside a subquery
+  (the joins chapter shows the safe alternative, NOT EXISTS).
+
+</Section>
+
+<Section kind="code" title="CASE: turning conditions into values">
+
+WHERE uses a condition to keep or drop rows. Often you want the condition's answer as a value instead: label each
+product as budget, mid or premium. The <Term id="case-expression">CASE expression</Term> does that. It tries its
+WHEN tests from top to bottom and returns the THEN value of the first test that is TRUE. If none is TRUE, it
+returns the ELSE value, or NULL if there is no ELSE.
+
+<SqlRunner example={priceBands} title="price_bands.sql" />
+
+"The first TRUE test wins" has a consequence: order the tests from strictest to loosest. Below, the same three
+branches are in the wrong order. `price >= 10` is TRUE for the Headphones (59) and the Desk lamp (32), so they are
+labelled 'mid' and the 'premium' branch is never reached.
+
+<SqlRunner example={caseOrder} title="case_wrong_order.sql" />
+
+CASE has a short form, `CASE city WHEN 'London' THEN ...`, which is shorthand for `CASE WHEN city = 'London'`.
+Because it uses `=`, a `WHEN NULL` branch can never match. Fay falls through to ELSE and is labelled 'EU'. The
+long ("searched") form with `IS NULL` fixes it:
+
+<SqlRunner example={caseNull} title="case_and_null.sql" />
+
+**Two traps that are not about NULL but look like it.** Dividing two integers in SQLite (and PostgreSQL and SQL
+Server) does integer division and throws away the fraction: `7 / 2` is 3. Make one side a decimal (`2.0`) or
+`CAST` it first to get 3.5. Dividing by zero does not raise an error in SQLite; it returns NULL, and
+`NULLIF(x, 0)` (NULL if x equals 0) is the portable way to get that behaviour on purpose in databases that do
+raise an error.
+
+The second trap is <Term id="type-affinity">type affinity</Term>. SQLite remembers each value's type, and text
+compares letter by letter, so `'10' < '9'` is TRUE (because '1' comes before '9'), while `10 < 9` is FALSE. If
+numbers were loaded as text, sorting and comparing them goes wrong without any error.
+
+<SqlRunner example={numberTraps} title="number_traps.sql" />
+
+</Section>
+
+<Section kind="mistakes" title="NULL mistakes that return the wrong rows">
+
+<CommonMistake
+  title="Testing for NULL with ="
+  wrong={'SELECT name FROM customers WHERE city = NULL;'}
+  error="(no error) no rows, even though Fay's city is NULL"
+  cause="NULL = NULL is UNKNOWN, and WHERE drops UNKNOWN rows."
+  fix="WHERE city IS NULL."
+/>
+
+<CommonMistake
+  title="A 'not equal' filter that loses the unknowns"
+  wrong={"WHERE status <> 'cancelled'   -- 'every order that was not cancelled'"}
+  error="(no error) orders with a NULL status vanish from the report"
+  cause="NULL <> 'cancelled' is UNKNOWN, so those rows are dropped along with the cancelled ones."
+  fix="Decide what a missing status means. If it should be kept: WHERE status IS DISTINCT FROM 'cancelled'. If it is a data bug, add a NOT NULL constraint so it cannot happen."
+/>
+
+<CommonMistake
+  title="A NULL inside an arithmetic total"
+  wrong={'SELECT price + shipping AS total FROM orders;'}
+  error="(no error) total is NULL for every order with no shipping recorded"
+  cause="Any arithmetic with NULL is NULL."
+  fix="COALESCE(shipping, 0) if a missing shipping cost really means zero. If it means 'not known yet', keep the NULL so nobody reports a made-up total."
+/>
+
+<CommonMistake
+  title="Percentages that come out as 0"
+  wrong={'SELECT shipped / total * 100 AS pct FROM summary;'}
+  error="(no error) pct is 0 for every row"
+  cause="Both columns are integers, so shipped / total is integer division (for example 9 / 12 = 0)."
+  fix="Multiply by a decimal first: 100.0 * shipped / total, and guard the denominator with NULLIF(total, 0)."
+/>
+
+</Section>
+
+<Section kind="practice" title="Habits that keep NULL from surprising you">
+
+- **Check that filters add up**: count the rows of a filter and of its opposite; a shortfall means NULLs.
+- **Use IS NULL, IS NOT NULL and IS DISTINCT FROM** whenever a column can be missing.
+- **Order CASE branches from strictest to loosest**, test NULL first, and always write an ELSE.
+- **Prefer NOT NULL constraints** in your own tables, so "missing" only exists where it is meaningful.
+- **Write decimals on purpose** (`100.0 *`) in ratios, and guard division with NULLIF.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<SqlExercise exercise={exercise}>
+  Give every customer a region: 'UK' for London, 'EU' for any other known city, and 'unknown' when the city is
+  missing. The starter looks right but mislabels one customer. Find out who and fix it.
+</SqlExercise>
+
+</Section>
+
+<Section kind="summary">
+
+NULL means "a value exists but we do not know it", so SQL answers any question about it with UNKNOWN. AND and OR
+can still decide when the known side settles the answer, but otherwise UNKNOWN spreads. WHERE keeps only TRUE
+rows, so UNKNOWN rows silently vanish, which is why a filter and its opposite can fail to add up and why NOT IN
+with a NULL returns nothing. IS NULL, IS DISTINCT FROM and COALESCE are the tools that treat missing values on
+purpose. CASE turns conditions into values by taking the first TRUE branch, so the order of branches matters and
+NULL needs its own branch.
+
+Next we stop looking at rows one at a time and start summarising many rows at once.
+
+Next: [GROUP BY, aggregates and HAVING](#/learn/sql/aggregation/group-by).
+
+</Section>

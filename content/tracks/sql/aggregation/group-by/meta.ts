@@ -13,5 +13,10 @@ export default {
     'Build conditional aggregates with SUM(CASE ...) to pivot categories into columns',
   ],
   prerequisites: ['sql/foundations/nulls-logic'],
-  concepts: [],
+  concepts: ['group-by', 'aggregate-function', 'having-clause', 'conditional-aggregation', 'table-grain'],
+  references: [
+    { title: 'SQLite: Aggregate functions', url: 'https://www.sqlite.org/lang_aggfunc.html', version: '3.54' },
+    { title: 'SQLite: SELECT (GROUP BY, HAVING, bare columns)', url: 'https://www.sqlite.org/lang_select.html', version: '3.54' },
+    { title: 'PostgreSQL: GROUP BY and HAVING', url: 'https://www.postgresql.org/docs/current/queries-table-expressions.html#QUERIES-GROUP', version: '18' },
+  ],
 } satisfies LessonMeta;

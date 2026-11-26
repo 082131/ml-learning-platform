@@ -96,3 +96,20 @@
   font-size: var(--fs-13);
   color: var(--ink-2);
 }
+.nullCell {
+  font-style: italic;
+}
+.tv {
+  padding: 0 var(--s-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  text-decoration: none;
+  display: inline-block;
+}
+.tv[data-tv='TRUE'] {
+  border-color: var(--ok);
+}
+.tv[data-tv='UNKNOWN'] {
+  border-style: dashed;
+  border-color: var(--warn);
+}
