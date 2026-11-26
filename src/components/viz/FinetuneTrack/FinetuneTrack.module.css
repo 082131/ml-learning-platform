@@ -1,0 +1,274 @@
+/* LLM fine-tuning track visualizations. Colors come from tokens; every status also has a text label. */
+.grid2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--s-2);
+}
+.panel {
+  min-width: 0;
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.panelHead {
+  margin: 0 0 var(--s-1);
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.mono {
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  overflow-wrap: anywhere;
+}
+.muted {
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+}
+.list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--s-2);
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--line);
+  font-size: var(--fs-13);
+}
+.row:last-child {
+  border-bottom: 0;
+}
+.tag {
+  padding: 1px 6px;
+  border: 1px solid var(--line-strong);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.tag[data-tone='ok'] {
+  border-color: var(--ok);
+  color: var(--ok);
+}
+.tag[data-tone='err'] {
+  border-color: var(--err);
+  color: var(--err);
+}
+.tag[data-tone='warn'] {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+.verdict {
+  margin: 0 0 var(--s-2);
+  font-weight: 600;
+}
+.verdict[data-ok='true'] {
+  color: var(--ok);
+}
+.verdict[data-ok='false'] {
+  color: var(--err);
+}
+
+/* Horizontal bars with a value label */
+.bars {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.bar {
+  display: grid;
+  grid-template-columns: minmax(70px, 140px) minmax(0, 1fr) minmax(56px, auto);
+  align-items: center;
+  gap: var(--s-2);
+  font-size: var(--fs-13);
+}
+.barLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.barTrack {
+  position: relative;
+  height: 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+.barFill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  background: var(--accent);
+}
+.barFill[data-tone='err'] {
+  background: repeating-linear-gradient(45deg, var(--err) 0 3px, transparent 3px 6px);
+  border-right: 2px solid var(--err);
+}
+.barFill[data-tone='muted'] {
+  background: var(--ink-3);
+}
+.barMarker {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  background: var(--ink);
+}
+.barValue {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Token strips (loss masks, next-token predictions) */
+.tokens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tok {
+  padding: 2px 5px;
+  border: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-2);
+  background: var(--surface-2);
+}
+.tok[data-trained='true'] {
+  border-color: var(--accent);
+  color: var(--ink);
+  background: var(--accent-soft, var(--surface));
+  box-shadow: inset 0 -3px 0 var(--accent);
+}
+.tok[data-special='true'] {
+  font-weight: 600;
+}
+.tok[data-nl='true'] {
+  flex-basis: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  height: 0;
+  overflow: hidden;
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-3);
+  margin: var(--s-2) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}
+
+/* Packed rows */
+.blocks {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.block {
+  display: flex;
+  height: 22px;
+  border: 1px solid var(--line-strong);
+  background: repeating-linear-gradient(135deg, var(--surface-2) 0 4px, transparent 4px 8px);
+}
+.seg {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent-ink);
+  background: var(--accent);
+  border-right: 2px solid var(--surface);
+}
+
+/* Matrices */
+.mats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+}
+.mat {
+  display: grid;
+  gap: 2px;
+}
+.matCell {
+  min-width: 30px;
+  padding: 3px 4px;
+  border: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-align: center;
+  background: var(--surface);
+}
+.matCell[data-changed='true'] {
+  border-color: var(--accent);
+  box-shadow: inset 0 -3px 0 var(--accent);
+}
+.op {
+  font-family: var(--font-mono);
+  color: var(--ink-2);
+}
+.matTitle {
+  margin: 0 0 2px;
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+/* Probability columns */
+.probs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.probCol {
+  display: grid;
+  gap: 4px;
+  font-size: var(--fs-13);
+}
+.probTrack {
+  position: relative;
+  height: 110px;
+  border-bottom: 1px solid var(--ink-2);
+  background: var(--surface-2);
+}
+.probRef,
+.probNew {
+  position: absolute;
+  bottom: 0;
+}
+.probRef {
+  left: 10%;
+  width: 35%;
+  background: var(--ink-3);
+}
+.probNew {
+  right: 10%;
+  width: 35%;
+  background: var(--accent);
+}
