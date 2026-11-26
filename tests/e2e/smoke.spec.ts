@@ -8,7 +8,14 @@ async function openNav(page: Page, name: RegExp) {
     await page.getByRole('button', { name: 'Menu' }).click();
     await page.getByRole('dialog', { name: 'Menu' }).getByRole('link', { name }).click();
   } else {
-    await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name }).click();
+    const nav = page.getByRole('navigation', { name: 'Main' });
+    const direct = nav.getByRole('link', { name });
+    if (await direct.count()) {
+      await direct.click();
+    } else {
+      await nav.getByRole('button', { name: /^Tracks/ }).click();
+      await nav.getByRole('list', { name: 'All tracks' }).getByRole('link', { name }).click();
+    }
   }
 }
 
@@ -43,6 +50,27 @@ test('visits every track from the navigation', async ({ page }) => {
     await expect(page.getByRole('region', { name: `${title} lesson map` })).toBeVisible();
     await expectNoHorizontalScroll(page);
   }
+});
+
+test('the Tracks menu lists every track, names the open one and closes with Escape', async ({ page }) => {
+  test.skip(isPhone(page), 'The phone menu lists tracks directly.');
+  const nav = page.getByRole('navigation', { name: 'Main' });
+  const button = nav.getByRole('button', { name: /^Tracks/ });
+  await button.click();
+  const list = nav.getByRole('list', { name: 'All tracks' });
+  const titles = await page.evaluate(
+    () => [...document.querySelectorAll('[aria-label="All tracks"] a')].length,
+  );
+  expect(titles).toBeGreaterThanOrEqual(9);
+  await expectNoHorizontalScroll(page);
+  await list.getByRole('link', { name: 'AI Engineer', exact: true }).click();
+  await expect(list).toBeHidden();
+  await expect(button).toHaveText(/Tracks: AI/);
+  await button.click();
+  await expect(list).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(list).toBeHidden();
+  await expect(button).toBeFocused();
 });
 
 test('opens a lesson, follows a prerequisite, marks complete and keeps it after reload', async ({ page }) => {

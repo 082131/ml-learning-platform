@@ -107,11 +107,74 @@
   }
 }
 
-/* Between the phone menu and wide screens the track chips need the room: keep the logo mark (the link keeps its
-   aria-label) and drop the wordmark and the shortcut hint. */
-@media (min-width: 1080px) and (max-width: 1439px) {
-  .wordmark,
-  .kbd {
-    display: none;
-  }
+.menuRoot {
+  position: relative;
+}
+.chip[data-active='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+button.chip {
+  gap: var(--s-1);
+  cursor: pointer;
+}
+.caret {
+  font-size: 10px;
+}
+.menuPanel {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 340px;
+  max-height: calc(100vh - var(--nav-h) - 24px);
+  overflow-y: auto;
+  padding: var(--s-2);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+}
+.menuList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.menuLink {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-3);
+  padding: var(--s-2);
+  border-radius: var(--radius);
+  color: var(--ink);
+  font-size: var(--fs-13);
+  text-decoration: none;
+}
+.menuLink:hover {
+  background: var(--bg);
+}
+.menuLink[aria-current='page'] {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.menuCode {
+  flex: 0 0 3.5em;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-2);
+}
+.menuLink[aria-current='page'] .menuCode {
+  color: inherit;
+}
+.menuHeading {
+  margin: var(--s-4) 0 var(--s-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-2);
 }
