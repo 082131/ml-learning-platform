@@ -1,0 +1,201 @@
+import { discrete, formulaCode, simRunner } from './code';
+import { binomExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Named shapes for counting things">
+
+In the last lesson we described a random variable by writing out its whole table. That works for a spinner with
+three outcomes, but think about questions like these:
+
+- 20 people visit a product page today, and each buys with chance 10%. How likely is it that 3 or more buy?
+- A support team gets 3 tickets an hour on average. How likely is an hour with more than 6?
+
+Writing the table by hand would be painful. Luckily, counts like these come from processes that repeat over and over
+in data work, and the same few shapes keep appearing. Each shape has a name and a formula, and once you recognise the
+process you get the whole table for free. This lesson covers the three you will meet most often: the Bernoulli (one
+yes/no), the binomial (how many yes answers out of a fixed number of tries) and the Poisson (how many events in a
+window of time).
+
+The real skill is not the formulas, which a library computes for you. It is **recognising which process produced the
+data, and checking that its assumptions hold**, because when they do not, the formula answers a question about a
+different world.
+
+</Section>
+
+<Section kind="technical" title="From one coin flip to many">
+
+### Bernoulli: a single yes/no
+
+A <Term id="bernoulli-trial">Bernoulli trial</Term> is one try with two outcomes: success (written 1) with
+probability $p$, failure (written 0) with probability $1 - p$. One visitor buys or does not. One email is opened or
+not. One prediction is right or wrong.
+
+Using the previous lesson's formulas on this two-row table: $E[X] = 1 \cdot p + 0 \cdot (1 - p) = p$, and
+$\mathrm{Var}(X) = p(1 - p)$. The variance is largest at $p = 0.5$ (a coin flip is as uncertain as it gets) and zero
+at $p = 0$ or $1$ (nothing is uncertain).
+
+### Binomial: how many successes in n tries
+
+Now repeat the trial $n$ times, independently, with the same $p$, and count the successes. That count follows the
+<Term id="binomial-distribution">binomial distribution</Term>. To build its formula, take the question "exactly 2
+buyers among 20 visitors" and split it into two smaller questions.
+
+1. **What is the chance of one specific arrangement?** Say visitors 1 and 2 buy and the other 18 do not. Because the
+   visitors are independent, we multiply: $p \cdot p \cdot (1-p)^{18} = 0.1^2 \cdot 0.9^{18} \approx 0.0015$.
+2. **How many arrangements are there?** The two buyers could be any 2 of the 20 visitors. The number of ways to pick
+   2 from 20 is "20 choose 2" $= \binom{20}{2} = 190$. Every arrangement has the same chance from step 1.
+
+Multiply the two answers, and you have the binomial formula:
+
+$$
+P(X = k) = \binom{n}{k}\, p^k\, (1 - p)^{n - k}
+$$
+
+Reading it part by part: $\binom{n}{k}$ counts the arrangements, $p^k$ is the chance that the chosen $k$ succeed, and
+$(1-p)^{n-k}$ is the chance that the rest fail. For our example, $190 \times 0.0015 \approx 0.285$.
+
+Because the count is a sum of $n$ independent Bernoulli trials, the "variances add" rule gives its spread directly:
+
+$$
+E[X] = np \qquad \mathrm{Var}(X) = np(1 - p)
+$$
+
+20 visitors at 10% average 2 buyers, with SD $\sqrt{20 \cdot 0.1 \cdot 0.9} \approx 1.34$.
+
+### Poisson: events in a window of time
+
+Tickets arriving, errors logged, requests per second. Here there is no fixed number of tries; events just happen at
+some average rate. The <Term id="poisson-distribution">Poisson distribution</Term> describes the count of events in
+a window when they happen independently, at a steady average rate $\lambda$ (lambda) per window:
+
+$$
+P(X = k) = \frac{\lambda^k e^{-\lambda}}{k!}
+$$
+
+Where does it come from? Chop the hour into 3,600 seconds. In each second a ticket arrives with a tiny chance,
+$\lambda / 3{,}600$. That is a binomial with huge $n$ and tiny $p$, and as you chop finer and finer, the binomial
+formula turns into this one. So the Poisson is not a new idea: it is the binomial for "many tries, each very
+unlikely".
+
+Its mean and variance are both $\lambda$. That gives a quick reality check on data: if hourly counts have a mean of 3
+and a variance of 12, the events are not independent (they come in clumps, such as an outage creating fifty tickets
+at once), and the Poisson will underestimate the busy hours.
+
+### Exactly, at most, more than
+
+A PMF answers "exactly k". Most practical questions are "at most k" or "more than k". Because "exactly 0", "exactly
+1", ... are mutually exclusive, we add the bars:
+
+$$
+P(X \le k) = \sum_{i=0}^{k} P(X = i) \qquad P(X > k) = 1 - P(X \le k)
+$$
+
+The running total $P(X \le k)$ is the <Term id="cdf">cumulative distribution function</Term> (CDF). It is how
+libraries answer "how likely is a value this low or lower", and next lesson it becomes the main tool for continuous
+values.
+
+</Section>
+
+<Section kind="visual" title="Try it: shape and tail">
+
+Choose a distribution and move the sliders. Highlighted bars are the outcomes counted in $P(X \le k)$.
+
+<Experiment def={discrete} title="Count distribution explorer">
+  <DiscreteView />
+  <Readout title="Probabilities" />
+</Experiment>
+
+Things to try:
+
+- **Binomial, n = 20, p = 0.1, k = 2**: P(X ≤ 2) ≈ 0.677, so about one day in three has 3 or more buyers.
+- **Move p from 0.1 to 0.5**: the shape goes from lopsided (piled up near 0, a tail to the right) to symmetric
+  around $np = 10$.
+- **Binomial n = 60, p = 0.05, then Poisson λ = 3**: almost the same bars. Many tries with a small chance each is the
+  Poisson situation.
+- **Poisson, λ = 3, k = 6**: P(X > 6) ≈ 0.034. Roughly one hour in thirty is a "more than 6 tickets" hour, which is
+  the kind of number you staff for.
+
+</Section>
+
+<Section kind="code" title="The formulas, and a check against simulation">
+
+The formulas in Python, with the values from the explorer filled in.
+
+<Experiment def={discrete} title="counts.py, linked to the explorer" controls={false}>
+  <Code example={formulaCode} title="counts.py" />
+  <Readout title="What it prints" />
+</Experiment>
+
+How do we know the formulas describe the process? Simulate the process itself, many times, and compare. The columns
+should agree to two or three decimals, and the hourly ticket counts should have a variance close to their mean.
+
+<PythonRunner example={simRunner} title="check_counts.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Formulas used outside their assumptions">
+
+<CommonMistake
+  title="Trials that are not independent"
+  wrong={'# 30 users from the same 3 companies, each converts with p = 0.2\nP_none = 0.8 ** 30'}
+  error="(no error) the formula gives 0.0012, but whole companies decide together, so 'no conversions at all' is far more likely"
+  cause="Users in one company share a decision. The binomial assumes each trial is independent."
+  fix="Count the units that decide independently (companies, not users), or use a model for clustered data."
+/>
+
+<CommonMistake
+  title="A rate that is not constant"
+  wrong={'lam = tickets_per_day / 24     # average per hour, used for the 9 am hour'}
+  error="(no error) the 9 am hour is badly under-staffed"
+  cause="Tickets arrive mostly in working hours. A Poisson needs a steady rate over the window you apply it to."
+  fix="Estimate λ for each hour of the day (or day of the week) separately."
+/>
+
+<CommonMistake
+  title="An off-by-one in the tail"
+  wrong={'P_3_or_more = 1 - sum(binom_pmf(k, 20, 0.1) for k in range(3 + 1))'}
+  error="(no error) this computes P(X > 3) = P(X ≥ 4), not P(X ≥ 3)"
+  cause="range(4) includes k = 3, so subtracting it from 1 removes the k = 3 bar too."
+  fix="P(X ≥ 3) = 1 - P(X ≤ 2) = 1 - sum(... for k in range(3)). Say the inequality in words before coding it."
+/>
+
+</Section>
+
+<Section kind="practice" title="Where you will use this">
+
+- **Conversion and click counts** in A/B tests are binomial. Its variance $p(1-p)$ is where the standard error of a
+  conversion rate comes from in the A/B chapter.
+- **Model accuracy on a test set** is binomial too: 400 labelled examples at 90% accuracy give a count with SD 6, so
+  88% vs 90% on 400 examples may be noise. The hypothesis testing lesson makes this precise.
+- **Capacity and alerting**: requests per second, errors per minute and tickets per hour are modelled as Poisson to
+  set thresholds such as "page someone if errors exceed the 99.9th percentile of the expected count".
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={binomExercise}>
+  Compute binomial probabilities and tails with the standard library. You will reuse the tail in the testing lesson.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+We started from the smallest random event, a single yes/no (Bernoulli) with mean $p$ and variance $p(1-p)$. Repeating
+it $n$ times independently and counting gave the binomial: count the arrangements, multiply by the chance of each,
+and the "variances add" rule hands us its mean $np$ and variance $np(1-p)$. Pushing the binomial to many tiny chances
+gave the Poisson for events in time, with mean and variance both $\lambda$. Adding bars turned "exactly k" into "at
+most k", the CDF. Each formula only describes the world its assumptions describe: independent trials, a fixed $n$, a
+steady rate.
+
+Counts take separate values you can put bars on. Measurements such as times, heights and amounts can take any value
+in a range, and that needs a different idea, a curve whose area is probability:
+[The normal distribution and z-scores](#/learn/stats/distributions/normal-distribution).
+
+</Section>

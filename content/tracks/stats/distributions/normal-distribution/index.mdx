@@ -1,0 +1,201 @@
+import { areaCode, normal, rulesRunner } from './code';
+import { normalExercise, questions } from './quiz';
+
+<Section kind="intuition" title="When values form a smooth hill">
+
+Suppose a shop records its number of online orders every day for three years. Most days land near 500, some days
+are a bit busier or quieter, and very few are wildly off. If you draw a histogram of those 1,000 days, you get a
+hill: tall in the middle, sloping down on both sides, roughly symmetric. Heights of adults, measurement errors,
+daily totals of many small independent purchases: the same hill keeps appearing.
+
+That hill has a name, the **normal distribution** (or bell curve), and two numbers describe it completely: where its
+centre is (the mean) and how wide it is (the standard deviation). Knowing just those two numbers lets you answer
+questions like "how often do we get more than 600 orders?" or "how many orders do we need to handle on all but the
+worst 1% of days?".
+
+There is a second reason to learn it, and it is the bigger one. Next chapter we will see that **averages** of almost
+any kind of data follow this curve, even when the data themselves do not. That fact, the central limit theorem, is
+why the normal distribution sits underneath confidence intervals, hypothesis tests and A/B tests.
+
+</Section>
+
+<Section kind="technical" title="Densities, the bell curve and z-scores">
+
+### Why continuous values need a new idea
+
+For counts we drew a bar for each value and the bar's height was its probability. Order counts are whole numbers,
+but think about something truly continuous, such as a delivery time: 31.2 minutes, 31.27, 31.2748... There are
+infinitely many possible values, so each exact one must have probability 0 (otherwise they would add up to more than
+1). "Exactly 31.2748... minutes" never happens; "between 31 and 32 minutes" does.
+
+So for continuous values we describe probability with a curve called a
+<Term id="pdf">probability density function</Term> (PDF), and we read it by **area**: the probability that the value
+lands between $a$ and $b$ is the area under the curve between $a$ and $b$. The total area is 1. The curve's height
+is a density, "probability per unit of x", which is why it can be bigger than 1 for a narrow distribution. Height
+tells you where values are crowded; only areas are probabilities.
+
+### The normal curve
+
+The <Term id="normal-distribution">normal distribution</Term> with mean $\mu$ (mu) and standard deviation $\sigma$
+(sigma) has the density
+
+$$
+f(x) = \frac{1}{\sigma\sqrt{2\pi}}\; e^{-\frac{1}{2}\left(\frac{x - \mu}{\sigma}\right)^2}
+$$
+
+You will never compute this by hand, but each part has a meaning worth seeing once:
+
+- $\frac{x - \mu}{\sigma}$ is the distance from the centre, measured in standard deviations.
+- Squaring it and putting it in $e^{-\frac12(\cdot)^2}$ makes the curve highest at the centre and fall off fast and
+  symmetrically on both sides. The fall-off is so fast that values more than 3 SDs away are rare, and more than 5
+  are almost unheard of.
+- $\frac{1}{\sigma\sqrt{2\pi}}$ just scales the height so the total area is exactly 1. A wider curve ($\sigma$ big)
+  must be lower.
+
+### The 68-95-99.7 rule
+
+Because every normal curve is the same shape slid by $\mu$ and stretched by $\sigma$, the same shares always fall
+within the same number of SDs of the mean:
+
+| Within | Share of values | For orders ~ N(500, 40) |
+| --- | --- | --- |
+| 1 SD | 68.3% | 460 to 540 |
+| 2 SD | 95.4% | 420 to 580 |
+| 3 SD | 99.7% | 380 to 620 |
+
+So a day with more than 580 orders (beyond 2 SD on the high side) happens on about $(100 - 95.4) / 2 \approx 2.3\%$
+of days.
+
+### z-scores: one scale for every normal
+
+To use one table (or one function) for every normal distribution, we convert a value to a
+<Term id="z-score">z-score</Term>: how many standard deviations it lies from the mean.
+
+$$
+z = \frac{x - \mu}{\sigma}
+$$
+
+600 orders is $z = (600 - 500) / 40 = 2.5$. A z-score of 2.5 means the same rarity whatever the units, which is how
+you compare a busy day at a big store with a busy day at a small one.
+
+### From value to probability, and back
+
+Two questions come up constantly, and they go in opposite directions:
+
+1. **Value → probability.** "How likely are more than 600 orders?" Use the CDF, $\Phi$ (capital phi), which gives
+   the area to the left: $P(X > 600) = 1 - \Phi(2.5) = 1 - 0.9938 = 0.0062$.
+2. **Probability → value.** "How many orders do the busiest 5% of days exceed?" Use the inverse CDF: the z with 95%
+   of the area to its left is 1.645, so the value is $500 + 1.645 \times 40 \approx 565.8$.
+
+In Python both live in `statistics.NormalDist`: `.cdf(x)` and `.inv_cdf(p)`.
+
+### When the bell does not fit
+
+The normal is a model, and many quantities do not follow it. Wait times, incomes and request latencies cannot go
+below zero and have long right tails (a few very large values). A normal model of them predicts impossible negative
+values and underestimates the extremes. Always look at a histogram before using a normal curve on raw data. The good
+news, next chapter, is that **averages** of such data are close to normal anyway.
+
+</Section>
+
+<Section kind="visual" title="Try it: shade an area">
+
+The curve shows daily orders. Move a and b to shade a range; the shaded area is the probability of a day in that
+range. The dashed lines mark 1 and 2 SDs from the mean.
+
+<Experiment def={normal} title="Normal curve explorer">
+  <NormalView />
+  <Readout title="Areas" />
+</Experiment>
+
+Things to try:
+
+- **a = 460, b = 540** (±1 SD): area 0.6827. Now set σ to 20 and **a = 480, b = 520**: still 0.6827. The same number of
+  SDs always holds the same share.
+- **a = 600, b = 700**: about 0.006. That is the right tail beyond z = 2.5.
+- **Shrink σ to 10**: the curve gets taller and narrower. Its peak height goes up, but the total area stays 1. Height
+  is density, not probability.
+
+</Section>
+
+<Section kind="code" title="NormalDist in the standard library">
+
+The program behind the explorer. The z-scores and the area are computed exactly as in the readout.
+
+<Experiment def={normal} title="normal_area.py, linked to the explorer" controls={false}>
+  <Code example={areaCode} title="normal_area.py" />
+  <Readout title="What it prints" />
+</Experiment>
+
+The 68-95-99.7 rule, a tail probability, a percentile, and a simulation to check them against 200,000 simulated days:
+
+<PythonRunner example={rulesRunner} title="normal_rules.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Reading the curve wrongly">
+
+<CommonMistake
+  title="Treating the density as a probability"
+  wrong={'p_exactly_500 = NormalDist(500, 40).pdf(500)    # 0.00997...'}
+  error="(no error) the number is a density per order, not the chance of 500 orders"
+  cause="For a continuous model, P(X = 500 exactly) is 0. The pdf is probability per unit."
+  fix="Ask about a range: cdf(500.5) - cdf(499.5) for 'about 500', which here is close to pdf(500) × 1 because the window is 1 order wide."
+/>
+
+<CommonMistake
+  title="Using cdf when you need the inverse"
+  wrong={'capacity = NormalDist(500, 40).cdf(0.99)'}
+  error="(no error) returns about 0.0, a probability, where a number of orders was wanted"
+  cause="cdf maps a value to a probability. A capacity question gives the probability and asks for the value."
+  fix="capacity = NormalDist(500, 40).inv_cdf(0.99)  # about 593 orders"
+/>
+
+<CommonMistake
+  title="Assuming raw data are normal"
+  wrong={'threshold = waits.mean() + 3 * waits.std()     # "3-sigma" alert on wait times'}
+  error="(no error) the alert fires far more often than the 0.13% a normal model promises"
+  cause="Wait times are skewed with a long right tail; 3 SDs above the mean is not rare for them."
+  fix="Use an empirical percentile (np.quantile(waits, 0.999)) or a distribution that fits the data."
+/>
+
+</Section>
+
+<Section kind="practice" title="Where you will use this">
+
+- **Standardising features.** `StandardScaler` computes z-scores for each column, so features measured in different
+  units are on the same scale for a model.
+- **Outlier and anomaly rules** such as "flag beyond 3 SD" assume roughly normal data; check the histogram first.
+- **Every z-test and confidence interval** in the next chapters ends with a normal CDF or inverse CDF: 1.96 is just
+  `NormalDist().inv_cdf(0.975)`.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={normalExercise}>
+  Build the normal CDF from math.erf, standardise with a z-score, and compute the area between two values.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+Continuous values cannot have a probability for each exact value, so we described them with a density curve and
+read probabilities as areas under it. The normal curve is the most important such shape: two numbers, the mean and
+the standard deviation, fix it completely, and because every normal curve is the same shape slid and stretched, the
+same shares always lie within 1, 2 and 3 SDs (68%, 95%, 99.7%). The z-score turns any value into "SDs from the mean",
+so one CDF answers value-to-probability questions, and its inverse answers probability-to-value questions. And the
+model only fits data that are actually hill-shaped, which skewed quantities like wait times are not.
+
+So far we have assumed we know the distribution. In real work we only see a sample from it. The next chapter asks
+how much a sample's average can be trusted, and finds the normal curve waiting there:
+[Samples, populations and the standard error](#/learn/stats/sampling/sampling-distributions).
+
+</Section>
