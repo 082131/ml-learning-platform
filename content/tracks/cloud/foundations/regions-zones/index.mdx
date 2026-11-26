@@ -1,0 +1,245 @@
+import { availabilityDemo, layout, layoutCode, listZones } from './code';
+import { layoutExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Renting someone else's computers, by the second">
+
+Training a model needs a lot of computing for a short time. A team might need eight GPUs for three days this week
+and none next week. Buying those GPUs would cost hundreds of thousands of dollars, and they would sit idle most of
+the year. "The cloud" is the alternative: a company that owns enormous buildings full of computers rents them out,
+and you pay only for the minutes you use.
+
+So the simplest mental model is a **utility**, like electricity. You don't build a power station to boil a kettle;
+you plug into the grid and pay for what you draw. In the cloud you ask for a machine with a GPU, it is ready in a
+couple of minutes, and the meter runs until you give it back.
+
+That model immediately raises the questions this lesson answers. *Where* are those computers? What happens when one
+of them, or a whole building, fails? And if you are renting, which problems are the landlord's and which are yours?
+
+</Section>
+
+<Section kind="technical" title="Regions, zones, and who is responsible for what">
+
+**The big picture first.** Every decision in this lesson follows one chain: you pick a **region** (which city your
+work runs in) → inside it you place copies of your work in one or more **zones** (separate buildings) → that layout
+decides how often your service is down, how fast it answers, and what it costs.
+
+### Regions: which city
+
+A <Term id="cloud-region">region</Term> is a geographic area where the provider runs data centres, such as AWS
+`us-east-1` (Northern Virginia) or Google Cloud `europe-west4` (Netherlands). Regions are deliberately independent:
+a disaster or a software fault in one should not spread to another.
+
+You choose a region for four reasons, and it helps to know which one is driving the choice:
+
+1. **Where the data already is.** Training reads the dataset many times. If the data sits in a bucket in one region
+   and the GPUs in another, you pay to move it every time (the storage chapter puts numbers on this). This is
+   usually the strongest reason for ML work.
+2. **Where the users are.** For a model that answers requests, every extra thousand kilometres adds round-trip time
+   (light in fibre covers roughly 200 km per millisecond, and real routes are longer).
+3. **Rules about data.** Laws or contracts may require that personal data stays in a country or the EU.
+4. **What is available and what it costs.** The newest GPU types appear in a few regions first, and prices differ by
+   region.
+
+### Zones: which building
+
+Inside a region are several <Term id="availability-zone">availability zones</Term> (AWS) or *zones* (Google Cloud):
+groups of data centres with their own power, cooling and network, a few kilometres to tens of kilometres apart.
+They are close enough that traffic between them takes about a millisecond, and far enough apart that a fire, a
+flood or a power failure usually takes out only one.
+
+Why both levels? Because they protect against different things. Zones protect you from the *common* failures (one
+building has a problem) while keeping your copies close together and fast. Regions protect you from the *rare*
+failures (a whole area has a problem), at the cost of distance and of copying your data across.
+
+### What "99.9% available" means
+
+<Term id="availability-sla">Availability</Term> is the fraction of time something works. Before calculating
+anything, translate it into hours, because that is what you will feel: a year has 24 × 365 = 8,760 hours, so
+
+- 99% up means 1% down: 87.6 hours a year, more than three and a half days;
+- 99.9% up means 8.76 hours a year;
+- 99.99% up means 53 minutes a year.
+
+Each extra "nine" divides the downtime by ten. Now, how do the parts combine into the whole? There are two rules,
+and every layout is built from them.
+
+**Parts in series multiply.** If *A and B must both* work (the zone must have power *and* the VM inside it must be
+healthy), the chance of success is the product: 0.999 × 0.99 = 0.98901. A chain is weaker than its weakest link.
+
+**Copies in parallel fail only together.** If *any one* of n copies is enough, the service fails only when all n
+are down at the same moment. One copy is down with chance (1 − p), so all n are down with chance (1 − p)ⁿ, and
+
+$$
+P(\text{at least one up}) = 1 - (1 - p)^n .
+$$
+
+With p = 0.99 and two copies: 1 − 0.01² = 1 − 0.0001 = 0.9999. One extra copy turned "down 1% of the time" into
+"down 0.01% of the time", because both copies now have to fail at once.
+
+### Putting the rules together: why zones matter
+
+Here is the result that surprises most people. Take two VMs. Put both in **one zone**: they protect you against VM
+failures, but the zone itself is still a single point of failure, so the zone's 99.9% caps everything:
+0.999 × (1 − 0.01²) ≈ 0.9989. Put them in **two zones**, one each: now a zone failure takes out only one copy,
+and the arithmetic gives about 1.9 hours down a year instead of 10.5. Same two VMs, same price, five times less
+downtime. You will reproduce these numbers in the experiment and in the code below.
+
+<Callout kind="simplification">
+The formulas assume failures are **independent**: one copy failing tells you nothing about the others. Real failures
+are often correlated. A bad deployment pushed to every copy, an expired certificate or a full disk breaks all copies
+at once, whatever zone they are in. Redundancy protects against hardware and building failures, not against your
+own mistakes; that is what staged rollouts are for (see the
+[Deploy track's rollouts lesson](#/learn/deploy/kubernetes/autoscaling-rollouts)).
+</Callout>
+
+### Who is responsible for what
+
+Renting changes who has to worry about each failure. Providers describe this as the
+<Term id="shared-responsibility">shared responsibility model</Term>: the provider is responsible for security and
+reliability *of* the cloud (buildings, hardware, the network, the hypervisor), and you are responsible for what you
+put *in* it (your data, who can access it, how your machines and networks are configured, your code).
+
+How much is yours depends on the service model, often summarised as <Term id="iaas-paas-saas">IaaS, PaaS and SaaS</Term>:
+
+| Model | You rent | You still manage | ML example |
+| --- | --- | --- | --- |
+| Infrastructure as a service | a virtual machine, a disk | the OS, drivers, CUDA, your code, scaling | an EC2 or Compute Engine GPU VM |
+| Platform as a service | a service that runs your code | your code, data and configuration | a SageMaker or Vertex AI training job |
+| Software as a service | a finished product | only your inputs and access | a hosted model API |
+
+The further down the table, the less you manage and the less you control. Most ML teams use all three, and the
+compute and managed-services chapters are about choosing between them.
+
+### The same ideas under two names
+
+AWS and Google Cloud offer nearly the same building blocks with different names. Learning the idea once and the
+names twice is the efficient way to work with both:
+
+| What it is | AWS | Google Cloud | Lesson |
+| --- | --- | --- | --- |
+| Virtual machine | EC2 | Compute Engine | [Compute options](#/learn/cloud/compute/compute-options) |
+| Object storage | S3 | Cloud Storage (GCS) | [Object storage](#/learn/cloud/storage/object-storage-training) |
+| Identity and permissions | IAM | IAM | [IAM](#/learn/cloud/foundations/iam-permissions) |
+| Private network | VPC | VPC | [Networking](#/learn/cloud/foundations/networking) |
+| Serverless functions | Lambda | Cloud Run functions | [Compute options](#/learn/cloud/compute/compute-options) |
+| Managed ML platform | SageMaker AI | Vertex AI | [Managed training](#/learn/cloud/managed/managed-training) |
+| Hosted foundation models | Bedrock | Vertex AI Model Garden | [Model APIs](#/learn/cloud/managed/model-apis) |
+| Managed Kubernetes | EKS | GKE | [Deploy track](#/learn/deploy/kubernetes/k8s-for-models) |
+
+</Section>
+
+<Section kind="visual" title="Try it: where your copies run">
+
+Choose how reliable each layer is and how many copies you place where. The left panel draws the layout; the right
+panel combines the layers with the two rules above.
+
+<Experiment def={layout} title="Availability by layout">
+  <AvailabilityView />
+  <Readout title="This layout" />
+</Experiment>
+
+Things to try:
+
+- **Start with one VM in one zone**: about 97 hours down a year. The VM's own 99% dominates.
+- **Set instances per zone to 2**: 10.5 hours. Now the zone's 99.9% is the ceiling; a third or fourth copy in the
+  same zone barely helps. Try it and watch the number stall.
+- **Go back to 1 instance per zone and set zones to 2**: 1.9 hours, with the same two VMs. This is the "Ohhh"
+  moment of the lesson: placement beats quantity.
+- **Add a second region**: downtime drops to minutes, but you now pay for twice the copies, and (in real life) you
+  must keep data in sync across regions. Most ML services stop at multi-zone.
+
+</Section>
+
+<Section kind="code" title="The same calculation in Python">
+
+The experiment's current layout, as code. Change a control above and the literals change here.
+
+<Experiment def={layout} title="layout.py, linked to the experiment" controls={false}>
+  <Code example={layoutCode} title="layout.py" />
+  <Readout title="What it prints" />
+</Experiment>
+
+The three layouts from the explanation, side by side. Run it to see the "same price, different downtime" result:
+
+<PythonRunner example={availabilityDemo} title="availability.py" />
+
+In a real account you ask the provider which zones exist and which of them offer the GPU type you want, because
+not all do:
+
+<Code example={listZones} title="zones.py (boto3, not run here)" />
+
+</Section>
+
+<Section kind="mistakes" title="Mistakes that cost availability or money">
+
+<CommonMistake
+  title="Two copies in the same zone, called 'highly available'"
+  wrong={'# both replicas launched with the default subnet\nreplica_a = launch(subnet="subnet-1a")\nreplica_b = launch(subnet="subnet-1a")'}
+  error="(no error) a power event in us-east-1a takes both replicas down together"
+  cause="The copies protect against VM failures, but they share one building, so the zone is still a single point of failure."
+  fix="Spread copies across at least two zones (one subnet per zone), and put a load balancer in front that spans those zones."
+/>
+
+<CommonMistake
+  title="Choosing the region before checking where the data and GPUs are"
+  wrong={'# team picked us-west-2 because it is "close to us"\n# training data: 40 TB in a bucket in eu-west-1'}
+  error="(no error) every training run copies 40 TB across regions; the transfer bill is larger than the GPU bill"
+  cause="For training, the data's location matters more than the engineers' location."
+  fix="Train in the region where the data lives (or move the data once, deliberately). Check that the GPU type you need is offered there."
+/>
+
+<CommonMistake
+  title="Reading an SLA as a promise of uptime"
+  wrong={'# "EC2 has an SLA, so our service is 99.99% available"'}
+  error="(no error) your single-zone service is down for hours; the SLA refunds a fraction of the instance bill"
+  cause="An SLA describes the provider's part and the credit you get when it is missed. It says nothing about your design, and it is usually defined for multi-zone deployments."
+  fix="Calculate your own layout's availability from its parts, and design for the downtime you can accept."
+/>
+
+</Section>
+
+<Section kind="practice" title="How teams choose a region and a layout">
+
+- **Start from the data.** Train where the data lives; serve close to the users. These can be different regions.
+- **Check capacity early.** Confirm the GPU instance types you need are offered in your region and zones, and
+  request quota before you need it (the GPU lesson covers quotas).
+- **Spread across zones by default** for anything that serves traffic. Single-zone is fine for a training job that
+  can simply be restarted.
+- **Translate nines into hours** when you talk about reliability, and agree on a number before designing.
+- **Know your half of the shared responsibility model:** access, data, network configuration and patching your own
+  machines are yours.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={layoutExercise}>
+  Turn the two rules into a function you can use to compare layouts before you build them.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+The cloud is rented computing, paid by use. Those computers live in **regions** (cities), and each region has
+several **zones** (separate buildings). You pick the region mainly for where the data is, then for users, rules and
+available GPUs.
+
+Availability follows from the layout through two rules: parts that must *all* work multiply their chances, and
+copies where *any one* is enough fail only together, 1 − (1 − p)ⁿ. Putting those together explains the key result:
+copies in the same zone are capped by that zone, so spreading the same copies across zones cuts downtime far more
+than adding copies in one place. The math assumes independent failures, so it protects against hardware and
+buildings, not against a bad deploy.
+
+Finally, renting splits the work: the provider runs the buildings and hardware; your data, access and configuration
+are yours. The next lesson starts with the most important of those: who is allowed to do what.
+
+Next: [Identity and permissions with IAM](#/learn/cloud/foundations/iam-permissions).
+
+</Section>

@@ -680,4 +680,67 @@ export const tracks: Track[] = [
       },
     ],
   },
+  {
+    id: 'cloud',
+    title: 'Cloud for ML',
+    code: 'T.14',
+    summary:
+      'Run ML work on rented computers without surprises: regions and zones, IAM permissions, networks, object storage that keeps GPUs fed, moving data, choosing between serverless, VMs and GPU instances, spot capacity with checkpoints, managed training on SageMaker and Vertex AI, model APIs versus self-hosting, reading and cutting the bill, and Terraform.',
+    chapters: [
+      {
+        id: 'foundations',
+        title: 'Cloud foundations',
+        level: 'beginner',
+        lessons: [
+          { id: 'cloud/foundations/regions-zones', status: 'written' },
+          { id: 'cloud/foundations/iam-permissions', status: 'written' },
+          { id: 'cloud/foundations/networking', status: 'written' },
+        ],
+      },
+      {
+        id: 'storage',
+        title: 'Storage and data movement',
+        level: 'intermediate',
+        lessons: [
+          { id: 'cloud/storage/object-storage-training', status: 'written' },
+          { id: 'cloud/storage/moving-data', status: 'written' },
+        ],
+      },
+      {
+        id: 'compute',
+        title: 'Compute and GPUs',
+        level: 'intermediate',
+        lessons: [
+          { id: 'cloud/compute/compute-options', status: 'written' },
+          { id: 'cloud/compute/gpu-instances', status: 'written' },
+          { id: 'cloud/compute/spot-checkpoints', status: 'written' },
+        ],
+      },
+      {
+        id: 'managed',
+        title: 'Managed ML services',
+        level: 'intermediate',
+        lessons: [
+          { id: 'cloud/managed/managed-training', status: 'written' },
+          { id: 'cloud/managed/model-apis', status: 'written' },
+        ],
+      },
+      {
+        id: 'operations',
+        title: 'Cost and infrastructure as code',
+        level: 'advanced',
+        lessons: [
+          { id: 'cloud/operations/cost-control', status: 'written' },
+          { id: 'cloud/operations/infrastructure-as-code', status: 'written' },
+        ],
+      },
+      {
+        id: 'capstone',
+        title: 'Capstone',
+        level: 'advanced',
+        project: 'cloud/capstone/fine-tune-and-serve',
+        lessons: [{ id: 'cloud/capstone/fine-tune-and-serve', status: 'written' }],
+      },
+    ],
+  },
 ];

@@ -1,0 +1,419 @@
+/* Cloud for ML track visualizations (started from the Automation track styles). Colors come from tokens; every status also has a text label. */
+.grid2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--s-2);
+}
+.panel {
+  min-width: 0;
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.panelHead {
+  margin: 0 0 var(--s-1);
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.mono {
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  overflow-wrap: anywhere;
+}
+.muted {
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+}
+.list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--s-2);
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--line);
+  font-size: var(--fs-13);
+}
+.row:last-child {
+  border-bottom: 0;
+}
+.tag {
+  padding: 1px 6px;
+  border: 1px solid var(--line-strong);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.tag[data-tone='ok'] {
+  border-color: var(--ok);
+  color: var(--ok);
+}
+.tag[data-tone='err'] {
+  border-color: var(--err);
+  color: var(--err);
+}
+.tag[data-tone='warn'] {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+.verdict {
+  margin: 0 0 var(--s-2);
+  font-weight: 600;
+}
+.verdict[data-ok='true'] {
+  color: var(--ok);
+}
+.verdict[data-ok='false'] {
+  color: var(--err);
+}
+
+/* Bars (months, buckets) */
+.cols {
+  display: flex;
+  align-items: stretch;
+  gap: 3px;
+  height: 160px;
+}
+.col {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+}
+.colUp,
+.colDown {
+  position: relative;
+}
+.colUp {
+  border-bottom: 1px solid var(--ink-2);
+}
+.barUp,
+.barDown {
+  position: absolute;
+  left: 0;
+  right: 0;
+}
+.barUp {
+  bottom: 0;
+  background: var(--accent);
+}
+.barDown {
+  top: 0;
+  background: repeating-linear-gradient(45deg, var(--err) 0 3px, transparent 3px 6px);
+  border: 1px solid var(--err);
+}
+.axisLabels {
+  display: flex;
+  gap: 3px;
+  margin-top: 4px;
+}
+.axisLabels > span {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-2);
+}
+.hist {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 110px;
+  border-bottom: 1px solid var(--ink-2);
+}
+.hist > span {
+  flex: 1 1 0;
+  min-width: 0;
+  background: var(--accent);
+}
+
+/* Timelines (retries, Gantt charts) */
+.track {
+  position: relative;
+  height: 28px;
+  margin: 6px 0;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+.mark {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  min-width: 6px;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent-ink);
+  background: var(--accent);
+}
+.mark[data-tone='err'] {
+  background: var(--err);
+}
+.mark[data-tone='warn'] {
+  background: var(--warn);
+}
+.mark[data-tone='ok'] {
+  background: var(--ok);
+}
+.mark[data-tone='skip'] {
+  background: transparent;
+  border: 1px dashed var(--ink-2);
+  color: var(--ink-2);
+}
+.gantt {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ganttRow {
+  display: grid;
+  grid-template-columns: minmax(84px, 120px) minmax(0, 1fr) minmax(96px, auto);
+  align-items: center;
+  gap: var(--s-2);
+  font-size: var(--fs-13);
+}
+.ganttRow .track {
+  margin: 0;
+  height: 22px;
+}
+
+/* Key cells (rerun lab) */
+.cells {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cell {
+  display: grid;
+  gap: 2px;
+  padding: 4px;
+  text-align: center;
+  border: 1px solid var(--line-strong);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.cell[data-copies='0'] {
+  border-style: dashed;
+  color: var(--ink-2);
+}
+.cell[data-dup='true'] {
+  border-color: var(--err);
+  color: var(--err);
+  font-weight: 600;
+}
+.cell[data-resume='true'] {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Flow (pipeline stages) */
+.flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 var(--s-2);
+  padding: 0;
+  list-style: none;
+}
+.flow > li {
+  padding: 4px 8px;
+  border: 1px solid var(--line-strong);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.flow > li[data-reached='true'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+.flow > li[data-reached='false'] {
+  color: var(--ink-2);
+  border-style: dashed;
+}
+.code {
+  margin: 0;
+  padding: var(--s-1) var(--s-2);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .barUp,
+  .barDown,
+  .hist > span {
+    transition: height 160ms ease;
+  }
+}
+
+/* Horizontal bars with a label and a value (bills, comparisons) */
+.bars {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.bar {
+  display: grid;
+  grid-template-columns: minmax(96px, 160px) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: var(--fs-13);
+}
+.barTrack {
+  position: relative;
+  height: 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+.barFill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--accent);
+}
+.barFill[data-tone='err'] {
+  background: var(--err);
+}
+.barFill[data-tone='ok'] {
+  background: var(--ok);
+}
+.barFill[data-tone='muted'] {
+  background: var(--ink-3);
+}
+.formula {
+  grid-column: 2 / -1;
+  margin-top: -4px;
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.big {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 600;
+}
+.nested {
+  display: grid;
+  gap: 6px;
+  padding: var(--s-2);
+  border: 1px dashed var(--line-strong);
+}
+.nested > .nested {
+  border-style: solid;
+}
+.boxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.box {
+  padding: 2px 6px;
+  border: 1px solid var(--line-strong);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.box[data-tone='ok'] {
+  border-color: var(--ok);
+  color: var(--ok);
+}
+.box[data-tone='err'] {
+  border-color: var(--err);
+  color: var(--err);
+  text-decoration: line-through;
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 4px;
+  vertical-align: middle;
+  background: var(--accent);
+}
+.swatch[data-tone='err'] {
+  background: var(--err);
+}
+.swatch[data-tone='warn'] {
+  background: var(--warn);
+}
+.swatch[data-tone='ok'] {
+  background: var(--ok);
+}
+.mark[data-tone='work'] {
+  background: var(--accent);
+}
+.mark[data-tone='lost'] {
+  background: repeating-linear-gradient(45deg, var(--err) 0 3px, transparent 3px 6px);
+  border: 1px solid var(--err);
+}
+.mark[data-tone='restart'] {
+  background: var(--warn);
+}
+.mark[data-tone='checkpoint'] {
+  background: var(--ok);
+}
+.diff {
+  margin: 0;
+  padding: var(--s-1) var(--s-2);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 520px) {
+  .bar {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .bar > .barTrack {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .formula {
+    grid-column: 1 / -1;
+    margin-top: 0;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .barFill {
+    transition: width 160ms ease;
+  }
+}
+
+.spaced {
+  margin-top: var(--s-2);
+}
