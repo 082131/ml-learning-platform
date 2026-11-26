@@ -1,0 +1,198 @@
+import { transitions, transitionsPy, yourMove } from './code';
+import { questions, transitionExercise } from './quiz';
+
+<Section kind="intuition" title="Actions are requests, not guarantees">
+
+In lesson 1 every move went exactly where you pointed. Real worlds are not that obedient. A robot's wheel slips on a
+wet floor. A recommended video may or may not be watched. A trade may or may not be filled at your price. You choose
+the action, but the world decides, with some randomness, what actually happens.
+
+So we need a precise way to write down a world where **the same action in the same situation can lead to different
+results**, each with some probability. That description is called a **Markov decision process**, or MDP. It is not a
+new algorithm; it is the shared vocabulary that every planning and learning method in the rest of this track works
+on. Once a problem is written as an MDP, we know exactly what "the best policy" means and can start computing it.
+
+The mental model: an MDP is the **rulebook of the game**. It lists the situations, the moves, the odds of where each
+move leads, and the score each outcome earns.
+
+</Section>
+
+<Section kind="technical" title="The five parts of an MDP">
+
+### Why we need the rulebook written down
+
+A bandit (lesson 3) had one situation. In the grid, your action also decides *where you are next*, and where you are
+next decides which rewards are still reachable. To plan, you must know, or learn, how actions move you around. An
+<Term id="mdp">MDP</Term> writes that down in five parts:
+
+1. **States** $S$: every situation the agent can be in. Our grid has 11 cells that are not walls; 9 of them are
+   places where the agent can act, and 2 (goal and pit) are terminal.
+2. **Actions** $A$: the choices in each state. Here: up, right, down, left.
+3. **Transition probabilities** $P(s' \mid s, a)$: the chance of landing in state $s'$ (read "s prime", the next
+   state) when you take action $a$ in state $s$. The vertical bar is read "given": "the probability of $s'$ given
+   that we are in $s$ and chose $a$".
+4. **Rewards** $r(s, a, s')$: the reward for that transition. In our grid, −0.04 per move, plus +1 or −1 when the
+   move enters the goal or the pit.
+5. **Discount factor** $\gamma$: how much the future counts (lesson 2).
+
+### The slippery grid
+
+Our grid becomes stochastic (random) with one rule: a move goes in the intended direction with probability 0.8, and
+slips to each side, at a right angle, with probability 0.1. It never goes backwards. If the direction it actually goes
+is blocked by a wall or the edge, the agent stays where it is.
+
+Work through one case, the one the explorer starts with: the agent is at (1,2), just left of the pit, and chooses
+**up**.
+
+- With probability 0.8 it goes up to (0,2). Reward −0.04.
+- With probability 0.1 it slips left, into the wall at (1,1), and stays at (1,2). Reward −0.04.
+- With probability 0.1 it slips right, into the pit at (1,3). Reward −0.04 − 1 = −1.04, and the episode ends.
+
+The three probabilities add up to 1, as they must: the agent always ends up *somewhere*. This one row of numbers,
+$P(\cdot \mid (1,2), \text{up})$, is everything the environment knows about that action.
+
+Now the important consequence. Going up from (1,2) is the shortest way to the goal, but it carries a 10% chance of
+falling into the pit **every time**. Going a longer way round, away from the pit, avoids that risk. Whether the
+shortcut is worth it depends on the numbers, and the next two lessons will compute exactly that.
+
+### The Markov property: why the current state is enough
+
+Look at what $P(s' \mid s, a)$ depends on: only the current state and action. Not the route the agent took to get
+there, not how long it has been walking. This is the <Term id="markov-property">Markov property</Term>: **the future
+depends on the past only through the present state**.
+
+It sounds like a technicality, but everything else rests on it. If the current state contains everything relevant,
+then a policy only needs to look at the current state, and the value of a state (lesson 5) is a single number per
+state. If the property fails, the agent has to remember history, and the clean methods of the next lessons stop
+being exact.
+
+A quick test of whether your state is Markov: *could two different histories that end in the same state lead to
+different futures?*
+
+- In our grid, no. Standing on (1,2) is the same situation however you got there.
+- A ball described only by its **position** fails the test: two balls at the same spot, one moving up and one moving
+  down, have different futures. Add the **velocity** to the state and the test passes.
+
+So when a problem is not Markov, the usual fix is to put more information into the state (velocity, the last few
+frames of a game, the conversation so far for a chatbot), not to give up on MDPs.
+
+### Two kinds of randomness that are easy to mix up
+
+| | Transition probabilities $P(s' \mid s, a)$ | Policy $\pi(a \mid s)$ |
+| --- | --- | --- |
+| Who controls it | the environment | the agent |
+| What it is random about | where the action leads | which action is chosen |
+| Can learning change it? | no, it is the world's physics | yes, that is the whole point |
+
+A policy can be **deterministic**, choosing one action per state ("in (1,2), go up"), or a
+<Term id="stochastic-policy">stochastic policy</Term> that gives each action a probability ("in (1,2), up 70%, left
+30%"). The ε-greedy rule from lesson 3 is stochastic. A deterministic policy is just the special case where one
+action has probability 1.
+
+Even with a deterministic policy, the episode is still random, because $P$ is. That is why the next lesson talks about
+**expected** returns: the average return over all the ways the episode can unfold.
+
+### What the agent knows
+
+In this chapter we assume the agent **knows** $P$ and $r$: it has the rulebook and can plan with it, like a chess
+player thinking ahead. This is called **planning** or dynamic programming. In chapter 3 we drop that assumption: the
+agent will only see samples, one transition at a time, and must learn from them. That is the more realistic case and
+the heart of RL.
+
+</Section>
+
+<Section kind="visual" title="Try it: where can an action lead?">
+
+Pick a cell and an action. The highlighted cells are where the agent can land, with their probabilities; the list
+also shows how often each one came up in 1,000 simulated tries.
+
+<Experiment def={transitions} title="Transition explorer">
+  <RlTransitions />
+  <Readout title="This action" />
+</Experiment>
+
+Things to try:
+
+- **(1,2), up** (the default): 0.8 to safety, 0.1 to stay, 0.1 into the pit. In 1,000 simulated tries the pit came up
+  roughly 100 times, close to the probability but not exactly, because samples are noisy.
+- **(1,2), left**: now the intended move hits the wall. You stay with 0.8, slip up with 0.1, slip down with 0.1. No
+  chance of the pit at all: "left" is a safe way to wait.
+- **(0,0), up**: the intended move and the slip to the left both bump into the edge, so "stay" collects 0.8 + 0.1 =
+  0.9. Two directions, one outcome.
+- **Slip = 0**: the grid of lesson 1 again, one outcome per action. **Slip = 0.6**: actions barely mean anything; the
+  intended direction (0.4) is now *less* likely than the two slips combined (0.6).
+
+</Section>
+
+<Section kind="code" title="A transition model in Python">
+
+The function `transitions` returns the whole row $P(\cdot \mid s, a)$ as a dictionary from next cell to probability.
+The simulation at the end samples from it, which is all a learning agent will ever get to see.
+
+<PythonRunner example={transitionsPy} title="transitions.py" />
+
+The question the explorer is answering right now:
+
+<Experiment def={transitions} title="your query as code" controls={false}>
+  <Code example={yourMove} title="query.py" />
+</Experiment>
+
+</Section>
+
+<Section kind="mistakes" title="Modelling mistakes">
+
+<CommonMistake
+  title="Probabilities that do not add up to 1"
+  wrong={'probs = {move(s, a): 0.8}\nfor side in SIDEWAYS[a]:\n    probs[move(s, side)] = 0.1   # overwrites when two land on the same cell'}
+  error="(no error) at (0, 0), up: {(0, 0): 0.1, (0, 1): 0.1}, which sums to 0.2"
+  cause="Two directions landed on the same cell and the second assignment replaced the first instead of adding to it."
+  fix="Accumulate with probs[cell] = probs.get(cell, 0) + p, and assert that every row sums to 1."
+/>
+
+<CommonMistake
+  title="A state that forgets something the future depends on"
+  wrong="state = (row, col)   # for a robot that is still moving"
+  error="(no error) the same state leads to very different outcomes, and learning never settles"
+  cause="If momentum, a timer or a held key changes what happens next, the position alone is not Markov."
+  fix="Put everything the future depends on into the state: position and velocity, the last few frames, the items carried."
+/>
+
+<CommonMistake
+  title="Confusing P with π"
+  wrong="The agent learned to slip less often."
+  error="(misconception) slipping is part of the environment; no policy can change its probability"
+  cause="P is the world's physics; π is the agent's choice. Learning changes π only."
+  fix="What the agent can learn is to choose actions whose slips are harmless, such as moving away from the pit."
+/>
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={transitionExercise}>
+  Write the expected immediate reward of an action from its transition row.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+The chain of this lesson: real actions do not always do what we meant, so we describe the world as an **MDP**:
+states, actions, **transition probabilities** $P(s' \mid s, a)$, rewards and γ. In the slippery grid an action goes
+where intended with 0.8 and slips sideways with 0.1 each, which turns "the shortest route" into "a route with a risk
+attached". The **Markov property** says the current state is all that matters for the future, which is what lets a
+policy and, next, a value be defined per state. Randomness comes from two places that must not be confused: the
+environment's $P$, which the agent cannot change, and the policy's $\pi$, which is what it learns.
+
+With the rulebook written down, we can finally ask the question that drives the next lesson: if the agent follows a
+given policy in this random world, how much return should it **expect** from each cell?
+
+Next: [Value functions and the Bellman equation](#/learn/rl/mdp/value-functions).
+
+</Section>
