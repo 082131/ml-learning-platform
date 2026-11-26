@@ -13,5 +13,9 @@ export default {
     'Write self-joins to compare rows of the same table',
   ],
   prerequisites: ['sql/aggregation/group-by'],
-  concepts: [],
+  concepts: ['sql-join', 'foreign-key', 'outer-join', 'cross-join', 'self-join', 'relationship-cardinality'],
+  references: [
+    { title: 'SQLite: SELECT (join operators, RIGHT and FULL JOIN since 3.39)', url: 'https://www.sqlite.org/lang_select.html#from_clause', version: '3.54' },
+    { title: 'PostgreSQL: Joined tables', url: 'https://www.postgresql.org/docs/current/queries-table-expressions.html#QUERIES-JOIN', version: '18' },
+  ],
 } satisfies LessonMeta;

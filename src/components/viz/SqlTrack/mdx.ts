@@ -1,4 +1,6 @@
 import { CteSteps } from './CteSteps';
+import { FanOut } from './FanOut';
+import { JoinLab } from './JoinLab';
 import { NullFilter } from './NullFilter';
 import { QueryPipeline } from './QueryPipeline';
 import { SqlExercise } from './SqlExercise';
@@ -11,4 +13,6 @@ export default {
   SqlExercise,
   QueryPipeline,
   NullFilter,
+  JoinLab,
+  FanOut,
 };

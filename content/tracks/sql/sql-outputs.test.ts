@@ -84,6 +84,31 @@ const claims: Record<string, (sets: SqlValue[][][]) => void> = {
   'where-vs-having': ([rows]) => expect(rows).toEqual([[1, 3], [4, 2]]),
   'monthly-pivot': ([rows]) => expect(rows![1]).toEqual(['2026-02', 6, 4, 66.7]),
   'bare-column': ([, fixed]) => expect(fixed![0]).toEqual([1, '2026-01-06', '2026-02-22', 3]),
+  'inner-join': ([rows]) => expect(rows!.length).toBe(11),
+  'left-join': ([rows]) => {
+    expect(rows!.length).toBe(13);
+    expect(rows!.slice(-2)).toEqual([['Gus', null], ['Hana', null]]);
+  },
+  'filter-placement': ([wrong, right]) => {
+    expect(wrong!.map((r) => r[0])).toEqual(['Ada', 'Ben', 'Chen', 'Dana', 'Eli']);
+    expect(right!.slice(-3)).toEqual([['Fay', 0], ['Gus', 0], ['Hana', 0]]);
+  },
+  'three-tables': ([rows]) => expect(rows).toEqual([['electronics', 3, 152], ['home', 4, 100], ['stationery', 4, 46]]),
+  'self-join': ([rows]) => expect(rows![0]).toEqual(['Rosa', 'exec', null]),
+  'cross-join': ([rows]) => expect(rows!.length).toBe(9),
+  'full-join': ([rows]) => expect(rows).toEqual([['Gus', null], ['Hana', null], [null, 109]]),
+  'fanout-bug': ([rows]) => expect(rows).toEqual([[105, 2, 31, 62], [107, 4, 82, 82], [110, 4, 148, 148]]),
+  'fanout-fix': ([rows]) => expect(rows).toEqual([[105, 31, 31], [107, 41, 41], [110, 74, 74]]),
+  'join-duplicates': ([rows]) => expect(rows!.map((r) => r[0])).toEqual(['Ben', 'Ben', 'Chen', 'Chen', 'Dana']),
+  'semi-join': ([rows]) => expect(rows!.map((r) => r[0])).toEqual(['Ben', 'Chen', 'Dana']),
+  'anti-join': ([noOrders, neverSold]) => {
+    expect(noOrders!.map((r) => r[0])).toEqual(['Gus', 'Hana']);
+    expect(neverSold).toEqual([['Poster']]);
+  },
+  'not-in-trap': ([count, fixed]) => {
+    expect(count).toEqual([[0]]);
+    expect(fixed!.map((r) => r[0])).toEqual(['Gus', 'Hana']);
+  },
 };
 
 describe('claims in the lesson prose', () => {

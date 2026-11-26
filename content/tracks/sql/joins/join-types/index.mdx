@@ -1,0 +1,209 @@
+import { crossJoin, filterPlacement, fullJoin, innerJoin, joinLab, leftJoin, selfJoin, threeTables } from './code';
+import { exercise, questions } from './quiz';
+
+<Section kind="intuition" title="Why the data is split up, and how to put it back together">
+
+Our shop could have kept one giant table with a row per product sold, repeating the customer's name and city
+and the product's name and category on every row. It does not, for a good reason: if Ada moves from London to
+Leeds, one giant table would need the change on every row she ever bought, and forgetting one row leaves the data
+contradicting itself. So each fact is stored once, in the table it belongs to, and tables point at each other with
+ids. An order does not copy Ada's name; it stores `customer_id = 1`.
+
+That design keeps data correct, but questions cut across tables. "Who placed order 103?" needs `orders` (which
+holds `customer_id`) and `customers` (which holds the name). A <Term id="sql-join">join</Term> puts the pieces
+back together: for each order, find the customer whose `id` equals the order's `customer_id`, and glue the two
+rows side by side.
+
+The mechanics of matching are easy. The interesting part, and the reason for this lesson, is the rows at the
+edges. Gus and Hana have no orders. Order 109 was a guest checkout with no customer. Should they appear? Different
+join types give different answers, and one misplaced filter can silently turn one type into another. By the end
+you should be able to predict the exact rows of any join before you run it.
+
+</Section>
+
+<Section kind="technical" title="Matched pairs, then the leftovers">
+
+**How a join thinks.** A clean way to predict any join is two steps:
+
+1. **Find the matched pairs.** Conceptually, pair every customer with every order and keep the pairs where the ON
+   condition is TRUE. With `ON o.customer_id = c.id` there are 11 pairs: every order except 109 finds its customer.
+2. **Decide what to do with the leftovers.** Rows that found no partner either disappear or are kept with the
+   other side's columns filled with NULL. The join type is just that decision.
+
+| Join | Keeps | Rows here |
+| --- | --- | --- |
+| `JOIN` (inner) | matched pairs only | 11 |
+| `LEFT JOIN` | matched pairs, plus left rows with no match | 11 + Gus + Hana = 13 |
+| `RIGHT JOIN` | matched pairs, plus right rows with no match | 11 + order 109 = 12 |
+| `FULL JOIN` | matched pairs, plus leftovers from both sides | 11 + 2 + 1 = 14 |
+
+LEFT, RIGHT and FULL are the <Term id="outer-join">outer joins</Term>: they reach outside the matched pairs. The
+word "left" just means "the table written before the JOIN keyword". A RIGHT JOIN is a LEFT JOIN with the tables
+swapped, so most teams only write LEFT joins and put the table whose rows must all survive first.
+
+**Two rules explain every surprise.**
+
+- **NULL matches nothing.** Order 109 has `customer_id` NULL, and NULL = anything is UNKNOWN, never TRUE. So it
+  never forms a pair, exactly like the NULL rows in WHERE from the NULL lesson.
+- **A match can repeat a row.** Ada has 3 orders, so she appears 3 times. This is a
+  <Term id="relationship-cardinality">one-to-many relationship</Term>: one customer, many orders. A join's row
+  count is the number of matching pairs, not the size of either table. The next lesson shows how this repetition
+  inflates sums.
+
+<SqlRunner example={innerJoin} title="who_ordered.sql" />
+
+The aliases `o` and `c` (`FROM orders AS o`) are short names, so `c.id` means "the id column of customers". They
+are needed as soon as two tables have a column with the same name, such as `id`.
+
+The LEFT JOIN below keeps every customer. Gus and Hana appear once each, with NULL in `order_id`, because they
+matched no order. Order 109 is gone, because it has no customer and customers is the table we kept whole.
+
+<SqlRunner example={leftJoin} title="every_customer.sql" />
+
+</Section>
+
+<Section kind="visual" title="Try it: join types, and where the filter goes">
+
+Pick a join type, and choose where the condition `o.status = 'shipped'` goes. Each result row says why it exists.
+
+<Experiment def={joinLab} title="Join explorer">
+  <JoinLab />
+  <Readout title="This join" />
+</Experiment>
+
+Things to try:
+
+- **Step through the four join types with no filter.** 11, 13, 12 and 14 rows, as in the table above. The 11
+  matched pairs never change; only the leftovers do.
+- **LEFT JOIN, filter in WHERE.** 8 rows. The LEFT JOIN first built 13 rows, then WHERE tested
+  `o.status = 'shipped'` on each. For Gus and Hana `o.status` is NULL, the test is UNKNOWN, and the row is dropped.
+  Ben's returned order, Chen's cancelled one and Fay's pending one fail the test too. You asked for a LEFT JOIN and
+  received an inner join.
+- **LEFT JOIN, filter in ON.** 11 rows. Now the condition is part of the matching: only shipped orders can pair
+  with a customer, and a customer with no shipped order (Fay, Gus, Hana) is kept once with NULLs. This is what
+  "every customer, with their shipped orders" means.
+
+The rule that follows: **for an outer join, a condition on the optional side goes in ON**. A condition in WHERE
+runs after the join and removes the NULL-padded rows the outer join was built to keep. For an inner join it makes
+no difference where the condition goes, because there are no NULL-padded rows to lose.
+
+<SqlRunner example={filterPlacement} title="filter_placement.sql" />
+
+Counting makes the difference concrete. With the filter in WHERE, Fay, Gus and Hana are missing from the report.
+With it in ON they appear with 0 shipped orders. `COUNT(o.id)` (not `COUNT(*)`) is what turns their NULL-padded
+row into 0: it counts non-NULL order ids, and they have none.
+
+</Section>
+
+<Section kind="code" title="More than two tables, self-joins and cross joins">
+
+**Chains of joins.** Each join adds one table along one key. To get revenue by category we walk
+`orders → order_items → products`. After the first join, the grain is one order line (17 lines in all). Joining
+products does not change the row count, because each line has exactly one product; it only adds the `category`
+column. Checking the row count after each join, and asking "should this join change the count?", is the quickest
+way to catch a wrong key.
+
+<SqlRunner example={threeTables} title="revenue_by_category.sql" />
+
+The shipped revenue splits into electronics 152 (Headphones 59 in order 102, the Charger in 105, and 55 + 19 in
+order 110), home 100 and stationery 46. `COUNT(DISTINCT o.id)` counts orders, not lines, because order 105 has a
+line in two categories and must count once in each but not twice in one.
+
+**A table joined to itself.** `employees.manager_id` points at another row of `employees`. A
+<Term id="self-join">self-join</Term> uses the table twice under two aliases, `e` for the employee and `m` for the
+manager. LEFT JOIN keeps Rosa, who has no manager.
+
+<SqlRunner example={selfJoin} title="managers.sql" />
+
+**Every combination.** A <Term id="cross-join">cross join</Term> has no ON: it pairs every row with every row,
+so 3 cities × 3 categories gives 9 rows. That sounds useless until you need a report that shows zeros. A plain
+GROUP BY only has rows for combinations that occurred; LEFT JOINing the data onto a cross-joined grid keeps every
+combination.
+
+<SqlRunner example={crossJoin} title="every_pair.sql" />
+
+**Leftovers on both sides.** A FULL JOIN filtered to rows with a NULL on either side lists every record without a
+partner. Here that is Gus, Hana and the guest order 109, which is a useful data-quality check before trusting a
+join.
+
+<SqlRunner example={fullJoin} title="orphans.sql" />
+
+</Section>
+
+<Section kind="mistakes" title="Joins that lose or invent rows">
+
+<CommonMistake
+  title="A WHERE filter that undoes the LEFT JOIN"
+  wrong={"FROM customers c LEFT JOIN orders o ON o.customer_id = c.id\nWHERE o.status = 'shipped'"}
+  error="(no error) customers without shipped orders disappear from the report"
+  cause="WHERE runs after the join; for NULL-padded rows the condition is UNKNOWN, so they are dropped."
+  fix="Move the condition on the optional table into ON: LEFT JOIN orders o ON o.customer_id = c.id AND o.status = 'shipped'."
+/>
+
+<CommonMistake
+  title="Joining on the wrong column"
+  wrong={'JOIN customers c ON c.id = o.id'}
+  error="(no error) order 101 is matched with no one, or with the wrong customer whose id happens to equal 101"
+  cause="Both tables have an id column; the join compared the order's own id with the customer id."
+  fix="Join a foreign key to the key it references: ON c.id = o.customer_id. Check row counts after the join."
+/>
+
+<CommonMistake
+  title="A forgotten join condition"
+  wrong={'SELECT c.name, o.id FROM customers c, orders o;'}
+  error="(no error) 96 rows: every customer paired with every order"
+  cause="Listing tables with commas and no condition is a cross join: 8 × 12 = 96."
+  fix="Use explicit JOIN ... ON so a missing condition is a syntax error rather than a silent cross join."
+/>
+
+<CommonMistake
+  title="COUNT(*) after a LEFT JOIN"
+  wrong={'SELECT c.name, COUNT(*) AS orders FROM customers c LEFT JOIN orders o ON o.customer_id = c.id GROUP BY c.id;'}
+  error="(no error) Gus and Hana show 1 order each"
+  cause="Their NULL-padded row is still a row, and COUNT(*) counts rows."
+  fix="COUNT(o.id) counts only rows where an order matched."
+/>
+
+</Section>
+
+<Section kind="practice" title="A routine for every join">
+
+- **Predict the row count** from matched pairs plus kept leftovers, then run and compare.
+- **Start from the table whose rows must all survive**, and use LEFT JOIN from it.
+- **Conditions on the optional side go in ON**; conditions on the kept side can go in WHERE.
+- **Join keys to the keys they reference**, and check counts after each join in a chain.
+- **Count the optional side's key** (`COUNT(o.id)`) after an outer join, never `COUNT(*)`.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<SqlExercise exercise={exercise}>
+  List all 8 customers with `name` and `spent`, the total of their shipped order lines (quantity × unit price),
+  showing 0 for anyone without shipped orders. Highest spend first, ties broken by name. The starter loses three
+  customers; work out why before fixing it.
+</SqlExercise>
+
+</Section>
+
+<Section kind="summary">
+
+A join rebuilds a question across tables: it forms every pair of rows whose ON condition is TRUE, then the join
+type decides whether unmatched rows disappear (inner) or stay with NULLs on the other side (LEFT, RIGHT, FULL).
+NULL keys never match, and a key that matches several rows repeats the other side once per match. Because WHERE
+runs after the join, a condition on the optional side of an outer join belongs in ON; in WHERE it removes the very
+rows the outer join kept. Self-joins relate rows of one table, and cross joins build every combination for reports
+that must show zeros.
+
+The repetition of rows in one-to-many joins has a sharp consequence for sums, which is where the next lesson
+starts.
+
+Next: [Fan-out, semi-joins and anti-joins](#/learn/sql/joins/fanout-semi-anti).
+
+</Section>

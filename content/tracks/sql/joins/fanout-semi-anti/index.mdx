@@ -1,0 +1,183 @@
+import { antiJoin, fanoutBug, fanoutFix, fanoutLab, joinDuplicates, notInTrap, semiJoin } from './code';
+import { exercise, questions } from './quiz';
+
+<Section kind="intuition" title="When a join copies rows you then add up">
+
+The last lesson ended with a warning: a join repeats a row once for every match. That repetition is harmless when
+you only look at the rows, and dangerous the moment you SUM them.
+
+Here is the situation in plain words. Order 107 contains 2 items (a desk lamp at 32 and a mug at 9, so 41 in
+total), and Eli paid for it in 2 instalments of 20.50. Suppose you want one line per order showing "items total"
+and "amount paid", so you join the order to its items and to its payments. The join has to pair every item with
+every payment, because both belong to the same order and SQL has no other way to put them in one row. 2 items ×
+2 payments = 4 rows. Each item now appears twice and each payment appears twice, so both sums come out at 82
+instead of 41. Nothing errors. The report is simply double.
+
+This is called <Term id="join-fan-out">fan-out</Term>, and it is the most common cause of inflated numbers in
+analytics. The second half of the lesson covers the opposite need: sometimes you do not want the matching rows at
+all, only the answer to "is there a match?" or "is there no match?". Those are semi-joins and anti-joins, and they
+avoid duplicates by design.
+
+</Section>
+
+<Section kind="technical" title="Why fan-out happens, and the two ways to avoid it">
+
+**Grain again.** `order_items` and `payments` are both one-to-many from `orders`: one order, many lines; one
+order, many payments. Joining `orders` to `order_items` changes the grain to "one order line". Joining that to
+`payments` changes it again, to "one (order line, payment) pair". The second join is many-to-many through the
+order, which is why the rows multiply rather than add.
+
+The rule to remember: **each sum gets multiplied by the number of rows on the other side**. Order 107's item
+total is multiplied by its 2 payments, and its payment total by its 2 items. Order 105 has 2 items but only 1
+payment, so its item total is right (31) while its payments are doubled (62).
+
+<SqlRunner example={fanoutBug} title="fanout_bug.sql" />
+
+**Fix 1: aggregate each side to the join key first.** If each side has at most one row per order before it is
+joined, nothing can multiply. Compute "items total per order" in one subquery, "paid per order" in another, and
+join those one-row-per-order results to `orders`. Now 107 shows 41 and 41.
+
+<SqlRunner example={fanoutFix} title="fanout_fix.sql" />
+
+**Fix 2: do not join what you do not need.** If the question is only about payments, leave `order_items` out.
+Every extra one-to-many join is a chance to fan out.
+
+What about `SUM(DISTINCT ...)`? It is a tempting patch and a bad one: DISTINCT removes duplicate values, not
+duplicate rows, so two genuine lines that both cost 9.00 would count once. It hides the symptom on test data and
+fails on real data.
+
+</Section>
+
+<Section kind="visual" title="Try it: how many rows, and how wrong is the sum?">
+
+One order with some items and some payments. Change how many of each and watch the joined rows and the two sums.
+
+<Experiment def={fanoutLab} title="Fan-out explorer">
+  <FanOut />
+  <Readout title="This order" />
+</Experiment>
+
+Things to try:
+
+- **2 items, 2 payments.** 4 rows; both sums double, like order 107.
+- **3 items, 1 payment.** 3 rows; the item total is right, the paid total is tripled. With only one row on one
+  side, that side causes no inflation, but the other side's sum is multiplied by it.
+- **4 items, 4 payments.** 16 rows and every sum is 4 times too big. Fan-out grows with the product of the sides,
+  so one customer with many orders and many support tickets can dominate a report.
+- **Switch the query to "SUM each side first".** Always 1 row and both sums correct, whatever the counts.
+
+</Section>
+
+<Section kind="code" title="Semi-joins and anti-joins: asking only whether a match exists">
+
+**The question behind the query.** "Which customers bought electronics?" is a yes/no question per customer. A
+join answers a different question, "list every (customer, electronics line) pair", so Ben appears twice (he bought
+headphones in two orders) and so does Chen (headphones and a charger in one order).
+
+<SqlRunner example={joinDuplicates} title="join_repeats.sql" />
+
+A <Term id="semi-join">semi-join</Term> keeps each row of the first table at most once, if at least one match
+exists. In SQL it is `WHERE EXISTS (subquery)`. The subquery mentions `c.id` from the outer query, so it is
+evaluated per customer: "for this customer, is there at least one electronics line?". `SELECT 1` inside EXISTS is
+a convention: EXISTS only cares whether a row comes back, not what is in it.
+
+<SqlRunner example={semiJoin} title="semi_join.sql" />
+
+`WHERE c.id IN (SELECT customer_id FROM ...)` is another way to write a semi-join, and fine when the subquery
+does not need the outer row.
+
+An <Term id="anti-join">anti-join</Term> is the opposite: keep the rows with no match. "Customers who never
+ordered" and "products never sold" are anti-joins. Two safe spellings:
+
+- `WHERE NOT EXISTS (subquery)`: "there is no matching row".
+- `LEFT JOIN ... WHERE right.key IS NULL`: keep every row, then keep only those the LEFT JOIN had to pad with
+  NULLs. Test the join key (or another column that cannot be NULL in a real match), so a padded row is the only way
+  the test can be TRUE.
+
+<SqlRunner example={antiJoin} title="anti_join.sql" />
+
+**The NOT IN trap, now with a real cause.** The obvious third spelling, `WHERE id NOT IN (SELECT customer_id
+FROM orders)`, returns nothing here. The NULL lesson explained why: NOT IN means "not equal to every value in the
+list", and the guest order puts a NULL in the list. "id is not equal to NULL" is UNKNOWN, so no customer passes.
+NOT EXISTS does not have this problem, because it asks whether a matching row exists, and a NULL key never
+matches anything.
+
+<SqlRunner example={notInTrap} title="not_in_trap.sql" />
+
+</Section>
+
+<Section kind="mistakes" title="Duplicates and disappearing rows">
+
+<CommonMistake
+  title="Summing across two one-to-many joins"
+  wrong={'FROM orders o JOIN order_items oi ON ... JOIN payments p ON ...\nSELECT SUM(oi.quantity * oi.unit_price), SUM(p.amount)'}
+  error="(no error) orders with several items and several payments are counted several times"
+  cause="The two child tables multiply each other through the shared order."
+  fix="Aggregate each child table to one row per order_id first, then join."
+/>
+
+<CommonMistake
+  title="Patching fan-out with DISTINCT"
+  wrong={'SELECT SUM(DISTINCT p.amount) ...'}
+  error="(no error) two genuine instalments of 20.50 count as one"
+  cause="DISTINCT removes repeated values, not repeated rows."
+  fix="Remove the cause: pre-aggregate, or drop the join that is not needed."
+/>
+
+<CommonMistake
+  title="NOT IN with a nullable subquery"
+  wrong={'WHERE id NOT IN (SELECT customer_id FROM orders)'}
+  error="(no error) no rows at all"
+  cause="One NULL customer_id makes 'id <> NULL' UNKNOWN for every customer."
+  fix="WHERE NOT EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = customers.id)."
+/>
+
+<CommonMistake
+  title="Using a join to test for existence"
+  wrong={"SELECT c.name FROM customers c JOIN orders o ON o.customer_id = c.id WHERE o.status = 'returned'"}
+  error="(no error) customers with two returned orders are listed twice"
+  cause="A join returns every matching pair, not one row per customer."
+  fix="WHERE EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = c.id AND o.status = 'returned')."
+/>
+
+</Section>
+
+<Section kind="practice" title="Habits that keep totals honest">
+
+- **Before every join, say what it does to the grain.** One-to-one keeps it; one-to-many changes it.
+- **Never join two one-to-many children of the same parent and then sum.** Pre-aggregate each child.
+- **Use EXISTS and NOT EXISTS for yes/no questions** instead of joins with DISTINCT.
+- **Avoid NOT IN on subqueries**; if you must, filter out NULLs inside the subquery.
+- **Reconcile**: a total after joins should equal the same total from the base table alone.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<SqlExercise exercise={exercise}>
+  For every order that has at least one payment, return `id`, `items_total` (the sum of its lines) and `paid`
+  (the sum of its payments), with no fan-out. The starter double-counts two orders. Find them, then fix the query.
+</SqlExercise>
+
+</Section>
+
+<Section kind="summary">
+
+A join repeats rows once per match, so joining two one-to-many tables to the same parent multiplies them: every
+sum is inflated by the row count of the other side. The fix is to bring each side to one row per key before
+joining (or to leave out joins the question does not need), not DISTINCT. When the question is only whether a
+match exists, use a semi-join (EXISTS) or an anti-join (NOT EXISTS, or LEFT JOIN with IS NULL on the key); they
+return each row at most once. NOT IN breaks when its list contains a NULL, which ties this lesson back to
+three-valued logic.
+
+The pre-aggregating subqueries above are getting long. The next lesson gives them names.
+
+Next: [Subqueries and CTEs](#/learn/sql/ctes/subqueries-ctes).
+
+</Section>

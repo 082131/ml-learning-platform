@@ -707,8 +707,8 @@ export const tracks: Track[] = [
         title: 'Combining tables with joins',
         level: 'intermediate',
         lessons: [
-          { id: 'sql/joins/join-types', status: 'outline' },
-          { id: 'sql/joins/fanout-semi-anti', status: 'outline' },
+          { id: 'sql/joins/join-types', status: 'written' },
+          { id: 'sql/joins/fanout-semi-anti', status: 'written' },
         ],
       },
       {

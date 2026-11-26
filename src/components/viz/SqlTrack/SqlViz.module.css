@@ -113,3 +113,21 @@
   border-style: dashed;
   border-color: var(--warn);
 }
+.sql {
+  margin: 0;
+  padding: var(--s-2) var(--s-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow-x: auto;
+  white-space: pre;
+}
+.why {
+  color: var(--ink-2);
+  font-family: var(--font-sans);
+}
+.rows tr[data-padded] td {
+  background: var(--accent-soft);
+}
