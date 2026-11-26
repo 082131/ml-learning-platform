@@ -694,7 +694,7 @@ export const tracks: Track[] = [
         lessons: [
           { id: 'rl/foundations/agents-rewards', status: 'written' },
           { id: 'rl/foundations/returns-discounting', status: 'written' },
-          { id: 'rl/foundations/bandits-exploration', status: 'outline' },
+          { id: 'rl/foundations/bandits-exploration', status: 'written' },
         ],
       },
       {

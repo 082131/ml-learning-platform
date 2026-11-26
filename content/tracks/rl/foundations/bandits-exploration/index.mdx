@@ -1,0 +1,212 @@
+import { bandit, banditPy, policyCode } from './code';
+import { questions, ucbExercise } from './quiz';
+
+<Section kind="intuition" title="Your favourite restaurant, or the new one?">
+
+You know a restaurant you like. Tonight you can go there again and get a good meal for sure, or try the new place
+down the street, which might be better or might be a disappointment. If you always go to your favourite, you will
+never find out that the new place is excellent. If you always try new places, you rarely enjoy the meals you already
+know are good.
+
+That is the **exploration–exploitation trade-off**: *exploiting* means using the option that currently looks best;
+*exploring* means trying other options to learn more about them. Every RL agent faces it, because it only learns
+about actions it actually tries (the second problem from lesson 1).
+
+This lesson studies the trade-off in the simplest possible RL problem, where there is only one situation and the only
+question is which action to take, again and again. Strip everything else away and the trade-off is easy to see.
+
+</Section>
+
+<Section kind="technical" title="Bandits, estimates and three ways to explore">
+
+### The problem
+
+A <Term id="multi-armed-bandit">multi-armed bandit</Term> is a row of slot machines (old slang: "one-armed
+bandits"). Each machine, or *arm*, pays out with its own probability, which you do not know. Every turn you pull one
+arm and see whether it paid. Your goal is the largest total payout over, say, 1,000 pulls.
+
+Our version is a website testing four headlines, A to D, for the same article. Showing a headline is pulling an arm;
+a click is a reward of 1, no click is 0. The true click rates are 0.30, 0.50, 0.45 and 0.60. D is the best, but B and
+C are close enough that a few unlucky impressions can make D look worse than them. The agent never sees these
+numbers; it only sees clicks.
+
+In the language of lesson 1: there is one state (the same web page every time), four actions, and each episode is a
+single step. There are no delayed consequences at all, which is exactly why bandits are the cleanest place to study
+exploration.
+
+### Step 1: estimate each arm from what you have seen
+
+The natural estimate of a headline's click rate is the average reward it has earned so far: clicks divided by times
+shown. We call that estimate $Q(a)$ for arm $a$, and $N(a)$ is how many times it has been shown.
+
+Keeping a list of every reward to average it would be wasteful. Instead the estimate can be updated one reward at a
+time with the <Term id="incremental-mean">incremental mean</Term>:
+
+$$
+Q(a) \leftarrow Q(a) + \frac{1}{N(a)} \bigl( R - Q(a) \bigr)
+$$
+
+Read it as a sentence: **new estimate = old estimate + step size × (what we just saw − what we expected)**. The
+part in brackets is the *surprise*: positive if the reward was better than expected, negative if worse. The step size
+$1/N(a)$ decides how much one surprise moves the estimate. The first reward moves it all the way (step 1), the tenth
+only a tenth of the way, because by then nine earlier rewards also count. A small example: after clicks 1, 0, 1 the
+estimate goes 0 → 1 → 0.5 → 0.667, exactly the plain average 2/3.
+
+Remember this shape. Every learning rule in this track, from TD learning to Q-learning to policy gradients, is
+"move the estimate a step toward a target". Only the target changes.
+
+### Step 2: why pure greedy fails
+
+The obvious policy is **greedy**: always show the headline with the highest estimate. The problem is that estimates
+built from a handful of impressions are noisy, and greedy never revisits a headline once it falls behind. If D gets
+no clicks in its first two showings, its estimate is 0 and greedy may never show it again. Its bad estimate can never
+be corrected, because correcting it would require showing it.
+
+In the Python run below this is exactly what happens. All estimates start at 0 and ties go to the first headline,
+so greedy shows A. A's estimate can only stay at 0 or rise above 0, so it is never behind the untried headlines, and
+greedy shows A all 1,000 times. It earns 296 clicks when about 600 were possible.
+
+### Step 3: three cures
+
+1. **<Term id="epsilon-greedy">ε-greedy</Term>.** Be greedy most of the time, but with a small probability
+   $\varepsilon$ (epsilon, say 0.1) pick a headline at random. Every headline keeps getting shown occasionally, so
+   no estimate stays wrong forever. The price: even after the agent knows D is best, it still wastes 10% of its pulls
+   on random choices.
+2. **Optimistic starting values.** Start every estimate at 1.0, higher than any real click rate. Each headline then
+   *disappoints* the first times it is shown, its estimate drops, and even a greedy agent moves on to the next one.
+   Every arm gets tried early, for free. It only helps at the start, though: once the estimates settle, it is plain
+   greedy again.
+3. **<Term id="ucb">Upper confidence bound (UCB)</Term>.** Pick the arm with the highest *optimistic* score:
+
+$$
+\text{score}(a) = Q(a) + c \sqrt{\frac{\ln t}{N(a)}}
+$$
+
+The first part is what we believe; the second part is a bonus for uncertainty. $N(a)$ in the denominator makes the
+bonus big for arms shown rarely and small for arms shown often. $\ln t$ (the natural log of the number of pulls so
+far) grows slowly, so an arm that has been ignored for a long time slowly earns its bonus back and gets another
+look. $c$ sets how strongly the agent explores. The idea in plain words: **"an option I know little about might be
+   great, so give it the benefit of the doubt"**. Unlike ε-greedy, UCB explores on purpose, not at random.
+
+### Step 4: how we measure "good exploration"
+
+Total reward is the obvious score. A sharper one is <Term id="regret">regret</Term>: how many clicks we lost compared
+with showing D every time. With 500 pulls the best possible expectation is $0.6 \times 500 = 300$ clicks, so an agent
+that averages 275 has a regret of 25. Good exploration keeps regret growing slowly: the agent pays for learning early
+and then mostly exploits.
+
+### Exploration vs exploitation, side by side
+
+| | Exploring | Exploiting |
+| --- | --- | --- |
+| What it does | tries actions whose value is uncertain | takes the action with the best estimate |
+| What it gains | better estimates, so better choices later | reward now |
+| What it costs | reward now (some tries are bad) | possibly missing a better action forever |
+
+Neither is "right". A good agent explores a lot when it knows little and less as its estimates firm up.
+
+</Section>
+
+<Section kind="visual" title="Try it: four headlines, 500 impressions">
+
+The top panel shows one run: the true click rate of each headline (thin bar, hidden from the agent) and the agent's
+estimate after 500 impressions (thick bar), with how often it showed each one. The chart averages 200 runs, so you
+see the typical behaviour, not one lucky or unlucky run.
+
+<Experiment def={bandit} title="Bandit explorer">
+  <RlBandit />
+  <Readout title="Averaged over 200 runs" />
+</Experiment>
+
+Things to try:
+
+- **Greedy**: the share of runs choosing D settles far below 100%. Many runs locked onto whichever headline clicked
+  first. Look at the top panel: some headlines were shown once or never, and their estimates are just wrong.
+- **Greedy with optimistic start (1)**: same strategy, noticeably better, because every headline gets tried early.
+- **ε-greedy, ε = 0.1**: climbs toward picking D most of the time. Now drag ε to 0.5: it finds D quickly, but half its
+  pulls are random forever, so the reward per pull drops. Drag ε to 0.01: it explores so rarely that many runs stay
+  stuck.
+- **UCB**: try c = 1, then c = 0.3. A smaller c trusts the estimates sooner. Notice that the starting estimate makes
+  no difference to UCB, because it tries every headline once before its scores mean anything.
+- **Change the seed** to see that a single run can look very different from the average.
+
+</Section>
+
+<Section kind="code" title="The same strategies in Python">
+
+All three strategies on the same four headlines, 1,000 impressions each, with a fixed seed. Python's random number
+generator draws different numbers from the explorer's, so the counts are not identical to the visual, but the story is
+the same.
+
+<PythonRunner example={banditPy} title="bandit.py" />
+
+Read the output as a story. Greedy showed A 1,000 times. ε-greedy explored, but in this run B got most of the impressions
+(490) and D only 98; its estimates of B, C and D ended almost tied, so it never committed to D and earned less than
+UCB. UCB
+kept giving D the benefit of the doubt and ended up showing it 728 times, with a correct estimate of 0.60. One run
+proves little, which is why the explorer averages 200.
+
+The explorer's current settings, in the variables `run()` uses:
+
+<Experiment def={bandit} title="your settings as code" controls={false}>
+  <Code example={policyCode} title="settings.py" />
+</Experiment>
+
+</Section>
+
+<Section kind="mistakes" title="Exploration mistakes">
+
+<CommonMistake
+  title="Never exploring"
+  wrong={'a = Q.index(max(Q))   # always the best estimate'}
+  error="(no error) one headline gets every impression; the best one may never be shown twice"
+  cause="An estimate can only be corrected by trying the action again, and greedy never does."
+  fix="Add ε-greedy, optimistic initial values or UCB, and check how often each action was tried."
+/>
+
+<CommonMistake
+  title="Averaging with the wrong count"
+  wrong={'Q[a] += (reward - Q[a]) / t   # t = total pulls so far'}
+  error="(no error) estimates of rarely chosen arms barely move"
+  cause="The step size must be 1/N(a), the number of times this arm was pulled, not the total number of pulls."
+  fix="Keep a count per arm and divide by it."
+/>
+
+<CommonMistake
+  title="Judging a strategy by one run"
+  wrong="ε-greedy got 472 clicks and UCB 553, so UCB is always better."
+  error="(misconception) with a different seed the order can flip"
+  cause="Bandit results are noisy: a few lucky clicks early on change the whole run."
+  fix="Compare strategies averaged over many runs, as the explorer does, and report the spread as well as the mean."
+/>
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={ucbExercise}>
+  Write the incremental update and the UCB choice.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+The chain of this lesson: the agent only learns about actions it tries, so it must sometimes **explore** instead of
+**exploiting** its current best guess. In a bandit it keeps one **estimate per action**, updated by the incremental
+mean ("old + step × (reward − old)"), the update shape that every later method reuses. **Pure greedy** can lock onto a
+bad action because a wrong estimate is never retested. **ε-greedy** retests at random, **optimistic starts** force
+early tries, and **UCB** retests the options it is least sure about. **Regret** measures what exploration cost.
+
+A bandit has one state and no delayed consequences. Real problems have many states, where an action also changes
+*where you end up next*, and where that landing spot may be random. The next lesson writes that world down precisely.
+
+Next: [Markov decision processes](#/learn/rl/mdp/markov-decision-processes).
+
+</Section>
