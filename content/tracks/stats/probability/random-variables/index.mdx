@@ -1,0 +1,212 @@
+import { formulaCode, gamble, simRunner } from './code';
+import { evExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Putting numbers on outcomes">
+
+So far our outcomes were yes/no: fraud or not, a 7 or not. Most data are numbers: dollars spent, minutes waited,
+orders per day. A <Term id="random-variable">random variable</Term> is simply **a number whose value is decided by
+chance**. The roll of a die is one. So is the payout of a prize spinner, the size of tomorrow's insurance claims,
+or the number of users who sign up today.
+
+Once outcomes are numbers, two questions come up every time, and this lesson answers both:
+
+1. **What value should I expect, on average?** If you play the spinner all evening, will you end up ahead? If an
+   insurer sells 10,000 policies, how much will it pay out?
+2. **How far from that average does a single result usually land?** Is the payout reliably close to the average, or
+   could one evening be a big win and the next a big loss?
+
+The first answer is the expected value. The second is the variance and its square root, the standard deviation.
+Everything later in this track, from sampling to A/B tests, is built on these two numbers.
+
+</Section>
+
+<Section kind="technical" title="Expected value and spread">
+
+### The distribution is a table
+
+A random variable is described by its distribution: every value it can take and the probability of each. For a
+variable with a list of separate values (a discrete variable), that table is called its
+<Term id="pmf">probability mass function</Term>, or PMF. Our running example is a prize spinner:
+
+| Outcome | Value $x$ | Probability $p$ |
+| --- | --- | --- |
+| lose | −$1 | 0.5 |
+| small win | +$1 | 0.3 |
+| big win | +$4 | 0.2 |
+
+The probabilities add up to 1, because one of the outcomes always happens.
+
+### Expected value: the long-run average
+
+Imagine spinning 1,000 times. About 500 spins lose $1, about 300 win $1 and about 200 win $4. Your total is about
+$500 \cdot (-1) + 300 \cdot 1 + 200 \cdot 4 = 600$ dollars, so your average per spin is about $0.60.
+
+Notice what we did: we multiplied each value by how often it happens and added up. Dividing the counts by 1,000
+turns them into probabilities, and that gives the definition of the
+<Term id="expected-value">expected value</Term>:
+
+$$
+E[X] = \sum_x x \cdot P(X = x) = (-1)(0.5) + (1)(0.3) + (4)(0.2) = 0.6
+$$
+
+It is a **weighted average**: each value counts in proportion to how often it occurs. The law of large numbers
+(from the first lesson) is the promise that makes it meaningful: the average of many independent spins really does
+settle near 0.6.
+
+Two things the expected value is **not**. It need not be a possible outcome (no single spin pays $0.60). And it is
+not "the typical result": half the spins lose money.
+
+### Variance: how far results usually land from the average
+
+Two games can have the same expected value and feel completely different. "Always pay $0.60" and our spinner both
+average 0.6, but the spinner swings between −$1 and +$4. We need a number for that spread.
+
+The natural first idea is "the average distance from the mean". Distances above and below cancel if we keep their
+signs, so we square them first. The <Term id="variance">variance</Term> is the probability-weighted average of the
+squared distances:
+
+$$
+\mathrm{Var}(X) = \sum_x (x - E[X])^2 \cdot P(X = x)
+$$
+
+For the spinner: $(−1 − 0.6)^2 (0.5) + (1 − 0.6)^2 (0.3) + (4 − 0.6)^2 (0.2) = 1.28 + 0.048 + 2.312 = 3.64$.
+
+Squaring has a side effect: the units are squared too (dollars²), which means nothing to a person. Taking the square
+root brings us back to dollars. That is the <Term id="standard-deviation">standard deviation</Term>:
+
+$$
+\mathrm{SD}(X) = \sqrt{\mathrm{Var}(X)} = \sqrt{3.64} \approx 1.91 \text{ dollars}
+$$
+
+Read it as: a single spin typically lands about $1.91 away from the $0.60 average. Look at where the 3.64 came from:
+the big win contributes 2.312 of it. Rare values far from the mean dominate the variance, because the distance is
+squared.
+
+### Rules you will use again and again
+
+These rules let you get the mean and spread of new quantities without redoing the table. Each has a plain meaning.
+
+- **Shift and stretch:** $E[aX + b] = a\,E[X] + b$ and $\mathrm{SD}(aX + b) = |a|\,\mathrm{SD}(X)$. Converting
+  hours to minutes ($a = 60$) stretches every distance by 60. Adding a fixed fee ($b$) moves every value by the same
+  amount, so the average moves but the spread does not.
+- **Sums:** $E[X + Y] = E[X] + E[Y]$ always. If $X$ and $Y$ are independent,
+  $\mathrm{Var}(X + Y) = \mathrm{Var}(X) + \mathrm{Var}(Y)$. Variances add, **standard deviations do not**: two
+  independent spins have SD $\sqrt{3.64 + 3.64} \approx 2.70$, not $2 \times 1.91 = 3.82$, because a good spin and a bad
+  spin partly cancel.
+
+The second rule is the seed of the most important result in the sampling chapter. The total of $n$ independent spins
+has variance $n \cdot 3.64$, so its SD grows like $\sqrt{n}$. The average is the total divided by $n$, so its SD is
+$\sqrt{n} \cdot 1.91 / n = 1.91 / \sqrt{n}$: averages of more spins are less spread out. Keep that in mind; it comes
+back as the standard error.
+
+</Section>
+
+<Section kind="visual" title="Try it: watch the average settle">
+
+The left chart is the distribution table. The right chart plays the game over and over and plots the average so far.
+The dashed line is E[X].
+
+<Experiment def={gamble} title="Expected value explorer">
+  <GambleView />
+  <Readout title="This random variable" />
+</Experiment>
+
+Things to try:
+
+- **Spinner, 10 plays, then 5,000**: with 10 plays the average can be far from 0.6 (even negative). With 5,000 it
+  hugs the line. Change the seed to see different evenings.
+- **Insurance claims**: E[X] = $140 but 90% of policies pay $0, and the SD is about $707. The running average jumps
+  every time a $5,000 claim arrives. This is why insurers need many policies: one policy is unpredictable, the
+  average of 10,000 is not.
+- **Fair die**: E[X] = 3.5, a value the die can never show.
+
+</Section>
+
+<Section kind="code" title="The formulas, and a simulation">
+
+The formulas in code, for the random variable chosen above. Each line is one step of the derivation.
+
+<Experiment def={gamble} title="describe.py, linked to the explorer" controls={false}>
+  <Code example={formulaCode} title="describe.py" />
+  <Readout title="What it prints" />
+</Experiment>
+
+Now five players each spin 1,000 times. Compare the two columns: the averages are all near 0.6 but not equal, while
+the SD of single spins stays near 1.9 for everyone.
+
+<PythonRunner example={simRunner} title="spinner.py" />
+
+Those are two different spreads, and confusing them is one of the most common mistakes in statistics. The SD of
+single spins (about 1.9) describes one spin and does not shrink with more data. How much the **average** varies from
+player to player (here roughly 0.5 to 0.63) does shrink as each player spins more. The sampling chapter gives that
+second spread its name.
+
+</Section>
+
+<Section kind="mistakes" title="Averages that mislead">
+
+<CommonMistake
+  title="Reading the expected value as the typical outcome"
+  wrong={'"The expected claim is $140, so a typical customer costs us about $140."'}
+  error="(no error) 90% of customers cost $0, and 2% cost $5,000"
+  cause="The expected value is a weighted average, pulled up by rare large values. It says what the total of many will be, not what one will be."
+  fix="Report the expected value for totals and budgets, and the median or the full distribution for 'a typical customer'."
+/>
+
+<CommonMistake
+  title="Adding standard deviations"
+  wrong={'sd_total = sd_a + sd_b        # two independent sources of delay'}
+  error="(no error) overstates the spread: 3 + 3 = 6 instead of about 4.24"
+  cause="For independent variables, variances add. Standard deviations are square roots of variances, and square roots do not add."
+  fix="sd_total = (sd_a**2 + sd_b**2) ** 0.5. If the variables are correlated, add the covariance term as well."
+/>
+
+<CommonMistake
+  title="Probabilities that do not add up to 1"
+  wrong={'values = [0, 500, 5000]\nprobs  = [0.9, 0.08, 0.01]'}
+  error="(no error) E[X] comes out as $90 instead of $140, because 1% of the probability is missing"
+  cause="An outcome was left out or a probability was mistyped; the weighted average silently ignores the missing share."
+  fix="Assert abs(sum(probs) - 1) < 1e-9 before computing anything, as the exercise does."
+/>
+
+</Section>
+
+<Section kind="practice" title="Where you will use this">
+
+- **Cost and capacity planning.** Expected requests per user times the number of users gives expected load; the SD
+  tells you how much headroom to keep.
+- **Decisions under uncertainty.** "Should we ship this?" is often an expected value: the chance it works times the
+  gain, minus the chance it fails times the loss. The Bayesian A/B lesson uses exactly this as "expected loss".
+- **Loss functions.** Training a model minimises the expected loss over the data, approximated by the average loss on
+  a batch. Mean squared error is a variance-like quantity: the average squared distance from the truth.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={evExercise}>
+  Compute the mean, variance and standard deviation of any distribution table, and reject tables that are not valid.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+We gave outcomes numbers and called the result a random variable, described by a table of values and probabilities.
+Asking "what do I get on average over many plays?" led to the expected value, a probability-weighted average that the
+law of large numbers makes real. Asking "how far does one play usually land from that?" led to the variance, the
+weighted average of squared distances, and its square root, the standard deviation, which is back in the original
+units. Two rules connect them to everything that follows: shifting and stretching a variable moves and scales these
+numbers in predictable ways, and for independent variables the variances add, which is why an average of many draws
+is less spread out than a single draw.
+
+Writing out a table by hand works for three outcomes. Many real quantities follow a few standard shapes, and knowing
+them saves the work: [Bernoulli, binomial and Poisson](#/learn/stats/distributions/binomial-poisson).
+
+</Section>

@@ -680,4 +680,76 @@ export const tracks: Track[] = [
       },
     ],
   },
+  {
+    id: 'stats',
+    title: 'Statistics and probability',
+    code: 'T.11',
+    summary:
+      'The reasoning behind every data decision, built from intuition up: probability rules, conditional probability and Bayes\' rule, random variables, the binomial, Poisson and normal distributions, sampling and the central limit theorem, confidence intervals, hypothesis tests and power, A/B testing from design to decision, and Bayesian thinking.',
+    chapters: [
+      {
+        id: 'probability',
+        title: 'Probability',
+        level: 'beginner',
+        lessons: [
+          { id: 'stats/probability/probability-rules', status: 'written' },
+          { id: 'stats/probability/conditional-probability', status: 'written' },
+          { id: 'stats/probability/random-variables', status: 'written' },
+        ],
+      },
+      {
+        id: 'distributions',
+        title: 'Distributions',
+        level: 'beginner',
+        lessons: [
+          { id: 'stats/distributions/binomial-poisson', status: 'written' },
+          { id: 'stats/distributions/normal-distribution', status: 'written' },
+        ],
+      },
+      {
+        id: 'sampling',
+        title: 'Sampling',
+        level: 'intermediate',
+        lessons: [
+          { id: 'stats/sampling/sampling-distributions', status: 'written' },
+          { id: 'stats/sampling/central-limit-theorem', status: 'written' },
+        ],
+      },
+      {
+        id: 'inference',
+        title: 'Estimates and tests',
+        level: 'intermediate',
+        lessons: [
+          { id: 'stats/inference/confidence-intervals', status: 'written' },
+          { id: 'stats/inference/hypothesis-tests', status: 'written' },
+          { id: 'stats/inference/errors-power', status: 'written' },
+        ],
+      },
+      {
+        id: 'experiments',
+        title: 'A/B testing',
+        level: 'advanced',
+        lessons: [
+          { id: 'stats/experiments/ab-test-design', status: 'written' },
+          { id: 'stats/experiments/ab-test-analysis', status: 'written' },
+        ],
+      },
+      {
+        id: 'bayesian',
+        title: 'Bayesian thinking',
+        level: 'advanced',
+        lessons: [
+          { id: 'stats/bayesian/bayesian-updating', status: 'written' },
+          { id: 'stats/bayesian/bayesian-ab-testing', status: 'written' },
+        ],
+      },
+      {
+        id: 'capstone',
+        title: 'Capstone',
+        level: 'advanced',
+        project: 'stats/capstone/experiment-report',
+        lessons: [{ id: 'stats/capstone/experiment-report', status: 'written' }],
+      },
+    ],
+  },
 ];

@@ -1,0 +1,216 @@
+import { countCode, dice, simRunner } from './code';
+import { probExercise, questions } from './quiz';
+
+<Section kind="intuition" title="A probability is a long-run share">
+
+Imagine you roll two dice a million times and keep a tally. Some totals turn up a lot (7 is the most common) and
+some rarely (2 and 12). If 7 shows up in about 167,000 of the million rolls, we say "the probability of a 7 is
+about 1/6". That is the simplest mental model of probability, and the one this whole track builds on: **a
+probability is the share of times something happens if you could repeat the situation over and over.**
+
+Why do we need this? Because almost every question in data work is a question about outcomes we cannot predict one
+by one. Will this user click? Is this transaction fraud? Did the new model really get better, or did it get lucky
+on this test set? We cannot answer "what will happen next time", but we can answer "how often would it happen",
+and that turns out to be enough to make good decisions. Statistics, A/B testing and machine learning are all built
+on top of that idea.
+
+A probability is always a number from 0 to 1. Zero means "never happens", 1 means "always happens", and 0.3 means
+"happens in about 30% of repetitions". It is not a promise about the next single trial: a 30% event can happen
+three times in a row, and a 90% event can fail. It is a promise about the long run.
+
+</Section>
+
+<Section kind="technical" title="Outcomes, events and three rules">
+
+### Step 1: list everything that could happen
+
+To compute a probability we first need a complete list of possible outcomes. That list is called the
+<Term id="sample-space">sample space</Term>. For two dice it is every pair (first die, second die): (1, 1), (1, 2),
+and so on up to (6, 6), which makes 6 × 6 = 36 outcomes.
+
+Notice that (3, 4) and (4, 3) are listed separately. That matters, because the next step only works if every
+outcome in the list is equally likely, and each specific pair has the same chance, 1 in 36. If you lumped "a 3 and
+a 4" into one outcome, it would be twice as likely as "two 3s", and counting would give wrong answers.
+
+### Step 2: ask a yes/no question about the outcome
+
+An <Term id="probability-event">event</Term> is any yes/no question about the outcome: "is the sum 7?", "is the
+first die a 6?". Each event picks out some of the 36 outcomes. "The sum is 7" picks out six of them: (1, 6),
+(2, 5), (3, 4), (4, 3), (5, 2), (6, 1).
+
+### Step 3: count and divide
+
+When all outcomes are equally likely, the probability of an event is just a share:
+
+$$
+P(A) = \frac{\text{number of outcomes in } A}{\text{number of outcomes in the sample space}}
+$$
+
+So $P(\text{sum is 7}) = 6/36 = 1/6$. This is the "long-run share" idea from the intuition, computed without
+rolling anything: if every one of the 36 pairs comes up equally often in the long run, then sum-7 pairs make up
+6/36 of all rolls.
+
+### Three rules that save you from counting
+
+Counting works for dice, but most real problems have too many outcomes to list. Three rules let you combine
+probabilities you already know.
+
+**1. The complement rule ("not").** Either A happens or it does not, so the two chances add up to 1:
+
+$$
+P(\text{not } A) = 1 - P(A)
+$$
+
+This is most useful for "at least one" questions. "At least one 6 in four rolls" has many cases (one 6, two 6s,
+...), but its <Term id="complement-rule">complement</Term>, "no 6 at all", has just one. We compute the easy side
+and subtract from 1.
+
+**2. The addition rule ("or").** To get the chance that A or B (or both) happens, add the two chances, then
+subtract the overlap:
+
+$$
+P(A \text{ or } B) = P(A) + P(B) - P(A \text{ and } B)
+$$
+
+Why subtract? Outcomes that are in both A and B were counted once in $P(A)$ and again in $P(B)$. Subtracting
+$P(A \text{ and } B)$ removes the double count. When the events cannot happen together (they are
+<Term id="mutually-exclusive">mutually exclusive</Term>), the overlap is 0 and you simply add.
+
+**3. The multiplication rule ("and").** If knowing that A happened does not change the chance of B, the events are
+<Term id="independent-events">independent</Term>, and
+
+$$
+P(A \text{ and } B) = P(A) \cdot P(B)
+$$
+
+Separate rolls of a die are independent (the die has no memory), so the chance of two 6s in two rolls is
+$\tfrac16 \cdot \tfrac16 = \tfrac{1}{36}$. If the events are not independent, you cannot just multiply. The next
+lesson shows what to do instead.
+
+### Independent is not the same as mutually exclusive
+
+These two words sound related and are constantly mixed up, so it is worth being precise.
+
+- **Mutually exclusive** means A and B **cannot both happen**: "the sum is 2" and "the sum is 12". The overlap is
+  empty.
+- **Independent** means knowing A **tells you nothing** about B: "the first die is odd" and "the second die is 6".
+  They overlap (in 3 outcomes), and that overlap is exactly as large as the product rule predicts.
+
+In fact, two mutually exclusive events with positive probabilities are never independent. If you learn that the sum
+was 2, you know for certain the sum was not 12. That is the strongest information one event can give about another.
+
+</Section>
+
+<Section kind="visual" title="Try it: count the cells">
+
+Pick two events. The grid lists all 36 outcomes (rows are the first die, columns the second) and marks the cells in
+A, in B, and in both. The readout does the three rules with those counts.
+
+<Experiment def={dice} title="Two-dice explorer">
+  <DiceGrid />
+  <Readout title="Counting" />
+</Experiment>
+
+Things to try, and what to look for:
+
+- **"the sum is 7" and "the first die shows 6"**: one cell in both. $1/36 = (6/36) \cdot (6/36)$, so they are
+  independent. Surprising at first: learning the first die is a 6 leaves exactly one way to reach 7 out of six
+  possible second dice, which is still 1/6.
+- **"the sum is 10 or more" and "the first die shows 6"**: three cells in both, but the product rule predicts only
+  one. A 6 on the first die makes a high sum much more likely, so the events are dependent.
+- **"both dice show the same number" and "the sum is 7"**: no overlap at all. They are mutually exclusive, and the
+  readout shows that this makes them dependent.
+
+</Section>
+
+<Section kind="code" title="The same counting in Python">
+
+This program is the explorer above written in Python. The two event lines change when you change the menus, so you
+can read the exact rule being counted.
+
+<Experiment def={dice} title="count_dice.py, linked to the explorer" controls={false}>
+  <Code example={countCode} title="count_dice.py" />
+  <Readout title="What it prints" />
+</Experiment>
+
+Counting gives exact answers. Simulation gives approximate ones, but it works for problems far too big to list. This
+run rolls two dice many times and measures the share of 7s. Watch how close the share gets to 1/6 as the number of
+rolls grows: that is the long-run idea from the start of the lesson, happening in front of you.
+
+<PythonRunner example={simRunner} title="simulate_dice.py" />
+
+With 100 rolls the share can be off by several percentage points; with a million it is within a few hundredths of a
+point. The error shrinks roughly like $1/\sqrt{n}$, which is why you need a hundred times more rolls to get ten times
+closer. That pattern, the <Term id="law-of-large-numbers">law of large numbers</Term>, returns in the sampling
+chapter, where it becomes the reason bigger A/B tests give sharper answers.
+
+</Section>
+
+<Section kind="mistakes" title="Where counting goes wrong">
+
+<CommonMistake
+  title="Outcomes that are not equally likely"
+  wrong={'sums = range(2, 13)          # 11 possible sums\nP_sum_7 = 1 / len(sums)        # 1/11'}
+  error="(no error) the answer 0.0909 is wrong: the true value is 1/6 = 0.1667"
+  cause="Counting only works on equally likely outcomes. The sums are not equally likely: 7 can be made 6 ways, 2 only one way."
+  fix="Count in the sample space of equally likely outcomes (the 36 ordered pairs), then group them into sums."
+/>
+
+<CommonMistake
+  title="Adding probabilities of events that overlap"
+  wrong={'P_mobile_or_ad = 0.5 + 0.4      # 0.9'}
+  error="(no error) 0.9 overstates it; with a 0.2 overlap the true value is 0.7"
+  cause="Users who are both on mobile and from an ad are counted twice."
+  fix="Subtract the overlap: P(A or B) = P(A) + P(B) - P(A and B). Only add directly when the events cannot happen together."
+/>
+
+<CommonMistake
+  title="Multiplying probabilities of dependent events"
+  wrong={'P_two_aces = (4/52) * (4/52)   # drawing two cards without putting the first back'}
+  error="(no error) 0.0059 is slightly too high; the true value is 4/52 * 3/51 = 0.0045"
+  cause="After one ace is drawn, only 3 aces remain among 51 cards. The second draw depends on the first."
+  fix="Multiply by the conditional probability of the second event given the first: the next lesson's topic."
+/>
+
+</Section>
+
+<Section kind="practice" title="Where you will use this">
+
+- **Data checks.** "What share of rows have a missing email or a missing phone?" is the addition rule. Computing it
+  as the sum of the two shares double counts rows missing both.
+- **System reliability.** If three independent services each have 99.9% uptime and a request needs all three, it
+  succeeds with probability $0.999^3 \approx 0.997$. If they share a database, they are not independent, and the
+  real number can be very different.
+- **"At least one" in experiments.** Testing 20 metrics, each with a 5% false alarm chance, gives a
+  $1 - 0.95^{20} \approx 64\%$ chance of at least one false alarm. The A/B testing chapter comes back to this.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={probExercise}>
+  Turn the counting method into two small functions, and use them to test independence exactly.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+We started with the idea that a probability is a long-run share. To compute that share without repeating anything,
+we listed the equally likely outcomes (the sample space), asked a yes/no question about them (an event), and divided
+the favourable count by the total. Because listing is not always possible, we picked up three rules that combine
+known probabilities: "not" subtracts from 1, "or" adds and removes the double counted overlap, and "and" multiplies,
+but only when the events are independent, meaning one tells you nothing about the other. Mutually exclusive events
+are the opposite case: knowing one rules the other out.
+
+The open question is what to do when events are **not** independent, which is most of real life: a transaction
+that is flagged is more likely to be fraud, a user who clicked once is more likely to click again. That is
+conditional probability, next: [Conditional probability and Bayes' rule](#/learn/stats/probability/conditional-probability).
+
+</Section>

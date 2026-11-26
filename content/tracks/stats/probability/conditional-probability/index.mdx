@@ -1,0 +1,207 @@
+import { bayesCode, screen, sweepRunner } from './code';
+import { bayesExercise, questions } from './quiz';
+
+<Section kind="intuition" title="New information shrinks the world">
+
+You run a fraud model on card payments. It is good: it flags 95% of fraudulent payments and only 5% of legitimate
+ones. A payment just got flagged. How likely is it to be fraud?
+
+Most people answer "about 95%". The real answer, with 1 fraudulent payment in every 100, is about 16%. Six out of
+seven flagged payments are false alarms, from a model that sounds excellent. This lesson is about why, and the idea
+behind it is simple once you see it: **when you learn something, you stop looking at everything that could have
+happened and look only at the cases where what you learned is true.** "The payment was flagged" means: forget the
+payments that were not flagged, and ask what share of the flagged ones are fraud.
+
+That shrinking of the world is called conditioning, and it is what the previous lesson's multiplication rule was
+missing. It is also the most practical idea in this chapter. Every time a model, a test or an alert says
+"positive", someone has to decide how much to trust it, and that trust depends on how common the real thing was to
+begin with.
+
+</Section>
+
+<Section kind="technical" title="From counts to Bayes' rule">
+
+### Conditional probability: the share inside the smaller world
+
+The <Term id="conditional-probability">conditional probability</Term> $P(A \mid B)$, read "the probability of A
+given B", is the share of B-cases in which A also happens:
+
+$$
+P(A \mid B) = \frac{P(A \text{ and } B)}{P(B)}
+$$
+
+Read the formula as the "shrink the world" idea. The denominator, $P(B)$, is the new world: only the cases where B
+happened. The numerator, $P(A \text{ and } B)$, is the part of that world where A happens too. Dividing gives the
+share.
+
+A tiny example with counts. In a class of 100, 40 students did a practice exam and 24 of those passed. Then
+$P(\text{passed} \mid \text{practised}) = 24/40 = 0.6$. We ignored the 60 who did not practise, because the
+condition says we only care about those who did.
+
+### The order inside the bar matters
+
+$P(A \mid B)$ and $P(B \mid A)$ have the same "and" on top but different worlds underneath:
+
+- $P(\text{flagged} \mid \text{fraud})$: among fraudulent payments, the share the model flags. This is the model's
+  <Term id="sensitivity">sensitivity</Term> (also called recall or true positive rate), here 95%.
+- $P(\text{fraud} \mid \text{flagged})$: among flagged payments, the share that are fraud. This is what the person
+  reviewing the alert needs to know (it is also the model's precision), and it is only 16%.
+
+They differ because the worlds have different sizes. There are 1,000 fraudulent payments but 5,900 flagged ones, so
+the same 950 "fraud and flagged" payments are a big share of the first world and a small share of the second.
+
+### Natural frequencies: the tree
+
+The clearest way to get from one to the other is to imagine a concrete crowd. Take 100,000 payments:
+
+1. **Split by the truth.** The <Term id="base-rate">base rate</Term> of fraud is 1%, so 1,000 are fraud and 99,000
+   are legitimate.
+2. **Split each group by the model.** It flags 95% of the 1,000 fraud (950 caught, 50 missed) and, through its
+   <Term id="false-positive-rate">false positive rate</Term> of 5%, 5% of the 99,000 legitimate payments (4,950
+   false alarms).
+3. **Condition on what you saw.** Everything flagged: 950 + 4,950 = 5,900. The fraudulent share: 950 / 5,900 ≈
+   16.1%.
+
+Why so low? Because the 5% false alarm rate is applied to a huge group (99,000) while the 95% catch rate is applied
+to a small one (1,000). A small rate times a big group beats a big rate times a small group.
+
+### Bayes' rule is the tree written as a formula
+
+If you write the three steps with probabilities instead of counts, you get <Term id="bayes-rule">Bayes' rule</Term>:
+
+$$
+P(\text{fraud} \mid \text{flag}) =
+\frac{P(\text{flag} \mid \text{fraud}) \cdot P(\text{fraud})}
+{P(\text{flag} \mid \text{fraud}) \cdot P(\text{fraud}) + P(\text{flag} \mid \text{legit}) \cdot P(\text{legit})}
+$$
+
+Each part maps to the tree:
+
+- $P(\text{flag} \mid \text{fraud}) \cdot P(\text{fraud}) = 0.95 \cdot 0.01 = 0.0095$: the "fraud and flagged" branch
+  (950 out of 100,000). This is the multiplication rule for events that are **not** independent:
+  $P(A \text{ and } B) = P(B \mid A) \cdot P(A)$.
+- $P(\text{flag} \mid \text{legit}) \cdot P(\text{legit}) = 0.05 \cdot 0.99 = 0.0495$: the false alarm branch (4,950).
+- The denominator adds every way to get flagged: $0.0095 + 0.0495 = 0.059$, the 5,900.
+- The ratio $0.0095 / 0.059 \approx 0.161$.
+
+So Bayes' rule is not a new law to memorise. It is "of everything that matches what I saw, what share is the thing I
+care about", written with probabilities.
+
+### Prior, evidence, posterior
+
+The rule also describes how beliefs should change. Before the flag, the chance of fraud was the base rate, 1%: the
+**prior**. The flag is **evidence**. After seeing it, the chance is 16.1%: the **posterior**. The flag made fraud
+sixteen times more likely, but not likely. If a second, independent check also flags the payment, today's posterior
+becomes the next prior, and the chance climbs to about 79% (the knowledge check works it out). The Bayesian chapter
+at the end of this track builds a whole way of doing statistics on this update step.
+
+</Section>
+
+<Section kind="visual" title="Try it: move the base rate">
+
+The tree follows 100,000 payments through the model. The bar at the bottom is the flagged pile: how much of it is
+real fraud and how much is false alarm.
+
+<Experiment def={screen} title="Fraud flag explorer">
+  <FraudTree />
+  <Readout title="What a flag means" />
+</Experiment>
+
+Things to try:
+
+- **Base rate 0.1%** (fraud is very rare): P(fraud | flagged) falls to about 2%. The same model is now almost all
+  false alarms.
+- **Base rate 20%**: it rises to about 83%. Nothing about the model changed; only how common fraud is.
+- **Back to 1%, then drag false alarms from 5% to 1%**: the answer roughly triples, to 49%. Now drag "fraud caught"
+  from 95% to 100% instead: it barely moves. When the condition is rare, the false alarm rate is the lever that
+  matters.
+
+</Section>
+
+<Section kind="code" title="Bayes' rule in a few lines">
+
+The function below is the tree from the explorer, written with shares instead of counts. Its three inputs follow
+the sliders.
+
+<Experiment def={screen} title="bayes_flag.py, linked to the explorer" controls={false}>
+  <Code example={bayesCode} title="bayes_flag.py" />
+  <Readout title="What it prints" />
+</Experiment>
+
+Here the same model is placed in four settings. Watch the two columns: the model's sensitivity, the right column,
+never changes. What a flag means, the left column, changes enormously.
+
+<PythonRunner example={sweepRunner} title="base_rates.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Reading conditional probabilities backwards">
+
+<CommonMistake
+  title="Confusing P(A | B) with P(B | A)"
+  wrong={'"The model catches 95% of fraud, so a flagged payment is 95% likely to be fraud."'}
+  error="(no error) the real P(fraud | flagged) at a 1% base rate is 16%"
+  cause="95% is P(flagged | fraud). The question is P(fraud | flagged). They share a numerator but divide by different groups: all fraud (1,000) versus all flagged (5,900)."
+  fix="Say both in words before computing: 'among fraud, the share flagged' and 'among flagged, the share fraud'. Then build the tree."
+/>
+
+<CommonMistake
+  title="Ignoring the base rate"
+  wrong={'precision = recall   # assumed equal when choosing an alert threshold'}
+  error="(no error) the alert queue is mostly false alarms and reviewers start ignoring it"
+  cause="Precision depends on how common positives are; recall does not. A model evaluated on a balanced test set (50% fraud) looks far more precise than it will be in production (1% fraud)."
+  fix="Report precision at the production base rate, or test on data with realistic class balance. Bayes' rule converts between them."
+/>
+
+<CommonMistake
+  title="Multiplying as if the events were independent"
+  wrong={'P_fraud_and_flag = 0.01 * (5900 / 100_000)   # P(fraud) * P(flag)'}
+  error="(no error) gives 0.00059, but the true value is 950 / 100,000 = 0.0095, 16 times larger"
+  cause="Fraud and flags are strongly dependent: that is the whole point of a fraud model. The product rule only holds for independent events."
+  fix="Use the general rule: P(A and B) = P(B | A) * P(A) = 0.95 * 0.01."
+/>
+
+</Section>
+
+<Section kind="practice" title="Where you will use this">
+
+- **Alert thresholds.** Before shipping a classifier that pages someone, compute P(real problem | alert) at the real
+  base rate. If it is 5%, people will learn to ignore the pager.
+- **Evaluation on resampled data.** If you balanced the classes for training or testing, precision on that data is
+  not production precision. Re-weight with the real base rate.
+- **Naive Bayes and spam filters** apply Bayes' rule once per word, treating the words as independent given the
+  class. The update-the-prior idea is the same as here.
+- **A/B testing.** "The test says significant" is a positive result too. How much to trust it depends on how many of
+  the ideas you test really work, which is a base rate. The hypothesis testing lesson returns to this.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={bayesExercise}>
+  Write Bayes' rule twice: once as a formula and once as a table of counts, and check they agree.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+We began with a model that sounds 95% accurate yet is right only 16% of the time it raises an alert. To see why, we
+treated new information as shrinking the world: given a flag, look only at the flagged cases. That gave the
+conditional probability $P(A \mid B)$, the share of B-cases where A also holds, and showed it is not the same as
+$P(B \mid A)$ because the two divide by different groups. Building a tree of 100,000 payments made the difference
+visible: a small false alarm rate applied to the many legitimate payments outweighs a high catch rate applied to the
+few fraudulent ones. Writing that tree with probabilities is Bayes' rule, and reading it as prior, evidence and
+posterior shows how a belief should move when evidence arrives.
+
+So far our events have been yes/no. Next we attach numbers to outcomes (a payout, a count, a time) and ask what
+value to expect on average and how far a single result usually lands from it:
+[Random variables, expected value and variance](#/learn/stats/probability/random-variables).
+
+</Section>
