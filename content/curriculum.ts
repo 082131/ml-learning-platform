@@ -680,4 +680,81 @@ export const tracks: Track[] = [
       },
     ],
   },
+  {
+    id: 'sql',
+    title: 'SQL and Analytics',
+    code: 'T.10',
+    summary:
+      'Ask questions of data in SQL, with a real SQLite database running in your browser: SELECT and NULL logic, GROUP BY, every join type and its traps, subqueries and CTEs, window functions, analytics patterns (funnels, cohorts, sessions, point-in-time ML features), and how indexes and query plans make queries fast.',
+    chapters: [
+      {
+        id: 'foundations',
+        title: 'Reading data with SELECT',
+        level: 'beginner',
+        lessons: [
+          { id: 'sql/foundations/select-basics', status: 'outline' },
+          { id: 'sql/foundations/nulls-logic', status: 'outline' },
+        ],
+      },
+      {
+        id: 'aggregation',
+        title: 'Summarising with GROUP BY',
+        level: 'beginner',
+        lessons: [{ id: 'sql/aggregation/group-by', status: 'outline' }],
+      },
+      {
+        id: 'joins',
+        title: 'Combining tables with joins',
+        level: 'intermediate',
+        lessons: [
+          { id: 'sql/joins/join-types', status: 'outline' },
+          { id: 'sql/joins/fanout-semi-anti', status: 'outline' },
+        ],
+      },
+      {
+        id: 'ctes',
+        title: 'Subqueries and CTEs',
+        level: 'intermediate',
+        lessons: [
+          { id: 'sql/ctes/subqueries-ctes', status: 'outline' },
+          { id: 'sql/ctes/recursive-ctes', status: 'outline' },
+        ],
+      },
+      {
+        id: 'windows',
+        title: 'Window functions',
+        level: 'intermediate',
+        lessons: [
+          { id: 'sql/windows/ranking', status: 'outline' },
+          { id: 'sql/windows/frames-lag-lead', status: 'outline' },
+        ],
+      },
+      {
+        id: 'analytics',
+        title: 'Analytics patterns',
+        level: 'advanced',
+        lessons: [
+          { id: 'sql/analytics/funnels-cohorts', status: 'outline' },
+          { id: 'sql/analytics/sessions-dedup', status: 'outline' },
+          { id: 'sql/analytics/ml-features', status: 'outline' },
+        ],
+      },
+      {
+        id: 'performance',
+        title: 'Performance',
+        level: 'advanced',
+        lessons: [
+          { id: 'sql/performance/indexes-plans', status: 'outline' },
+          { id: 'sql/performance/query-tuning', status: 'outline' },
+        ],
+      },
+      {
+        id: 'capstone',
+        title: 'Capstone',
+        level: 'advanced',
+        project: 'sql/capstone/weekly-report',
+        lessons: [{ id: 'sql/capstone/weekly-report', status: 'outline' }],
+      },
+    ],
+  },
 ];

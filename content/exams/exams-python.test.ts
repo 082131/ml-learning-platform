@@ -21,7 +21,7 @@ function cpython(code: string): { ok: boolean; err: string } {
 
 describe.skipIf(!hasPython)('hands-on tasks under CPython', () => {
   for (const exam of Object.values(exams))
-    for (const task of exam.handsOn.tasks)
+    for (const task of exam.handsOn.tasks.filter((t) => t.language !== 'sql'))
       for (const check of task.checks)
         it(`${task.id} · ${check.name}`, () => {
           const sol = cpython(`${task.solution}\n${check.tests}`);

@@ -1,0 +1,119 @@
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-3);
+  border-top: 1px solid var(--line);
+}
+.status {
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}
+.note {
+  margin: 0;
+  padding: 0 var(--s-3) var(--s-3);
+  color: var(--ink-2);
+}
+.output,
+.tables {
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+.tables .output {
+  border-top: 0;
+}
+.outputHead {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
+}
+.set {
+  padding: 0 var(--s-3) var(--s-2);
+}
+.setLabel {
+  margin: var(--s-2) 0 var(--s-1);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}
+.resultWrap {
+  max-height: 22rem;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.result {
+  border-collapse: collapse;
+  min-width: 100%;
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+}
+.result th,
+.result td {
+  padding: var(--s-1) var(--s-3);
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  white-space: nowrap;
+}
+.result th {
+  position: sticky;
+  top: 0;
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-weight: 600;
+}
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.null {
+  color: var(--ink-2);
+  font-style: italic;
+}
+.muted {
+  margin: var(--s-1) 0;
+  padding: 0 var(--s-3);
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}
+.set .muted {
+  padding: 0;
+}
+.error {
+  margin: 0;
+  padding: var(--s-2) var(--s-3) var(--s-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  color: var(--err);
+  white-space: pre-wrap;
+  background: transparent;
+  border: 0;
+}
+.checks {
+  margin: 0;
+  padding: var(--s-2) var(--s-3);
+  list-style: none;
+  font-size: var(--fs-13);
+  border-top: 1px solid var(--line);
+}
+.checks li {
+  padding: var(--s-1) 0;
+}
+.checks li[data-state='pass'] > span:first-child {
+  color: var(--ok);
+}
+.checks li[data-state='fail'] > span:first-child {
+  color: var(--err);
+}
+.why {
+  color: var(--ink-2);
+}

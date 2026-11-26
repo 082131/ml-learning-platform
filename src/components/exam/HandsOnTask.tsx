@@ -6,6 +6,7 @@ import { Badge, Button } from '@/components/ui';
 import { CodeEditor } from '@/components/code/CodeEditor';
 import { PlainCode } from '@/components/code/PlainCode';
 import { usePythonRunner } from '@/components/code/pythonRuntime';
+import { useSqlRunner } from '@/components/viz/SqlTrack/sqlRuntime';
 import { InlineText } from '@/components/assessment/InlineText';
 import s from './Exam.module.css';
 
@@ -39,6 +40,8 @@ export function HandsOnTask({
   solution = 'penalty',
 }: HandsOnTaskProps) {
   const runner = usePythonRunner();
+  const sql = useSqlRunner();
+  const isSql = task.language === 'sql';
   const [code, setCode] = useState(record?.code ?? task.starter);
   const [results, setResults] = useState<Record<string, CheckResult>>({});
   const [phase, setPhase] = useState<string | null>(null);
@@ -47,6 +50,16 @@ export function HandsOnTask({
 
   const runChecks = async () => {
     const next: Record<string, CheckResult> = {};
+    if (isSql) {
+      setPhase('Running the graded checks in SQLite');
+      const r = await sql.grade(task.setup ?? '', code, task.checks.map((c) => ({ name: c.name, tests: c.tests })));
+      for (const c of r.checks) next[c.name] = { ok: c.ok, why: c.why };
+      setResults(next);
+      setPhase(null);
+      const passed = Object.keys(next).filter((k) => next[k]!.ok);
+      onRun({ code, passed, score: taskScore(task, passed) });
+      return;
+    }
     for (const [i, c] of task.checks.entries()) {
       setPhase(`Running check ${i + 1} of ${task.checks.length}`);
       const r = await runner.run({ code, tests: c.tests });
@@ -106,7 +119,7 @@ export function HandsOnTask({
           Reset to starter
         </Button>
         <span className={s.meta} role="status">
-          {phase ? `${phase}… The first run downloads Python.` : ran ? `This run: ${current} / ${total}` : ''}
+          {phase ? `${phase}…${isSql ? '' : ' The first run downloads Python.'}` : ran ? `This run: ${current} / ${total}` : ''}
         </span>
       </div>
       <ul className={s.checks} aria-label="Graded checks">
@@ -131,7 +144,7 @@ export function HandsOnTask({
       {solution === 'hidden' ? null : record?.revealed || solution === 'shown' ? (
         <div className={s.section}>
           <span className={s.meta}>Reference solution</span>
-          <PlainCode source={task.solution} language="python" label="Reference solution" />
+          <PlainCode source={task.solution} language={isSql ? 'sql' : 'python'} label="Reference solution" />
         </div>
       ) : confirmReveal ? (
         <div className={s.confirm}>

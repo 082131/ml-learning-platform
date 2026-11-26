@@ -29,7 +29,8 @@ export interface Certification {
   format: string;
 }
 
-/** One automatically graded check of a hands-on task. `tests` are assert statements run after the learner's code. */
+/** One automatically graded check of a hands-on task. `tests` are assert statements run after the learner's code.
+ * For SQL tasks `tests` is a SQL query that returns 1 or 'ok' when the check passes (see src/lib/sql/types.ts). */
 export interface HandsOnCheck {
   name: string;
   points: number;
@@ -45,6 +46,10 @@ export interface HandsOnTask {
   starter: string;
   solution: string;
   checks: HandsOnCheck[];
+  /** Added for the SQL track (T.10): 'sql' tasks run in SQLite (sql.js) instead of Python. Default 'python'. */
+  language?: 'python' | 'sql';
+  /** SQL tasks: the tables created before the learner's code runs. */
+  setup?: string;
 }
 
 export interface ExamDef {

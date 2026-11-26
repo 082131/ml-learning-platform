@@ -82,7 +82,7 @@ function cpython(code: string): { ok: boolean; err: string } {
 
 describe.skipIf(!hasPython || !hasModule('numpy'))('coding screen tasks under CPython', () => {
   for (const screen of screens)
-    for (const task of screen.tasks)
+    for (const task of screen.tasks.filter((t) => t.language !== 'sql'))
       for (const check of task.checks)
         it(`${task.id} · ${check.name}`, () => {
           const sol = cpython(`${task.solution}\n${check.tests}`);

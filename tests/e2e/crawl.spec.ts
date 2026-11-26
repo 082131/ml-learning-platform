@@ -26,5 +26,5 @@ test('every curriculum route renders without console errors', async ({ page }) =
   }
   expect(errors).toEqual([]);
   expect(routes.length).toBe(4 + 1 + tracks.length + lessonIds.length);
-  expect(lessonIds.length).toBe(156);
+  expect(lessonIds.length).toBe(171);
 });
