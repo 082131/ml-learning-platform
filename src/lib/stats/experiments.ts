@@ -392,6 +392,9 @@ export interface SamplingResult {
   skewMeans: number;
   /** Share of sample means within μ ± 1.96·σ/√n. */
   within: number;
+  /** Shares below μ − 1.96·σ/√n and above μ + 1.96·σ/√n: 2.5% each if the means are normal. */
+  tailLow: number;
+  tailHigh: number;
 }
 
 export function samplingResult(s: SamplingState): SamplingResult {
@@ -399,7 +402,9 @@ export function samplingResult(s: SamplingState): SamplingResult {
   const { means, first } = sampleMeans(pop, s.n, SAMPLE_REPS, s.seed);
   const seFormula = pop.sd / Math.sqrt(s.n);
   const within = means.filter((m) => Math.abs(m - pop.mean) <= 1.96 * seFormula).length / means.length;
-  return { means, first, seMeasured: spread(means), seFormula, meanOfMeans: mean(means), skewMeans: skewness(means), within };
+  const tailLow = means.filter((m) => m < pop.mean - 1.96 * seFormula).length / means.length;
+  const tailHigh = means.filter((m) => m > pop.mean + 1.96 * seFormula).length / means.length;
+  return { means, first, seMeasured: spread(means), seFormula, meanOfMeans: mean(means), skewMeans: skewness(means), within, tailLow, tailHigh };
 }
 
 const popOptions = Object.values(POPULATIONS).map((p) => ({ value: p.id, label: p.label }));
@@ -423,6 +428,7 @@ export function samplingExperiment(id: string, initial: SamplingState): Experime
         { label: 'σ / √n (predicted standard error)', value: `${pop.sd.toFixed(2)} / √${s.n} = ${r.seFormula.toFixed(3)}` },
         { label: 'Skewness of the means', value: r.skewMeans.toFixed(2) },
         { label: 'Means within μ ± 1.96 SE', value: pct(r.within) },
+        { label: 'Below / above that range', value: `${pct(r.tailLow)} / ${pct(r.tailHigh)} (a normal curve: 2.5% / 2.5%)` },
       ];
     },
   };

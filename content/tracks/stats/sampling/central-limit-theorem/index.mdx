@@ -1,0 +1,184 @@
+import { checkCode, clt, cltRunner } from './code';
+import { cltExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Averaging cancels extremes">
+
+Support wait times are lopsided: most customers wait a few minutes, a few wait over an hour. Their histogram looks
+nothing like a bell. Now take the **average** of 30 waits, many times over, and plot those averages. They form a
+near-perfect bell. The same happens with heights, with yes/no conversions, with almost anything. That is the
+**central limit theorem** (CLT), and it is one of the most useful facts in statistics.
+
+Why would averaging produce a bell? Think about what it takes for an average of 30 waits to be extreme. A very high
+average needs most of the 30 customers to have waited a long time, all at once. That is rare, because long waits
+are rare and they would have to coincide. A middling average, on the other hand, can happen in a huge number of ways:
+some long, some short, mixed in any order. So averages pile up in the middle and thin out quickly toward the edges.
+The more values you average, the stronger this effect, and the shape that results is the normal curve.
+
+Why it matters: almost every method in the rest of this track (confidence intervals, z-tests, A/B tests) needs to
+know how a sample mean is distributed. The CLT says we do not need to know the shape of the data to answer that. We
+only need $\mu$, $\sigma$ and $n$.
+
+</Section>
+
+<Section kind="technical" title="What the theorem says, and when to trust it">
+
+### The statement
+
+Take $n$ independent values from any population with mean $\mu$ and a finite standard deviation $\sigma$. As $n$
+grows, the distribution of the sample mean $\bar x$ gets closer and closer to a normal distribution:
+
+$$
+\bar x \;\approx\; N\!\left(\mu,\; \frac{\sigma}{\sqrt n}\right)
+$$
+
+Each part comes from somewhere we have already been:
+
+- **The centre, $\mu$**: the sample mean is unbiased (last lesson).
+- **The width, $\sigma / \sqrt n$**: the standard error, from the variance rules (last lesson).
+- **The shape, normal**: this is the new part, and the theorem's real content. The previous lesson told us the
+  centre and the spread of the means; the CLT tells us the shape too.
+
+The same holds for sums (a sum is just $n$ times the mean): the total of $n$ values is approximately
+$N(n\mu, \sigma\sqrt n)$.
+
+### What it does not say
+
+The CLT is about the **distribution of the average across repeated samples**, never about the data. Collecting more
+wait times will not make wait times normal; it will show their skewed shape more clearly. People often write "by
+the CLT, the data are normal", and it is always wrong.
+
+### How large is "large enough"?
+
+The theorem says "as $n$ grows". How fast the bell appears depends on the population:
+
+- **Symmetric populations** (heights, uniform values, even two humps): the means look normal already at $n \approx 5$
+  to 10, because there is no lopsidedness to wash out.
+- **Skewed populations** (wait times, incomes, latencies): it takes longer. For exponential waits the skewness of
+  the mean is $2 / \sqrt n$: 2 at $n = 1$, 0.37 at $n = 30$, 0.14 at $n = 200$. The famous "n ≥ 30" rule is for
+  moderate skew; heavy tails need more.
+- **Rare yes/no events** (conversion rates of 1%): the mean of 0/1 values is a proportion, and it only looks normal
+  once you expect about 10 or more successes and 10 or more failures ($np \ge 10$ and $n(1-p) \ge 10$). At a 0.5%
+  rate that is 2,000 visitors.
+
+### Using it: how unusual is this sample mean?
+
+The CLT turns questions about averages into normal-curve questions, using the z-score idea from the normal lesson
+but with the standard error as the unit:
+
+$$
+z = \frac{\bar x - \mu}{\sigma / \sqrt n}
+$$
+
+Heights have $\mu = 170$ cm and $\sigma = 10$ cm. One 174 cm person is $z = 0.4$, ordinary. A random group of 25
+averaging 174 cm is $z = (174 - 170) / (10/5) = 2$: unusual, because averages of 25 rarely stray that far. This exact
+calculation, "how many standard errors away is what we saw?", is the heart of every test in the next chapter.
+
+</Section>
+
+<Section kind="visual" title="Try it: watch the bell appear">
+
+Left: the population and one sample. Right: 1,000 sample means, zoomed in on their range, with the normal curve the
+CLT predicts drawn dashed over them.
+
+<Experiment def={clt} title="Central limit theorem explorer">
+  <SamplingView scale="zoom" />
+  <Readout title="How normal are the means?" />
+</Experiment>
+
+Things to try:
+
+- **Wait times, n = 1, 2, 5, 30, 100**: at n = 1 the means are as skewed as the data (skewness about 2). By 30 the
+  dashed curve fits well, and the readout's two tail shares move toward 2.5% each.
+- **"Converted or not" (a 10% rate), n = 5, then 200**: at small n the means can only take a few values (0, 0.2,
+  0.4...), a lumpy picture. By 200 (20 expected conversions) it is a smooth bell.
+- **Two humps, n = 2 and n = 5**: a population with no bell at all, yet its averages look normal very quickly,
+  because it is symmetric.
+
+</Section>
+
+<Section kind="code" title="Checking the prediction">
+
+The check in code: draw 1,000 means and count how many land beyond the predicted 2.5% and 97.5% points. Both shares
+should be near 2.5% when the CLT approximation is good.
+
+<Experiment def={clt} title="clt_check.py, linked to the explorer" controls={false}>
+  <Code example={checkCode} title="clt_check.py" />
+  <Readout title="Compare" />
+</Experiment>
+
+The same check with 20,000 samples of skewed wait times at four sample sizes. Look at the tails: at n = 1, 5.1% of
+values exceed the upper point and none fall below the lower one, the signature of skew. By n = 200 both tails are
+close to 2.5%.
+
+<PythonRunner example={cltRunner} title="clt_tails.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Misusing the theorem">
+
+<CommonMistake
+  title="'By the CLT, my data are normal'"
+  wrong={'# 5,000 latencies, so the CLT applies\nthreshold = lat.mean() + 3 * lat.std()'}
+  error="(no error) far more than 0.13% of requests exceed the threshold"
+  cause="The CLT is about the distribution of an average, not of single values. Latencies stay skewed however many you collect."
+  fix="Use the CLT for the mean (for example a confidence interval of the average latency). For single requests, use empirical percentiles such as p99."
+/>
+
+<CommonMistake
+  title="Normal approximations for rare events"
+  wrong={'p_hat = 1 / 200             # one conversion among 200 visitors\nse = (p_hat * (1 - p_hat) / 200) ** 0.5\nlow = p_hat - 1.96 * se       # -0.0048: a negative conversion rate'}
+  error="(no error) an interval that includes impossible negative rates"
+  cause="With about one expected success the sampling distribution is lumpy and skewed; the normal curve does not describe it."
+  fix="Collect more data (aim for 10 or more expected successes), or use methods made for small counts: an exact binomial interval, a Wilson interval, or the Bayesian approach in the last chapter."
+/>
+
+<CommonMistake
+  title="Values that are not independent"
+  wrong={'# 30 measurements from the same user session\nse = s / 30 ** 0.5'}
+  error="(no error) the SE is far too small, so results look more certain than they are"
+  cause="Repeated measurements of one unit are correlated: they share that user's habits. The CLT and σ/√n both assume independent values."
+  fix="Average per user first and use the number of users as n, or use methods that account for clustering."
+/>
+
+</Section>
+
+<Section kind="practice" title="Where you will use this">
+
+- **Conversion rates** are means of 0/1 values. The CLT is why an A/B test can use a normal curve for the difference
+  in rates once each group has enough conversions.
+- **Average latency, revenue per user, session length** are skewed, so check the expected sample size: means of
+  revenue per user (heavy tails from big spenders) may need thousands of users before the normal approximation is
+  good.
+- **Mini-batch gradients** in training are averages over a batch, which is one reason their noise is roughly normal
+  and shrinks like $1/\sqrt{\text{batch size}}$.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={cltExercise}>
+  Turn the theorem into a function: where will a sample mean land, with a given probability?
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+The last lesson gave us the centre ($\mu$) and the spread ($\sigma/\sqrt n$) of a sample mean. The central limit
+theorem gives its shape: approximately normal, whatever the shape of the data, because extreme averages need many
+extreme values at once while middling averages can be reached in countless ways. How large $n$ must be depends on
+how skewed or rare the data are, and the theorem always describes averages and sums, never the data themselves.
+Putting the pieces together, "how far is this sample mean from $\mu$?" becomes a z-score measured in standard errors,
+answered with the normal CDF.
+
+There is a catch we have quietly skipped: those calculations needed $\mu$, the very number we are trying to learn.
+The next lesson turns the reasoning around, from "where will the sample mean land, given $\mu$" to "where could
+$\mu$ be, given the sample mean": [Confidence intervals](#/learn/stats/inference/confidence-intervals).
+
+</Section>

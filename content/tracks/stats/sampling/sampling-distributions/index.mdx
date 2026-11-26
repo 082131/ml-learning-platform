@@ -1,0 +1,203 @@
+import { resampleCode, sampling, seRunner } from './code';
+import { questions, seExercise } from './quiz';
+
+<Section kind="intuition" title="You only ever see one sample">
+
+You want to know how long customers wait for support. You cannot measure every customer who will ever contact you,
+so you take 30 recent waits and average them: 18.4 minutes. A colleague takes a different 30 and gets 22.1. Neither
+of you made a mistake. **Different samples give different answers**, simply because of which customers happened to
+be picked.
+
+That raises the central question of this chapter: **if my sample had been different, how different would my answer
+have been?** If the answer is "a few seconds", the average is precise and you can act on it. If it is "ten minutes
+either way", you need more data before deciding anything.
+
+The trick is to imagine repeating the whole study many times. Each repeat gives its own average, and those averages
+form a distribution of their own. How spread out that distribution is tells us how much one average can be trusted.
+The surprising part, which this lesson builds up to, is that we can predict that spread from a single sample, with
+one short formula.
+
+</Section>
+
+<Section kind="technical" title="From one sample to many imaginary ones">
+
+### Three things that are easy to mix up
+
+- The <Term id="population">population</Term> is everything we want to learn about: all support waits, all users,
+  all transactions. It has a true mean $\mu$ and a true SD $\sigma$, which we do not know.
+- A <Term id="sample">sample</Term> is the part we actually measured: 30 waits, $x_1, \dots, x_{30}$.
+- A **statistic** is a number computed from the sample, such as the sample mean
+  $\bar x = \tfrac1n \sum x_i$. We use it as our estimate of $\mu$.
+
+The population is fixed. The sample is random (which 30 did we get?), so any statistic computed from it is a random
+variable too, with its own distribution.
+
+### The sampling distribution
+
+The distribution of a statistic across all the samples we could have drawn is its
+<Term id="sampling-distribution">sampling distribution</Term>. In real work we never see it, because we only take
+one sample. A simulation can draw thousands, and that is what the explorer below does: it draws 1,000 samples of size
+$n$ from a known population, computes each sample's mean, and plots the 1,000 means.
+
+Two things are true of the means, and you can watch both happen:
+
+1. **They centre on $\mu$.** On average the sample mean is right; it does not lean high or low. (That makes it an
+   *unbiased* estimator.)
+2. **They are less spread out than the data,** and the bigger $n$ is, the tighter they bunch.
+
+### How tightly: the standard error
+
+We can predict how tightly from the rules in the random variables lesson. The sample mean is the sum of $n$
+independent values divided by $n$.
+
+- Each value has variance $\sigma^2$. Variances of independent values add, so the sum has variance $n\sigma^2$.
+- Dividing by $n$ divides the variance by $n^2$ (stretching by $a$ scales variance by $a^2$), which leaves
+  $n\sigma^2 / n^2 = \sigma^2 / n$.
+- The SD is the square root of that.
+
+So the spread of the sample mean, called the <Term id="standard-error">standard error</Term> (SE), is
+
+$$
+\mathrm{SE}(\bar x) = \frac{\sigma}{\sqrt n}
+$$
+
+Read the formula as a sentence: **the more the data vary ($\sigma$), the less precise the mean; the more data you
+have ($n$), the more precise, but only in proportion to $\sqrt n$.** For wait times with $\sigma = 20$ minutes, 4
+waits give $\mathrm{SE} = 10$, 16 give 5, 64 give 2.5. Each halving of the error costs four times the data.
+
+Notice what is missing from the formula: the size of the population. A random sample of 1,000 people tells you about
+as much about a city as about a country. Precision comes from how many you asked, not from what share you asked.
+
+### SD and SE are different questions
+
+This is the distinction people most often get wrong, so it is worth stating plainly.
+
+| | Standard deviation (SD) | Standard error (SE) |
+| --- | --- | --- |
+| Describes | single values: how much one wait differs from another | the sample mean: how much it would change with a different sample |
+| More data | stays about the same (it is a property of the population) | shrinks, like $1/\sqrt n$ |
+| Answers | "how variable are wait times?" | "how precise is our average wait?" |
+
+They are connected by the formula: SE = SD / $\sqrt n$.
+
+### Using it with one real sample
+
+In practice we do not know $\sigma$, so we plug in the sample's own standard deviation $s$:
+$\widehat{\mathrm{SE}} = s / \sqrt n$. That $s$ is computed by dividing by $n - 1$, not $n$:
+
+$$
+s = \sqrt{\frac{1}{n-1}\sum_{i=1}^{n} (x_i - \bar x)^2}
+$$
+
+Why $n - 1$? The distances are measured from $\bar x$, which was computed from the same values and so sits closer to
+them than the true $\mu$ does. That makes the squared distances a little too small on average. Dividing by $n - 1$
+instead of $n$ corrects it exactly; the code below shows the bias with numbers. In Python, `statistics.stdev` and
+NumPy's `std(ddof=1)` divide by $n - 1$; `statistics.pstdev` and NumPy's default `std()` divide by $n$.
+
+</Section>
+
+<Section kind="visual" title="Try it: one sample, then a thousand">
+
+Left: the population (its true shape) and the values of one sample as ticks along the bottom. Right: the means of
+1,000 separate samples of size $n$, on the same axis so you can compare their spread with the population's.
+
+<Experiment def={sampling} title="Sampling explorer">
+  <SamplingView scale="population" />
+  <Readout title="Spread of the means" />
+</Experiment>
+
+Things to try:
+
+- **n = 1**: each "sample mean" is a single value, so the right histogram is just the population again.
+- **n = 10, then 40, then 160**: the histogram narrows. The measured SD of the means tracks $\sigma / \sqrt n$:
+  quadrupling $n$ halves it.
+- **Change the population**: heights, uniform, two humps. The formula keeps working, because it only used the
+  variance rules, not the population's shape.
+- **Change the seed**: the individual means move, but their spread barely does. The SE is a property of the
+  sampling process, not of one lucky sample.
+
+</Section>
+
+<Section kind="code" title="The explorer as a program, and the √n law">
+
+The explorer's experiment in plain Python. The population line follows the menu above.
+
+<Experiment def={sampling} title="resample.py, linked to the explorer" controls={false}>
+  <Code example={resampleCode} title="resample.py" />
+  <Readout title="Compare" />
+</Experiment>
+
+This run checks $\sigma / \sqrt n$ for four sample sizes, then shows why the sample SD divides by $n - 1$: with
+samples of 5 waits, dividing by $n$ gives an average variance of about 319 when the truth is 400.
+
+<PythonRunner example={seRunner} title="standard_error.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Precision that is not what it seems">
+
+<CommonMistake
+  title="Reporting the SD as the precision of a mean"
+  wrong={'print(f"average wait {waits.mean():.1f} ± {waits.std():.1f} min")   # 19.6 ± 20.0 from 400 waits'}
+  error="(no error) suggests the average is uncertain by 20 minutes; its SE is 1 minute"
+  cause="± SD describes how spread out single waits are. The uncertainty of the mean is the SE, SD / √n."
+  fix="Say which you mean: 'waits vary with SD 20 min; the average is 19.6 min (SE 1.0)'. Better still, give a confidence interval (next lessons)."
+/>
+
+<CommonMistake
+  title="Dividing by n for a sample SD"
+  wrong={'s = np.std(sample)        # NumPy divides by n by default'}
+  error="(no error) underestimates the spread, badly so for small samples (by 20% in variance at n = 5)"
+  cause="Distances from the sample mean are slightly too small; dividing by n does not correct for that."
+  fix="np.std(sample, ddof=1) or statistics.stdev(sample). pandas' Series.std() already uses ddof=1."
+/>
+
+<CommonMistake
+  title="Expecting more data to fix a biased sample"
+  wrong={'# 50,000 sessions, all from the desktop app\nse = sessions.std(ddof=1) / len(sessions) ** 0.5   # 0.02 min'}
+  error="(no error) a tiny SE around a wrong answer"
+  cause="The SE measures random sampling error only. If the sample is not random (only desktop users), the estimate can be precisely wrong."
+  fix="Check how the sample was collected first. Fix the sampling, or weight it to match the population."
+/>
+
+</Section>
+
+<Section kind="practice" title="Where you will use this">
+
+- **Every error bar** on a chart of averages should be an SE (or a confidence interval built from it), not an SD.
+  Ask which one you are looking at.
+- **Planning data collection.** $n = (\sigma / \text{target SE})^2$ tells you how many labels, users or runs you need
+  for a given precision, before you collect them.
+- **Model evaluation.** Accuracy on a test set is a sample mean of 0/1 values. Its SE is
+  $\sqrt{p(1-p)/n}$: on 1,000 examples at 90% accuracy, about 0.95 percentage points. Two models less than about two
+  SEs apart may not really differ.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={seExercise}>
+  Estimate the standard error from one sample, and plan how many observations a target precision needs.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+We only ever see one sample, so we asked how different our answer would have been with another one. Imagining many
+repeats turned the sample mean into a random variable with its own distribution, the sampling distribution. The
+variance rules then predicted its spread, the standard error $\sigma / \sqrt n$: it shrinks with more data, but only
+like the square root, and it does not depend on the population's size. We separated it from the standard deviation,
+which describes single values and does not shrink, and we saw why the sample SD divides by $n - 1$.
+
+There is one thing we have not looked at yet: the **shape** of the histogram of means. Pick the skewed wait times and
+look again at large $n$. It is turning into a bell. Why that happens, and why it makes everything else in this track
+possible, is next: [The central limit theorem](#/learn/stats/sampling/central-limit-theorem).
+
+</Section>
