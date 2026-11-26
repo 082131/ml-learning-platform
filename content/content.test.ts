@@ -29,6 +29,7 @@ describe('content validation', () => {
       count('deploy'),
       count('git'),
       count('automation'),
-    ]).toEqual([55, 12, 13, 14, 9, 9, 14, 12]);
+      count('finetune'),
+    ]).toEqual([55, 12, 13, 14, 9, 9, 14, 12, 13]);
   });
 });

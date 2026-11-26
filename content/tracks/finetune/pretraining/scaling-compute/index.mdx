@@ -1,0 +1,186 @@
+import { budgetCode, compute } from './code';
+import { optimalExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Pretraining is a budget problem">
+
+Most people who fine-tune will never pretrain a model. So why learn about it? Because every decision a lab made in
+pretraining shows up in the model you fine-tune: how much it knows, how big it is, how expensive it is to run, and
+why a "small" 8B model can beat an older 70B one. And the same arithmetic tells you what *your* fine-tune will cost.
+
+The core idea is simple. Training a model means pushing every token of data through every parameter, forwards and
+then backwards. So the work grows with **how big the model is** times **how much data it reads**. Labs have a fixed
+amount of compute (GPUs × time), and the big question is how to spend it:
+
+> Bigger model on less data, or smaller model on more data?
+
+The big picture of this lesson is a chain: we turn size and data into **compute**, turn compute into **GPU-hours,
+days and dollars**, and then use **scaling laws** to decide how to split a budget between size and data.
+
+</Section>
+
+<Section kind="technical" title="From size and data to compute, time and money">
+
+**Step 1: compute.** The rule of thumb used throughout the field is
+
+$$
+C \approx 6 \cdot N \cdot D
+$$
+
+where $N$ is the number of parameters, $D$ the number of training tokens and $C$ the
+<Term id="training-flops">training compute</Term> in floating-point operations (FLOPs). Where does the 6 come from?
+
+- In the **forward pass**, each parameter is used in one multiply and one add for each token: 2 FLOPs per
+  parameter per token.
+- In the **backward pass**, the model computes two sets of gradients for every layer: how the loss changes with the
+  layer's input (to keep passing the signal backwards) and how it changes with the weights (to update them). That is
+  about twice the forward work: 4 FLOPs.
+
+2 + 4 = 6. Attention adds a little on top for long sequences, but for planning, 6·N·D is the number everyone uses.
+
+*Worked example.* A 7B model on 2 trillion tokens: $6 \times 7\times10^{9} \times 2\times10^{12} = 8.4\times10^{22}$
+FLOPs. Hard to picture, so the next step converts it.
+
+**Step 2: GPU-hours.** An H100 GPU can do about $989 \times 10^{12}$ dense BF16 operations per second at its peak.
+Real jobs lose time to communication between GPUs, memory traffic and pauses, so they reach only a fraction of that
+peak. That fraction is the <Term id="model-flops-utilization">model FLOPs utilization (MFU)</Term>; 35 to 50% is good
+for large runs. So
+
+$$
+\text{GPU-hours} = \frac{C}{\text{peak} \times \text{MFU} \times 3600}
+= \frac{8.4\times10^{22}}{989\times10^{12} \times 0.4 \times 3600} \approx 58{,}982
+$$
+
+On 512 GPUs that is $58{,}982 / 512 / 24 \approx 4.8$ days. At an assumed $2.50 per GPU-hour, about $147,000 of
+compute, before any failed experiments. Now "pretraining is expensive" has a number attached.
+
+**Step 3: how to split the budget.** Given a fixed $C$, you can choose a bigger model and fewer tokens, or the
+opposite. Which gives the lowest loss? This is where <Term id="scaling-law">scaling laws</Term> come in. Researchers
+trained hundreds of models of different sizes on different amounts of data and found that the loss falls smoothly,
+as a power law, with both. That smoothness means you can fit a curve on cheap small runs and predict the loss of an
+expensive big one.
+
+The Chinchilla paper (Hoffmann et al., 2022) used this to find the
+<Term id="compute-optimal">compute-optimal</Term> split: grow parameters and tokens together, at about **20 tokens per
+parameter**. Their 70B model trained on 1.4 trillion tokens (exactly 20 per parameter) beat a 280B model trained with
+the same compute on fewer tokens. Before that paper, most large models were too big for their data.
+
+Using the ratio is just algebra. With $D = 20N$, $C = 6 \cdot N \cdot 20N = 120 N^2$, so $N = \sqrt{C / 120}$. For our
+$8.4\times10^{22}$ budget: $N = \sqrt{7\times10^{20}} \approx 26.5$B parameters on about 529B tokens.
+
+**Step 4: why modern models ignore that ratio.** The natural question now is "then why was Llama 3 8B trained on 15
+trillion tokens, almost 1,900 per parameter?". Because "compute-optimal" only counts *training* compute. A model that
+will answer billions of requests also costs money every time it runs, and a smaller model is cheaper per request. So
+labs deliberately train small models far past 20 tokens per parameter: the loss keeps improving (more slowly), and
+the extra training cost is repaid many times over at inference. Keep the two goals apart:
+
+| Goal | Best choice |
+| --- | --- |
+| Lowest loss for a fixed training budget | about 20 tokens per parameter |
+| Best model at a fixed *serving* cost | a smaller model, trained on far more tokens |
+
+**What goes into the tokens.** $D$ is not just "the internet". It is a <Term id="data-mixture">data mixture</Term>: web
+text (filtered heavily for quality), code, books, scientific papers, math, many languages. The proportions decide
+what the model is good at, so labs test mixtures on small models first, exactly as they test sizes. Deduplication and
+filtering, which you will meet again in the [dataset quality lesson](#/learn/finetune/data/dataset-quality), matter as
+much here as in fine-tuning.
+
+</Section>
+
+<Section kind="visual" title="Try it: plan a pretraining run">
+
+Choose a model size, a number of tokens, a GPU and a utilization. The bars compare your tokens per parameter with the
+Chinchilla ratio and with Llama 3 8B.
+
+<Experiment def={compute} title="Compute budget">
+  <FtComputeView />
+  <Readout title="This run" />
+</Experiment>
+
+Things to try:
+
+- The default (7B, 2,000B tokens, H100, 40%, 512 GPUs) reproduces the worked example: 4.8 days.
+- Switch the GPU to **A100**. The same job takes about 3.2 times longer, because the A100's peak is 312 versus 989
+  TFLOP/s.
+- Set 70B and 1,400B tokens: exactly 20 tokens per parameter, so the readout's compute-optimal split matches your
+  run.
+- Drop the utilization from 40% to 20%: the days double. Engineering that raises MFU is worth real money.
+
+</Section>
+
+<Section kind="code" title="The planning arithmetic in Python">
+
+<PythonRunner example={budgetCode} title="budget.py" />
+
+The same three functions answer questions about fine-tuning too. A LoRA fine-tune of an 8B model on 20 million tokens
+over 3 epochs is roughly $6 \times 8\times10^9 \times 6\times10^7 = 2.9\times10^{18}$ FLOPs (an overestimate, since
+LoRA skips the weight-gradient work for frozen layers): about two GPU-hours on one H100 at 40% MFU. That gap, days on hundreds of
+GPUs versus hours on one, is why almost everyone fine-tunes rather than pretrains.
+
+</Section>
+
+<Section kind="mistakes" title="Planning mistakes">
+
+<CommonMistake
+  title="Using the sparse peak"
+  wrong={'hours = C / (1979e12 * 0.4) / 3600   # H100 "1,979 TFLOPS"'}
+  error="(no error) the plan promises half the real training time"
+  cause="The headline number assumes 2:4 structured sparsity, which normal training does not use. The dense BF16 peak is 989 TFLOP/s."
+  fix="Use the dense number for the precision you train in, and a realistic MFU."
+/>
+
+<CommonMistake
+  title="Treating compute-optimal as best"
+  wrong={'budget = 1e23\nN = sqrt(budget / 120)   # "the right size"'}
+  error="(no error) a model that is cheap to train and expensive to serve"
+  cause="Chinchilla minimizes training compute only. It ignores the cost of every future request."
+  fix="Include expected inference volume. For widely served models, choose a smaller N and train on more tokens."
+/>
+
+<CommonMistake
+  title="Forgetting the failed runs"
+  wrong={'cost = gpu_hours * price   # one run'}
+  error="(no error) the budget runs out halfway"
+  cause="Real projects include ablations, restarts after loss spikes and hardware failures, and evaluation."
+  fix="Budget for the experiments around the final run, often as much again or more."
+/>
+
+</Section>
+
+<Section kind="practice" title="Using these numbers at work">
+
+- **Sanity-check claims.** "We trained a 70B model in a day on 64 GPUs" implies an impossible MFU; the arithmetic
+  takes a minute.
+- **Estimate your fine-tune before renting GPUs**: tokens × epochs × 6 × parameters, divided by peak × MFU.
+- **Read model cards with this lens**: parameters and training tokens tell you how over-trained (and how cheap to
+  serve for its quality) a model is.
+- **For continued pretraining** (adapting a model to a new domain with lots of raw text), the same compute
+  arithmetic applies on a smaller D.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={optimalExercise}>
+  Split a compute budget into a compute-optimal model size and token count.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+Training cost follows one chain. Size times data gives compute, about 6·N·D FLOPs, because each parameter does 2
+operations per token forwards and 4 backwards. Dividing by the GPU's dense peak times a realistic utilization gives
+GPU-hours, and from there days and dollars. Scaling laws show the loss falls smoothly with size and data, so labs plan
+big runs from small ones; Chinchilla found the training-compute sweet spot at about 20 tokens per parameter. Models
+that will be served at scale are deliberately trained far past it, because a smaller model is cheaper for every
+request. The same arithmetic shows a fine-tune costs hours where pretraining costs months.
+
+Next: [Running a training job: batches, learning-rate schedules and loss curves](#/learn/finetune/pretraining/training-runs).
+
+</Section>

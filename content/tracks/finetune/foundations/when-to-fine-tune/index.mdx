@@ -1,0 +1,184 @@
+import { decide, fewShot, paybackCode, paybackDef } from './code';
+import { paybackExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Three tools for three different problems">
+
+When a model's answers are not good enough, there are three levers you can pull, and they fix different things.
+Picking the wrong one is the most common and most expensive mistake in this whole field, so this lesson comes
+before any training code.
+
+Think of the model as a capable new colleague:
+
+- **Prompting** is telling them clearly what you want, with a few examples. It costs minutes and you can change it
+  any time. It works when the colleague already *can* do the job and just needs to know your expectations.
+- **Retrieval** (<Term id="retrieval-augmented-generation">RAG</Term>) is handing them the right documents before
+  they answer. It works when they *could* answer but lack the facts, especially facts that change.
+- **Fine-tuning** is training them until a behaviour becomes habit. It works when you need the same behaviour every
+  time (a format, a tone, a narrow skill) and explaining it in every request is too long, too costly or not reliable
+  enough.
+
+The chain to remember: first find out *what kind of problem you have* (missing facts or wrong behaviour), then
+pick the tool that changes that thing, and only then think about cost.
+
+</Section>
+
+<Section kind="technical" title="What each tool can and cannot change">
+
+**What fine-tuning changes.** The [previous lesson](#/learn/finetune/foundations/how-llms-learn) showed that
+fine-tuning runs the same next-token training on your own examples. So the model gets better at producing text
+*that looks like your examples*. That makes it strong at:
+
+- **Format and style**: always JSON with these fields, always three sentences, always your brand's tone.
+- **Narrow skills**: a classification scheme with 40 labels, your company's internal jargon, a domain language the
+  base model rarely saw.
+- **Cost and speed**: a small fine-tuned model can often match a large model that needs a long prompt, and every
+  token you no longer send is money and latency saved.
+
+**What fine-tuning is weak at: new facts.** This surprises people. If the training examples contain facts the model
+did not already know, the model learns them slowly and unreliably. Worse, a study by Gekhman et al. (2024) found that
+the model learns the *confident answering style* of those examples faster than the facts themselves, so it starts
+answering confidently even when it does not know: hallucinations go up. Facts the model already absorbed in
+pretraining are its <Term id="parametric-knowledge">parametric knowledge</Term>; adding to that store through a small
+fine-tune is the job it does worst.
+
+**Why retrieval handles facts better.** With retrieval, the facts are in the prompt, right in front of the model, at
+the moment it answers. Change a document and the next answer changes. You can also show the source, so people can
+check it. A comparison by Ovadia et al. (2024) found retrieval more reliable than fine-tuning for injecting new
+knowledge. The AI track covers how to build it: [the RAG pipeline](#/learn/ai/rag/rag-pipeline).
+
+**Why prompting comes first, always.** A careful prompt with a few examples
+(<Term id="few-shot-prompting">few-shot prompting</Term>) is cheap and fast to change, and it gives you two things
+every later step needs:
+
+1. A **baseline**: a measured score on an <Term id="eval-set">evaluation set</Term>. Without it you cannot tell
+   whether a fine-tune helped.
+2. **Data**: the best prompted outputs, reviewed by people, often become the first fine-tuning examples.
+
+**How much data does fine-tuning need?** For style and format, a few hundred to a few thousand clean examples are
+often enough (the LIMA study fine-tuned a strong assistant on 1,000 carefully chosen examples). For narrow skills,
+thousands. Below about a hundred, put your examples in the prompt instead. Quality matters more than quantity, which
+is why there is a whole [lesson on data quality](#/learn/finetune/data/dataset-quality).
+
+**Putting it together as a decision.** Ask these questions in order:
+
+1. Have we tried a careful prompt and measured it? If not, do that first.
+2. Is the problem missing or outdated facts? Use retrieval.
+3. Is it behaviour (format, style, skill) or cost? Do we have at least a few hundred good examples? Fine-tune.
+   If not, collect examples first.
+4. Is it both? Combine them: fine-tune the behaviour, retrieve the facts. This is common in production.
+
+</Section>
+
+<Section kind="visual" title="Try it: which tool fits?">
+
+Describe your situation. The recommendation follows the four questions above.
+
+<Experiment def={decide} title="Prompt, RAG or fine-tune?">
+  <FtDecisionView />
+  <Readout title="Recommendation" />
+</Experiment>
+
+Things to try:
+
+- Set "Tried and measured a careful prompt?" to **no**: whatever the problem, the answer is to prompt first.
+- Choose **Missing or outdated facts** and flip "Do the facts change often?": retrieval either way, for a different
+  reason each time.
+- Choose **Too slow or too expensive** with 40 examples, then with 1,500: the same problem, but you need data before
+  you can fine-tune.
+
+</Section>
+
+<Section kind="code" title="The prompt you are trying to replace">
+
+This is the kind of prompt that makes people consider fine-tuning: dozens of rules and several worked examples, sent
+with every single request.
+
+<Code example={fewShot} title="request.json" />
+
+If that prompt is 1,500 tokens and a fine-tune makes it unnecessary, how fast does the saving repay the cost? The
+arithmetic is short:
+
+<PythonRunner example={paybackCode} title="payback.py" />
+
+The same estimate, with sliders:
+
+<Experiment def={paybackDef} title="Payback estimate">
+  <FtPaybackView />
+  <Readout title="Payback" />
+</Experiment>
+
+Notice which slider matters most: at 20,000 requests a day the fine-tune pays back in about two months, at 1,000
+requests a day it takes over three years. Fine-tuning for cost only makes sense at volume.
+
+<Callout kind="simplification">
+Hosted fine-tuned models are sometimes priced higher per token than the base model, and self-hosting a model has
+its own server cost. Both reduce the monthly saving. The estimate also assumes the shorter prompt keeps the same
+quality, which you must check on your evaluation set.
+</Callout>
+
+</Section>
+
+<Section kind="mistakes" title="Fine-tuning for the wrong reason">
+
+<CommonMistake
+  title="Fine-tuning to teach the product catalogue"
+  wrong={'train.jsonl: 20,000 Q&A pairs generated from the current catalogue\n(prices, stock, specs)'}
+  error="(no error) the model quotes last quarter's prices with confidence, and invents specs for new products"
+  cause="Facts are learned unreliably by fine-tuning and go stale the day the catalogue changes. Confident answering is learned faster than the facts."
+  fix="Retrieve the catalogue entries at question time; fine-tune, if at all, only the answer style."
+/>
+
+<CommonMistake
+  title="Skipping the baseline"
+  wrong={'week 1: collect data\nweek 2: fine-tune\nweek 3: "it seems better?"'}
+  error="(no error) no way to know if three weeks of work helped"
+  cause="No measured prompt baseline and no fixed evaluation set."
+  fix="Before any training, build the evaluation set and score the best prompt on it. Every candidate is compared with that number."
+/>
+
+<CommonMistake
+  title="Fine-tuning with 50 examples"
+  wrong={'50 examples, 10 epochs'}
+  error="(no error) the model parrots the 50 answers and gets worse on everything else"
+  cause="Too little data to learn a general behaviour, so the model memorizes; many epochs make it worse."
+  fix="Put the 50 best examples in the prompt, log real traffic, and fine-tune once you have hundreds of reviewed examples."
+/>
+
+</Section>
+
+<Section kind="practice" title="Before you start a fine-tune">
+
+- **Write down the problem in one sentence**, and whether it is facts or behaviour.
+- **Have an evaluation set** of a few hundred real inputs with reference answers or a grading rubric.
+- **Score your best prompt on it.** That is the number to beat.
+- **Estimate the payback** if cost is the motive, including people time.
+- **Plan the data**: where examples come from, who reviews them, how you keep test items out of training.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={paybackExercise}>
+  Compute how many months a fine-tune takes to pay for itself.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+The decision runs in one direction. First name the problem: missing facts or wrong behaviour. Facts, especially
+changing ones, belong in the prompt through retrieval, because fine-tuning learns facts slowly and can teach the model
+to answer confidently beyond what it knows. Behaviour (format, style, narrow skills) is what fine-tuning changes well,
+and it can also cut cost by replacing a long prompt, which pays off at high volume. Whatever you choose, a measured
+prompt baseline comes first: it is the number every fine-tune must beat, and its best outputs often become the first
+training data.
+
+Next: [Pretraining at scale: compute budgets and scaling laws](#/learn/finetune/pretraining/scaling-compute).
+
+</Section>

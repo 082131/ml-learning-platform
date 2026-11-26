@@ -680,4 +680,77 @@ export const tracks: Track[] = [
       },
     ],
   },
+  {
+    id: 'finetune',
+    title: 'LLM Fine-tuning and Training',
+    code: 'T.12',
+    summary:
+      'How large language models are trained and adapted: next-token loss and perplexity, pretraining compute and scaling laws, learning-rate schedules, instruction data with chat templates and loss masks, dataset quality, supervised fine-tuning, LoRA and QLoRA, reward models and RLHF, DPO, and how to evaluate a fine-tune before you ship it.',
+    chapters: [
+      {
+        id: 'foundations',
+        title: 'How LLMs learn',
+        level: 'beginner',
+        lessons: [
+          { id: 'finetune/foundations/how-llms-learn', status: 'written' },
+          { id: 'finetune/foundations/when-to-fine-tune', status: 'written' },
+        ],
+      },
+      {
+        id: 'pretraining',
+        title: 'Pretraining and training runs',
+        level: 'intermediate',
+        lessons: [
+          { id: 'finetune/pretraining/scaling-compute', status: 'written' },
+          { id: 'finetune/pretraining/training-runs', status: 'written' },
+        ],
+      },
+      {
+        id: 'data',
+        title: 'Fine-tuning data',
+        level: 'intermediate',
+        lessons: [
+          { id: 'finetune/data/chat-templates-masking', status: 'written' },
+          { id: 'finetune/data/dataset-quality', status: 'written' },
+        ],
+      },
+      {
+        id: 'sft',
+        title: 'Supervised fine-tuning',
+        level: 'intermediate',
+        lessons: [{ id: 'finetune/sft/supervised-fine-tuning', status: 'written' }],
+      },
+      {
+        id: 'peft',
+        title: 'Parameter-efficient fine-tuning',
+        level: 'advanced',
+        lessons: [
+          { id: 'finetune/peft/lora', status: 'written' },
+          { id: 'finetune/peft/qlora-memory', status: 'written' },
+        ],
+      },
+      {
+        id: 'alignment',
+        title: 'Preference tuning',
+        level: 'advanced',
+        lessons: [
+          { id: 'finetune/alignment/rlhf-reward-models', status: 'written' },
+          { id: 'finetune/alignment/dpo', status: 'written' },
+        ],
+      },
+      {
+        id: 'evaluation',
+        title: 'Evaluating fine-tunes',
+        level: 'advanced',
+        lessons: [{ id: 'finetune/evaluation/evaluating-fine-tunes', status: 'written' }],
+      },
+      {
+        id: 'capstone',
+        title: 'Capstone',
+        level: 'advanced',
+        project: 'finetune/capstone/support-assistant',
+        lessons: [{ id: 'finetune/capstone/support-assistant', status: 'written' }],
+      },
+    ],
+  },
 ];

@@ -1,0 +1,206 @@
+import { batch, runMath, schedule, trainArgs } from './code';
+import { lrExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Driving a training run">
+
+The [previous lesson](#/learn/finetune/pretraining/scaling-compute) decided *how much* training to do. This one is
+about *how* the training is driven, step by step. These settings are the same whether you pretrain on thousands of
+GPUs or fine-tune on one, and they are the settings you will touch most often.
+
+A training run repeats one loop: take a batch of sequences, compute the loss, compute the gradient (which direction
+makes the loss smaller), and move the weights a small step in that direction. Three questions decide how well that
+loop goes:
+
+1. **How much data goes into each step?** That is the batch size.
+2. **How big is each step?** That is the learning rate, and it should change over the run.
+3. **What stops one bad step from ruining everything?** That is gradient clipping.
+
+A useful analogy is walking downhill in fog. The gradient is the slope under your feet. The batch size is how many
+spots you feel before deciding on a direction (more spots, a more reliable direction). The learning rate is your
+stride: long strides cover ground fast but can overshoot the valley; short strides are safe but slow. Clipping is
+refusing to take a stride longer than a set length, however steep a spot feels.
+
+Big picture: batch → gradient → clip → step of size "learning rate" → repeat, while the learning rate follows a
+schedule and you watch the loss curve to see whether it is working.
+
+</Section>
+
+<Section kind="technical" title="Batches, schedules and clipping">
+
+**1. The effective batch.** A GPU can only hold a few sequences at a time: the *micro batch*. To get the reliable
+gradient of a bigger batch without more memory, we use <Term id="gradient-accumulation">gradient accumulation</Term>:
+run several micro batches forwards and backwards, add up their gradients, and only then take one optimizer step. With
+several GPUs, each computes its own micro batches and the gradients are averaged across GPUs. So
+
+$$
+\text{sequences per step} = \text{micro batch} \times \text{accumulation steps} \times \text{GPUs}
+$$
+
+and tokens per step = sequences × sequence length. Example: $4 \times 8 \times 2 = 64$ sequences of 2,048 tokens =
+131,072 tokens per step. A 20-million-token dataset then takes $\lceil 20{,}000{,}000 / 131{,}072 \rceil = 153$ steps per
+epoch.
+
+*Why it matters next:* the learning rate only means something together with the batch size. A bigger batch gives a
+less noisy gradient, so it tolerates a bigger step. When you change GPUs, change the accumulation so the effective
+batch stays the same, and the learning rate can stay too.
+
+**2. The learning rate and its schedule.** The <Term id="learning-rate">learning rate</Term> scales each step. One fixed
+value is a compromise that fits no part of the run well, so training uses a
+<Term id="lr-schedule">learning-rate schedule</Term> with two phases:
+
+- **Warmup.** For the first few percent of steps, the rate climbs from 0 to its peak. *Why:* the Adam optimizer
+  divides each gradient by a running estimate of its typical size. At step 1 those estimates are based on almost
+  nothing, so a full-size step could be wildly wrong. Small steps give the estimates time to settle.
+- **Decay.** After the peak, the rate falls. *Why:* early on, the weights are far from good values and big steps
+  make fast progress. Later, the weights are near a good region and big steps just bounce around it; smaller steps
+  let them settle in.
+
+The common decay shapes:
+
+| Schedule | Shape after warmup | Where you see it |
+| --- | --- | --- |
+| constant | flat at the peak | quick experiments |
+| linear | straight line down | Hugging Face's default |
+| <Term id="cosine-decay">cosine</Term> | flat, then steep, then flat at a floor | most LLM pretraining and fine-tuning recipes |
+| warmup-stable-decay (WSD) | flat at the peak, then a short decay at the end | recent pretraining runs; you can stop or extend the run without knowing its length up front |
+
+The cosine formula, part by part: $\text{progress}$ runs from 0 (end of warmup) to 1 (last step). The factor
+$0.5\,(1 + \cos(\pi \cdot \text{progress}))$ goes smoothly from 1 to 0. Scaling it between a floor and the peak gives
+
+$$
+\text{lr} = \text{floor} + (\text{peak} - \text{floor}) \cdot 0.5\,(1 + \cos(\pi \cdot \text{progress}))
+$$
+
+With peak 2e-4, floor 2e-5 (10%), 30 warmup steps and 1,000 steps in total: step 15 is halfway through warmup, so
+1e-4; step 515 is halfway through the decay, where the factor is exactly 0.5, so $2\times10^{-5} + 1.8\times10^{-4}
+\times 0.5 = 1.1\times10^{-4}$; step 1,000 is the floor, 2e-5.
+
+*Typical peaks*, which the later lessons explain: around 3e-4 for pretraining small models (lower for big ones),
+about 1e-5 to 2e-5 for full fine-tuning, and about 1e-4 to 2e-4 for LoRA, which trains far fewer weights.
+
+**3. Gradient clipping.** Sometimes a batch is unusual (a corrupted document, a long run of repeated characters)
+and its gradient is enormous. One full step along it can throw the weights far away from everything learned so far.
+<Term id="gradient-clipping">Gradient clipping</Term> by norm caps the gradient's overall length: if the length (the
+square root of the sum of squared components) is above a limit, usually 1.0, every component is multiplied by
+limit / length. The direction is kept; only the size is capped. For gradient (3, 4), the length is 5, so with a limit
+of 1 it becomes (0.6, 0.8).
+
+**4. Reading the loss curve.** With these three settings in place, the loss curve is your dashboard. Learn to
+recognize five shapes:
+
+- **Healthy:** a steep drop early, then a slow, steady decline. Some noise from batch to batch is normal.
+- **Learning rate too high:** the loss falls, then becomes jagged, then climbs or shoots up and stays up
+  (divergence). Lower the peak or lengthen the warmup.
+- **Learning rate too low:** a slow, almost straight decline that is still falling when training ends.
+- **<Term id="loss-spike">Loss spike</Term>:** a sudden jump, often with a huge gradient norm in the logs, that
+  recovers within tens of steps. Look at the batch. If spikes repeat, lower the learning rate or tighten clipping.
+  Large pretraining runs keep frequent <Term id="checkpoint">checkpoints</Term> so they can rewind past a spike that
+  does not recover.
+- **Plateau:** the loss flattens early. Check the data pipeline (is it repeating the same batches?) before touching
+  the optimizer.
+
+Always log the gradient norm and the learning rate next to the loss. Most diagnoses come from reading the three
+together.
+
+</Section>
+
+<Section kind="visual" title="Try it: shape the learning rate">
+
+<Experiment def={schedule} title="Learning-rate schedule">
+  <FtLrScheduleView />
+  <Readout title="This schedule" />
+</Experiment>
+
+Things to try:
+
+- Compare **Cosine decay** and **Linear decay** at step 500: both are at 1.1e-4 halfway, but cosine stays higher
+  early and lower late.
+- Set the warmup to 0 and imagine the first step at the full peak: that is the step warmup protects.
+- Choose **Warmup-stable-decay**: flat until 80% of the run, then a straight drop. You could stop at step 600 and
+  still decide to decay then, which is why long pretraining runs like it.
+
+And the batch arithmetic:
+
+<Experiment def={batch} title="Effective batch">
+  <FtBatchView />
+  <Readout title="Per step" />
+</Experiment>
+
+Halve the GPUs and double the accumulation: the tokens per step do not change, so neither should the learning rate.
+
+</Section>
+
+<Section kind="code" title="The same pieces in code">
+
+<PythonRunner example={runMath} title="run_math.py" />
+
+In practice you set all of this through the trainer's arguments. These are the names in Hugging Face Transformers 5:
+
+<Code example={trainArgs} title="train_args.py (not run here)" />
+
+</Section>
+
+<Section kind="mistakes" title="Run settings that go wrong">
+
+<CommonMistake
+  title="Changing GPUs without changing accumulation"
+  wrong={'# was: 8 GPUs x micro 4 x accum 4 = 128 sequences\n# now: 2 GPUs x micro 4 x accum 4 = 32 sequences, same learning rate'}
+  error="(no error) a noisier, different run that no longer matches your earlier results"
+  cause="The effective batch shrank 4× while the step size stayed the same."
+  fix="Scale gradient_accumulation_steps so micro × accumulation × GPUs is unchanged."
+/>
+
+<CommonMistake
+  title="Copying a pretraining learning rate into full fine-tuning"
+  wrong={'learning_rate=3e-4   # from a pretraining recipe, full fine-tune of an 8B model'}
+  error="(no error) the loss drops fast, then the model's general answers fall apart"
+  cause="A fine-tune starts from good weights. A pretraining-sized step moves them far, erasing what they knew."
+  fix="Start full fine-tuning around 1e-5 to 2e-5 (LoRA around 1e-4 to 2e-4), and compare a couple of values on validation loss."
+/>
+
+<CommonMistake
+  title="Logging only the loss"
+  wrong={'logging: loss'}
+  error="(no error) a spike or a divergence you cannot explain"
+  cause="Without the learning rate and gradient norm you cannot tell a bad batch from a bad schedule."
+  fix="Log loss, learning rate and gradient norm every few steps, and evaluate on held-out data regularly."
+/>
+
+</Section>
+
+<Section kind="practice" title="A starting recipe">
+
+- **Warmup 1 to 5% of steps**, then cosine to about 10% of the peak.
+- **Clip at a norm of 1.0** (the Transformers default).
+- **Pick the effective batch first**, then the learning rate; keep the batch fixed when hardware changes.
+- **Evaluate and checkpoint on the same schedule** so the best checkpoint can be kept.
+- **Change one setting at a time** and compare runs on the same evaluation set.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={lrExercise}>
+  Implement warmup plus cosine decay with a floor.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+A training run is a loop of batch, gradient, step. The effective batch (micro batch × accumulation × GPUs) decides how
+reliable each gradient is, and the learning rate must be chosen together with it. The learning rate warms up so early
+steps are not taken on unreliable optimizer statistics, then decays (cosine is the usual shape) so late steps settle
+instead of bouncing. Gradient clipping caps any single step so one odd batch cannot undo the run. The loss curve,
+read together with the learning rate and gradient norm, tells you whether the run is healthy, too aggressive, too
+timid or hit a spike. The same settings drive fine-tuning, which is where the track goes next: first the data.
+
+Next: [Instruction data: chat templates, loss masking and packing](#/learn/finetune/data/chat-templates-masking).
+
+</Section>

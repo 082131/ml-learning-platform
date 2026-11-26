@@ -1,0 +1,231 @@
+import { hfLoss, loss, lossByHand } from './code';
+import { perplexityExercise, questions } from './quiz';
+
+<Section kind="intuition" title="One skill, learned three times">
+
+Every large language model you have used was built by teaching one simple skill: **guess the next piece of text**.
+Give the model "The capital of France is" and it should put a high probability on "Paris". That is the whole task.
+The surprising part is how much a model has to learn to get good at it. To guess the next word of a physics
+textbook it has to pick up some physics; to guess the next line of a Python file it has to pick up some Python.
+
+The skill is learned in three stages, and each stage starts from the model the previous one produced. Here is the
+big picture before any detail:
+
+1. **Pretraining.** The model reads trillions of tokens of general text (web pages, books, code) and practises
+   guessing the next token. Out comes a <Term id="base-model">base model</Term>: it knows a lot about language and the
+   world, but it only *continues* text. Ask it a question and it may simply write more questions, because lists of
+   questions are common on the web.
+2. **Supervised fine-tuning (SFT).** We show the base model tens of thousands of example conversations written the way
+   we want: a question, then a good answer. It practises the same next-token guessing, but only on this curated data.
+   Out comes a model that has the *habit* of answering.
+3. **Preference tuning.** We show it pairs of answers to the same question, one that people preferred and one they
+   did not, and nudge it towards the preferred kind. Out comes an <Term id="instruct-model">instruct model</Term>: the
+   helpful, polite assistant you chat with.
+
+Stages 2 and 3 together are called <Term id="post-training">post-training</Term>. An analogy that holds up well:
+pretraining is reading a whole library, SFT is an apprenticeship where someone shows you how answers should look,
+and preference tuning is a reviewer telling you which of your two drafts is better.
+
+This track follows that chain. This lesson is about the one number all of it is built on: the loss.
+
+</Section>
+
+<Section kind="technical" title="The loss: how wrong was the guess?">
+
+**What problem does the loss solve?** Training needs a single number that says how badly the model is doing, so that
+gradient descent can change the weights to make that number smaller (the AI track's
+[transformer lesson](#/learn/ai/llm/transformers-llms) shows how a model turns its scores into probabilities with a
+softmax). The question the number must answer is: *how much probability did the model put on what really came next?*
+
+**One prediction.** Say the model gave the correct next token probability $p$. The
+<Term id="cross-entropy-loss">cross-entropy loss</Term> of that prediction is
+
+$$
+\text{loss} = -\ln p
+$$
+
+Read it piece by piece. $p$ is between 0 and 1. The natural log of a number below 1 is negative, so the minus sign
+turns it into a positive cost. The result behaves exactly as a "wrongness" score should:
+
+| p (probability on the truth) | loss = −ln p | in words |
+| --- | --- | --- |
+| 1.0 | 0 | certain and right: no cost |
+| 0.5 | 0.69 | a coin flip between two options |
+| 0.05 | 3.00 | the truth was a long shot |
+| 0.001 | 6.91 | confidently wrong: very expensive |
+
+**Why a logarithm and not just 1 − p?** Two reasons, and both matter later in the track.
+
+- *Sentences multiply, logs add.* The probability of a whole sentence is the product of the probabilities of its
+  tokens. The log of a product is the sum of the logs, so the loss of a sentence is simply the sum of its per-token
+  losses. That is why training can score every position of every sequence independently and add them up.
+- *Confident mistakes must hurt most.* With 1 − p, going from p = 0.01 to p = 0.001 would barely change the cost (0.99
+  to 0.999). With −ln p it jumps from 4.6 to 6.9. A model that puts almost no probability on the truth is pushed hard
+  to fix that.
+
+**A whole sentence.** Take "The capital of France is Paris". The model reads "The" and predicts "capital", reads "The
+capital" and predicts "of", and so on: five predictions. Suppose it gave the correct tokens these probabilities:
+
+| context | next token | p | −ln p |
+| --- | --- | --- | --- |
+| The | capital | 0.05 | 2.996 |
+| The capital | of | 0.60 | 0.511 |
+| The capital of | France | 0.20 | 1.609 |
+| The capital of France | is | 0.70 | 0.357 |
+| The capital of France is | Paris | 0.80 | 0.223 |
+
+The sum is $2.996 + 0.511 + 1.609 + 0.357 + 0.223 = 5.696$, and the **average loss** is $5.696 / 5 = 1.139$ nats
+("nats" is the unit you get with the natural log; with log base 2 you would get bits). We average rather than sum so
+that long and short texts can be compared.
+
+**Perplexity: the same number, easier to picture.** A loss of 1.139 nats is hard to imagine. Undo the log and you get
+the <Term id="perplexity">perplexity</Term>:
+
+$$
+\text{perplexity} = e^{\text{average loss}} = e^{1.139} = 3.12
+$$
+
+It means: *on average, the model was as unsure as if it were choosing uniformly among about 3 tokens.* You can check
+that reading on a clean case. If the model gave every correct token p = 0.25, the loss would be −ln 0.25 = 1.386 and
+the perplexity e^1.386 = 4, exactly "one of four equally likely choices".
+
+**Where does training start?** A model with random weights spreads probability roughly evenly over its vocabulary.
+With 50,000 tokens, every token gets p = 1/50,000, so the loss is ln 50,000 = 10.82 and the perplexity is 50,000.
+Pretraining pushes that down to single digits on ordinary text. That drop, from "any of 50,000" to "one of a
+handful", is what learning a language looks like in numbers.
+
+**Loss and perplexity are not two ideas.** They carry the same information in different units: loss is what the
+optimizer works with, perplexity is what people report. When one goes down, so does the other.
+
+</Section>
+
+<Section kind="visual" title="Try it: move the probabilities, watch the loss">
+
+Pick a model or drag the probability it gave each correct token. The bars show each token's loss; the readout
+shows the average and the perplexity.
+
+<Experiment def={loss} title="Next-token loss explorer">
+  <FtTokenLossView />
+  <Readout title="This sentence" />
+</Experiment>
+
+Things to try:
+
+- Start from **After pretraining** (average 1.139, perplexity 3.12, as in the table above). Then choose **Confident
+  about the wrong city**: only "Paris" changed, from 0.8 to 0.01, yet the average loss jumps to 2.016. One confident
+  miss dominates five predictions.
+- Drag "capital" from 0.05 to 0.5. The first token is genuinely hard to guess from "The" alone, so a real model rarely
+  gets it right; notice how much of the sentence's loss lives in that one position.
+- Choose **Early in pretraining**: every token is a long shot and the perplexity is in the dozens. Training is the
+  process that moves this explorer from that preset towards the second one.
+
+</Section>
+
+<Section kind="code" title="The same numbers in Python">
+
+The table above, computed:
+
+<PythonRunner example={lossByHand} title="loss_by_hand.py" />
+
+With a real model, the library computes exactly this for you. Passing `labels` makes a Hugging Face causal language
+model return the average next-token cross-entropy:
+
+<Code example={hfLoss} title="hf_loss.py (not run here)" />
+
+</Section>
+
+<Section kind="experiment" title="Three stages, side by side">
+
+The loss formula never changes, but what the model is shown, and which tokens count, does. This table is the map of
+the rest of the track:
+
+| | Pretraining | Supervised fine-tuning | Preference tuning |
+| --- | --- | --- | --- |
+| Starts from | random weights | the base model | the SFT model |
+| Data | trillions of tokens of general text | thousands to millions of example conversations | thousands to millions of answer pairs (better, worse) |
+| Training signal | next-token loss on every token | next-token loss, usually only on the answer tokens | "make the preferred answer more likely than the other one" |
+| What it adds | knowledge of language, facts, code | the habit and format of answering | the style people prefer: helpful, honest, safe |
+| Typical cost | months on thousands of GPUs | hours to days on a few GPUs | hours to days on a few GPUs |
+| Lessons | [scaling](#/learn/finetune/pretraining/scaling-compute), [training runs](#/learn/finetune/pretraining/training-runs) | [data](#/learn/finetune/data/chat-templates-masking), [SFT](#/learn/finetune/sft/supervised-fine-tuning), [LoRA](#/learn/finetune/peft/lora) | [RLHF](#/learn/finetune/alignment/rlhf-reward-models), [DPO](#/learn/finetune/alignment/dpo) |
+
+Two distinctions cause most of the confusion around these words:
+
+- **Fine-tuning versus prompting.** <Term id="fine-tuning">Fine-tuning</Term> changes the model's weights, so the change
+  is permanent and applies to every request. Prompting changes only the input of one request; the weights stay as
+  they were. A prompt is like telling a colleague what you want today; fine-tuning is like training them until it
+  becomes habit.
+- **Base model versus instruct model.** Both contain the same knowledge from pretraining. The instruct model has had
+  post-training, so it treats your text as a request. When you fine-tune for your own product, you usually start from
+  the instruct model, unless you want to teach a completely different format.
+
+The natural next question is "so when should *I* fine-tune instead of prompting?". That is the
+[next lesson](#/learn/finetune/foundations/when-to-fine-tune).
+
+</Section>
+
+<Section kind="mistakes" title="Misreading the loss">
+
+<CommonMistake
+  title="Comparing perplexity across tokenizers"
+  wrong={'model A (32k vocabulary): perplexity 8.1\nmodel B (128k vocabulary): perplexity 10.9\n=> "A is the better model"'}
+  error="(no error) a conclusion the numbers do not support"
+  cause="Perplexity is per token. A tokenizer with a bigger vocabulary packs more text into each token, so each token is harder to guess even if the model is better."
+  fix="Compare models with the same tokenizer, or normalize by words or bytes (bits per byte), or compare on a task you care about."
+/>
+
+<CommonMistake
+  title="Celebrating a low training loss"
+  wrong={'epoch 8: train loss 0.21  (was 1.40)\n=> ship it'}
+  error="(no error) the model has memorized its training examples and answers new questions worse"
+  cause="Training loss measures examples the model has already seen. It can keep falling while the model gets worse on anything new."
+  fix="Always track the loss on held-out examples the model never trains on, and stop when that one stops improving (see the SFT lesson)."
+/>
+
+<CommonMistake
+  title="Expecting a base model to chat"
+  wrong={'base_model.generate("Summarize this email: ...")'}
+  error="(no error) it continues the email, or writes another instruction, instead of a summary"
+  cause="A base model has never been trained to treat text as an instruction. That habit comes from supervised fine-tuning."
+  fix="Use the instruct version of the model, or prompt the base model with a pattern it can continue (an email followed by the word Summary and a colon)."
+/>
+
+</Section>
+
+<Section kind="practice" title="Habits that carry through the track">
+
+- **Read loss as "probability on the truth".** A loss of 0.1 means p ≈ 0.9 on average; 2.3 means p ≈ 0.1.
+  Converting in your head (p ≈ e^−loss) makes loss curves meaningful.
+- **Report perplexity with its tokenizer and dataset**, never on its own.
+- **Keep a held-out set from day one.** Every later lesson compares models on data they did not train on.
+- **Know which stage you are changing.** Most teams never pretrain; they fine-tune an instruct model. That decides
+  the data, cost and risks of the project.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={perplexityExercise}>
+  Turn a list of per-token probabilities into a perplexity.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+The whole chain in a few sentences: an LLM learns one skill, guessing the next token, and we score each guess with
+−ln p, the probability it put on the truth. Averaging that over tokens gives the loss that training pushes down;
+raising e to it gives the perplexity, "how many tokens the model is hesitating between". Pretraining applies this
+loss to trillions of tokens of general text and produces a base model that knows things but only continues text.
+Supervised fine-tuning applies the same loss to curated conversations so the model learns the habit of answering,
+and preference tuning then uses comparisons between answers to shape which answers it prefers. Fine-tuning changes
+weights permanently; prompting changes only one request.
+
+Next: [When to fine-tune, and when prompting or retrieval is enough](#/learn/finetune/foundations/when-to-fine-tune).
+
+</Section>
