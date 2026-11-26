@@ -692,7 +692,7 @@ export const tracks: Track[] = [
         title: 'Reading data with SELECT',
         level: 'beginner',
         lessons: [
-          { id: 'sql/foundations/select-basics', status: 'outline' },
+          { id: 'sql/foundations/select-basics', status: 'written' },
           { id: 'sql/foundations/nulls-logic', status: 'outline' },
         ],
       },

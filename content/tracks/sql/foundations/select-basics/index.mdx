@@ -1,0 +1,224 @@
+import { aliasInWhere, distinctCities, everything, februaryOrders, londoners, pipeline, pipelineSql, vatPrices } from './code';
+import { exercise, questions } from './quiz';
+
+<Section kind="intuition" title="A table is a list of things, and SQL is how you ask about it">
+
+Picture a spreadsheet tab called `customers`. Each line describes one customer, and each column holds one fact
+about every customer: a name, a city, the day they signed up. A database table is exactly that picture, with one
+extra promise: every line has the same columns, and each column holds one kind of value. In database language a
+line is a **row** (one thing) and a column is a **column** (one fact about each thing).
+
+The reason we need a language for this, instead of scrolling and filtering by hand, is scale and repeatability.
+"Which London customers signed up in January?" is easy to answer by eye for 8 customers. For 8 million it is
+not, and you also want to ask the same question again next week and get an answer computed the same way.
+<Term id="sql">SQL</Term> (Structured Query Language) is the language for asking such questions. You describe the
+answer you want, and the database works out how to find it.
+
+That last sentence is the key idea of this whole track. In Python you write the steps: loop over the rows, check
+each one, append it to a list. In SQL you write what the result should look like: "the name and city of every
+customer whose city is London". The database chooses the steps. This is why the same short query can run on a
+laptop or across a warehouse of machines.
+
+Everything in this track runs against one small online shop, so the rows become familiar: 8 customers, 7
+products, 12 orders and the items, payments and website events behind them. The SQL boxes below run in a real
+SQLite database inside your browser. Edit them and press Run as often as you like; nothing is sent anywhere.
+
+</Section>
+
+<Section kind="technical" title="SELECT, FROM, WHERE, ORDER BY, LIMIT">
+
+**Reading a schema.** Before asking questions, look at what a table promises. The
+<Term id="table-schema">schema</Term> lists the columns and their types. Our `customers` table is
+`customers(id INTEGER PRIMARY KEY, name TEXT, city TEXT, signup_date TEXT)`. The
+<Term id="primary-key">primary key</Term> `id` is different for every row, so it identifies one customer even if
+two customers share a name. Dates are stored as text in the form `YYYY-MM-DD`, which matters later: text in that
+form sorts in date order.
+
+**The smallest query.** `SELECT * FROM customers` means "every column (`*`) of every row of `customers`". It is
+the SQL version of opening the spreadsheet tab. Run it and look at the rows, because the rest of the lesson keeps
+using them. Notice Fay's city: it says NULL, which means "no value recorded". The next lesson is about why that
+is not the same as an empty string.
+
+<SqlRunner example={everything} title="all_customers.sql" />
+
+A query is built from <Term id="sql-clause">clauses</Term>. Each clause starts with a keyword and does one job:
+
+| Clause | Its one job | Question it answers |
+| --- | --- | --- |
+| `FROM customers` | choose the table the rows come from | where are the rows? |
+| `WHERE city = 'London'` | keep only the rows that pass a test | which rows do I want? |
+| `SELECT name, city` | choose (or calculate) the output columns | what do I want to see about them? |
+| `ORDER BY name` | sort the result | in what order? |
+| `LIMIT 3` | keep only the first rows of the sorted result | how many? |
+
+**WHERE tests one row at a time.** For each row, the database evaluates the condition using only that row's
+values. If the condition is true, the row stays. If it is false, the row is gone for the rest of the query.
+This "one row at a time" rule is worth remembering, because it is exactly what WHERE *cannot* do: it cannot ask
+"is this order bigger than the average order?", because the average is a fact about many rows. That needs
+GROUP BY or a subquery, which later lessons build.
+
+<SqlRunner example={londoners} title="londoners.sql" />
+
+Three of the 8 customers are in London (Ada, Chen and Hana), so three rows come back. The conditions you will
+use most:
+
+- `=`, `<>` (not equal), `<`, `<=`, `>`, `>=` compare one value with another.
+- `IN ('shipped', 'returned')` is a short way to write `status = 'shipped' OR status = 'returned'`.
+- `BETWEEN 5 AND 15` means `>= 5 AND <= 15`: both ends are included.
+- `LIKE 'Lon%'` matches text patterns: `%` stands for any run of characters and `_` for exactly one.
+- `AND`, `OR` and `NOT` combine conditions. `AND` binds tighter than `OR`, so add brackets when you mix them.
+
+**SELECT can calculate.** The output columns do not have to exist in the table. `price * 1.2` computes a new
+value for every row, and `AS price_with_vat` gives the new column a name, called a
+<Term id="column-alias">column alias</Term>. `ROUND(x, 2)` keeps two decimals. That rounding is not cosmetic:
+computers store most decimals in binary, so `12 * 1.2` is really `14.399999999999999`. Rounding gives the number
+a person expects.
+
+<SqlRunner example={vatPrices} title="vat_prices.sql" />
+
+**ORDER BY and LIMIT.** A table has no built-in order. The database is free to return rows in whatever order is
+fastest, and that order can change when the data or the indexes change. `ORDER BY price DESC` is the only way to
+get a guaranteed order (`DESC` is largest first, `ASC`, the default, is smallest first). `LIMIT 3` then keeps the
+first three rows of that sorted result. Used together they answer "top N" questions, like the three most
+expensive products.
+
+</Section>
+
+<Section kind="visual" title="The order SQL actually runs your query in">
+
+Here is the surprise that explains most beginner errors: a query is not evaluated in the order it is written.
+You write `SELECT` first because it describes the answer, but the database cannot pick columns before it has
+rows, and it cannot keep the "first 2" before it has sorted. The
+<Term id="logical-query-order">logical query order</Term> is FROM, then WHERE, then SELECT, then ORDER BY, then
+LIMIT. Each stage receives the rows the previous stage produced.
+
+Move the sliders and select each stage. Watch how many rows leave each one.
+
+<Experiment def={pipeline} title="Query pipeline">
+  <QueryPipeline />
+  <Code example={pipelineSql} title="the_query.sql" />
+  <Readout title="Rows after each stage" />
+</Experiment>
+
+Things to try:
+
+- **Start with price >= 10 and LIMIT 2.** FROM passes all 7 products. WHERE keeps 4 (Desk lamp 32, Headphones 59,
+  Charger 19 and Poster 12) and throws away the Notebook, the Pen set and the Mug. SELECT keeps two columns,
+  ORDER BY sorts the 4 rows, and LIMIT keeps the top 2: Headphones and Desk lamp.
+- **Set price >= 60.** WHERE keeps nothing, and every later stage has nothing to work on. An empty result is not
+  an error; it is the correct answer to "which products cost 60 or more?".
+- **Set LIMIT to 7 with price >= 10.** LIMIT asks for 7 rows but only 4 exist, so you get 4. LIMIT is a maximum,
+  not a promise.
+
+The order also tells you which names exist where. An alias is created at the SELECT stage, so ORDER BY (which
+runs after SELECT) can use it, and WHERE (which runs before) cannot. In standard SQL, as in PostgreSQL or SQL
+Server, `WHERE vat_price > 30` fails with "column does not exist". SQLite is lenient and accepts it, which is
+convenient here but makes queries break when you move them to another database. The portable habit is to repeat
+the expression in WHERE:
+
+<SqlRunner example={aliasInWhere} title="aliases.sql" />
+
+<Callout kind="simplification">
+  The logical order describes what the result must look like, not what the machine does step by step. A real
+  database may read an index to find only the London rows instead of scanning everything and filtering, or stop
+  reading as soon as LIMIT has enough sorted rows. It is allowed to take any shortcut that gives the same
+  result. The performance chapter shows how to see the real plan with EXPLAIN QUERY PLAN.
+</Callout>
+
+</Section>
+
+<Section kind="code" title="Filtering dates, lists and duplicates">
+
+Dates in this shop are text like `'2026-02-14'`. Because the year comes first, then the month, then the day, text
+order is the same as date order, so `>=` and `<` work as date comparisons. To ask "which orders were placed in
+February?", the safest way is a half-open range: on or after the first day of February, and strictly before the
+first day of March. It stays correct if the column later stores times (`'2026-02-28 18:30'`) and for months of any
+length.
+
+<SqlRunner example={februaryOrders} title="february_orders.sql" />
+
+Five orders match. Order 104 (3 February) is missing because it was cancelled and `IN ('shipped', 'returned')`
+does not include 'cancelled'. That is the AND at work: a row must pass every condition.
+
+`DISTINCT` removes repeated rows from the result. `SELECT DISTINCT city` returns each city once: Berlin, London,
+Paris, and one NULL row for Fay. Notice the NULL sorts first in SQLite. DISTINCT answers "which different values
+exist?". It does not count them; counting is what GROUP BY does in the aggregation chapter.
+
+<SqlRunner example={distinctCities} title="cities.sql" />
+
+</Section>
+
+<Section kind="mistakes" title="Queries that run but answer the wrong question">
+
+<CommonMistake
+  title="LIMIT without ORDER BY"
+  wrong={"SELECT name FROM customers LIMIT 3;   -- 'the first 3 customers'"}
+  error="(no error) the 3 rows happen to be the oldest today; after a reload or a new index they are not"
+  cause="A table has no order. LIMIT cuts whatever order the rows arrive in."
+  fix="Say what first means: ORDER BY signup_date, id LIMIT 3. Adding id as a second key also makes ties deterministic."
+/>
+
+<CommonMistake
+  title="Mixing AND and OR without brackets"
+  wrong={"WHERE status = 'shipped' OR status = 'returned' AND order_date >= '2026-02-01'"}
+  error="(no error) January orders that were shipped are included"
+  cause="AND binds tighter than OR, so this means shipped OR (returned AND in February)."
+  fix="Bracket the OR: WHERE (status = 'shipped' OR status = 'returned') AND order_date >= '2026-02-01', or use IN ('shipped', 'returned')."
+/>
+
+<CommonMistake
+  title="Using an alias in WHERE"
+  wrong={'SELECT price * 1.2 AS gross FROM products WHERE gross > 30;'}
+  error='ERROR: column "gross" does not exist  (PostgreSQL; SQLite accepts it)'
+  cause="WHERE is evaluated before SELECT, so the alias does not exist yet in standard SQL."
+  fix="Repeat the expression in WHERE, or compute it in a subquery or CTE and filter outside it."
+/>
+
+<CommonMistake
+  title="Comparing text with the wrong case"
+  wrong={"SELECT name FROM customers WHERE city = 'london';"}
+  error="(no error) no rows"
+  cause="= compares text exactly, and 'london' is not 'London'."
+  fix="Match the stored case, or compare lower(city) = 'london'. Better still, clean the data so a city is always written one way."
+/>
+
+</Section>
+
+<Section kind="practice" title="Habits for every query">
+
+- **Start with `SELECT * ... LIMIT 10`** on a table you do not know, to see real values before you filter.
+- **Name every calculated column** with AS, so the result explains itself.
+- **Always pair LIMIT with ORDER BY**, and add a unique column (like `id`) as the last sort key so ties are stable.
+- **Use half-open ranges for dates**: `>= start AND < next_start`.
+- **Read your query in evaluation order** (FROM, WHERE, SELECT, ORDER BY, LIMIT) when it does something surprising.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<SqlExercise exercise={exercise}>
+  Return the name, category and price of every home or stationery product that costs from 5 to 15, both ends
+  included, with the most expensive first. The checks run your query against the shop tables in SQLite.
+</SqlExercise>
+
+</Section>
+
+<Section kind="summary">
+
+A table is a list of things (rows) with the same facts about each (columns), and the schema says which facts.
+SQL describes the answer and lets the database find it. A SELECT starts from the rows in FROM, keeps the ones
+that pass the WHERE test row by row, computes the output columns in SELECT, sorts them with ORDER BY, and cuts
+the sorted list with LIMIT. That evaluation order is why ORDER BY can use an alias and WHERE (in standard SQL)
+cannot, and why LIMIT means nothing without ORDER BY.
+
+The next lesson looks at the value that breaks the "true or false" picture of WHERE: NULL.
+
+Next: [NULL, CASE and three-valued logic](#/learn/sql/foundations/nulls-logic).
+
+</Section>

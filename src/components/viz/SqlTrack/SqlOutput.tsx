@@ -10,7 +10,7 @@ const HEADING: Record<SqlRunResult['status'], string> = {
 };
 
 const firstLine = (sql: string) => {
-  const line = sql.trim().split('\n')[0] ?? '';
+  const line = sql.trim().split('\n').find((l) => l.trim() && !l.trim().startsWith('--')) ?? '';
   return line.length > 60 ? `${line.slice(0, 57)}…` : line;
 };
 

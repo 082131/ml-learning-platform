@@ -1,4 +1,5 @@
 import { CteSteps } from './CteSteps';
+import { QueryPipeline } from './QueryPipeline';
 import { SqlExercise } from './SqlExercise';
 import { SqlRunner } from './SqlRunner';
 
@@ -7,4 +8,5 @@ export default {
   SqlRunner,
   CteSteps,
   SqlExercise,
+  QueryPipeline,
 };
