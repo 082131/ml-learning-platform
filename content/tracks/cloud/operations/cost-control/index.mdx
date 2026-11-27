@@ -1,0 +1,236 @@
+import { bill, billDemo, budgetCode, costByTagCode, lifecycleCode } from './code';
+import { billExercise, questions } from './quiz';
+
+<Section kind="intuition" title="The electricity bill of a house where nobody switches anything off">
+
+Imagine a shared house where the lights, the heating and the oven are never switched off, the bill arrives a month
+later as one number, and nobody knows whose room used what. The bill is high, everyone suspects everyone else, and
+the usual suggestion is to buy cheaper light bulbs. The real fix is boring: meters per room, a warning when the month
+is heading over budget, and switches that turn things off when nobody is home.
+
+Cloud bills for ML teams look exactly like that house. Training GPUs get the attention, but the bill is often
+dominated by things nobody is using: notebooks running all night, an endpoint sized for a launch that never came,
+checkpoints from last spring, data copied across regions every day. And the bill arrives as "EC2: \$4,000" rather than
+"the search experiment: \$4,000".
+
+This lesson builds the habits that fix it, in the order that matters: make the bill readable, get warned in time,
+then remove the leaks, largest first, and only then haggle over the price per hour.
+
+</Section>
+
+<Section kind="technical" title="From one number to named lines, and from lines to fixes">
+
+**The big picture.** You cannot cut what you cannot see → so first give every cost an owner with tags → then get
+warned before the month is spent, with budgets and anomaly alerts → then read the bill as lines with formulas, hours ×
+price, and find the largest → most large lines are idle time, so remove the idle hours → and only for the usage that
+remains, lower the price with spot or commitments.
+
+### Step 1: make the bill readable with tags
+
+Every cloud resource can carry labels: a <Term id="cost-allocation-tag">cost allocation tag</Term> such as
+`project=search` or `team=ranking`. Billing tools can then group costs by them, which turns "SageMaker: \$3,100" into
+"the ranking team's nightly retraining: \$2,400, the search notebooks: \$700". Two details trip teams up:
+
+- **Activation.** On AWS, a tag you add to resources only appears in Cost Explorer after you activate it as a cost
+  allocation tag in the Billing console. On Google Cloud, labels appear in the billing export (to BigQuery). Do it on
+  day one, before the costs you will want to explain.
+- **Enforcement.** Tags only help if they are always there. Put them in infrastructure code (the next lesson), pass
+  them on every training job, and enforce them with a tag policy or a guardrail that denies creating untagged
+  resources. The size of the "untagged" row in your report is the measure of how well this works.
+
+The goal is **unit cost**: not "we spent \$7,000", but "a retraining run costs \$40", "a thousand predictions cost
+\$0.12". Unit costs tell you whether spending grew because the business grew or because something leaked.
+
+### Step 2: get warned in time, and know that a warning is not a stop
+
+A <Term id="cloud-budget">budget</Term> (AWS Budgets, Google Cloud budgets) sets a monthly amount and sends alerts
+when actual spend, or the forecast for the month, crosses a percentage of it. Two facts shape how to use it:
+
+1. **A budget notifies; it does not cap.** Nothing stops when the alert fires, unless you add an action: AWS Budgets
+   can apply an IAM or guardrail policy or stop chosen EC2 and RDS instances, and on Google Cloud you can connect the
+   budget's Pub/Sub messages to a function of your own. Real hard limits come from elsewhere: quotas (the GPU quota
+   from the GPU lesson is a cost control too), guardrail policies that forbid the largest instance types, and
+   auto-stop rules.
+2. **Billing data arrives late.** Cost data is updated several times a day, not instantly. A runaway loop that starts
+   on Friday evening can run for many hours before any alert based on actual spend fires. That is why you alert on
+   the **forecast** (for example at 80%) and use anomaly detection (AWS Cost Anomaly Detection), which flags a service
+   or tag whose daily spend jumps far above its usual pattern.
+
+### Step 3: read the bill as lines, hours × price
+
+Here is a typical month for a small ML team, with illustrative prices. Each line is a formula, and writing it out is
+what reveals the fix:
+
+| Line | Formula | Cost |
+| --- | --- | --- |
+| Training GPUs | 300 GPU-hours × \$4 | \$1,200 |
+| Notebooks | 4 notebooks × 730 h × \$1.20 | \$3,504 |
+| Model endpoint | 2 instances × 730 h × \$1 | \$1,460 |
+| Object storage | 40,000 GB × \$0.023 | \$920 |
+| Data transfer out | 2,000 GB × \$0.09 | \$180 |
+| **Total** | | **\$7,264** |
+
+The surprise is in the second line. Training, which everyone worries about, is a sixth of the bill. The notebooks are
+almost half, and the formula says why: **730 hours** is every hour of the month, while people use them about 174
+(8 hours on 21.75 working days). Three quarters of the line is paid for nobody.
+
+### Step 4: remove idle time, which is most of the leaks
+
+Most large lines in an ML bill are hours × price where many of the hours are idle. The usual suspects:
+
+- **Notebooks and development machines.** Turn on <Term id="idle-shutdown">idle shutdown</Term> (SageMaker Studio
+  and Vertex AI Workbench both offer it). In the example, 730 → 174 hours saves \$2,669, 37% of the whole bill.
+- **Forgotten instances, volumes and addresses.** A GPU VM nobody stopped (the managed-training lesson's 14 idle
+  hours), block storage volumes left behind when instances were terminated, snapshots, and public IPv4 addresses,
+  which AWS bills by the hour. A weekly report of resources without recent activity catches them.
+- **Endpoints sized for the peak.** The model-APIs lesson showed that a fleet sized for the busiest hour sits mostly
+  idle. Autoscaling (or a serverless endpoint for occasional traffic) brings the average from 2 instances to about
+  1.1 in the example, saving \$657.
+- **Storage that only grows.** Every spot-safe run writes checkpoints, and with versioning each overwrite keeps the
+  old copy. <Term id="lifecycle-rule">Lifecycle rules</Term> expire old checkpoints and noncurrent versions, move
+  archives to cheaper <Term id="storage-class">storage classes</Term>, and abort incomplete multipart uploads, whose
+  parts are billed but invisible in a normal listing. Halving the stored data saves \$460 here.
+- **Data on the move.** <Term id="egress">Egress</Term> and cross-region copies, from the moving-data lesson, and NAT
+  gateway processing charges, from the networking lesson (an S3 gateway endpoint removes them for S3 traffic).
+
+### Step 5: only then, lower the price of what remains
+
+Once the idle hours are gone, the remaining usage is real, and two price levers apply to it:
+
+- **Spot** for work that can resume, as in the spot lesson. Moving all training to spot at 60% off saves \$720 here:
+  worthwhile, but the second-largest saving, not the first.
+- **A <Term id="commitment-discount">commitment</Term>** (AWS Savings Plans or Reserved Instances, Google Cloud
+  committed use discounts): a lower rate for promising one or three years of a certain usage. The catch is in the
+  word promise: you pay for the commitment whether or not you use it. So the order matters. **Scale down first, then
+  commit to the steady floor** you are certain to use. Committing to 2 always-on endpoint instances and then
+  autoscaling to an average of 1.1 leaves almost half of the commitment paid for and unused.
+
+Applied together, the controls in the example bring \$7,264 down to about \$2,517, 65% less, without making a single
+training run slower. That ordering, visibility, then warnings, then idle time, then price, is the core of what the
+industry calls FinOps.
+
+<Callout kind="simplification">
+The bill is illustrative: instance and notebook prices are round numbers, the spot discount is a fixed 60%, the
+commitment a flat 30% on the endpoint, autoscaling a fixed 55% of the instances on average, and lifecycle rules a
+fixed 50% of the stored data. Storage and egress use Amazon S3 Standard and internet data transfer list prices in US
+East (first tiers). Real bills add request charges, taxes, support plans and many smaller lines, and real discounts
+vary by instance type, region and term.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Try it: fix a month's bill">
+
+The month from the table above. Turn on each control and watch which line shrinks; the readout compares with the same
+month with every control off.
+
+<Experiment def={bill} title="A month of ML cloud costs">
+  <BillView />
+  <Readout title="This month" />
+</Experiment>
+
+Things to try:
+
+- **Turn on "Stop idle notebooks" first.** The bill falls from \$7,264 to \$4,595, more than any other single control,
+  and the largest line is now the endpoint.
+- **Set training on spot to 100%** instead. It saves \$720: real money, but a quarter of what idle shutdown saved.
+- **Turn on the commitment before and after autoscaling.** Alone it saves \$438; on top of autoscaling it is applied
+  to 1.1 instances instead of 2, which is the "commit to the floor" rule in numbers.
+- **Raise notebooks to 12.** Without idle shutdown, the notebooks alone cost \$10,512, more than everything else
+  together. Teams grow, and so does this line, silently.
+- **Turn everything on.** About \$2,517, 65% less than with every control off.
+
+</Section>
+
+<Section kind="code" title="Rank the fixes, then put the controls in place">
+
+Each control applied alone, ranked by what it saves, with the lab's numbers:
+
+<PythonRunner example={billDemo} title="bill.py" />
+
+Group last month's costs by an activated project tag with Cost Explorer:
+
+<Code example={costByTagCode} title="cost_by_project.py (needs an AWS account; not run here)" />
+
+A budget with a forecast alert at 80% and an actual alert at 100%. The limit follows the lab's month plus 10%:
+
+<Experiment def={bill} title="budget.py, linked to the lab" controls={false}>
+  <Code example={budgetCode} title="budget.py (needs an AWS account; not run here)" />
+  <Readout title="The month this budget watches" />
+</Experiment>
+
+Lifecycle rules for a training bucket: expire checkpoints and their old versions, archive old datasets, and abort
+failed uploads:
+
+<Code example={lifecycleCode} title="lifecycle.py (needs an AWS account; not run here)" />
+
+</Section>
+
+<Section kind="mistakes" title="How cost control goes wrong">
+
+<CommonMistake
+  title="Treating a budget as a spending limit"
+  wrong={'# "we have a $3,000 budget, so we can never spend more than $3,000"'}
+  error="(no error) the alert email arrives on Monday, after a $9,000 weekend"
+  cause="Budgets notify; they do not stop resources, and billing data lags by hours."
+  fix="Alert on the forecast and on anomalies, and add real limits: quotas, guardrail policies on instance types, budget actions and auto-stop rules."
+/>
+
+<CommonMistake
+  title="Committing before scaling down"
+  wrong={'# buy a 1-year Savings Plan for today\'s usage, then turn on autoscaling'}
+  error="(no error) the commitment shows as partly unused every month for a year"
+  cause="A commitment is paid whether used or not; autoscaling then removed the usage it was meant to discount."
+  fix="Remove idle time and right-size first, watch a few weeks of usage, then commit only to the floor you always use."
+/>
+
+<CommonMistake
+  title="Checkpoints kept forever, in every version"
+  wrong={'torch.save(state, "last.pt"); upload("s3://acme-ml/checkpoints/run-42/last.pt")   # every 30 min, versioned bucket'}
+  error="(no error) the storage line grows every month although the listed objects do not"
+  cause="Each overwrite keeps a noncurrent version, and failed multipart uploads keep their parts; neither shows up in a normal listing."
+  fix="Lifecycle rules: expire checkpoints after N days, expire noncurrent versions, and abort incomplete multipart uploads."
+/>
+
+</Section>
+
+<Section kind="practice" title="Cost habits for an ML team">
+
+- **Tag from day one** (project, team, environment, owner), activate the tags for billing, and enforce them in code.
+- **Set a budget per team or project** with a forecast alert and anomaly detection, routed to people who can act.
+- **Turn on idle shutdown** for every notebook and development instance, and review unused resources weekly.
+- **Autoscale or go serverless** for endpoints, and stop non-production endpoints outside working hours.
+- **Put lifecycle rules on every bucket** that holds checkpoints, logs or intermediate data.
+- **Use spot for resumable work**, and commit only after usage is stable, to the floor.
+- **Track unit costs** (per training run, per thousand predictions) next to the total.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={billExercise}>
+  Write the month's bill as named lines and find the largest.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+A cloud bill becomes manageable when it stops being one number. Tags give each cost an owner, budgets with forecast
+and anomaly alerts warn while there is still time (they warn, they do not stop), and writing each line as hours ×
+price shows where the money goes. In ML bills, the largest lines are usually idle hours: notebooks running all night,
+endpoints sized for the peak, forgotten machines, and storage that only grows.
+
+So the order of work follows from the formulas: remove idle hours first (idle shutdown, autoscaling, lifecycle
+rules), then lower the price of the usage that remains, with spot for resumable work and commitments only for the
+steady floor. In the example that order cuts the month by about two thirds without slowing any training run.
+
+Next: [Infrastructure as code: Terraform plans before it changes anything](#/learn/cloud/operations/infrastructure-as-code).
+
+</Section>
