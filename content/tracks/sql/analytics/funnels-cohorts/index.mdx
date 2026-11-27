@@ -1,0 +1,231 @@
+import { eventsVsUsers, everFunnel, funnelLab, honestCohorts, naiveCohorts, orderedFunnel } from './code';
+import { exercise, questions } from './quiz';
+
+<Section kind="intuition" title="Two questions every product team asks">
+
+Every online product eventually asks two questions about its users. The first is **"where do people give up?"**:
+of everyone who arrives, how many look at a product, how many put it in the cart, how many pay? That chain of
+steps is a <Term id="conversion-funnel">funnel</Term>, named after its shape: wide at the top, narrower at each
+step. The step with the biggest drop is where the team should look first.
+
+The second question is **"do people come back?"**: of everyone who signed up in January, how many were still
+active in February, in March? Grouping users by when they started is a cohort, and the share still active later
+is <Term id="cohort-retention">retention</Term>. It is the difference between a product people try once and one
+they keep using.
+
+Both questions sound like a COUNT and a division, and that is exactly why they go wrong so often. A rate is
+"how many succeeded, out of how many", and every word in that sentence hides a decision. *How many* of what:
+events, or people? *Succeeded* how: in order, and within what time? *Out of* whom: everyone who started, or only
+the ones the query happened to keep? This lesson builds both reports from the shop's `events` table with the
+tools of the last three chapters (conditional aggregation, CTEs, LEFT JOINs and window functions), and each step
+makes one of those decisions explicit. You will see the same data give a visit-to-purchase conversion of 37.5,
+50 or 75 percent, and a retention table with three cells that look like collapsing customers but are really
+months that have not happened yet.
+
+</Section>
+
+<Section kind="technical" title="What exactly are we counting?">
+
+The `events` table has one row per thing a user did: `visit`, `view_product`, `add_to_cart`, `checkout` and
+`purchase`, each with a `user_id` and an `event_time`. 8 users, 74 events, from January to early April.
+
+**Decision 1: count units, not rows.** The first instinct is `COUNT(*)` per event. Run it next to
+`COUNT(DISTINCT user_id)` and the two disagree everywhere: 21 visits but only 8 visitors, 14 add-to-cart events
+but only 7 users who added something. Event counts measure *activity*: Ada visited 5 times, and Ben's app sent
+add_to_cart twice in the same minute. A conversion rate is a question about *people* ("what share of visitors
+bought?"), so each person should count once per step. Divide event counts and you get 11 / 21 = 52.4 percent,
+a number that is neither "share of visitors who bought" (it divides purchases by visits) nor anything else you
+would want to report.
+
+<SqlRunner example={eventsVsUsers} title="events_vs_users.sql" />
+
+**The simplest correct funnel: "did the user ever do it?"** Turn each user into one row with a 0 or 1 per step,
+then add up the columns. This is <Term id="conditional-aggregation">conditional aggregation</Term> from the
+GROUP BY lesson: `event = 'visit'` is 1 or 0 for each row, and `MAX` over a user's rows is 1 if any of them was a
+visit. The result is 8, 8, 7, 6, 6.
+
+<SqlRunner example={everFunnel} title="ever_funnel.sql" />
+
+**Decision 2: order and time.** The "ever" funnel ignores *when* things happened. A user who visited in January
+and bought in April counts as converted, and so would a user who bought *before* they ever viewed a product
+(through a direct link, say). Usually the question is narrower: "of the people who visited, how many went on to
+buy, in that order, within some time?". That needs each step to happen after the previous one, and within a
+window measured from the first visit. The way to express "after the previous step" in SQL is to build the steps
+as a chain of CTEs, where each step only looks at the users who reached the step before and only at events at or
+after the time they reached it. Because each step reads from the previous one, a later step can never contain
+more users than an earlier step, which is the defining shape of a funnel.
+
+**Decision 3: the denominator.** A funnel gives two kinds of percentage. *Step conversion* divides each step by
+the previous one ("of the users who added to cart, 80 percent checked out") and tells you where people drop.
+*Overall conversion* divides by the first step ("50 percent of visitors bought") and tells you the end result.
+Both are useful; they are different answers, so a funnel report should label which is which. Choosing the
+<Term id="metric-denominator">denominator</Term> is choosing the question.
+
+</Section>
+
+<Section kind="visual" title="Try it: one log, many funnels">
+
+The explorer runs the ordered funnel over the real events. Change the time window and watch users drop in and
+out; the table below the bars shows when each user reached each step, counted from their first visit.
+
+<Experiment def={funnelLab} title="Funnel explorer">
+  <FunnelLab />
+  <Readout title="This funnel" />
+</Experiment>
+
+Things to try:
+
+- **7 days (the start).** 8, 7, 5, 4, 4: half the visitors bought within a week. Hana's product view came 17
+  days after her visit, so she stops at the first step; Chen and Fay added to cart 14 and 12 days later.
+- **1 hour.** 8, 7, 5, 3, 3: conversion falls to 37.5 percent. Look at Eli's row: he added to cart 2 minutes in,
+  then came back and checked out 34 hours later. In a 1-hour or 1-day funnel that checkout is "late", and Eli
+  counts as a lost cart. Nothing about Eli changed; the definition did.
+- **Any time.** 8, 8, 7, 6, 6, identical to the "ever" funnel above, because in this data nobody did a step
+  before the one it follows. Conversion is now 75 percent, double the 1-hour figure.
+- **Count event rows.** 21, 17, 14, 11, 11. The top of the funnel is inflated by repeat visits, and the steps no
+  longer describe people at all. The window setting does nothing here, because raw event counts have no idea of
+  order or time.
+
+The point of the explorer is not that one window is right. "Bought in the same sitting" and "bought within a
+week" are both legitimate questions. The point is that a conversion rate without its definition is not a number
+you can compare: last month's 1-hour rate against this month's 7-day rate would show a fake 33 percent
+improvement.
+
+</Section>
+
+<Section kind="code" title="The ordered funnel and the cohort table, step by step">
+
+**The ordered funnel as a chain.** Here is the 7-day version from the explorer, written as named steps. Select a
+step to see only its rows. `visited` sets each user's clock (`start`, the first visit). Every later step joins
+the previous step's users to their events of the next type that happened at or after the previous step's time
+(`e.event_time >= p.t`) and no later than 7 days after the start (`datetime(p.start, '+7 days')`). `MIN` keeps the
+first such event, which becomes the time the next step must follow.
+
+<CteSteps example={orderedFunnel} title="Ordered 7-day funnel" />
+
+The last two steps are worth a second look. `funnel` stacks the five counts into five rows with UNION ALL, which
+changes the grain to "one row per step". Once the steps are rows, the window functions from the last chapter do
+the percentages: `LAG(users)` is the previous step, so `users / LAG(users)` is step conversion, and
+`FIRST_VALUE(users)` is the top of the funnel, so `users / FIRST_VALUE(users)` is overall conversion. The biggest
+drop is view_product to add_to_cart (71.4 percent continue); checkout to purchase loses nobody.
+
+**Cohort retention, the naive version.** A cohort table has one row per cohort (here, signup month) and one
+column per "months since signup": month 0 is the signup month itself, month 1 the next calendar month, and so on.
+Each cell is "share of the cohort active in that month". The first attempt below gets the mechanics right:
+it turns months into numbers (year × 12 + month) so "months since signup" is a subtraction, and uses
+`COUNT(DISTINCT CASE WHEN month_n = 1 THEN user_id END)` to count each user once per cell.
+
+<SqlRunner example={naiveCohorts} title="naive_cohorts.sql" />
+
+Now read the bottom row as a manager would: the March cohort went from 100 percent to 0 percent after one month.
+That looks like a disaster, and it is an illusion. The data ends on 6 April. March's month 1 is April, which
+has had 6 days; its month 2 is May, which has not happened at all. The February row has the same problem in its
+last two cells. A 0 in those cells does not mean "we measured and nobody came back", it means "we did not
+measure", and the query cannot tell those apart unless we tell it. (Month 0 is 100 percent for every cohort for a
+duller reason: in this shop every customer visited in the month they signed up, so month 0 measures nothing. Many teams start the
+table at month 1 for that reason.)
+
+There is a second, quieter problem: the naive query takes the cohort size from users *with events*. That is
+everyone here, but a customer who signed up and never did anything would vanish from the denominator and lift
+every percentage in their row.
+
+**The honest version.** Four steps fix both problems. `cohorts` takes the size from `customers`, the list of
+everyone who signed up. `as_of` finds the last *complete* month from the data. `cells` builds every (cohort,
+month) cell with a cross join, so empty cells exist, LEFT JOINs the activity onto it, and marks whether the cell's
+calendar month is complete. The final step only fills complete cells.
+
+<CteSteps example={honestCohorts} title="Cohort retention with incomplete months left blank" />
+
+The result has the characteristic triangle shape of every real retention table: the oldest cohort has the most
+columns, the newest the fewest. January kept everyone in month 1 and two of three (66.7 percent) in month 2;
+February kept two of three in month 1. Reading down a column compares cohorts at the same age, which is the
+comparison that matters ("are newer customers sticking better than older ones?"). Reading along a row follows
+one group over time.
+
+**Averaging a retention column.** If you need one month-1 number, average only complete cells and weight by
+cohort size: (3 + 2) / (3 + 3) = 83.3 percent. Averaging the naive column (100, 66.7 and the fake 0) gives 55.6
+percent, a number about a month that has not happened. And notice what the triangle implies for later columns:
+month 2 here is the January cohort alone. Long-term retention is always measured on the oldest users, who may
+behave differently from the newest, so treat the right-hand end of a retention table with care.
+
+</Section>
+
+<Section kind="mistakes" title="Funnel and retention mistakes">
+
+<CommonMistake
+  title="Counting events instead of users"
+  wrong={'SELECT event, COUNT(*) FROM events GROUP BY event'}
+  error="(no error) 21 'visitors', and every conversion rate mixes repeat activity with people"
+  cause="One user can produce many events of the same type, including duplicates."
+  fix="COUNT(DISTINCT user_id) per step, or build one row per user with step flags first."
+/>
+
+<CommonMistake
+  title="A filter that shrinks the denominator"
+  wrong={"FROM customers c JOIN orders o ON o.customer_id = c.id\nWHERE o.order_date <= date(c.signup_date, '+7 days')"}
+  error="(no error) every cohort 'converts' 100 percent"
+  cause="Customers without a matching order are removed before counting, so only successes are left to divide by."
+  fix="LEFT JOIN orders with the condition in ON, and count customers from the customers table."
+/>
+
+<CommonMistake
+  title="Steps that do not depend on each other"
+  wrong={"carted AS (SELECT user_id FROM events WHERE event = 'add_to_cart')   -- not joined to viewed"}
+  error="(no error) a later step can be bigger than an earlier one"
+  cause="Each step was counted independently, so order was never enforced."
+  fix="Build each step from the previous step's users and require event_time >= the previous step's time."
+/>
+
+<CommonMistake
+  title="Zeros for periods that have not happened"
+  wrong={'COUNT(DISTINCT CASE WHEN month_n = 1 THEN user_id END) / COUNT(DISTINCT user_id)'}
+  error="(no error) the newest cohort appears to churn completely"
+  cause="Cells after the end of the data, or in the current partial month, are computed as 0 instead of unknown."
+  fix="Compute the last complete period and return NULL for cells beyond it."
+/>
+
+</Section>
+
+<Section kind="practice" title="Habits for funnels and retention">
+
+- **Write the definition first, in words**: unit (users), order (each step after the previous), window (7 days
+  from the first visit), denominator (previous step or first step).
+- **Count each unit once per step** with DISTINCT or one-row-per-user flags.
+- **Take the denominator from the full population** (everyone who signed up), not from rows that survived a join.
+- **Leave incomplete periods blank** and say what date the data runs to.
+- **Weight averages by cohort size**, and remember that late columns describe only the oldest cohorts.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<SqlExercise exercise={exercise}>
+  For each signup-month cohort, return `cohort`, `customers` and `converted`: how many of its customers placed an
+  order within 7 days of signing up. Every cohort must appear, even if nobody converted. The starter reports 100
+  percent conversion everywhere. Work out why before you fix it.
+</SqlExercise>
+
+</Section>
+
+<Section kind="summary">
+
+Funnels and retention tables are rates, and a rate is only as good as its definition. Counting users instead of
+events makes each step describe people. Building each funnel step from the previous step's users, at or after the
+previous step's time and within a window from the start, makes the steps ordered and makes the funnel shrink by
+construction; LAG and FIRST_VALUE then give step and overall conversion. The same data gives 37.5, 50 or 75 percent
+conversion depending on the window, so the window belongs in the report. A cohort table counts each cohort's
+active users per month since signup, takes its denominator from everyone who signed up, and leaves months that
+have not fully happened blank, which is what gives retention tables their triangle shape.
+
+Funnels measured within a time window raise the next question: what is a "visit", and when does one end? That is
+sessions, and with them deduplication and streaks.
+
+Next: [Sessions, deduplication and streaks](#/learn/sql/analytics/sessions-dedup).
+
+</Section>

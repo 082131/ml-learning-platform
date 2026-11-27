@@ -142,6 +142,9 @@ const claims: Record<string, (sets: SqlValue[][][]) => void> = {
   },
   'moving-average': ([rows]) => expect(rows!.map((r) => r[3])).toEqual([14.5, 36.75, 30.5, 36.33, 27, 40.67, 43.67, 37.67, 21, 32, 34.33, 44.17]),
   'month-over-month': ([rows]) => expect(rows).toEqual([['2026-01', 91.5, null, null], ['2026-02', 185, 91.5, 102.2], ['2026-03', 132.5, 185, -28.4]]),
+  'events-vs-users': ([rows]) => expect(rows).toEqual([['visit', 21, 8], ['view_product', 17, 8], ['add_to_cart', 14, 7], ['checkout', 11, 6], ['purchase', 11, 6]]),
+  'ever-funnel': ([rows]) => expect(rows).toEqual([[8, 8, 7, 6, 6]]),
+  'naive-cohorts': ([rows]) => expect(rows).toEqual([['2026-01', 3, 100, 100, 66.7, 33.3], ['2026-02', 3, 100, 66.7, 33.3, 0], ['2026-03', 2, 100, 0, 0, 0]]),
   'days-to-next': ([rows]) => {
     expect(rows!.filter((r) => r[0] === 1).map((r) => r[4])).toEqual([22, 25, null]);
     expect(rows!.length).toBe(11);
@@ -149,6 +152,23 @@ const claims: Record<string, (sets: SqlValue[][][]) => void> = {
 };
 
 describe('CTE walk-through claims', () => {
+  it('ordered 7-day funnel: 8, 7, 5, 4, 4 with step and overall conversion', async () => {
+    const ex = ctes.find(([, e]) => e.id === 'ordered-funnel')![1];
+    const db = await openTestDb('shop');
+    const rows = (i?: number) => runScript(db, composeCte(ex, i)).statements[0]!.rows;
+    expect([0, 1, 2, 3, 4].map((i) => rows(i).length)).toEqual([8, 7, 5, 4, 4]);
+    expect(rows()).toEqual([['visit', 8, null, 100], ['view_product', 7, 87.5, 87.5], ['add_to_cart', 5, 71.4, 62.5], ['checkout', 4, 80, 50], ['purchase', 4, 100, 50]]);
+  });
+  it('honest cohorts: 8 customers, 17 active months, last full month March, 12 cells, a triangle', async () => {
+    const ex = ctes.find(([, e]) => e.id === 'honest-cohorts')![1];
+    const db = await openTestDb('shop');
+    const rows = (i?: number) => runScript(db, composeCte(ex, i)).statements[0]!.rows;
+    expect(rows(0).length).toBe(8);
+    expect(rows(1).length).toBe(17);
+    expect(rows(2)).toEqual([[2026 * 12 + 3]]);
+    expect(rows(3).length).toBe(12);
+    expect(rows()).toEqual([['2026-01', 3, 100, 100, 66.7, null], ['2026-02', 3, 100, 66.7, null, null], ['2026-03', 2, 100, null, null, null]]);
+  });
   it('above-average spenders: 13 lines, 5 customers, average 57.80, three above it', async () => {
     const ex = ctes.find(([, e]) => e.id === 'above-average-spenders')![1];
     const db = await openTestDb('shop');

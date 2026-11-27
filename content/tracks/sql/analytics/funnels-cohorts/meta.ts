@@ -13,5 +13,10 @@ export default {
     'Recognise survivorship and incomplete-period traps in retention charts',
   ],
   prerequisites: ['sql/windows/frames-lag-lead'],
-  concepts: [],
+  concepts: ['conversion-funnel', 'cohort-retention', 'metric-denominator', 'cte', 'conditional-aggregation'],
+  references: [
+    { title: 'SQLite: Date and time functions (datetime modifiers)', url: 'https://www.sqlite.org/lang_datefunc.html', version: '3.54' },
+    { title: 'SQLite: Window functions (LAG, FIRST_VALUE)', url: 'https://www.sqlite.org/windowfunctions.html', version: '3.54' },
+    { title: 'PostgreSQL: Aggregate functions (FILTER clause)', url: 'https://www.postgresql.org/docs/current/sql-expressions.html#SYNTAX-AGGREGATES', version: '18' },
+  ],
 } satisfies LessonMeta;

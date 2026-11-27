@@ -1,5 +1,6 @@
 import { CteSteps } from './CteSteps';
 import { FanOut } from './FanOut';
+import { FunnelLab } from './FunnelLab';
 import { JoinLab } from './JoinLab';
 import { NullFilter } from './NullFilter';
 import { QueryPipeline } from './QueryPipeline';
@@ -19,4 +20,5 @@ export default {
   FanOut,
   RecursionTrace,
   WindowLab,
+  FunnelLab,
 };

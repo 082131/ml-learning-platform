@@ -1,6 +1,7 @@
 // Experiment definitions for the SQL track's visualizations. Logic lives in the pure modules they call.
 import type { ExperimentDef } from '../types';
 import { fanout, fanoutSql, type FanoutResult, type FanoutState } from './fanout';
+import { funnel, funnelSql, WINDOW_LABEL, type FunnelResult, type FunnelSpec, type FunnelWindow } from './funnel';
 import { joinTables, type FilterPlace, type JoinKind, type JoinResult } from './joins';
 import { EMPLOYEES, recurse, type Direction, type RecursionResult } from './recursion';
 import { computeWindow, windowSql, type WindowFn, type WindowRow, type WindowSpec } from './window';
@@ -220,6 +221,43 @@ export function windowExperiment(id: string, mode: 'ranking' | 'frames'): Experi
       { label: 'Rows in and rows out', value: `${r.rows.length} and ${r.rows.length}` },
       { label: 'Partitions', value: String(new Set(r.rows.map((x) => x.partitionKey)).size) },
       { label: 'NULL values (no row to look at)', value: String(r.rows.filter((x) => x.value === null).length) },
+    ],
+  };
+}
+
+export type FunnelLabResult = FunnelResult & { sql: string };
+
+/** The purchase funnel of the event log under different definitions (time window, users or events). */
+export function funnelExperiment(id: string): ExperimentDef<FunnelSpec, FunnelLabResult> {
+  return {
+    id,
+    initial: { window: '7d', count: 'users' },
+    controls: [
+      {
+        kind: 'select',
+        id: 'count',
+        label: 'Count',
+        options: [
+          { value: 'users', label: 'users who reached each step, in order' },
+          { value: 'events', label: 'event rows (no order, no time limit)' },
+        ],
+        get: (s) => s.count,
+        set: (s, v) => ({ ...s, count: v as FunnelSpec['count'] }),
+      },
+      {
+        kind: 'select',
+        id: 'window',
+        label: 'Within ... of the first visit',
+        options: (Object.keys(WINDOW_LABEL) as FunnelWindow[]).map((w) => ({ value: w, label: WINDOW_LABEL[w] })),
+        get: (s) => s.window,
+        set: (s, v) => ({ ...s, window: v as FunnelWindow }),
+      },
+    ],
+    compute: (s) => ({ ...funnel(s), sql: funnelSql(s) }),
+    readout: (s, r) => [
+      { label: 'Definition', value: s.count === 'users' ? `users, in order, within ${WINDOW_LABEL[s.window]}` : 'event rows' },
+      { label: 'visit to purchase', value: `${r.steps[4]!.value} of ${r.steps[0]!.value} = ${r.steps[4]!.pctFirst}%` },
+      { label: 'Biggest drop', value: (() => { const w = r.steps.slice(1).reduce((a, b) => ((b.pctPrevious ?? 100) < (a.pctPrevious ?? 100) ? b : a)); return `into ${w.step} (${w.pctPrevious}% of previous)`; })() },
     ],
   };
 }
