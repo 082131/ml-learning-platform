@@ -332,6 +332,13 @@ describe('terraform plan', () => {
     const r = plan([renamed, vm], [bucket, vm], [bucket, vm], ['aws_s3_bucket.data']);
     expect(r.error).toMatch(/prevent_destroy/);
   });
+  it('replaces resources that refer to a replaced one', () => {
+    const versioning: Resource = { address: 'aws_s3_bucket_versioning.data', type: 'aws_s3_bucket_versioning', attrs: { bucket: 'aws_s3_bucket.data.id', 'versioning_configuration.status': 'Enabled' } };
+    const renamed = { ...bucket, attrs: { bucket: 'acme-ml-data-v2' } };
+    const r = plan([renamed, versioning], [bucket, versioning], [bucket, versioning]);
+    expect(r.changes[1]).toEqual({ address: 'aws_s3_bucket_versioning.data', action: 'replace', diffs: [['bucket', 'acme-ml-data', '(known after apply)', true]] });
+    expect(r.summary).toBe('Plan: 2 to add, 0 to change, 2 to destroy.');
+  });
   it('detects drift and plans to undo it', () => {
     const changed = { ...vm, attrs: { ...vm.attrs, instance_type: 'p4d.24xlarge' } };
     const r = plan([bucket, vm], [bucket, vm], [bucket, changed]);

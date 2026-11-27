@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui';
 import type { BillInput, BillResult } from '@/lib/cloud/bill';
 import type { CapstoneResult, CloudPlan } from '@/lib/cloud/capstone';
 import { num, usd, type IacResult, type IacState } from '@/lib/cloud/experiments';
-import { SYMBOL } from '@/lib/cloud/iac';
+import { KNOWN_AFTER_APPLY, SYMBOL } from '@/lib/cloud/iac';
 import { VizFrame, VizTable } from '../VizFrame/VizFrame';
 import { Bars } from './Bars';
 import s from './CloudTrack.module.css';
@@ -39,7 +39,7 @@ export function PlanView() {
     const verb = { create: 'will be created', update: 'will be updated in-place', replace: 'must be replaced', delete: 'will be destroyed', 'no-op': '' }[c.action];
     lines.push(`  # ${c.address} ${verb}`);
     lines.push(`  ${SYMBOL[c.action]} ${c.address.split('.')[0]} "${c.address.split('.')[1]}"`);
-    for (const [k, before, after, forces] of c.diffs) lines.push(`      ${k}: ${c.action === 'create' ? '' : `"${before}" -> `}${c.action === 'delete' ? 'null' : `"${after}"`}${forces ? '  # forces replacement' : ''}`);
+    for (const [k, before, after, forces] of c.diffs) lines.push(`      ${k}: ${c.action === 'create' ? '' : `"${before}" -> `}${c.action === 'delete' ? 'null' : after === KNOWN_AFTER_APPLY ? after : `"${after}"`}${forces ? '  # forces replacement' : ''}`);
     lines.push('');
   }
   lines.push(r.summary);

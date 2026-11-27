@@ -1,0 +1,229 @@
+import { iac, mainTf, planDemo, workflowCode } from './code';
+import { planExercise, questions } from './quiz';
+
+<Section kind="intuition" title="An architect's drawing instead of instructions to the builder">
+
+There are two ways to get a house built. You can stand next to the builder and give instructions: "put a wall here,
+now a window there". It works, but afterwards nobody knows exactly what was built, a second house will come out
+different, and if a wall is moved later nobody notices. Or you can hand over a drawing. The builder compares the
+drawing with the site, works out what is missing, and builds that. Change the drawing, and the builder works out the
+difference again.
+
+Clicking in a cloud console is the first way. <Term id="infrastructure-as-code">Infrastructure as code</Term> is the
+second: you describe the buckets, roles, networks and machines from the earlier lessons in text files, keep them in
+Git, and a tool (here **Terraform**, the most widely used) works out what to create, change or delete so that the real
+cloud matches the files.
+
+The power and the danger are the same thing: the tool does exactly what the difference says. This lesson is about
+reading that difference, the **plan**, so that a one-word edit never surprises you by deleting a training dataset.
+
+</Section>
+
+<Section kind="technical" title="Configuration, state and reality, and the plan between them">
+
+**The big picture.** You write the configuration (what you want) → Terraform keeps a state file (what it created,
+with real IDs) → on every plan it refreshes the state from the cloud (what really exists now) → it compares the
+configuration with that refreshed picture → each difference becomes create, update, replace or destroy → you review
+the plan, and only then apply it.
+
+### Three pictures of the same infrastructure
+
+Terraform works with three descriptions and keeps them apart:
+
+1. **The configuration**: `.tf` files in your repository. A `resource "aws_s3_bucket" "data"` block says "I want a
+   bucket, which I will call `aws_s3_bucket.data`". That name is the resource's **address**.
+2. **The <Term id="terraform-state">state</Term>**: a JSON file in which Terraform records, for each address, the real
+   resource it created (the bucket's name, the instance's ID) and the values it last saw. Without state, Terraform
+   could not know that `aws_instance.notebook` is instance `i-0abc…` rather than one of the other hundred instances in
+   the account.
+3. **Reality**: what the cloud API says exists right now. Before planning, Terraform **refreshes**: it reads each
+   resource in the state from the API and updates its picture.
+
+The plan is then a difference: configuration minus refreshed state. Each address falls into one of five cases.
+
+### Reading a plan: five actions, four symbols
+
+| Symbol | Action | When | Example |
+| --- | --- | --- | --- |
+| `+` | create | in the configuration, not in state | a new bucket block |
+| `~` | update in place | an argument changed and the cloud can change it on the existing resource | `instance_type` g5 → g6 |
+| `-/+` | replace | a changed argument <Term id="forces-replacement">forces replacement</Term> | a new `ami`, a new bucket name |
+| `-` | destroy | in state, no longer in the configuration | a deleted block |
+| | no-op | nothing differs | most resources, most of the time |
+
+The <Term id="terraform-plan">plan</Term> ends with a summary such as `Plan: 1 to add, 0 to change, 1 to destroy.` A
+replacement counts once as an add and once as a destroy, so that line is how a replacement often first catches your
+eye.
+
+The middle rows are where surprises live. Whether an edit is an update or a replacement is not your choice; it is a
+property of the cloud API, which the provider documents per argument. An EC2 instance can change its type with a
+stop and start, so `instance_type` updates in place. It cannot change its machine image, so a new `ami` means a new
+instance and an empty local disk. An S3 bucket cannot be renamed at all, so a new `bucket` argument means delete the
+old bucket and create a new one.
+
+### References chain replacements together
+
+Resources refer to each other: the versioning resource says `bucket = aws_s3_bucket.data.id`. Terraform uses these
+references to order its work (bucket first, then versioning) and to propagate changes. If the bucket is replaced, its
+ID will change, so the versioning resource's `bucket` becomes "known after apply", and because that argument also
+forces replacement, the versioning resource is replaced too. One renamed bucket gives `Plan: 2 to add, 0 to change,
+2 to destroy.` In a larger configuration, a single replaced network can pull a whole tree of resources with it. Read
+the count, then find the root cause.
+
+### Protecting what cannot be rebuilt
+
+Some resources are cheap to recreate (an instance from code) and some are not (a bucket with three years of training
+data, the bucket holding the state itself). For those, the `lifecycle` block has `prevent_destroy = true`: any plan
+that would destroy the resource, including a replacement, stops with an error before anything happens. It is a
+seatbelt, not a lock: deleting the whole block from the code removes the protection with it, which is one more reason
+for code review.
+
+Two related tools prevent accidental destroys when you only reorganize code. A `moved` block tells Terraform that
+`aws_s3_bucket.data` is now called `aws_s3_bucket.training_data`, so renaming a label plans no change at all. A
+`removed` block (with `destroy = false`) stops managing a resource while leaving it in place. Without them, a new
+label looks like "destroy the old address, create a new one".
+
+### Drift: when reality changes behind the code's back
+
+<Term id="configuration-drift">Drift</Term> is a difference between reality and the code, usually from a console
+change during an incident. Terraform finds it while refreshing and prints it first ("Objects have changed outside of
+Terraform"), then plans to put reality back the way the code says. That is the right default, the code is the source
+of truth, but it means a hand-made fix is silently reverted by the next unrelated apply unless someone copies it into
+the code. Teams run `plan -detailed-exitcode` on a schedule so drift is found in the morning, not during the next
+apply.
+
+### State is shared, locked and sensitive
+
+If two engineers keep their own state files, each has a different record of what exists, and their applies duplicate
+or delete each other's resources. So state lives in a shared **backend**, typically a versioned bucket (S3 for AWS,
+Cloud Storage for Google Cloud), with a **lock** so that only one plan or apply writes it at a time; since Terraform
+1.10, the S3 backend can lock with a lock file in the same bucket (`use_lockfile`). State can contain secrets
+(generated passwords, connection strings), so its bucket needs the tightest IAM policy in the account.
+
+The working pattern follows: changes go through pull requests, CI runs `plan` and posts it for review, and after
+approval CI applies **the saved plan file**, so what was reviewed is exactly what runs. Nobody applies from a laptop.
+The same files also carry the earlier lessons' rules: `default_tags` puts the cost-control tags on every resource,
+and IAM roles, VPC endpoints and lifecycle rules become reviewed code instead of console clicks.
+
+<Callout kind="simplification">
+The lab and `plan.py` model one part of Terraform: comparing configuration, state and refreshed reality, the
+update-or-replace decision for two documented arguments (`bucket` on S3 buckets and versioning, `ami` on instances),
+reference propagation, drift and `prevent_destroy`. Real plans also handle computed values, dependencies across
+modules, data sources and `create_before_destroy`, and the provider decides replacements for every argument. The
+plan text is simulated in Terraform's style; run `terraform plan` for the real thing. OpenTofu, an open-source fork,
+behaves the same way for everything shown here.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Try it: what will terraform plan say?">
+
+A configuration with a data bucket, its versioning, and a notebook instance. Pick what happened and read the plan
+before applying anything.
+
+<Experiment def={iac} title="terraform plan">
+  <PlanView />
+  <Readout title="Plan" />
+</Experiment>
+
+Things to try:
+
+- **Start with "First apply", then "Run plan again".** Three creates, then "No changes": running Terraform twice is
+  safe, because it applies differences, not instructions.
+- **Compare "Change instance_type" with "Change the AMI".** Both are one-word edits on the same block: the first is
+  `~` (0 to destroy), the second `-/+` (1 to destroy).
+- **Try "Rename the bucket".** Two resources are replaced, because the versioning resource refers to the bucket. Now
+  set prevent_destroy to yes: the plan stops with an error, which is the point.
+- **Try "Delete the notebook block".** A minus sign: removing code removes the resource.
+- **Try "Someone suspended versioning".** The drift note comes first, then a plan to turn versioning back on.
+
+</Section>
+
+<Section kind="code" title="The plan in miniature, the real configuration, and the workflow">
+
+The heart of `terraform plan`, in Python, for four of the lab's scenarios:
+
+<PythonRunner example={planDemo} title="plan.py" />
+
+The configuration behind the lab, with a locked S3 backend and default tags. The bucket name, `prevent_destroy`, the
+image and the instance type follow the lab:
+
+<Experiment def={iac} title="main.tf, linked to the lab" controls={false}>
+  <Code example={mainTf} title="main.tf (needs an AWS account; not run here)" />
+  <Readout title="What terraform plan would say" />
+</Experiment>
+
+The commands, as a pull request pipeline would run them:
+
+<Code example={workflowCode} title="ci.sh (needs Terraform and AWS credentials; not run here)" />
+
+</Section>
+
+<Section kind="mistakes" title="How infrastructure as code goes wrong">
+
+<CommonMistake
+  title="Applying without reading the destroy count"
+  wrong={'terraform apply -auto-approve   # "it\'s only a rename"'}
+  error="Error: deleting S3 Bucket (acme-ml-data): operation error S3: DeleteBucket, https response error StatusCode: 409, api error BucketNotEmpty: The bucket you tried to delete is not empty"
+  cause="A new bucket name forces replacement. Here the delete failed only because the bucket was not empty; with force_destroy set it would have succeeded."
+  fix="Read every -/+ and - in the plan before applying, add prevent_destroy to data buckets, and apply only reviewed plan files."
+/>
+
+<CommonMistake
+  title="Two people, two state files"
+  wrong={'# no backend block: terraform.tfstate on each laptop'}
+  error="Error: creating IAM Role (train-job): operation error IAM: CreateRole, https response error StatusCode: 409, api error EntityAlreadyExists: Role with name train-job already exists."
+  cause="The second engineer's state does not know the first one created the role, so Terraform tries to create it again."
+  fix="Use one remote backend with locking (S3 with use_lockfile, or Cloud Storage), and run applies from CI."
+/>
+
+<CommonMistake
+  title="Fixing production in the console"
+  wrong={'# incident: raised the endpoint instance count by hand; code still says 1'}
+  error="(no error) the next unrelated apply quietly sets the count back to 1"
+  cause="Terraform treats the console change as drift and restores what the code says."
+  fix="Copy every emergency change into the code the same day, and run a scheduled drift check with plan -detailed-exitcode."
+/>
+
+</Section>
+
+<Section kind="practice" title="Infrastructure as code that teams rely on">
+
+- **Everything in code**: buckets, roles, networks, endpoints, budgets and lifecycle rules, reviewed in pull requests.
+- **One locked remote backend per environment**, in a versioned bucket with tight access.
+- **Plan in CI, review the plan, apply the saved plan.** Treat `-/+` and `-` lines as the review's main subject.
+- **`prevent_destroy` on data and state buckets**, and `moved` blocks when you rename code.
+- **Scheduled drift detection**, and a rule that console changes during incidents are copied back into code.
+- **Pin provider versions** (`~> 6.0`) and upgrade deliberately, reading the provider's upgrade guide.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={planExercise}>
+  Compute a plan from configuration and state, and print Terraform's summary line.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+Infrastructure as code turns the console clicks of the earlier lessons into reviewed text. Terraform keeps three
+pictures apart: the configuration you write, the state that maps each address to a real resource, and the reality it
+refreshes from the cloud API. A plan is the difference between the configuration and that refreshed picture, and each
+line is one of four actions: create, update in place, replace, or destroy.
+
+Whether an edit updates or replaces is decided by the cloud, argument by argument, and references carry replacements
+from one resource to the next, so a one-word change can destroy more than it seems. Shared locked state keeps the
+team on one record, `prevent_destroy` and `moved` blocks guard against accidents, drift checks catch hand-made
+changes, and CI applies only the plan that was reviewed.
+
+Next: [Capstone: fine-tune and serve a model on a budget](#/learn/cloud/capstone/fine-tune-and-serve).
+
+</Section>

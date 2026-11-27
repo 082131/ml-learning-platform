@@ -393,7 +393,7 @@ export function billExperiment(id: string): ExperimentDef<BillInput, BillResult>
 // ---------- infrastructure as code ----------
 
 const BUCKET: Resource = { address: 'aws_s3_bucket.data', type: 'aws_s3_bucket', attrs: { bucket: 'acme-ml-data' } };
-const VERSIONING: Resource = { address: 'aws_s3_bucket_versioning.data', type: 'aws_s3_bucket_versioning', attrs: { bucket: 'aws_s3_bucket.data.id', status: 'Enabled' } };
+const VERSIONING: Resource = { address: 'aws_s3_bucket_versioning.data', type: 'aws_s3_bucket_versioning', attrs: { bucket: 'aws_s3_bucket.data.id', 'versioning_configuration.status': 'Enabled' } };
 const NOTEBOOK: Resource = { address: 'aws_instance.notebook', type: 'aws_instance', attrs: { ami: 'ami-0a1b2c3d', instance_type: 'g5.xlarge' } };
 const BASE = [BUCKET, VERSIONING, NOTEBOOK];
 const withAttr = (r: Resource, k: string, v: string): Resource => ({ ...r, attrs: { ...r.attrs, [k]: v } });
@@ -405,7 +405,7 @@ export const IAC_SCENARIOS: Record<string, { label: string; config: Resource[]; 
   ami: { label: 'Change the AMI (machine image)', config: [BUCKET, VERSIONING, withAttr(NOTEBOOK, 'ami', 'ami-9z8y7x6w')], state: BASE, cloud: BASE },
   remove: { label: 'Delete the notebook block from the code', config: [BUCKET, VERSIONING], state: BASE, cloud: BASE },
   rename: { label: 'Rename the bucket', config: [withAttr(BUCKET, 'bucket', 'acme-ml-data-v2'), VERSIONING, NOTEBOOK], state: BASE, cloud: BASE },
-  drift: { label: 'Someone suspended versioning in the console', config: BASE, state: BASE, cloud: [BUCKET, withAttr(VERSIONING, 'status', 'Suspended'), NOTEBOOK] },
+  drift: { label: 'Someone suspended versioning in the console', config: BASE, state: BASE, cloud: [BUCKET, withAttr(VERSIONING, 'versioning_configuration.status', 'Suspended'), NOTEBOOK] },
 };
 
 export interface IacState {

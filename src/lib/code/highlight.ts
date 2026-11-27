@@ -31,6 +31,7 @@ const GRAMMARS = {
   markdown: () => import('shiki/langs/markdown.mjs'),
   toml: () => import('shiki/langs/toml.mjs'),
   diff: () => import('shiki/langs/diff.mjs'),
+  hcl: () => import('shiki/langs/hcl.mjs'),
 } satisfies Record<CodeLanguage, () => Promise<{ default: LanguageRegistration[] }>>;
 
 let highlighter: Promise<HighlighterCore> | undefined;

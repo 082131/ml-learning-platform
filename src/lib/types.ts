@@ -60,7 +60,7 @@ export interface Annotation {
 export interface CodeExample {
   id: string;
   // 'markdown', 'toml' and 'diff' were added for the Git and documentation track (T.08).
-  language: 'python' | 'sql' | 'bash' | 'json' | 'typescript' | 'yaml' | 'markdown' | 'toml' | 'diff';
+  language: 'python' | 'sql' | 'bash' | 'json' | 'typescript' | 'yaml' | 'markdown' | 'toml' | 'diff' | 'hcl';
   source: string;
   slots?: Record<string, (state: unknown) => string>;
   annotations: Annotation[];
