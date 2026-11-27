@@ -34,7 +34,7 @@ per hash. The harder case is the <Term id="near-duplicate">near-duplicate</Term>
 **2. Measuring "almost the same".** We need a similarity score. The standard recipe has two steps:
 
 - **Shingles.** Turn each text into the set of its runs of $n$ consecutive words. With $n = 3$, "open settings choose
-  security" gives {"open settings choose", "settings choose security"}. Word runs, rather than single words, keep some
+  security" gives `{"open settings choose", "settings choose security"}`. Word runs, rather than single words, keep some
   word order: two texts with the same words shuffled share few shingles.
 - **<Term id="jaccard-similarity">Jaccard similarity</Term>.** Compare the two sets:
 
@@ -44,7 +44,7 @@ $$
 
 The top counts shingles both texts share; the bottom counts every distinct shingle of either. The result answers
 "what fraction of the content do these two have in common?": 1 means identical sets, 0 means nothing shared. For
-{a, b, c, d} and {c, d, e}: 2 shared out of 5 distinct, so 0.4.
+`{a, b, c, d}` and `{c, d, e}`: 2 shared out of 5 distinct, so 0.4.
 
 A threshold turns the score into a decision: pairs at or above it are near-duplicates, and you keep one per cluster.
 
