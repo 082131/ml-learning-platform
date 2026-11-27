@@ -1,0 +1,201 @@
+import { decontam, dedupDef, nearDups } from './code';
+import { jaccardExercise, questions } from './quiz';
+
+<Section kind="intuition" title="The model becomes what you feed it">
+
+A fine-tune copies the patterns in its data, the good ones and the bad ones. If a third of your examples are the same
+answer reworded, the model learns to give that answer everywhere. If your test questions sneaked into the training
+data, your evaluation measures memory, not skill. Most disappointing fine-tunes are data problems, not training
+problems, which is why teams often spend more time on data than on everything else together.
+
+This lesson covers the three data problems that matter most, in the order you should tackle them:
+
+1. **Duplicates and near-duplicates** silently over-weight some examples.
+2. **Contamination**: evaluation items hiding in the training data make every score meaningless.
+3. **Synthetic data**: model-written examples give volume, but copy the generator's mistakes at scale.
+
+The thread that connects them: every one is about making sure the numbers you see (the training signal and the
+evaluation score) mean what you think they mean.
+
+</Section>
+
+<Section kind="technical" title="Finding duplicates, leaks and bad synthetic data">
+
+**1. Why duplicates hurt.** During one epoch, each example contributes one gradient step's worth of learning. An
+example that appears 400 times contributes 400 times as much. It acts like a hidden weight you never chose. The model
+over-fits that pattern, produces it where it does not belong, and is more likely to repeat training text word for
+word. Lee et al. (2022) found that deduplicating pretraining data gave models that were as good or better with fewer
+training steps, and emitted memorized text far less often. The same logic holds, at smaller scale, for fine-tuning.
+
+Exact duplicates are easy: normalize the text (lowercase, strip punctuation and extra spaces), hash it, keep one copy
+per hash. The harder case is the <Term id="near-duplicate">near-duplicate</Term>: "How do I reset my password?" versus
+"How can I reset my password?". Hashes differ completely, yet for training they are the same example.
+
+**2. Measuring "almost the same".** We need a similarity score. The standard recipe has two steps:
+
+- **Shingles.** Turn each text into the set of its runs of $n$ consecutive words. With $n = 3$, "open settings choose
+  security" gives {"open settings choose", "settings choose security"}. Word runs, rather than single words, keep some
+  word order: two texts with the same words shuffled share few shingles.
+- **<Term id="jaccard-similarity">Jaccard similarity</Term>.** Compare the two sets:
+
+$$
+J(A, B) = \frac{|A \cap B|}{|A \cup B|}
+$$
+
+The top counts shingles both texts share; the bottom counts every distinct shingle of either. The result answers
+"what fraction of the content do these two have in common?": 1 means identical sets, 0 means nothing shared. For
+{a, b, c, d} and {c, d, e}: 2 shared out of 5 distinct, so 0.4.
+
+A threshold turns the score into a decision: pairs at or above it are near-duplicates, and you keep one per cluster.
+
+**Choosing $n$ and the threshold** is a trade-off you will see directly in the explorer. Small $n$ (single words)
+finds paraphrases, but also flags different questions that share template words ("Open Settings, choose …").
+Large $n$ only finds near-copies. Thresholds around 0.7 to 0.8 on 5-word shingles are common for long documents;
+short chat examples need smaller shingles.
+
+**3. Scaling it up with MinHash.** Comparing every pair is fine for thousands of examples. For millions, there are
+too many pairs. <Term id="minhash">MinHash</Term> solves this with a neat fact. Hash every shingle with a random hash
+function and keep the smallest value. For two sets, the smallest value over their union belongs to one shingle, and
+each shingle of the union is equally likely to be it. The two sets have the *same* minimum exactly when that shingle
+is in both, so:
+
+$$
+P(\text{minimums agree}) = \frac{|A \cap B|}{|A \cup B|} = J(A, B)
+$$
+
+Repeat with 128 different hash functions and the share of agreeing positions estimates $J$. Each document is now a
+fixed list of 128 numbers, however long it is, and a further trick (locality-sensitive hashing: grouping documents
+whose signatures agree in whole bands) finds likely pairs without comparing every pair. This is how web-scale
+pretraining data is deduplicated.
+
+**4. Contamination.** <Term id="data-contamination">Contamination</Term> means evaluation items are in the training
+data. It is the most expensive data bug, because it does not make the model worse; it makes the *measurement* wrong,
+so you ship believing in a gain that is not there. It sneaks in through scraped web pages that quote benchmarks,
+public FAQs that overlap your test questions, synthetic data generated from prompts that included test items, and
+near-duplicates split across train and test.
+
+The check is n-gram overlap: collect all n-grams of the evaluation items and drop any training example that shares
+one. GPT-3's analysis used 13-word n-grams; short examples need a smaller $n$. Two rules make it reliable:
+
+- **Deduplicate before you split**, so near-duplicate clusters cannot straddle train and test.
+- **Clean the training side**, never edit the evaluation set to make the check pass.
+
+The warning sign to remember: a jump that is too good to be true (71% to 97%) is contamination until proven
+otherwise.
+
+**5. Synthetic data.** <Term id="synthetic-data">Synthetic data</Term> is generated by a model: a strong model writes
+answers to your questions, or rewrites examples into new variations. It is cheap and fast, and it is how many open
+models were post-trained. It also has predictable failure modes, each with a check:
+
+- *It copies the generator's mistakes.* Review a random sample by hand; verify facts against your documents.
+- *It repeats itself.* Generators fall into a few phrasings; deduplicate it like any other data.
+- *It drifts in style.* Long, hedged, list-heavy answers become your model's style. Filter on length and format.
+- *It can leak the test set* if test items were in the generation prompts. Run the contamination check on it too.
+
+**Quality over quantity.** The LIMA study fine-tuned a 65B model on just 1,000 carefully curated examples and got a
+strong assistant. You will usually have more data than that, but the lesson holds: removing bad and duplicated
+examples often helps more than adding new ones.
+
+</Section>
+
+<Section kind="visual" title="Try it: find the duplicates and the leak">
+
+Eight training examples and three test questions. Move the shingle size and threshold and watch what gets flagged.
+The contamination check uses 8-word overlaps.
+
+<Experiment def={dedupDef} title="Deduplication and contamination">
+  <FtDedupView />
+  <Readout title="This setting" />
+</Experiment>
+
+Things to try:
+
+- The default (3-word shingles, threshold 0.5) removes #1 (an exact copy after normalizing) and #4 (the reworded
+  billing question, Jaccard 0.65). The reworded password question #2 (Jaccard 0.41) survives: paraphrases need a
+  lower threshold or smaller shingles.
+- Set shingles to **1 word**: #2 is caught (0.71), but so is #6, a *different* question (export data) that shares the
+  template words "Open Settings, choose …, then click". That is a false positive.
+- Look at the test panel: the export question is in the training data word for word, so any score on it measures
+  recall, not skill.
+
+</Section>
+
+<Section kind="code" title="Jaccard and MinHash in Python">
+
+<PythonRunner example={nearDups} title="near_dups.py" />
+
+The MinHash estimates (0.40, 0.67, 0.05) sit close to the exact values (0.41, 0.65, 0.04) using only 128 numbers per
+document. With more hash functions the estimates get closer.
+
+A decontamination pass before training, as a sketch:
+
+<Code example={decontam} title="decontaminate.py (sketch, not run here)" />
+
+</Section>
+
+<Section kind="mistakes" title="Data mistakes that fool you later">
+
+<CommonMistake
+  title="Splitting before deduplicating"
+  wrong={'train, test = split(examples)\ntrain = dedup(train)'}
+  error="(no error) test score inflated by near-copies of test items in training"
+  cause="Near-duplicate clusters straddle the split, so the model has effectively seen part of the test set."
+  fix="Deduplicate (or group clusters) first, then split by cluster."
+/>
+
+<CommonMistake
+  title="Trusting a synthetic dataset unread"
+  wrong={'synthetic = [strong_model(q) for q in questions]   # 20,000 answers\ntrain(synthetic)'}
+  error="(no error) the fine-tune confidently repeats the generator's factual errors and its long-winded style"
+  cause="Nobody checked a sample; errors and stylistic habits were copied 20,000 times."
+  fix="Review a random sample, filter on format, facts and length, deduplicate, and run the contamination check."
+/>
+
+<CommonMistake
+  title="Scraping your own public pages into training"
+  wrong={'train += scrape("https://acme.example/faq")   # eval set was written from the same FAQ'}
+  error="(no error) a 26-point jump that disappears in production"
+  cause="The evaluation questions were in the training data."
+  fix="Check n-gram overlap between every new data source and the evaluation set before training."
+/>
+
+</Section>
+
+<Section kind="practice" title="A data-quality pipeline">
+
+- **Normalize, then exact-dedup** with a hash.
+- **Near-dedup** with shingles and Jaccard (MinHash at scale); inspect a sample of flagged pairs to tune the threshold.
+- **Split after deduplication**, by cluster.
+- **Decontaminate** every training source against the evaluation set.
+- **Filter synthetic data**: sample review, fact checks, length and format filters.
+- **Record what you removed and why**, so a surprising result can be traced back to the data.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={jaccardExercise}>
+  Compare two texts with n-word shingles and Jaccard similarity.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+Data quality decides what the model learns and whether you can trust its score. Duplicates act as hidden weights, so
+we find near-duplicates by turning texts into sets of word runs and measuring their overlap with Jaccard similarity,
+and at scale we estimate that overlap cheaply with MinHash, whose minimum hashes agree with probability equal to the
+Jaccard similarity. Contamination, evaluation items hiding in training data, does not hurt the model but corrupts the
+measurement, so we deduplicate before splitting and remove training examples that share n-grams with the test set.
+Synthetic data adds volume but copies the generator's mistakes, so it gets the same checks plus a human sample review.
+With clean, well-formatted data, we can finally train.
+
+Next: [Supervised fine-tuning: hyperparameters, overfitting and forgetting](#/learn/finetune/sft/supervised-fine-tuning).
+
+</Section>

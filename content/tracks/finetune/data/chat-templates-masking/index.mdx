@@ -1,0 +1,205 @@
+import { dataset, mask, maskCode, packing, trlConfig } from './code';
+import { labelsExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Turning conversations into training rows">
+
+Supervised fine-tuning teaches by example: "when you see this, answer like that". The examples are conversations,
+but a model does not see conversations. It sees one long row of tokens and predicts the next token at every
+position. So before any training, every conversation has to be flattened into a token row, and we have to decide
+which positions the model is actually graded on.
+
+Three decisions, in the order the data flows:
+
+1. **Format.** How do "system says…, user says…, assistant says…" become one piece of text? That is the
+   <Term id="chat-template">chat template</Term>.
+2. **Grading.** Which tokens count in the loss? Usually only the assistant's answers: the model should learn to
+   *answer*, not to *write questions*. That is <Term id="loss-masking">loss masking</Term>.
+3. **Batching.** Examples have very different lengths. Do we pad each one to a fixed length (simple, wasteful) or
+   pack several into one row (efficient)? That is <Term id="sequence-packing">packing</Term>.
+
+An analogy: you are making flash cards for an apprentice. The template is the card layout everyone agrees on. Masking
+is covering the question side and grading only what they write on the answer side. Packing is printing several cards
+per page instead of one card per page with lots of white space.
+
+</Section>
+
+<Section kind="technical" title="Templates, masks and packing">
+
+**1. The data format.** Fine-tuning examples are stored as data, not as text: one JSON object per line, each with a
+list of messages and their roles. This is an <Term id="instruction-dataset">instruction dataset</Term>. Storing roles
+rather than pre-rendered text matters, because the next step depends on the model.
+
+<Code example={dataset} title="train.jsonl" />
+
+**2. The chat template.** Every instruct model was post-trained with one specific way of writing conversations as
+text, using <Term id="special-token">special tokens</Term> to mark turns. Many models (Qwen among them) use the ChatML
+layout:
+
+```
+<|im_start|>system
+You are the support assistant for Acme Cloud.<|im_end|>
+<|im_start|>user
+How do I reset my password?<|im_end|>
+<|im_start|>assistant
+Open Settings, choose Security, then click Reset password.<|im_end|>
+```
+
+Other model families use different markers. The template ships with the tokenizer, and `tokenizer.apply_chat_template`
+renders it. **Why this matters:** the model's behaviour is tied to the exact tokens it was trained on. Fine-tune with
+one template and serve with another, and the model sees an unfamiliar format at inference; quality drops, silently.
+The rule is simple: render training data with the same template the model will be served with, which means letting
+the tokenizer do it.
+
+At inference, the template also adds a *generation prompt*: the text `<|im_start|>assistant` and a newline, after the
+last user turn. That is the cue "now it is your turn to write". Keep it in mind for the next step.
+
+**3. The loss mask.** Recall from the [first lesson](#/learn/finetune/foundations/how-llms-learn) that the loss is the
+average −ln p over predicted positions. With masking, we choose which positions are averaged. The mechanism is a
+second row next to the tokens, the *labels*: for a trained position, the label is the token itself; for a masked
+position, it is **−100**. PyTorch's cross-entropy skips any position labelled −100 (its `ignore_index`).
+
+Which positions to train, and why each choice:
+
+- **Assistant content: trained.** This is the behaviour we want.
+- **System and user turns: masked.** They stay in the row, so the model reads them and learns to *condition* on them,
+  but it is not graded on predicting them. Otherwise it would spend effort learning to write like users.
+- **The assistant header `<|im_start|>assistant`: masked.** At inference it is part of the generation prompt, which
+  we supply; the model never needs to produce it.
+- **The assistant's `<|im_end|>`: trained.** This is the one people forget. It is how the model learns to *stop*.
+  Mask it, and the model never practises ending a turn, so at inference it rambles on, often into a made-up next
+  user turn.
+
+In the one-question example, 12 of the 42 (word-level) tokens are trained: the 11 tokens of the answer plus its end
+token. The other 30 are context.
+
+**Different data needs different masks.** Multi-turn conversations normally train on *all* assistant turns. For
+prompt-completion data (one input, one answer, such as classification) you train only on the completion. Training on
+everything is sometimes used for continued pretraining on raw text, where there is no "answer".
+
+**4. Padding versus packing.** GPUs process rectangular batches, so every row in a batch has the same length. The
+simple way is padding: one example per row, filled with padding tokens up to the maximum length. Padding tokens are
+masked, so they do not affect the loss, but the GPU still computes on them. With chat data, where most examples are
+a few hundred tokens, that can mean most of the compute is spent on padding.
+
+Packing fills each row with several whole examples instead. TRL's default strategy is *best-fit decreasing*: sort the
+examples longest first, put each one into the fullest row that still has room, and open a new row only when none
+does. In the explorer below, twelve chats totalling 4,240 tokens need 12 padded rows of 1,024 tokens (34.5% useful)
+but only 5 packed rows (82.8% useful): the same epoch in less than half the compute.
+
+**The next question: do packed examples see each other?** In a packed row, attention could let an example read the
+unrelated example placed before it. Modern trainers prevent this by passing each example's boundaries to the
+attention kernel (TRL's `padding_free` with FlashAttention). If your setup cannot do that, packing still often works,
+but it is a small source of noise to be aware of.
+
+**5. Truncation.** Examples longer than the maximum length are cut. If the cut falls in the answer, the model learns
+answers that stop mid-sentence. Measure the length distribution of your tokenized data before choosing the maximum
+length.
+
+</Section>
+
+<Section kind="visual" title="Try it: which tokens does the model learn from?">
+
+<Experiment def={mask} title="Loss mask">
+  <FtMaskView />
+  <Readout title="This conversation" />
+</Experiment>
+
+Things to try:
+
+- With **Two turns** and **Assistant replies only**, both answers and both of their end tokens are outlined; the
+  headers are not.
+- Switch to **Last reply only**: the first answer becomes context, as in prompt-completion training.
+- Switch to **Every token**: the user's question is now a target too. That is the setting for raw text, not for
+  conversations.
+
+Now the batching:
+
+<Experiment def={packing} title="Padding versus packing">
+  <FtPackView />
+  <Readout title="This batch" />
+</Experiment>
+
+- Compare **One example per row** and **Packed** on the short chats: 34.5% versus 82.8% useful compute.
+- Choose **Chats plus two long documents** at 1,024: the 2,600- and 1,500-token documents are cut, and the readout
+  counts the lost tokens. Raise the maximum length to 2,048 and fewer tokens are lost.
+
+</Section>
+
+<Section kind="code" title="Building the labels">
+
+The template, the mask and the labels in a few lines of Python:
+
+<PythonRunner example={maskCode} title="mask.py" />
+
+In TRL, the same choices are configuration:
+
+<Code example={trlConfig} title="sft_data.py (not run here)" />
+
+</Section>
+
+<Section kind="mistakes" title="Data bugs that train silently">
+
+<CommonMistake
+  title="Hand-written template strings"
+  wrong={'text = f"### User: {q}\\n### Assistant: {a}"   # for a model trained with ChatML'}
+  error="(no error) the fine-tune works in your notebook, then answers oddly behind the serving stack"
+  cause="Training used a home-made format; serving uses the model's official template. The model learned behaviour in a format it never sees in production."
+  fix="Store messages, and render them with tokenizer.apply_chat_template in both training and serving."
+/>
+
+<CommonMistake
+  title="Masking the end token"
+  wrong={'labels = [-100 if not in_reply_content else tok for tok in ids]   # <|im_end|> excluded'}
+  error="(no error) answers are right but never end: the model writes a fake '<|im_start|>user' turn"
+  cause="The model was never graded on producing the end-of-turn token, so it never learned when to stop."
+  fix="Train each assistant turn's closing special token along with its content."
+/>
+
+<CommonMistake
+  title="Padding everything to the longest example"
+  wrong={'max_length=8192, packing=False   # median example: 300 tokens'}
+  error="(no error) a run that takes many times longer than it should"
+  cause="Almost every row is mostly padding, and the GPU computes on all of it."
+  fix="Enable packing (with padding-free attention if available), or at least group examples of similar length."
+/>
+
+</Section>
+
+<Section kind="practice" title="A data checklist">
+
+- **Store messages with roles**, one JSON object per line; keep a separate evaluation file.
+- **Render with the model's own template**; print one rendered example and read it before training.
+- **Print the labels for one example** and check: answers and end tokens trained, everything else −100.
+- **Measure token lengths** and choose max_length so almost nothing is truncated.
+- **Pack short examples**, with example boundaries respected by attention where possible.
+- **Match production**: same system prompt, same tools description, same format as real requests.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={labelsExercise}>
+  Build the label row for a rendered conversation.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+Training data flows through three decisions. Conversations are stored as messages and rendered with the model's own
+chat template, because the model's behaviour is tied to the exact tokens of that format and serving will use the same
+template. A label row then decides what is graded: assistant answers and their end-of-turn tokens are trained, while
+system and user turns and the assistant header get −100, so the model reads them as context but learns only to
+answer, and learns when to stop. Finally, short examples are packed into full rows instead of padded, which can cut
+compute by more than half, as long as examples do not attend to each other and nothing important is truncated.
+With the format right, the next question is which examples deserve to be in the data at all.
+
+Next: [Dataset quality: deduplication, contamination and synthetic data](#/learn/finetune/data/dataset-quality).
+
+</Section>
