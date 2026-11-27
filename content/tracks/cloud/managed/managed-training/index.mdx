@@ -1,0 +1,266 @@
+import { billingDemo, managed, sagemakerCode, vertexCode } from './code';
+import { managedExercise, questions } from './quiz';
+
+<Section kind="intuition" title="Renting a kitchen versus ordering from a caterer">
+
+In the last three lessons you trained the hard way: pick a GPU instance, start it, install drivers, copy the data,
+run the script, write checkpoints, copy the model out, and remember to switch the machine off. That is like renting a
+kitchen. You get full control, and you also do the shopping, the cooking and the washing up, and you pay for the
+kitchen until you hand back the key.
+
+A <Term id="managed-training-job">managed training job</Term> is the caterer. You hand over a recipe (your training
+script), say how big the order is (the instance type and count) and where the ingredients are (a bucket path). The
+service finds the machines, brings the data, runs the script, collects the result into your bucket, and leaves. You
+pay for the cooking, not for the hours the kitchen sat empty.
+
+This lesson answers three questions in order: what exactly the service does for you (and what you give up), where
+the money goes in a job's life, and what your script must do so that the same code runs on a laptop, on SageMaker
+and on Vertex AI.
+
+</Section>
+
+<Section kind="technical" title="What a training job does, phase by phase">
+
+**The big picture.** You describe the job (script, container, instances, data, output) → the service provisions
+machines, unbilled → it copies or mounts your data, billed → your script runs against fixed paths → it uploads
+whatever the script left in the model folder, billed → and it tears everything down. Every saving and every surprise
+in this lesson comes from one of those steps.
+
+### What "managed" buys you, and what it costs
+
+On AWS the service is **Amazon SageMaker AI** training jobs; on Google Cloud it is **Vertex AI custom training**. In
+both, a job is a request, not a machine: you submit it, it runs, it ends. That changes four things compared with the
+VM you ran yourself.
+
+1. **No idle machines.** The instances exist only for the job. There is no "forgot to stop it" bill, which in
+   practice is the biggest single saving, larger than any discount.
+2. **A known environment.** You pick a prebuilt framework container (PyTorch 2.5 with CUDA, for example) or bring
+   your own image. No driver installation, and the same image every time, which makes runs repeatable.
+3. **Data in, model out, logs and metrics, by contract.** The service copies data to known paths, uploads the model
+   folder, streams logs to CloudWatch or Cloud Logging, and records every job's settings and timings.
+4. **Permissions through a role.** The job runs as an <Term id="iam-role">IAM role</Term> (SageMaker) or a service
+   account (Vertex AI), exactly as in the IAM lesson. Nothing on the machine holds long-lived keys.
+
+What you give up is the interactive machine. You cannot SSH in halfway through and poke around (SageMaker offers
+remote debugging and Vertex AI an interactive shell, but they are deliberate extras), each job pays a few minutes of
+start-up before your first line runs, and the instance price for the `ml.` instance types is somewhat higher than the
+same EC2 type. So managed jobs win when runs are repeatable and the machines would otherwise sit idle; a VM wins for
+long interactive exploration on one box.
+
+### The life of a SageMaker job, and which minutes are billed
+
+A training job moves through visible states, which `DescribeTrainingJob` reports with timestamps:
+
+| Phase | What happens | Billed? |
+| --- | --- | --- |
+| **Starting** | Find capacity, launch instances, pull the training image | No |
+| **Downloading** | Copy the input data to the instances (File mode) | Yes |
+| **Training** | Run your script | Yes |
+| **Uploading** | Pack `/opt/ml/model` into `model.tar.gz` and copy it to S3 | Yes |
+
+The billed window runs from `TrainingStartTime` to `TrainingEndTime`, which is why the download and the upload are on
+the bill but the wait for a GPU is not. Read that table with the previous lessons in mind and two consequences fall
+out. First, a long wait in Starting (a busy GPU type) costs you time but no money. Second, **every gigabyte you copy
+before training is paid at the GPU's hourly price**: a 2 TB dataset at 500 MB/s is 67 minutes of an expensive
+machine doing nothing but copying. That is the reason for the next section.
+
+The bill is instance-hours: billed time × instance count. With four instances, every billed minute counts four times,
+including the four parallel downloads.
+
+### The contract: fixed paths instead of configuration
+
+The service and your script never talk directly. They agree on folders, a
+<Term id="training-container-contract">training container contract</Term>. On SageMaker:
+
+- **`/opt/ml/input/data/<channel>/`**: each input you pass to `fit` (a *channel*, such as `train` or `validation`)
+  appears here. The environment variable `SM_CHANNEL_TRAIN` holds the path, so the script does not hard-code it.
+- **`/opt/ml/model/`**: write the final model here (`SM_MODEL_DIR`). At the end, the folder is packed into
+  `model.tar.gz` under your `output_path`. Anything written elsewhere is lost with the instance.
+- **`/opt/ml/checkpoints/`**: when you set `checkpoint_s3_uri`, this folder is synced to S3 during the job and
+  restored at the start of a restarted job. It is the "copy checkpoints to object storage" rule from the spot lesson,
+  done for you.
+- **`/opt/ml/output/`**: a `failure` file here becomes the job's failure reason, which saves digging through logs.
+
+Hyperparameters arrive as command-line arguments. So a script that reads its paths from environment variables, with
+local defaults, runs unchanged on a laptop and in a job. That is the whole point: the contract replaces all the
+glue code you wrote by hand on the VM.
+
+Vertex AI has the same idea with different names. Cloud Storage buckets are mounted with Cloud Storage FUSE under
+`/gcs/<bucket>/`, so `gs://acme-ml/datasets/v7` reads as the folder `/gcs/acme-ml/datasets/v7`, and the variable
+`AIP_MODEL_DIR` names the Cloud Storage location where the model must be saved (`AIP_CHECKPOINT_DIR` exists for
+checkpoints).
+
+### Input modes: copy first, or stream as you go
+
+SageMaker's <Term id="training-input-mode">input mode</Term> decides how data reaches the script:
+
+- **File** (the default) copies the whole channel to the instance's disk before the script starts. Simple, and every
+  later read is local and fast, but the copy is billed and the disk must hold the dataset.
+- **FastFile** presents the S3 objects as ordinary files and fetches each one on first read. Training starts almost
+  at once and there is no download phase, but each first read now goes over the network during training.
+- **Pipe** streams the data through a Unix pipe. It is older and needs code written for it; FastFile has mostly
+  replaced it.
+
+Which one wins depends on what the object-storage lesson called the request pattern. FastFile is excellent for **large
+files read in order**, such as the WebDataset shards from that lesson: the network delivers throughput and the
+latency is paid once per shard. For **millions of small files read in random order**, every first read pays S3's
+time to first byte, now while the GPU waits, so removing the download can make the job slower overall. The fix is the
+same as before: shard the data.
+
+With several instances, the default `FullyReplicated` distribution gives every instance the full dataset (four
+instances, four downloads); `ShardedByS3Key` gives each instance a slice, which suits data-parallel jobs that split
+the data anyway.
+
+### Managed spot training: the previous lesson as two settings
+
+Set `use_spot_instances=True` and the job runs on spot capacity. When an instance is reclaimed, SageMaker waits for
+new capacity, starts the job again, and restores `/opt/ml/checkpoints` from `checkpoint_s3_uri`, so a script that
+resumes from its latest checkpoint (the loop from the spot lesson) carries on. Two limits keep it bounded:
+`max_run` caps the training time and `max_wait` caps training plus waiting for capacity, so `max_wait` must be at
+least `max_run`. The job record reports `TrainingTimeInSeconds` and `BillableTimeInSeconds`, and the difference is
+the spot saving. Without a checkpoint configuration, every interruption restarts from step zero, which, as the spot
+lesson showed, makes long jobs a trap.
+
+<Callout kind="simplification">
+The lab and the billing example use illustrative numbers: 4 minutes of unbilled start-up, one fixed transfer rate
+for both download and upload, and the g6e.xlarge price used in the GPU lesson. Real start-up ranges from about a
+minute (warm pools, which keep instances alive between jobs) to much longer for scarce GPUs, transfer rates depend
+on instance size and file layout, and `ml.` instance prices differ from EC2 prices by region. The structure, which
+phases are billed and which are not, comes from the service documentation.
+</Callout>
+
+### SageMaker and Vertex AI side by side
+
+| Idea | SageMaker AI | Vertex AI |
+| --- | --- | --- |
+| The job | Training job (`Estimator.fit`) | Custom job (`CustomJob.run`) |
+| Machine | Instance type, e.g. `ml.g6e.xlarge` | Machine type + accelerator, e.g. `g2-standard-8` + `NVIDIA_L4` |
+| Identity | Execution role | Service account |
+| Data in | `/opt/ml/input/data/<channel>` (File / FastFile / Pipe) | `/gcs/<bucket>/…` via Cloud Storage FUSE |
+| Model out | `/opt/ml/model` → `model.tar.gz` | `AIP_MODEL_DIR` (a Cloud Storage path) |
+| Spot | Managed spot training | Spot VMs for custom jobs (`scheduling_strategy`) |
+
+Once the job has produced a model, both services can also host it on a managed endpoint. Serving has its own
+problems (latency, autoscaling, rollouts), and the Deploy and Inference tracks cover them: see
+[Kubernetes for models](#/learn/deploy/kubernetes/k8s-for-models) and
+[Serving APIs and containers](#/learn/inference/serving/apis-containers). The next lesson asks a related cost
+question: when is a hosted model API cheaper than any server you run?
+
+</Section>
+
+<Section kind="visual" title="Try it: the same run, managed and by hand">
+
+The same 3-hour fine-tune on one g6e.xlarge at an illustrative $1.86 per hour, with a 200 GB dataset copied at
+500 MB/s. The first timeline is a SageMaker job, the second a VM you run yourself; phases marked “not billed” cost
+nothing.
+
+<Experiment def={managed} title="Managed job versus your own VM">
+  <ManagedView />
+  <Readout title="Instance-hours and cost" />
+</Experiment>
+
+Things to try:
+
+- **Start with the defaults.** The managed job bills 3.12 instance-hours ($5.80) and the VM 17.87 ($33.24). Almost
+  all of the gap is the 14 hours nobody stopped the VM, not the setup.
+- **Set the VM's idle hours to 0.** The VM now costs $7.20, still more than the job because of the 45 minutes of
+  setup, but the gap shrinks to $1.40. The managed job's real advantage is discipline, not a cheaper GPU.
+- **Raise the dataset to 2,000 GB in File mode.** The download grows to 67 minutes, all billed. Switch to FastFile
+  and it disappears (if, as the lesson warned, your files are large and read in order).
+- **Use 4 instances.** Every billed minute now counts four times, including four full downloads with the default
+  distribution.
+
+</Section>
+
+<Section kind="code" title="The billing arithmetic, and the same job on two clouds">
+
+The phase table as code, for the lab's default run:
+
+<PythonRunner example={billingDemo} title="billing.py" />
+
+The SageMaker job, written with the SageMaker Python SDK. The instance count and input mode follow the lab:
+
+<Experiment def={managed} title="estimator.py, linked to the lab" controls={false}>
+  <Code example={sagemakerCode} title="estimator.py (needs an AWS account; not run here)" />
+  <Readout title="What the lab expects this job to bill" />
+</Experiment>
+
+The same job on Vertex AI. Note how each line maps to a row of the comparison table:
+
+<Code example={vertexCode} title="vertex_job.py (needs a Google Cloud project; not run here)" />
+
+</Section>
+
+<Section kind="mistakes" title="How managed jobs go wrong">
+
+<CommonMistake
+  title="Saving the model outside the model folder"
+  wrong={'torch.save(model.state_dict(), "outputs/model.pt")   # relative to the working directory'}
+  error="(no error) the job completes and model.tar.gz contains no weights"
+  cause="Only /opt/ml/model is packed and uploaded. Everything else on the instance is deleted when the job ends."
+  fix='Save to os.environ.get("SM_MODEL_DIR", "outputs") (or AIP_MODEL_DIR on Vertex AI), with a local default so the script still runs on a laptop.'
+/>
+
+<CommonMistake
+  title="Turning on spot without checkpoints"
+  wrong={'PyTorch(..., use_spot_instances=True, max_run=8 * 3600, max_wait=12 * 3600)   # no checkpoint_s3_uri'}
+  error="(no error) after each interruption the job restarts from step 0; long jobs hit max_wait and stop"
+  cause="Without checkpoint_s3_uri nothing survives the reclaimed instance, so every restart begins again."
+  fix="Set checkpoint_s3_uri, write checkpoints to /opt/ml/checkpoints, and resume from the latest one at start-up."
+/>
+
+<CommonMistake
+  title="A role the job cannot pass or use"
+  wrong={'role="arn:aws:iam::111122223333:role/train-job"   # caller lacks iam:PassRole'}
+  error="ClientError: An error occurred (AccessDeniedException) when calling the CreateTrainingJob operation: User: arn:aws:iam::111122223333:user/dana is not authorized to perform: iam:PassRole on resource: arn:aws:iam::111122223333:role/train-job"
+  cause="Handing a role to a service is itself a permission, separate from what the role can do. It stops anyone from launching a job with more rights than they have."
+  fix="Grant the submitting user iam:PassRole on that one role (with iam:PassedToService = sagemaker.amazonaws.com), and give the role only the bucket prefixes the job needs."
+/>
+
+</Section>
+
+<Section kind="practice" title="Managed training that teams rely on">
+
+- **Default to managed jobs for repeatable training** (fine-tunes, retraining, sweeps) and keep a VM or notebook for
+  exploration. The idle tail is the biggest saving.
+- **Write scripts against the contract**: read paths from `SM_CHANNEL_*`, `SM_MODEL_DIR` or `AIP_MODEL_DIR`, with
+  local defaults, so the same script is tested on a laptop first.
+- **Shard the data, then pick the mode**: FastFile for large sequential shards, File when the data is small or read
+  randomly many times.
+- **Turn on managed spot with checkpoints** for anything longer than an hour, and set `max_wait` with room for
+  capacity waits.
+- **Tag every job and pin its image version**, so the cost-control lesson's reports can attribute the bill and a run
+  can be repeated exactly.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={managedExercise}>
+  Compare the billed hours of a managed job and a VM you run yourself.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+A managed training job turns a machine you look after into a request that runs and ends. You describe the script,
+the container, the instances and the data; the service provisions the machines (not billed), copies or mounts the
+data and runs your script (billed), uploads the model folder (billed) and tears everything down. Because nothing is
+left running, the biggest saving is usually the idle hours a VM collects, not the price per hour.
+
+The script and the service meet at a contract of fixed paths: data under `/opt/ml/input/data`, the model in
+`/opt/ml/model`, checkpoints in `/opt/ml/checkpoints` on SageMaker, and `/gcs/` plus `AIP_MODEL_DIR` on Vertex AI.
+That contract is what lets one script run locally and managed. The input mode moves the data cost around (File pays
+a billed download, FastFile pays per read during training), and managed spot training is the previous lesson's
+checkpoint logic switched on with two settings.
+
+Next: [Model APIs: when a hosted model is cheaper than your own GPU](#/learn/cloud/managed/model-apis).
+
+</Section>
