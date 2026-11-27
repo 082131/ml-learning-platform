@@ -735,7 +735,7 @@ export const tracks: Track[] = [
         level: 'advanced',
         lessons: [
           { id: 'sql/analytics/funnels-cohorts', status: 'written' },
-          { id: 'sql/analytics/sessions-dedup', status: 'outline' },
+          { id: 'sql/analytics/sessions-dedup', status: 'written' },
           { id: 'sql/analytics/ml-features', status: 'outline' },
         ],
       },

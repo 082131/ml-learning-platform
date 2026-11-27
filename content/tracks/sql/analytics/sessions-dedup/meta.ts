@@ -13,5 +13,9 @@ export default {
     'Explain how the session timeout changes the metrics built on sessions',
   ],
   prerequisites: ['sql/analytics/funnels-cohorts'],
-  concepts: [],
+  concepts: ['sessionization', 'gaps-and-islands', 'deduplication', 'lag-lead', 'running-total', 'ranking-functions'],
+  references: [
+    { title: 'SQLite: Window functions', url: 'https://www.sqlite.org/windowfunctions.html', version: '3.54' },
+    { title: 'SQLite: Date and time functions (unixepoch, date modifiers)', url: 'https://www.sqlite.org/lang_datefunc.html', version: '3.54' },
+  ],
 } satisfies LessonMeta;

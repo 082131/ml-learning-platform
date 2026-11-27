@@ -5,6 +5,7 @@ import { JoinLab } from './JoinLab';
 import { NullFilter } from './NullFilter';
 import { QueryPipeline } from './QueryPipeline';
 import { RecursionTrace } from './RecursionTrace';
+import { SessionLab } from './SessionLab';
 import { SqlExercise } from './SqlExercise';
 import { SqlRunner } from './SqlRunner';
 import { WindowLab } from './WindowLab';
@@ -21,4 +22,5 @@ export default {
   RecursionTrace,
   WindowLab,
   FunnelLab,
+  SessionLab,
 };

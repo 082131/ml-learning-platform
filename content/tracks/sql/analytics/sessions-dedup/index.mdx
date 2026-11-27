@@ -1,0 +1,200 @@
+import { duplicateEvents, exactDuplicates, latestVersion, sessionLab, sessionSteps, streaks } from './code';
+import { exercise, questions } from './quiz';
+
+<Section kind="intuition" title="Raw logs are not the things you want to count">
+
+An event log records what a machine saw: a page loaded, a button was pressed, a request arrived. The questions
+people ask are about larger, human-sized things. "How many visits did we have?" "How many customers do we
+have, and what plan is each on?" "Who used the app every day this week?" None of those things exists as a row.
+A visit is a burst of events with a quiet period around it. A customer's current plan is one row out of several
+versions. A streak is a run of days with no gap in it. Before you can count them, you have to build them.
+
+This lesson builds three of these objects, and the same tools do all the work: LAG to compare each row with the
+one before it, a running SUM to turn "something changed here" into a group number, and ROW_NUMBER to pick one row
+out of several. The interesting part is not the syntax, it is the decisions hidden inside each object. A session
+needs a timeout, and the timeout you choose changes your conversion rate. "Latest version" needs an order, and
+ties in that order make the answer unstable. Duplicates come in two kinds that need different cures.
+
+</Section>
+
+<Section kind="technical" title="From 'where does something start?' to 'which group am I in?'">
+
+**Sessions.** A <Term id="sessionization">session</Term> is a group of one user's events with no long silence
+inside it. "Long" is a number you choose, the timeout; 30 minutes is a common default in analytics tools. The rule
+is simple to say: an event starts a new session if it is the user's first event, or if more than 30 minutes
+passed since their previous event. Turning that rule into SQL takes three steps, and each one is something you
+have already met.
+
+1. **The gap**: `LAG(event_time) OVER (PARTITION BY user_id ORDER BY event_time, id)` is the same user's previous
+   event, as in the days-to-next-order example. `unixepoch` turns both timestamps into whole seconds, so the
+   gap is an exact integer.
+2. **The flag**: a CASE turns each gap into a 1 ("a session starts here") or a 0 ("same session as before").
+3. **The number**: a running total of the flags, per user. It goes up by 1 at every session start and stays the
+   same between starts, so every event of a session gets the same number. This is the key idea of the lesson:
+   *a running sum of start-flags turns boundaries into group ids*. ROW_NUMBER would not work here, because it
+   gives every event a new number.
+
+Once each event carries `(user_id, session_no)`, a session is just a GROUP BY. Step through it:
+
+<CteSteps example={sessionSteps} title="Events into sessions (30-minute timeout)" />
+
+The result has 22 sessions. Ada's 19 events become 6 sessions, even though she has only 5 visit events: on 22
+February she added to cart at 12:03 and came back to view a product at 12:40, 37 minutes later. With a
+30-minute timeout, that is a new session that starts with a product view rather than a visit, which is perfectly
+possible (she may have left a tab open).
+
+</Section>
+
+<Section kind="visual" title="Try it: the timeout is a modelling choice">
+
+Move the timeout and watch the sessions split and merge. The table shows one user's events; a line above a row
+means that row starts a new session.
+
+<Experiment def={sessionLab} title="Session explorer">
+  <SessionLab />
+  <Readout title="This timeout" />
+</Experiment>
+
+Things to try:
+
+- **Ada at 30 minutes, then 37.** At 30, her 22 February visit is two sessions: the first ends with a cart and
+  no purchase, the second has the checkout and purchase. The readout counts 3 abandoned carts. At 37 minutes the
+  gap is no longer *more* than the timeout, the two sessions merge into one that bought, and abandoned carts drop
+  to 2. Nothing about Ada's behaviour changed.
+- **Down to 1 minute.** The log falls apart into 41 sessions, because many steps are 2 to 5 minutes apart.
+  Conversion per session drops from 50 to 26.8 percent and abandoned carts jump to 9. A team that shortened its
+  timeout would see conversion halve overnight.
+- **Between 5 and 36 minutes.** Nothing changes: 22 sessions throughout, because no gap in this data falls in
+  that range. Real data is similar: within-session gaps are short, between-session gaps are long, and a sensible
+  timeout sits in the quiet range between them. Looking at the distribution of gaps is how you choose it.
+- **Eli.** His two visits are 34 hours apart, so they are two sessions at any timeout here, and the first
+  is one of the abandoned carts: he added to cart on 14 February and bought on the 16th. Per session, that is a
+  lost cart; per user, it is a conversion. Which one you report depends on the question.
+
+</Section>
+
+<Section kind="code" title="Duplicates, latest versions and streaks">
+
+**Two kinds of duplicate.** <Term id="deduplication">Deduplication</Term> sounds like one task, but it is two.
+The first is *exact duplicates*: rows identical in every column, usually caused by a pipeline loading the same
+data twice. Grouping by every column and keeping groups with more than one row finds them. Chen's update of 15
+February appears twice:
+
+<SqlRunner example={exactDuplicates} title="exact_duplicates.sql" />
+
+A near cousin is a duplicate *event*: Ben's add_to_cart at 14:06 was recorded twice, with two different ids.
+The rows are not identical (the ids differ), so `DISTINCT *` would keep both. You have to decide which columns
+define "the same event" (user, time and event type here), group by those, and keep one id from each group.
+74 events become 73. That one extra row is why the funnel lesson counted users rather than events.
+
+<SqlRunner example={duplicateEvents} title="duplicate_events.sql" />
+
+The second kind is *several versions of one thing*. `customer_updates` keeps every change to a customer's details:
+Ada changed her email in February and upgraded to pro in March. These rows are not duplicates at all; they are
+history. The question "what is each customer's current plan?" needs one row per customer: the newest. That is
+top-N-per-group with N = 1 from the ranking lesson: number each customer's rows from newest to oldest and keep
+number 1.
+
+<SqlRunner example={latestVersion} title="latest_version.sql" />
+
+Look at what ROW_NUMBER did with Chen: two rows share the newest `updated_at`, so the choice between them was
+arbitrary. Here it does no harm because the rows are identical. If they differed (say one said `pro` and one
+`free`), the query would return either, and might return the other tomorrow. A table with no column that makes
+each row unique cannot break that tie, which is why exact duplicates are worth fixing at the source rather than
+patching in every query.
+
+**Streaks: gaps and islands.** "Who logged in on consecutive days, and for how long?" is a classic puzzle called
+<Term id="gaps-and-islands">gaps and islands</Term>: the islands are runs of consecutive days, separated by
+gaps. You could walk the days with LAG and a running sum, exactly like sessions (a gap of more than one day starts
+a new streak). There is also a shortcut worth knowing, because it shows up in interviews. Number each user's login
+days 1, 2, 3 ... and subtract that number from the date. Inside a streak, the date and the number both go up by
+one each row, so their difference stays the same. After a missed day, the date jumps by 2 but the number only by
+1, so the difference changes. The difference is therefore a key that is constant within a streak and different
+between streaks.
+
+<CteSteps example={streaks} title="Login streaks" />
+
+Ada logged in on 1, 2, 3, 5, 6 and 9 March. Subtracting 1, 2, 3, 4, 5, 6 days gives 28 February three times, then
+1 March twice, then 3 March: three streaks of 3, 2 and 1 days. The key itself means nothing; it is only a label
+that happens to be equal for rows that belong together, exactly like `session_no` above.
+
+</Section>
+
+<Section kind="mistakes" title="Sessions, duplicates and streak mistakes">
+
+<CommonMistake
+  title="Numbering sessions with ROW_NUMBER"
+  wrong={'ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY event_time) AS session_no'}
+  error="(no error) every event is its own 'session'"
+  cause="ROW_NUMBER increases on every row; a session id must stay constant inside the session."
+  fix="Flag session starts with LAG, then SUM(flag) OVER (PARTITION BY user_id ORDER BY event_time, id ROWS UNBOUNDED PRECEDING)."
+/>
+
+<CommonMistake
+  title="Forgetting PARTITION BY in the gap"
+  wrong={'LAG(event_time) OVER (ORDER BY event_time)'}
+  error="(no error) one user's event is compared with another user's"
+  cause="Without the partition, the previous row is whoever acted just before, in the whole log."
+  fix="PARTITION BY user_id, so each user's first event has a NULL gap and starts a session."
+/>
+
+<CommonMistake
+  title="DISTINCT to get the latest version"
+  wrong={'SELECT DISTINCT customer_id, email, plan FROM customer_updates'}
+  error="(no error) Ada appears three times"
+  cause="DISTINCT removes identical rows only; versions differ."
+  fix="ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY updated_at DESC, <unique column>) = 1."
+/>
+
+<CommonMistake
+  title="Counting days instead of streaks"
+  wrong={'SELECT user_id, COUNT(*) AS longest_streak FROM logins GROUP BY user_id'}
+  error="(no error) Ada's 'streak' is 6 days, though she never logged in more than 3 days in a row"
+  cause="COUNT counts login days, with no idea which are consecutive."
+  fix="Group by the gaps-and-islands key (date minus ROW_NUMBER) first, then take the longest group."
+/>
+
+</Section>
+
+<Section kind="practice" title="Habits for building objects from logs">
+
+- **Name the object and its rule before writing SQL**: "a session ends after 30 minutes of silence".
+- **Flags, then a running sum**: the general recipe for turning boundaries into group ids.
+- **Check the gap distribution** before choosing a timeout, and report the timeout with any session metric.
+- **Ask which kind of duplicate it is**: identical rows (DISTINCT, and fix the loader) or versions (ROW_NUMBER per key).
+- **Always add a tiebreaker** when ROW_NUMBER picks one row per key.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<SqlExercise exercise={exercise}>
+  For each user in `logins`, return `user_id`, `longest` (the length of their longest run of consecutive login
+  days) and `first_day` (when that run started). If two runs tie, take the most recent. The starter counts login
+  days rather than consecutive ones.
+</SqlExercise>
+
+</Section>
+
+<Section kind="summary">
+
+Sessions, current records and streaks are not stored anywhere; they are built from rows. Sessions come from a
+gap (LAG), a start flag, and a running SUM of flags that turns boundaries into session numbers, and the timeout
+behind the flag is a modelling choice that moves conversion and abandoned-cart numbers. Exact duplicates are
+removed by grouping on every column (or on the columns that define "the same event"), while multiple versions of
+an entity are reduced with ROW_NUMBER per key, which needs a tiebreaker to be repeatable. Streaks use the
+gaps-and-islands key, date minus ROW_NUMBER, which is constant within a run. All three reuse one idea from the
+window functions chapter: compare each row with its neighbours, then group by what you found.
+
+The next lesson points these tools at machine learning, where one row per user and date must contain only what
+was known at that date.
+
+Next: [SQL for ML: point-in-time features and splits](#/learn/sql/analytics/ml-features).
+
+</Section>

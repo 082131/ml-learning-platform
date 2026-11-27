@@ -1,7 +1,8 @@
 // Experiment definitions for the SQL track's visualizations. Logic lives in the pure modules they call.
 import type { ExperimentDef } from '../types';
 import { fanout, fanoutSql, type FanoutResult, type FanoutState } from './fanout';
-import { funnel, funnelSql, WINDOW_LABEL, type FunnelResult, type FunnelSpec, type FunnelWindow } from './funnel';
+import { sessionize, sessionsSql, type SessionResult } from './sessions';
+import { USER_NAMES, funnel, funnelSql, WINDOW_LABEL, type FunnelResult, type FunnelSpec, type FunnelWindow } from './funnel';
 import { joinTables, type FilterPlace, type JoinKind, type JoinResult } from './joins';
 import { EMPLOYEES, recurse, type Direction, type RecursionResult } from './recursion';
 import { computeWindow, windowSql, type WindowFn, type WindowRow, type WindowSpec } from './window';
@@ -258,6 +259,37 @@ export function funnelExperiment(id: string): ExperimentDef<FunnelSpec, FunnelLa
       { label: 'Definition', value: s.count === 'users' ? `users, in order, within ${WINDOW_LABEL[s.window]}` : 'event rows' },
       { label: 'visit to purchase', value: `${r.steps[4]!.value} of ${r.steps[0]!.value} = ${r.steps[4]!.pctFirst}%` },
       { label: 'Biggest drop', value: (() => { const w = r.steps.slice(1).reduce((a, b) => ((b.pctPrevious ?? 100) < (a.pctPrevious ?? 100) ? b : a)); return `into ${w.step} (${w.pctPrevious}% of previous)`; })() },
+    ],
+  };
+}
+
+export interface SessionLabState {
+  timeout: number;
+  user: number;
+}
+export type SessionLabResult = SessionResult & { sql: string };
+
+/** Sessions of the event log for an inactivity timeout, with one user's events shown in detail. */
+export function sessionExperiment(id: string): ExperimentDef<SessionLabState, SessionLabResult> {
+  return {
+    id,
+    initial: { timeout: 30, user: 1 },
+    controls: [
+      { kind: 'slider', id: 'timeout', label: 'New session after a gap of more than (minutes)', min: 1, max: 60, step: 1, get: (s) => s.timeout, set: (s, v) => ({ ...s, timeout: v }) },
+      {
+        kind: 'select',
+        id: 'user',
+        label: 'Show events of',
+        options: Object.entries(USER_NAMES).map(([v, label]) => ({ value: v, label })),
+        get: (s) => String(s.user),
+        set: (s, v) => ({ ...s, user: Number(v) }),
+      },
+    ],
+    compute: (s) => ({ ...sessionize(s.timeout), sql: sessionsSql(s.timeout) }),
+    readout: (_s, r) => [
+      { label: 'Sessions (from 74 events)', value: String(r.totalSessions) },
+      { label: 'Sessions with a purchase', value: `${r.purchaseSessions} (${r.conversion}%)` },
+      { label: 'Abandoned carts (cart, no purchase)', value: String(r.abandonedCarts) },
     ],
   };
 }

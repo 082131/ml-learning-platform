@@ -22,4 +22,25 @@ export default [
     short: 'The set a rate divides by: "of whom?". Conversion of visitors, of carts or of sessions are different rates. Filtering or inner-joining before counting can silently shrink the denominator to the successes.',
     introducedIn: 'sql/analytics/funnels-cohorts',
   },
+  {
+    id: 'sessionization',
+    term: 'Sessionization',
+    short: 'Splitting each user’s event stream into sessions: a new session starts when the gap since the previous event exceeds a timeout (often 30 minutes). In SQL: LAG for the gap, a 0/1 flag, and a running SUM of the flags as the session number.',
+    introducedIn: 'sql/analytics/sessions-dedup',
+    aliases: ['session', 'session timeout'],
+  },
+  {
+    id: 'gaps-and-islands',
+    term: 'Gaps and islands',
+    short: 'Finding runs of consecutive values (islands) separated by gaps, such as login streaks. Subtracting each row’s position (ROW_NUMBER) from its value gives a key that is constant within a run.',
+    introducedIn: 'sql/analytics/sessions-dedup',
+    aliases: ['streaks', 'consecutive runs'],
+  },
+  {
+    id: 'deduplication',
+    term: 'Deduplication',
+    short: 'Removing repeated records. Exact duplicates (identical rows) go with DISTINCT or GROUP BY; several versions of one entity are reduced to one with ROW_NUMBER() OVER (PARTITION BY key ORDER BY version DESC) = 1, with a tiebreaker.',
+    introducedIn: 'sql/analytics/sessions-dedup',
+    aliases: ['dedup', 'latest record per key'],
+  },
 ] satisfies GlossaryTerm[];

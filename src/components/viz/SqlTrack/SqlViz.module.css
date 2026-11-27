@@ -34,7 +34,7 @@
   margin: var(--s-2) 0 0;
   font-family: var(--font-mono);
   font-size: var(--fs-13);
-  color: var(--accent-ink, var(--ink));
+  color: var(--ink);
 }
 .note {
   margin: 0;

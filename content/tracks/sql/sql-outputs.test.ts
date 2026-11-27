@@ -145,6 +145,12 @@ const claims: Record<string, (sets: SqlValue[][][]) => void> = {
   'events-vs-users': ([rows]) => expect(rows).toEqual([['visit', 21, 8], ['view_product', 17, 8], ['add_to_cart', 14, 7], ['checkout', 11, 6], ['purchase', 11, 6]]),
   'ever-funnel': ([rows]) => expect(rows).toEqual([[8, 8, 7, 6, 6]]),
   'naive-cohorts': ([rows]) => expect(rows).toEqual([['2026-01', 3, 100, 100, 66.7, 33.3], ['2026-02', 3, 100, 66.7, 33.3, 0], ['2026-03', 2, 100, 0, 0, 0]]),
+  'exact-duplicates': ([rows]) => expect(rows).toEqual([[3, '2026-02-15 08:00:00', 'chen@mail.example', 'pro', 2]]),
+  'duplicate-events': ([dups, counts]) => {
+    expect(dups).toEqual([[2, '2026-01-15 14:06:00', 'add_to_cart', 2, '8,9']]);
+    expect(counts).toEqual([[74, 73]]);
+  },
+  'latest-version': ([rows]) => expect(rows!.map((r) => [r[0], r[3]])).toEqual([[1, 'pro'], [2, 'free'], [3, 'pro']]),
   'days-to-next': ([rows]) => {
     expect(rows!.filter((r) => r[0] === 1).map((r) => r[4])).toEqual([22, 25, null]);
     expect(rows!.length).toBe(11);
@@ -152,6 +158,23 @@ const claims: Record<string, (sets: SqlValue[][][]) => void> = {
 };
 
 describe('CTE walk-through claims', () => {
+  it('sessionize: 22 session starts, 22 sessions, Ada 6 of them', async () => {
+    const ex = ctes.find(([, e]) => e.id === 'sessionize')![1];
+    const db = await openTestDb('shop');
+    const rows = (i?: number) => runScript(db, composeCte(ex, i)).statements[0]!.rows;
+    expect(rows(0).length).toBe(74);
+    expect(rows(1).filter((r) => r[5] === 1).length).toBe(22);
+    const final = rows();
+    expect(final.length).toBe(22);
+    expect(final.filter((r) => r[0] === 1).map((r) => [r[3], r[4]])).toEqual([[5, 1], [5, 1], [2, 0], [3, 0], [3, 1], [1, 0]]);
+  });
+  it('login streaks: Ada 3, 2, 1; Ben 4; Chen 1 and 1', async () => {
+    const ex = ctes.find(([, e]) => e.id === 'login-streaks')![1];
+    const db = await openTestDb('shop');
+    const rows = (i?: number) => runScript(db, composeCte(ex, i)).statements[0]!.rows;
+    expect(rows(1).filter((r) => r[0] === 1).map((r) => r[3])).toEqual(['2026-02-28', '2026-02-28', '2026-02-28', '2026-03-01', '2026-03-01', '2026-03-03']);
+    expect(rows().map((r) => [r[0], r[3]])).toEqual([[1, 3], [1, 2], [1, 1], [2, 4], [3, 1], [3, 1]]);
+  });
   it('ordered 7-day funnel: 8, 7, 5, 4, 4 with step and overall conversion', async () => {
     const ex = ctes.find(([, e]) => e.id === 'ordered-funnel')![1];
     const db = await openTestDb('shop');
