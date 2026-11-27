@@ -10,6 +10,7 @@ import { SessionLab } from './SessionLab';
 import { SqlExercise } from './SqlExercise';
 import { SqlRunner } from './SqlRunner';
 import { TrainingLab } from './TrainingLab';
+import { WarehouseLab } from './WarehouseLab';
 import { WindowLab } from './WindowLab';
 
 /** Registers the SQL and Analytics track components for lessons (picked up by src/mdx-components.tsx). */
@@ -27,4 +28,5 @@ export default {
   SessionLab,
   TrainingLab,
   IndexLab,
+  WarehouseLab,
 };

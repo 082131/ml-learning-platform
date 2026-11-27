@@ -16,7 +16,7 @@ export const questions: QuizQuestion[] = [
   {
     id: 'equality-first',
     type: 'choice',
-    prompt: "For WHERE country = 'DE' AND order_date >= '2026-12-01', the explorer shows (country, order_date) reading 1,644 entries but (order_date, country) reading 8,493, although both are covering. Why the difference?",
+    prompt: "For WHERE country = 'DE' AND order_date >= '2026-12-01', the explorer shows (country, order_date) reading 1,697 entries but (order_date, country) reading 8,485, although both are covering. Why the difference?",
     options: [
       { text: 'SQLite prefers whichever index was created first and so walked a larger part of the second one', correct: false, explain: 'Creation order does not decide this; the column order inside the index does.' },
       { text: 'With order_date first, the matching DE rows are interleaved with other countries inside the date range, so the whole range must be read and filtered', correct: true, explain: 'In (country, order_date) all DE entries are together and sorted by date, so the December DE rows form one short run. Equality columns first, the range column last.' },

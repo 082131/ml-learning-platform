@@ -78,9 +78,9 @@ Things to try:
 - **One customer, then add (customer_id).** From 200,000 rows read to 10. This is the ideal case: a very
   selective condition (10 rows of 200,000) on the indexed column.
 - **"Count DE orders since 1 Dec 2026" through every index.** (country) reads all 40,000 DE entries, (order_date)
-  reads all 8,493 December entries, and (country, order_date) reads exactly the 1,644 that match and never
+  reads all 8,485 December entries, and (country, order_date) reads exactly the 1,697 that match and never
   touches the table. Now try (order_date, country): the same two columns in the other order still covers the
-  query, but reads 8,493 entries, because inside the date range the DE rows are interleaved with the other
+  query, but reads 8,485 entries, because inside the date range the DE rows are interleaved with the other
   countries.
 - **December revenue with (country, order_date).** A SCAN: the index is sorted by country first, so December is
   scattered across five separate stretches of it. That is the *leftmost-prefix rule*.

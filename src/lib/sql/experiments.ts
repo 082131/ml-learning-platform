@@ -2,6 +2,7 @@
 import type { ExperimentDef } from '../types';
 import { fanout, fanoutSql, type FanoutResult, type FanoutState } from './fanout';
 import { INDEX_CHOICES, INDEX_QUERIES, PLANS, indexLabSql, whyPlan, type IndexChoice, type IndexLabState, type IndexQuery, type PlanFacts } from './indexlab';
+import { formatBytes, warehouse, type WarehouseResult, type WarehouseSpec } from './warehouse';
 import { CUTOFFS, trainingRows, trainingSql, type TrainingRow, type TrainingSpec } from './mlfeatures';
 import { sessionize, sessionsSql, type SessionResult } from './sessions';
 import { USER_NAMES, funnel, funnelSql, WINDOW_LABEL, type FunnelResult, type FunnelSpec, type FunnelWindow } from './funnel';
@@ -346,11 +347,67 @@ export function indexExperiment(id: string): ExperimentDef<IndexLabState, IndexL
       { kind: 'select', id: 'index', label: 'Index on big_orders', options: (Object.keys(INDEX_CHOICES) as IndexChoice[]).map((i) => ({ value: i, label: INDEX_CHOICES[i].label })), get: (s) => s.index, set: (s, v) => ({ ...s, index: v as IndexChoice }) },
     ],
     compute: (s) => ({ ...PLANS[s.query][s.index], sql: indexLabSql(s), why: whyPlan(s) }),
+    resultSource: 'recorded from SQLite 3.54 on the 200,000-row table, and re-checked by the site’s tests',
     readout: (_s, r) => [
       { label: 'Plan', value: r.plan.startsWith('SCAN') ? 'SCAN (read everything)' : r.fetched === 0 ? 'SEARCH, covering index' : 'SEARCH with index' },
       { label: 'Entries read', value: r.entries.toLocaleString('en') },
-      { label: 'Table rows looked up', value: r.fetched.toLocaleString('en') },
+      { label: 'Table rows read', value: r.fetched.toLocaleString('en') },
       { label: 'Rows matching', value: r.matching.toLocaleString('en') },
+    ],
+  };
+}
+
+const dollars = (x: number) => (x >= 1 ? `$${x.toFixed(2)}` : x >= 0.01 ? `$${x.toFixed(3)}` : x >= 0.0001 ? `$${x.toFixed(5)}` : 'under $0.0001');
+
+/** A simulated columnar warehouse: bytes scanned and an illustrative cost per query. */
+export function warehouseExperiment(id: string): ExperimentDef<WarehouseSpec, WarehouseResult> {
+  return {
+    id,
+    initial: { columns: 'all', filter: 'none', source: 'raw' },
+    controls: [
+      {
+        kind: 'select',
+        id: 'source',
+        label: 'Read from',
+        options: [
+          { value: 'raw', label: 'orders_wh (2 billion rows)' },
+          { value: 'summary', label: 'daily_country_revenue (summary)' },
+        ],
+        get: (s) => s.source,
+        set: (s, v) => ({ ...s, source: v as WarehouseSpec['source'] }),
+      },
+      {
+        kind: 'select',
+        id: 'columns',
+        label: 'Columns',
+        options: [
+          { value: 'all', label: 'SELECT * (6 columns)' },
+          { value: 'needed', label: 'only order_date, country, amount' },
+        ],
+        get: (s) => s.columns,
+        set: (s, v) => ({ ...s, columns: v as WarehouseSpec['columns'] }),
+      },
+      {
+        kind: 'select',
+        id: 'filter',
+        label: 'Date filter',
+        options: [
+          { value: 'none', label: 'none (two years)' },
+          { value: 'year', label: 'last 365 days' },
+          { value: 'month', label: 'last 30 days' },
+          { value: 'month-fn', label: 'December via substr(order_date)' },
+        ],
+        get: (s) => s.filter,
+        set: (s, v) => ({ ...s, filter: v as WarehouseSpec['filter'] }),
+      },
+    ],
+    compute: warehouse,
+    resultSource: 'simulated: assumed column sizes and an illustrative price of $6 per TiB, not any real warehouse',
+    readout: (_s, r) => [
+      { label: 'Partitions read (of 730)', value: String(r.partitionsRead) },
+      { label: 'Bytes scanned', value: formatBytes(r.bytesRead) },
+      { label: 'Cost per run (illustrative)', value: dollars(r.cost) },
+      { label: 'Per month if a dashboard runs it hourly', value: dollars(r.cost * 24 * 30) },
     ],
   };
 }

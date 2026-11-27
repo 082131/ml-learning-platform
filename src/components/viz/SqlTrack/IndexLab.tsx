@@ -13,14 +13,14 @@ const width = (x: number) => (x <= 1 ? 0 : (Math.log10(x) / Math.log10(TOTAL)) *
 export function IndexLab() {
   const { result: r } = useExperimentContext<IndexLabState, IndexLabResult>('IndexLab');
   const bars: [string, number][] = [
-    ['index entries or rows read', r.entries],
-    ['table rows looked up', r.fetched],
+    ['entries read (index or table)', r.entries],
+    ['table rows read', r.fetched],
     ['rows that match', r.matching],
   ];
   return (
     <VizFrame
       title="What the plan has to read"
-      caption={`${r.plan}. Reads ${n(r.entries)} entries, looks up ${n(r.fetched)} table rows, ${n(r.matching)} rows match.`}
+      caption={`${r.plan}. Reads ${n(r.entries)} entries, reads ${n(r.fetched)} table rows, ${n(r.matching)} rows match.`}
       table={<VizTable caption="Work done by the plan" columns={['measure', 'rows']} rows={bars.map(([l, v]) => [l, v])} />}
     >
       <div className={s.viz} data-plan={r.plan} data-entries={r.entries}>

@@ -210,3 +210,16 @@
   color: var(--ink-2);
   font-style: italic;
 }
+.colChip {
+  padding: 2px var(--s-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+}
+.colChip[data-read] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--ink);
+}

@@ -241,8 +241,8 @@ INSERT INTO big_orders
 SELECT i,
        (i * 7919) % 20000 + 1,
        CASE (i * 31) % 5 WHEN 0 THEN 'DE' WHEN 1 THEN 'FR' WHEN 2 THEN 'UK' WHEN 3 THEN 'US' ELSE 'JP' END,
-       date('2025-01-01', '+' || ((i * 104729) % 730) || ' days'),
-       ((i * 2654435761) % 20000) / 100.0
+       date('2025-01-01', '+' || (((i / 5) * 104729) % 730) || ' days'),
+       ((i * 2654435761) % 19997) / 100.0
 FROM n;
 `;
 
