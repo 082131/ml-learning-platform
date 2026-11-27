@@ -1,6 +1,7 @@
 // Experiment definitions for the SQL track's visualizations. Logic lives in the pure modules they call.
 import type { ExperimentDef } from '../types';
 import { fanout, fanoutSql, type FanoutResult, type FanoutState } from './fanout';
+import { INDEX_CHOICES, INDEX_QUERIES, PLANS, indexLabSql, whyPlan, type IndexChoice, type IndexLabState, type IndexQuery, type PlanFacts } from './indexlab';
 import { CUTOFFS, trainingRows, trainingSql, type TrainingRow, type TrainingSpec } from './mlfeatures';
 import { sessionize, sessionsSql, type SessionResult } from './sessions';
 import { USER_NAMES, funnel, funnelSql, WINDOW_LABEL, type FunnelResult, type FunnelSpec, type FunnelWindow } from './funnel';
@@ -330,5 +331,26 @@ export function trainingExperiment(id: string): ExperimentDef<TrainingSpec, Trai
         { label: 'Rows whose features contain the labelled order', value: String(inside), status: inside ? 'error' : 'ok' },
       ];
     },
+  };
+}
+
+export type IndexLabResult = PlanFacts & { sql: string; why: string };
+
+/** EXPLAIN QUERY PLAN and rows read for a query on big_orders under one index choice. */
+export function indexExperiment(id: string): ExperimentDef<IndexLabState, IndexLabResult> {
+  return {
+    id,
+    initial: { query: 'customer', index: 'none' },
+    controls: [
+      { kind: 'select', id: 'query', label: 'Query', options: (Object.keys(INDEX_QUERIES) as IndexQuery[]).map((q) => ({ value: q, label: INDEX_QUERIES[q].label })), get: (s) => s.query, set: (s, v) => ({ ...s, query: v as IndexQuery }) },
+      { kind: 'select', id: 'index', label: 'Index on big_orders', options: (Object.keys(INDEX_CHOICES) as IndexChoice[]).map((i) => ({ value: i, label: INDEX_CHOICES[i].label })), get: (s) => s.index, set: (s, v) => ({ ...s, index: v as IndexChoice }) },
+    ],
+    compute: (s) => ({ ...PLANS[s.query][s.index], sql: indexLabSql(s), why: whyPlan(s) }),
+    readout: (_s, r) => [
+      { label: 'Plan', value: r.plan.startsWith('SCAN') ? 'SCAN (read everything)' : r.fetched === 0 ? 'SEARCH, covering index' : 'SEARCH with index' },
+      { label: 'Entries read', value: r.entries.toLocaleString('en') },
+      { label: 'Table rows looked up', value: r.fetched.toLocaleString('en') },
+      { label: 'Rows matching', value: r.matching.toLocaleString('en') },
+    ],
   };
 }

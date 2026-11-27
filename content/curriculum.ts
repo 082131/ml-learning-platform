@@ -744,7 +744,7 @@ export const tracks: Track[] = [
         title: 'Performance',
         level: 'advanced',
         lessons: [
-          { id: 'sql/performance/indexes-plans', status: 'outline' },
+          { id: 'sql/performance/indexes-plans', status: 'written' },
           { id: 'sql/performance/query-tuning', status: 'outline' },
         ],
       },

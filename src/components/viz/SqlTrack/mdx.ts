@@ -1,6 +1,7 @@
 import { CteSteps } from './CteSteps';
 import { FanOut } from './FanOut';
 import { FunnelLab } from './FunnelLab';
+import { IndexLab } from './IndexLab';
 import { JoinLab } from './JoinLab';
 import { NullFilter } from './NullFilter';
 import { QueryPipeline } from './QueryPipeline';
@@ -25,4 +26,5 @@ export default {
   FunnelLab,
   SessionLab,
   TrainingLab,
+  IndexLab,
 };

@@ -40,3 +40,10 @@ export const orderIs = (col: string, values: (string | number)[], name = 'rows a
   tests: `SELECT CASE WHEN group_concat(${ident(col)}, '|' ORDER BY _row) = ${q(values.join('|'))} THEN 'ok'
   ELSE 'expected ${col} in the order ${values.join(', ').replace(/'/g, "''")}, got ' || COALESCE(group_concat(${ident(col)}, ', ' ORDER BY _row), 'no rows') END FROM answer`,
 });
+
+/** Some row's `col` matches the LIKE `pattern` (or, with `present` false, no row does). Used to grade query
+ * plans: EXPLAIN QUERY PLAN rows have a `detail` column. */
+export const someRowLike = (col: string, pattern: string, why: string, name: string, present = true): SqlCheck => ({
+  name,
+  tests: `SELECT CASE WHEN ${present ? '' : 'NOT '}EXISTS (SELECT 1 FROM answer WHERE ${ident(col)} LIKE ${q(pattern)}) THEN 'ok' ELSE ${q(why)} END`,
+});

@@ -1,0 +1,214 @@
+import { bigTable, compositeIndex, functionOnColumn, indexLab, orderByLimit, scanThenSearch } from './code';
+import { exercise, questions } from './quiz';
+
+<Section kind="intuition" title="Finding a few rows without reading them all">
+
+Every query so far ran on a few dozen rows, so it did not matter how the database found them. Real tables have
+millions of rows, and then the question "how does the database find the 10 orders of customer 4242?" decides
+whether a query takes milliseconds or minutes.
+
+Without help, there is only one way: read every row and check it. That is a full table scan, and its cost grows
+with the size of the table, however few rows you want. Think of a book with no index at the back: to find every
+page that mentions "LAG", you read the whole book.
+
+An <Term id="database-index">index</Term> is the index at the back of the book. It is a separate structure that
+holds one column (or a few) in sorted order, each entry pointing at the row it came from. Because it is sorted,
+the database can jump to the right place the way you find a word in a dictionary: open in the middle, decide
+which half, repeat. 200,000 entries need only about 18 halvings to find one (2 to the power 18 is about 262,000),
+instead of 200,000 checks. Then it reads the few matching entries and follows their pointers to the rows.
+
+That picture explains almost everything in this lesson. An index helps only when the query's condition matches
+the index's sort order. A multi-column index is sorted like a phone book (by surname, then first name), so it
+helps a search for a surname but not for a first name alone. And an index has to be stored and updated on every
+insert, so it is a trade, not a free gift. The tool for seeing which choice the database made is the
+<Term id="query-plan">query plan</Term>.
+
+</Section>
+
+<Section kind="technical" title="SCAN, SEARCH and reading a plan">
+
+This lesson uses `big_orders`, a table of 200,000 generated orders (20,000 customers, five countries, two years
+of dates). It is built inside your browser each time a query runs, which takes a moment. The values come from a
+formula, so everyone gets the same rows, and some patterns are artificial (customer 4242 always orders from
+Japan, for example).
+
+<SqlRunner example={bigTable} title="big_orders.sql" />
+
+**EXPLAIN QUERY PLAN** shows what SQLite intends to do, without running the query. Each line is one step. The
+two words that matter most:
+
+- **SCAN big_orders**: read the table from start to end. Every row is examined.
+- **SEARCH big_orders USING INDEX idx_customer (customer_id=?)**: use the index to jump straight to the matching
+  entries. The part in brackets says which conditions the index is searched with; `?` stands for the value.
+
+Run the example: before the index exists, finding customer 4242 is a SCAN of 200,000 rows to return 10. After
+`CREATE INDEX`, the same query becomes a SEARCH that touches about 10 index entries and 10 rows. The runner shows
+how long the whole script took in your browser; most of that time is building the table and the index, not the
+search itself.
+
+<SqlRunner example={scanThenSearch} title="scan_then_search.sql" />
+
+Two more phrases appear in plans. **USING COVERING INDEX** means the index contains every column the query
+needs, so the table is never read at all: a <Term id="covering-index">covering index</Term>. And **USE TEMP
+B-TREE FOR ORDER BY** (or GROUP BY) means SQLite has to build a temporary sorted structure because no index
+already delivers the rows in the needed order. Neither phrase is good or bad on its own; they tell you where
+the work goes.
+
+**A plan is the database's guess, not a measurement.** The planner picks a plan from what it knows about the
+table and its indexes. SQLite's plan output does not show row counts or costs; PostgreSQL's `EXPLAIN ANALYZE`
+does run the query and reports real rows and times per step, which is the tool to reach for there. In this lesson,
+the explorer below reports how many rows each plan has to read, counted exactly in SQLite, as a stand-in for
+time.
+
+</Section>
+
+<Section kind="visual" title="Try it: which index helps which query?">
+
+Pick a query and an index. The explorer shows the plan line SQLite 3.54 produces and how much of the 200,000-row
+table that plan reads. These plans were computed once in SQLite and are checked by the site's tests; your
+browser does not need to build the big table to show them.
+
+<Experiment def={indexLab} title="Index explorer">
+  <IndexLab />
+  <Readout title="This plan" />
+</Experiment>
+
+Things to try:
+
+- **One customer, then add (customer_id).** From 200,000 rows read to 10. This is the ideal case: a very
+  selective condition (10 rows of 200,000) on the indexed column.
+- **"Count DE orders since 1 Dec 2026" through every index.** (country) reads all 40,000 DE entries, (order_date)
+  reads all 8,493 December entries, and (country, order_date) reads exactly the 1,644 that match and never
+  touches the table. Now try (order_date, country): the same two columns in the other order still covers the
+  query, but reads 8,493 entries, because inside the date range the DE rows are interleaved with the other
+  countries.
+- **December revenue with (country, order_date).** A SCAN: the index is sorted by country first, so December is
+  scattered across five separate stretches of it. That is the *leftmost-prefix rule*.
+- **December revenue with substr(), with (order_date).** Still a SCAN. Switch the query to the date-range version
+  of the same question and it becomes a SEARCH.
+- **One country with (country).** The index is used, but a fifth of the table matches. 40,000 index reads plus
+  40,000 separate row lookups is not obviously better than one pass over the table.
+
+</Section>
+
+<Section kind="code" title="Composite indexes, functions and sorting">
+
+**Composite indexes and the leftmost prefix.** A <Term id="composite-index">composite index</Term> on
+`(country, order_date)` is sorted by country, and within each country by date, like a phone book sorted by
+surname, then first name. So it can answer "country = DE" (one surname), and "country = DE and date in December"
+(one surname, a range of first names), but not "date in December" alone (a first name, which could be under any
+surname). The general rule: the index can be searched with equality conditions on its first columns, followed by
+at most one range condition. Everything after the range column can only filter, not search.
+
+<SqlRunner example={compositeIndex} title="composite_index.sql" />
+
+The second plan is worth reading closely: `SCAN big_orders USING COVERING INDEX idx_country_date`. The date
+condition cannot *search* the index, so SQLite reads all 200,000 entries, but it reads them from the index rather
+than the table, because COUNT(*) with a date condition needs nothing else. The index is narrower than the table,
+so this is cheaper than a table scan, but it is still a full pass. "Uses an index" and "searches an index" are
+not the same thing.
+
+**Do not hide the column inside a function.** The index on `order_date` is sorted by the dates themselves. A
+condition on `substr(order_date, 1, 7)` asks about a different value, and the planner cannot turn it back into a
+range of dates, so it scans. Writing the same question as a range on the column (`>= '2026-12-01' AND <
+'2027-01-01'`) lets it search. Conditions that can use an index this way are called
+<Term id="sargable">sargable</Term>. The two queries return the same total; only the work differs.
+
+<SqlRunner example={functionOnColumn} title="function_on_column.sql" />
+
+The same applies to `date(order_date) = ...`, `LOWER(email) = ...`, `amount * 1.2 > 100` and `CAST(...)`: put the
+column alone on one side and move the arithmetic to the other. When you cannot (case-insensitive search, say),
+SQLite and PostgreSQL both allow an index on the expression itself.
+
+**Indexes also deliver order.** "The 5 most recent orders" without an index means reading all 200,000 rows and
+sorting them (USE TEMP B-TREE FOR ORDER BY) to keep 5. With an index on `order_date`, the rows are already in
+order: SQLite walks the index from the newest end and stops after 5.
+
+<SqlRunner example={orderByLimit} title="order_by_limit.sql" />
+
+**What indexes cost.** Each index is a second copy of its columns that must be updated on every INSERT, UPDATE and
+DELETE, and stored. A table with ten indexes makes every write do eleven pieces of work. So index the columns your
+important queries filter, join and sort on, check with the plan that the index is actually used, and drop indexes
+nothing uses. Primary keys get an index automatically, which is why joins on `id` are fast; foreign key columns
+such as `customer_id` usually need one created explicitly.
+
+</Section>
+
+<Section kind="mistakes" title="Index mistakes">
+
+<CommonMistake
+  title="An index in the wrong column order"
+  wrong={'CREATE INDEX idx ON big_orders (order_date, country);  -- for WHERE country = ? AND order_date >= ?'}
+  error="(no error) the plan uses the index but reads every row in the date range"
+  cause="Only the first column's range can be searched; country is checked entry by entry."
+  fix="Equality columns first, the range column last: (country, order_date)."
+/>
+
+<CommonMistake
+  title="A function around the indexed column"
+  wrong={"WHERE substr(order_date, 1, 7) = '2026-12'"}
+  error="(no error) SCAN big_orders, even with an index on order_date"
+  cause="The index is sorted by order_date, not by substr(order_date, 1, 7)."
+  fix="WHERE order_date >= '2026-12-01' AND order_date < '2027-01-01'."
+/>
+
+<CommonMistake
+  title="Searching on the second column of a composite index"
+  wrong={"-- index on (country, order_date)\nWHERE order_date >= '2026-12-01'"}
+  error="(no error) a full scan of the table or the index"
+  cause="Without a condition on country there is no single range of the index to read."
+  fix="Add an index that starts with order_date, or include the country condition if the question allows it."
+/>
+
+<CommonMistake
+  title="Assuming an index is used"
+  wrong={'CREATE INDEX ...;  -- and move on'}
+  error="(no error) the query is as slow as before"
+  cause="The planner may not be able to use the index for this query, or may choose not to."
+  fix="Check EXPLAIN QUERY PLAN (EXPLAIN ANALYZE in PostgreSQL) before and after."
+/>
+
+</Section>
+
+<Section kind="practice" title="Habits for indexes">
+
+- **Read the plan before and after** every index you add.
+- **Index for real queries**: the columns they filter, join and sort on, in that order of importance.
+- **Equality columns first, one range column last**, then the columns needed to cover the query if it is hot.
+- **Keep columns bare in WHERE**: move functions and arithmetic to the other side.
+- **Weigh the write cost**: every index slows every insert a little and takes space.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<SqlExercise exercise={exercise}>
+  Create one index so that `SELECT order_date, amount FROM big_orders WHERE customer_id = 4242 ORDER BY
+  order_date;` needs no table lookups and no separate sort, and end your script with `EXPLAIN QUERY PLAN` of that
+  query so it can be checked. The starter's index is used, but the plan still has two kinds of extra work.
+</SqlExercise>
+
+</Section>
+
+<Section kind="summary">
+
+Without an index, finding rows means scanning the whole table. An index is a sorted copy of some columns with
+pointers to the rows, so the database can jump to matching entries, read only those, and follow the pointers;
+if the index holds every needed column it is covering and the table is never read. A composite index is sorted
+column by column, so it can be searched with equalities on its leading columns and one range after them. Wrapping
+the column in a function hides it from the index. EXPLAIN QUERY PLAN shows the choice: SCAN reads everything,
+SEARCH uses the index, and a temp B-tree means an extra sort. Indexes cost storage and write time, so add them for
+real queries and confirm with the plan.
+
+Indexes are one lever. The next lesson covers the others: rewriting queries that repeat work, and what changes
+when the database is a columnar warehouse that charges by data read.
+
+Next: [Tuning queries and warehouse costs](#/learn/sql/performance/query-tuning).
+
+</Section>

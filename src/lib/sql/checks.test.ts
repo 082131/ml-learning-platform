@@ -27,3 +27,17 @@ describe('check builders', () => {
     expect(r.checks[0]!.ok).toBe(true);
   });
 });
+
+describe('someRowLike', () => {
+  it('passes when a plan row matches and fails with the reason otherwise', async () => {
+    const { someRowLike } = await import('./checks');
+    const db = await openTestDb('shop');
+    const covering = someRowLike('detail', '%COVERING INDEX%', 'no covering index', 'covering');
+    const noSort = someRowLike('detail', '%TEMP B-TREE%', 'still sorts', 'no sort', false);
+    const plan = 'CREATE INDEX i ON orders (customer_id, order_date);\nEXPLAIN QUERY PLAN SELECT order_date FROM orders WHERE customer_id = 1 ORDER BY order_date;';
+    const r = gradeScript(db, '', plan, [covering, noSort]);
+    expect(r.checks.map((c) => c.ok)).toEqual([true, true]);
+    const bad = gradeScript(await openTestDb('shop'), '', 'EXPLAIN QUERY PLAN SELECT order_date FROM orders WHERE customer_id = 1 ORDER BY order_date;', [covering, noSort]);
+    expect(bad.checks.map((c) => c.why)).toEqual(['no covering index', 'still sorts']);
+  });
+});

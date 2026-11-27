@@ -158,6 +158,26 @@ const claims: Record<string, (sets: SqlValue[][][]) => void> = {
   'per-order-features': ([rows]) => {
     expect(rows!.filter((r) => r[0] === 1).map((r) => [r[4], r[5], r[6]])).toEqual([[0, null, 1], [1, 14.5, 2], [2, 32.5, 3]]);
   },
+  'big-orders-peek': ([summary]) => expect(summary).toEqual([[200000, 20000, '2025-01-01', '2026-12-31']]),
+  'scan-then-search': ([before, after, rows]) => {
+    expect(before!.map((r) => r[3])).toEqual(['SCAN big_orders']);
+    expect(after!.map((r) => r[3])).toEqual(['SEARCH big_orders USING INDEX idx_customer (customer_id=?)']);
+    expect(rows!.length).toBe(10);
+    expect(new Set(rows!.map((r) => r[2]))).toEqual(new Set(['JP']));
+  },
+  'composite-index': ([both, dateOnly]) => {
+    expect(both!.map((r) => r[3])).toEqual(['SEARCH big_orders USING COVERING INDEX idx_country_date (country=? AND order_date>?)']);
+    expect(dateOnly!.map((r) => r[3])).toEqual(['SCAN big_orders USING COVERING INDEX idx_country_date']);
+  },
+  'function-on-column': ([fn, range, totals]) => {
+    expect(fn!.map((r) => r[3])).toEqual(['SCAN big_orders']);
+    expect(range!.map((r) => r[3])).toEqual(['SEARCH big_orders USING INDEX idx_date (order_date>? AND order_date<?)']);
+    expect(totals![0]![0]).toBe(totals![0]![1]);
+  },
+  'order-by-limit': ([before, after]) => {
+    expect(before!.map((r) => r[3])).toEqual(['SCAN big_orders', 'USE TEMP B-TREE FOR ORDER BY']);
+    expect(after!.map((r) => r[3])).toEqual(['SCAN big_orders USING INDEX idx_date']);
+  },
   'days-to-next': ([rows]) => {
     expect(rows!.filter((r) => r[0] === 1).map((r) => r[4])).toEqual([22, 25, null]);
     expect(rows!.length).toBe(11);
