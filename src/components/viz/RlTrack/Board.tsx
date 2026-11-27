@@ -46,7 +46,7 @@ export function Board({ grid: g, values, arrows, mismatch, agent, path, path2, l
       style={{ gridTemplateColumns: `repeat(${g.cols}, minmax(0, 1fr))` }}
     >
       {g.kinds.map((k, i) => {
-        const showValue = values && !compact && k !== 'wall' && k !== 'cliff';
+        const showValue = values && !compact && (k === 'empty' || k === 'start');
         const arrow = arrows?.[i];
         const label = labels?.get(i);
         const parts: ReactNode[] = [];

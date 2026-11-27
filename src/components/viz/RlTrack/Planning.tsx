@@ -6,6 +6,7 @@ import { VizFrame, VizTable } from '../VizFrame/VizFrame';
 import { Board, fmtValue } from './Board';
 import s from './RlTrack.module.css';
 
+const fmt3 = (v: number) => (v < 0 ? `−${Math.abs(v).toFixed(3)}` : v.toFixed(3));
 const pct = (p: number) => `${Math.round(p * 100)}%`;
 
 /** One action from one cell: every cell it can land on, with its probability and a 1,000-try simulation. */
@@ -62,7 +63,7 @@ export function RlEvalGrid() {
       table={<VizTable caption="State values" columns={['cell', 'action', 'value']} rows={r.grid.kinds.flatMap((_, i) => (isActive(r.grid, i) ? [[cellName(r.grid, i), arrows[i] ?? 'random', fmtValue(r.V[i]!)]] : []))} />}
     >
       <div className={s.grid2} data-v-start={r.V[r.grid.start]!.toFixed(3)}>
-        <Board grid={r.grid} values={r.V} arrows={arrows} agent={state.cell} />
+        <Board grid={r.grid} values={r.V} arrows={arrows} labels={new Map([[state.cell, 'explained']])} />
         <Backup title={`New V${cellName(r.grid, state.cell)} = Σ π(a) · Q(a)`} terms={used.map((x) => ({ label: `π(${x.a}) = ${x.p === 1 ? '1' : x.p.toFixed(2)}`, q: r.cellQ[x.k]!, weight: x.p, a: x.a }))} total={total} r={r} cell={state.cell} gamma={state.gamma} />
       </div>
     </VizFrame>
@@ -89,11 +90,11 @@ function Backup({ title, terms, total, r, cell, gamma }: { title: string; terms:
             <span className={s.mono}>
               {t.label} × Q({ACTION_ARROW[t.a]}) {fmtValue(t.q)}
             </span>
-            <span className={s.tag}>{fmtValue(t.weight * t.q)}</span>
+            <span className={s.tag}>{fmt3(t.weight * t.q)}</span>
           </li>
         ))}
       </ul>
-      <p className={s.verdict}>= {fmtValue(total)}</p>
+      <p className={s.verdict}>= {fmt3(total)}</p>
       {first && (
         <>
           <h4 className={s.panelHead}>
@@ -106,7 +107,7 @@ function Backup({ title, terms, total, r, cell, gamma }: { title: string; terms:
                   {d.p.toFixed(2)} × ({fmtValue(d.reward)} + {gamma.toFixed(2)} × {fmtValue(d.nextValue)}) → {cellName(r.grid, d.next)}
                   {d.done ? ' ends' : ''}
                 </span>
-                <span className={s.tag}>{fmtValue(d.p * (d.reward + gamma * d.nextValue))}</span>
+                <span className={s.tag}>{fmt3(d.p * (d.reward + gamma * d.nextValue))}</span>
               </li>
             ))}
           </ul>

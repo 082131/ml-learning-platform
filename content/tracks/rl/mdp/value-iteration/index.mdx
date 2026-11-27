@@ -1,0 +1,204 @@
+import { valueIterationPy, vi, yourSettings } from './code';
+import { questions, viExercise } from './quiz';
+
+<Section kind="intuition" title="If every cell had its best price, the arrows would draw themselves">
+
+In the last lesson someone handed us a policy and we computed what each cell is worth under it. Now flip the
+question: *nobody gives us a policy. What is the best one?*
+
+Here is the key insight. Suppose you somehow knew the value of every cell **assuming you play perfectly from then
+on**. Then choosing a move would be trivial: from any cell, look one step ahead, and take the action that leads, on
+average, to the best reward plus best next-cell value. The arrows would draw themselves.
+
+So the problem shrinks to: *compute the values of perfect play*. Value iteration does exactly that, with one small
+change to the sweep you already know. Instead of averaging over what a given policy would do, each cell assumes it
+will take its **best** action.
+
+</Section>
+
+<Section kind="technical" title="From the expectation equation to the optimality equation">
+
+### The big picture
+
+Start with all values at 0 → sweep every cell, giving it the value of its **best** action (not the policy's average)
+→ repeat until the values settle: these are the **optimal values** → in every cell, pick the action that achieves that
+best value: that is the **optimal policy**.
+
+### What "best policy" means
+
+A policy $\pi$ is better than or equal to another policy $\pi'$ if its value is at least as high **in every state**.
+An <Term id="optimal-policy">optimal policy</Term> $\pi^*$ is one that is better than or equal to every other policy.
+It always exists for a finite MDP, and all optimal policies share the same values, written $V^*(s)$ and $Q^*(s, a)$.
+(There can be several optimal policies when two actions tie; they just choose differently between equally good moves.)
+
+### The Bellman optimality equation
+
+Last lesson's Bellman equation averaged over the policy's choices:
+$V^\pi(s) = \sum_a \pi(a \mid s) \, Q^\pi(s, a)$. If you act optimally, you do not average: you take the best action.
+That gives the <Term id="bellman-optimality">Bellman optimality equation</Term>:
+
+$$
+V^*(s) = \max_a \sum_{s'} P(s' \mid s, a) \bigl[\, r(s, a, s') + \gamma\, V^*(s') \,\bigr]
+$$
+
+Compare it piece by piece with the expectation version:
+
+- The inner part is unchanged: for one action, average "reward + γ × value of the landing cell" over where it might
+  land. That is $Q^*(s, a)$.
+- The outer $\sum_a \pi(a \mid s)$ is replaced by $\max_a$. "The value of a state is the value of its best action,
+  assuming optimal play afterwards."
+
+The difference is one word, average versus max, but it changes what the equation describes: no longer *a* policy, but
+*the best* one.
+
+### Value iteration: sweep the max
+
+The new equation has the same circularity as before ($V^*$ on both sides), and we break it the same way. This is
+<Term id="value-iteration">value iteration</Term>:
+
+1. Start with $V(s) = 0$ everywhere.
+2. Sweep: for every state, compute every action's value from the current $V$ and keep the largest.
+3. Repeat until the largest change is tiny.
+4. Read off the <Term id="greedy-policy">greedy policy</Term>: in each state, the action with the highest one-step
+   lookahead value.
+
+Why does it converge? The same argument as policy evaluation: after $k$ sweeps, $V$ is the best possible expected
+return over the next $k$ steps, and each extra step adds less (because of γ or because episodes end). On our grid it
+settles after 22 sweeps, and the values are exactly the safe policy's from the last lesson: 0.705 at the start. So the
+"safe route" we evaluated was in fact optimal.
+
+A practical detail: the **arrows usually settle long before the values do**. The greedy policy only needs the
+*ranking* of actions to be right, not the precise numbers. In the explorer you can watch the red arrows (ones that
+will still change) disappear by sweep 12, while the numbers keep creeping toward their final values until sweep 22.
+
+### The reward shapes the policy
+
+The optimal policy is not a property of the map alone; it depends on the rewards, the slip and γ. This is the most
+instructive part of the lesson, because it shows the reward design idea from lesson 1 at work:
+
+| Reward per move | What the optimal policy does | Why |
+| --- | --- | --- |
+| −0.04 | the safe route up the left; at (1,2) go up; at (2,3), below the pit, go *left*, away from it | moves are cheap, so a longer but safer route pays |
+| −0.4 | the bottom row now heads right and goes up beside the pit | moves are expensive enough that the shortcut's risk is worth taking |
+| −2 | from (1,2) and (2,3), step straight into the pit | every move costs more than the pit; ending the episode at −1 is the cheapest way out |
+| 0 | very cautious: at (1,2) go left into the wall, never risking the pit | waiting is free, so there is no reason to accept any risk |
+| +0.1 | with γ = 1, avoid both exits forever | every move pays, so ending the episode would stop the income; the values grow without limit |
+
+That last row is a warning: with γ = 1 and a positive step reward, "the best return" is infinite and value iteration
+never converges. Lower γ below 1 in the explorer and it converges again, because an endless stream of +0.1 is then
+worth a finite $0.1/(1-\gamma)$.
+
+### Policy iteration: the other classic method
+
+<Term id="policy-iteration">Policy iteration</Term> reaches the same answer by alternating the two things you already
+know: **evaluate** the current policy fully (lesson 5), then **improve** it by making it greedy with respect to those
+values, and repeat until the policy stops changing. Each round is more work (a full evaluation), but it usually needs
+very few rounds. Value iteration can be seen as policy iteration that stops each evaluation after a single sweep.
+Both rely on the same fact: being greedy with respect to a policy's values never makes the policy worse.
+
+### The limit of planning
+
+Value iteration needs the full rulebook, $P$ and $r$ for every state and action, and it sweeps over **every** state.
+That is fine for 11 cells. It is impossible for chess (around $10^{44}$ positions), and it is useless when nobody can
+write down $P$, as for a robot on a real floor. The next chapter removes both requirements: the agent will learn from
+sampled experience, visiting only the states it actually reaches.
+
+</Section>
+
+<Section kind="visual" title="Try it: value iteration, sweep by sweep">
+
+The numbers are the current value estimates; the arrows are the greedy actions they imply. Red arrows are ones that
+will still change before the values converge.
+
+<Experiment def={vi} title="Value iteration explorer">
+  <RlViGrid />
+  <Readout title="Value iteration" />
+</Experiment>
+
+Things to try:
+
+- **Sweeps 0 → 22** with the default settings. The last red arrow, at (2,2), disappears at sweep 12; the numbers
+  keep moving until sweep 22.
+- **Reward −0.4**: the bottom row switches to the shortcut beside the pit. **−2**: the cells next to the pit point
+  into it. Check the start's value: about −10.8, because even the fastest exit from the start costs several −2 moves.
+- **Reward 0**: (1,2) points left into the wall. With free moves, bumping into a wall to wait is better than any risk.
+- **Reward +0.1** with γ = 1: the readout says it does not converge. Now lower γ to 0.9 and it converges in 42
+  sweeps. The arrows still avoid the pit, but near the goal they head for it: at γ = 0.9, staying forever is worth
+  only $0.1/(1-0.9) = 1$, less than the goal's $1 + 0.1$.
+- **Slip 0**: with no randomness the pit is harmless unless you walk into it, so routes beside it become fine.
+
+</Section>
+
+<Section kind="code" title="Value iteration in Python">
+
+The grid model from before, a `q_value` with the step reward as a parameter, and `value_iteration`, which sweeps the
+max until nothing changes by more than 0.0001 and then reads off the greedy policy. Run it to see the two policies for
+−0.04 and −2 as arrow maps.
+
+<PythonRunner example={valueIterationPy} title="value_iteration.py" />
+
+The explorer's settings as a call:
+
+<Experiment def={vi} title="your settings as code" controls={false}>
+  <Code example={yourSettings} title="settings.py" />
+</Experiment>
+
+</Section>
+
+<Section kind="mistakes" title="Value iteration mistakes">
+
+<CommonMistake
+  title="Taking the max over next states instead of over actions"
+  wrong={'V[s] = max(r + gamma * V[n] for a in MOVES for p, n, r, done in outcomes(s, a))'}
+  error="(no error) every cell beside the pit looks great, because the agent assumes it always lands on the best cell"
+  cause="The agent chooses the action, not where it lands. The landing cell must be averaged with its probabilities; only the action is maximised."
+  fix="max over actions of the probability-weighted sum over next states."
+/>
+
+<CommonMistake
+  title="Trusting the values before they converge"
+  wrong="V(start) after 5 sweeps is 0.16, so the start is worth 0.16."
+  error="(misconception) after 5 sweeps the values only count the next 5 steps"
+  cause="Early sweeps are short-horizon estimates; the arrows may be right while the numbers are still too low."
+  fix="Run until the largest change is below a threshold, and report the converged values."
+/>
+
+<CommonMistake
+  title="Expecting convergence with γ = 1 and endless rewards"
+  wrong={'value_iteration(gamma=1.0, step=+0.1)'}
+  error="(no error) the loop never ends: the values grow by about 0.1 every sweep"
+  cause="If staying in the game forever earns more and more, the optimal value is infinite."
+  fix="Use γ < 1 for tasks that can continue forever, or make sure every policy ends the episode."
+/>
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={viExercise}>
+  Write value iteration and greedy policy extraction for a small MDP.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+The chain of this lesson: if we knew the values of **perfect play**, choosing actions would be a one-step lookahead.
+Those values satisfy the **Bellman optimality equation**, which is last lesson's equation with the policy's average
+replaced by a **max over actions**. **Value iteration** sweeps that max from zeros until the values settle, then
+reads off the **greedy policy**, which is optimal. The optimal policy depends on the rewards: a tiny step cost gives
+the safe route, a big one makes the pit attractive, and a positive one makes the agent avoid ending at all. **Policy
+iteration** gets the same answer by alternating full evaluation and greedy improvement.
+
+All of this needed the complete model $P$ and a sweep over every state. Real agents usually have neither. The next
+chapter keeps the Bellman idea but learns from samples instead of from the rulebook.
+
+Next: [Learning from experience: Monte Carlo and TD](#/learn/rl/learning/monte-carlo-td).
+
+</Section>
