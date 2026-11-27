@@ -1,0 +1,173 @@
+import { chainUp, countToFive, dateSpine, orgChart, recursionLab, runaway, teamSize } from './code';
+import { exercise, questions } from './quiz';
+
+<Section kind="intuition" title="Questions with no fixed number of steps">
+
+"Who does Sam manage?" is one self-join: find the employees whose `manager_id` is Sam's id. "Who is in Sam's
+whole team, including the people his reports manage?" is harder. Uma reports to Sam, and Xia reports to Uma, so
+Xia is in Sam's team too. One join finds one level. Two joins find two levels. But a real company might have three
+levels in one department and eight in another, and you cannot write "join as many times as needed".
+
+A <Term id="recursive-cte">recursive CTE</Term> solves this by repeating one step until there is nothing left to
+find. You give it a starting point ("Sam") and a rule for taking one step ("everyone who reports to the people I
+found last time"). The database applies the rule, then applies it again to what it just found, and keeps going
+until a step finds nobody new.
+
+The same machinery generates rows that are not in any table. Starting from 1 and repeatedly adding 1 produces a
+list of numbers; starting from 1 February and repeatedly adding a day produces a calendar. That turns out to be
+exactly what reports need to show days with zero sales, which is the second half of this lesson.
+
+</Section>
+
+<Section kind="technical" title="Anchor, step, and the rows each step can see">
+
+A recursive CTE has three parts, joined by `UNION ALL`:
+
+1. **The anchor** is an ordinary SELECT. It runs once and produces the starting rows.
+2. **The step** is a SELECT that reads the CTE itself. Each time it runs, it sees only the rows added by the
+   previous iteration (the anchor, the first time), and produces new rows from them.
+3. **The stop.** When an iteration's step produces no rows, there is nothing to feed the next iteration, and the
+   recursion ends. The result is every row from every iteration.
+
+The smallest example counts to five. The anchor gives 1. The step turns 1 into 2, then 2 into 3, and so on.
+When the last row is 5, `WHERE i < 5` is false, the step adds nothing, and the query finishes.
+
+<SqlRunner example={countToFive} title="count.sql" />
+
+Point 2 is the one to understand properly, because it is why the walk moves one level at a time. If the step
+could see every row found so far, it would rediscover the same rows on every iteration and never stop. Seeing only
+the newest rows means each iteration is "the next level down".
+
+**Walking a hierarchy.** For the org chart, the anchor is the person at the top (`manager_id IS NULL`), and the
+step joins `employees` to the rows found last time on `e.manager_id = c.id`: "people whose manager I just found".
+Two extra columns carry information down the tree: `level` adds 1 per step, and `path` appends each name, so
+every row knows how it was reached.
+
+<SqlRunner example={orgChart} title="org_chart.sql" />
+
+Sorting by `path` prints the tree in reading order: Rosa, then Sam and his whole branch (Uma, Xia, Vic), then
+Tara and hers. The query never says how deep the tree is; it finds out by walking.
+
+</Section>
+
+<Section kind="visual" title="Watch each iteration">
+
+Choose where the walk starts and which way it goes. Each line is one iteration and lists the rows that iteration
+added. The last iteration is always empty: that empty step is what stops the recursion.
+
+<Experiment def={recursionLab} title="Recursion explorer">
+  <RecursionTrace />
+  <Readout title="This walk" />
+</Experiment>
+
+Things to try:
+
+- **Rosa, down.** Anchor: Rosa. Step 1: Sam and Tara. Step 2: Uma, Vic and Wen. Step 3: Xia. Step 4: nobody
+  reports to Xia, so it adds nothing. 5 iterations, 7 rows: the whole company.
+- **Xia, up.** The step flips direction: instead of "people who report to the last rows", it is "the manager of
+  the last rows" (`m.id = c.manager_id`). Xia, Uma, Sam, Rosa, then Rosa's manager is NULL and NULL matches
+  nothing, so the walk ends.
+- **Wen, down.** The anchor is Wen and the very first step is empty. A recursive CTE always returns at least its
+  anchor rows.
+
+</Section>
+
+<Section kind="code" title="Chains, team totals and date spines">
+
+Walking upwards answers "who is above this person?", for example to find who can approve Xia's expenses:
+
+<SqlRunner example={chainUp} title="chain_of_command.sql" />
+
+A recursive CTE can feed an ordinary aggregate. Here the walk collects the ids of everyone in Sam's team (Sam,
+Uma, Vic, Xia), and the outer query counts the reports (3, not counting Sam) and adds up the team's salaries:
+150 + 110 + 105 + 95 = 460.
+
+<SqlRunner example={teamSize} title="team_size.sql" />
+
+**Generating a calendar.** Reports often need every day, even days with no data. GROUP BY over `orders` can only
+produce rows for days that had orders; February had orders on just 6 days, so a chart drawn from that would
+skip the other 22 and connect the dots across them. A <Term id="date-spine">date spine</Term> is the fix: generate
+every date in the range with a recursive CTE, then LEFT JOIN the data onto it. `date(day, '+1 day')` is SQLite's
+date arithmetic (PostgreSQL has `generate_series`, which does the same in one function call).
+
+<SqlRunner example={dateSpine} title="february_by_day.sql" />
+
+This combines three earlier ideas in one chain: the recursion makes the 28 days, the LEFT JOIN keeps days with no
+matching order, and `COUNT(o.id)` turns those unmatched days into 0 (COUNT(*) would wrongly give 1).
+
+**Make sure it stops.** A recursion stops only when a step adds nothing. If the stop condition is missing, or the
+data contains a cycle (A manages B and B manages A), it never does. A depth limit costs nothing and is good
+practice on real hierarchies:
+
+<SqlRunner example={runaway} title="depth_limit.sql" />
+
+If a runaway query does reach this site's database, it is stopped after 10 seconds and the database is restarted,
+so you can experiment safely.
+
+</Section>
+
+<Section kind="mistakes" title="Recursion that never ends or returns too much">
+
+<CommonMistake
+  title="No stop condition"
+  wrong={'WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n) SELECT i FROM n;'}
+  error="(runs until killed) Stopped after 10 seconds. The query may never finish ..."
+  cause="Every iteration adds a row, so there is always something to feed the next one."
+  fix="Add a condition to the step: WHERE i < 100. In hierarchies add a level limit as a safety net."
+/>
+
+<CommonMistake
+  title="Joining the step the wrong way round"
+  wrong={'JOIN chart AS c ON e.id = c.manager_id   -- meant to go down the tree'}
+  error="(no error) the walk goes UP from the anchor instead of down"
+  cause="e.id = c.manager_id finds the managers of the rows found so far."
+  fix="Down the tree: e.manager_id = c.id (people whose manager I found). Up: m.id = c.manager_id."
+/>
+
+<CommonMistake
+  title="Grouping without a spine"
+  wrong={'SELECT order_date, COUNT(*) FROM orders GROUP BY order_date;'}
+  error="(no error) days with no orders are missing, and charts draw straight lines across them"
+  cause="GROUP BY only makes groups for values that occur."
+  fix="Generate the days with a recursive CTE (or a calendar table) and LEFT JOIN the data onto it, counting a column of the data."
+/>
+
+</Section>
+
+<Section kind="practice" title="Habits for recursive queries">
+
+- **Write the anchor alone first** and check it returns the starting rows you expect.
+- **Carry a level (and, for trees, a path)** so you can see how each row was reached.
+- **Always have a stop condition**, plus a depth limit on real hierarchies in case of cycles.
+- **Use a date spine** whenever a report must show periods with no data.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<SqlExercise exercise={exercise}>
+  Return one row per day from 2026-03-01 to 2026-03-07 with `day` and `orders`, the number of orders placed that
+  day, including days with none (0). The starter only returns the two days that had orders.
+</SqlExercise>
+
+</Section>
+
+<Section kind="summary">
+
+A recursive CTE starts from anchor rows and repeats a step that reads only the rows the previous iteration added,
+so each iteration goes one level further. When a step adds nothing, it stops, and the result is every row from
+every iteration. That lets one query walk a hierarchy of any depth (down to a team, up to a chain of command) and
+generate rows such as a calendar. A date spine LEFT JOINed to the data makes reports show zero days instead of
+skipping them. Every recursion needs a stop condition, and real hierarchies deserve a depth limit.
+
+Next we return to the problem from GROUP BY, "summaries lose the detail rows", and solve it with window functions.
+
+Next: [Window functions and ranking](#/learn/sql/windows/ranking).
+
+</Section>

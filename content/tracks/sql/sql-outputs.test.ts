@@ -109,7 +109,31 @@ const claims: Record<string, (sets: SqlValue[][][]) => void> = {
     expect(count).toEqual([[0]]);
     expect(fixed!.map((r) => r[0])).toEqual(['Gus', 'Hana']);
   },
+  'scalar-subquery': ([rows]) => expect(rows).toEqual([['Headphones', 59, 20.21], ['Desk lamp', 32, 20.21]]),
+  'correlated-subquery': ([rows]) => expect(rows!.map((r) => [r[0], r[3]])).toEqual([['Headphones', 39], ['Desk lamp', 17.67], ['Pen set', 5.25]]),
+  'per-row-count': ([rows]) => expect(rows!.slice(-2)).toEqual([['Gus', 0], ['Hana', 0]]),
+  'count-to-five': ([rows]) => expect(rows).toEqual([[1], [2], [3], [4], [5]]),
+  'org-chart': ([rows]) => expect(rows!.map((r) => r[0])).toEqual(['Rosa', 'Sam', 'Uma', 'Xia', 'Vic', 'Tara', 'Wen']),
+  'chain-up': ([rows]) => expect(rows!.map((r) => r[0])).toEqual(['Xia', 'Uma', 'Sam', 'Rosa']),
+  'team-size': ([rows]) => expect(rows).toEqual([[3, 460]]),
+  'date-spine': ([rows]) => {
+    expect(rows!.length).toBe(28);
+    expect(rows!.filter((r) => r[1] !== 0).length).toBe(6);
+  },
+  'runaway-guard': ([rows]) => expect(rows).toEqual([[1000, 1000]]),
 };
+
+describe('CTE walk-through claims', () => {
+  it('above-average spenders: 13 lines, 5 customers, average 57.80, three above it', async () => {
+    const ex = ctes.find(([, e]) => e.id === 'above-average-spenders')![1];
+    const db = await openTestDb('shop');
+    const rows = (i?: number) => runScript(db, composeCte(ex, i)).statements[0]!.rows;
+    expect(rows(0).length).toBe(13);
+    expect(rows(1).length).toBe(5);
+    expect(rows(2)).toEqual([[57.8]]);
+    expect(rows()).toEqual([['Chen', 74, 57.8], ['Dana', 69.5, 57.8], ['Ben', 59, 57.8]]);
+  });
+});
 
 describe('claims in the lesson prose', () => {
   for (const [id, check] of Object.entries(claims))

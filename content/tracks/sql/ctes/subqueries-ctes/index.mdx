@@ -1,0 +1,178 @@
+import { aboveAverage, correlated, derivedTable, perRowCount, scalarSubquery } from './code';
+import { exercise, questions } from './quiz';
+
+<Section kind="intuition" title="Questions that need an answer to another question first">
+
+Some questions cannot be answered in one pass. "Which products cost more than the average product?" sounds
+simple, but WHERE tests one row at a time, and the average is a fact about all rows. You first need to answer a
+smaller question ("what is the average price?") and then use that answer in the bigger one.
+
+SQL lets you put a whole query inside another query for exactly this. The inner query is a
+<Term id="subquery">subquery</Term>: it answers the small question, and the outer query uses the answer as if it
+were a value, a list or a table. That is the first half of this lesson.
+
+The second half solves the problem subqueries create. Real questions need three or four of these small steps,
+and nesting them inside each other produces queries you must read from the inside out. A
+<Term id="cte">CTE</Term> (common table expression) gives each step a name and lists the steps top to bottom, in
+the order they happen. You can then check each step's rows on their own, which turns debugging a long query from
+guesswork into a routine.
+
+</Section>
+
+<Section kind="technical" title="Three kinds of subquery">
+
+A subquery is just a SELECT in brackets. What makes it useful is where you put it, because the place decides
+what shape of answer it must return.
+
+**1. A scalar subquery returns one value.** Used wherever a single value fits: in WHERE, in SELECT, in a
+calculation. `(SELECT AVG(price) FROM products)` is 141.50 / 7 = 20.21. The outer query then keeps products whose
+price is above 20.21: the Headphones and the Desk lamp.
+
+<SqlRunner example={scalarSubquery} title="above_average.sql" />
+
+The natural next question: what if the subquery returns several rows? PostgreSQL stops with an error, because a
+scalar subquery must be one value. SQLite quietly uses the first row, which is an arbitrary choice. Make the
+intent explicit with an aggregate (MAX, MIN, AVG).
+
+**2. A correlated subquery is recomputed for each outer row.** "Products that cost more than the average *of
+their own category*" needs a different average for each product. The subquery below mentions `p.category`, a
+column of the outer row, so it is <Term id="correlated-subquery">correlated</Term>: think of it as running once
+per product, with that product's category plugged in. Home's average is (32 + 9 + 12) / 3 = 17.67, so the Desk
+lamp qualifies; electronics' is 39, so the Headphones do; stationery's is (4 + 6.5) / 2 = 5.25, so the Pen set does.
+
+<SqlRunner example={correlated} title="above_category_average.sql" />
+
+"Once per outer row" describes the meaning, not necessarily the work. Optimizers often turn a correlated
+subquery into a join with a grouped result. The performance chapter shows how to check what really happens.
+
+**3. A subquery in FROM is a table.** You can build a table on the spot and query it. This is called a derived
+table, and it must have an alias (`AS lines`). Here it turns order lines into (category, line value) pairs, which
+the outer query then averages per category.
+
+<SqlRunner example={derivedTable} title="derived_table.sql" />
+
+The fan-out lesson used exactly this kind of subquery to aggregate each side to one row per order before joining.
+That was already a two-step query written as one, which is where CTEs come in.
+
+</Section>
+
+<Section kind="visual" title="A CTE, one step at a time">
+
+The question: "which customers spent more than the average customer on shipped orders?". It takes three steps,
+each built on the previous one, so it is written as three named steps with `WITH`. Select a step to see only the
+rows up to that point: the viewer runs the query cut off after that step, in SQLite, in your browser.
+
+<CteSteps example={aboveAverage} title="Above-average spenders" />
+
+Read the steps as a chain:
+
+1. **shipped_lines** keeps the order lines of shipped orders and the customer who placed them. 13 lines. The guest
+   order is excluded on purpose, because a customer with no id cannot be "a customer who spent more".
+2. **customer_spend** adds up each customer's lines. The grain changes from "one line" to "one customer": Ada
+   45.50, Ben 59, Chen 74, Dana 69.50, Eli 41.
+3. **average** turns those 5 rows into one: 289 / 5 = 57.80.
+4. **The final SELECT** compares each customer's spend with that one number and keeps Chen, Dana and Ben.
+
+Notice what the step viewer makes possible. If the final answer looked wrong, you would check each step's row
+count and grain in order, and the first step that disagrees with your expectation is where the bug is. With
+nested subqueries you cannot look inside.
+
+<Callout kind="simplification">
+  A CTE describes a step; it does not promise how the database runs it. PostgreSQL (12 and later) usually inlines
+  a CTE into the main query, as if you had written a subquery, and only computes it separately when it is used
+  twice or marked `MATERIALIZED`. SQLite makes the same choice and accepts the same hints. So CTEs are for
+  readability first; check the plan if speed matters.
+</Callout>
+
+</Section>
+
+<Section kind="code" title="Choosing between a subquery, a CTE and a join">
+
+The same question can often be written three ways. "How many orders does each customer have, including those
+with none?" can be a LEFT JOIN with GROUP BY and COUNT(o.id), or a correlated subquery in SELECT:
+
+<SqlRunner example={perRowCount} title="orders_per_customer.sql" />
+
+The correlated version cannot fan out (it only counts) and it naturally gives Gus and Hana 0. The join version is
+better when you need several values from the joined table at once. A rule of thumb that works well:
+
+| Situation | Reach for |
+| --- | --- |
+| One value used in a filter | scalar subquery |
+| "Is there a match?" | EXISTS / NOT EXISTS (semi- and anti-join) |
+| A per-row value from another table, one number | correlated subquery or LEFT JOIN of an aggregated subquery |
+| Several steps, or a step used twice | CTE |
+| Columns from both tables side by side | join |
+
+There is also a question of grain that the CTE above makes visible. AVG over `shipped_lines` would be the average
+order line (22.23), AVG over `customer_spend` is the average customer (57.80). Same function, different grain,
+different question. Naming the steps makes it much harder to average the wrong thing.
+
+</Section>
+
+<Section kind="mistakes" title="Subquery and CTE pitfalls">
+
+<CommonMistake
+  title="A 'scalar' subquery that returns many rows"
+  wrong={"WHERE price > (SELECT price FROM products WHERE category = 'home')"}
+  error="ERROR: more than one row returned by a subquery used as an expression  (PostgreSQL; SQLite uses the first row)"
+  cause="Three home products, three prices; the outer comparison needs one value."
+  fix="Say which one: (SELECT MAX(price) ...) or (SELECT AVG(price) ...)."
+/>
+
+<CommonMistake
+  title="A derived table without an alias"
+  wrong={'SELECT category, AVG(v) FROM (SELECT ...) GROUP BY category;'}
+  error='ERROR: subquery in FROM must have an alias  (PostgreSQL before 16; SQLite and PostgreSQL 16+ accept it)'
+  cause="Older databases require every table in FROM to have a name."
+  fix="Always name it: FROM (SELECT ...) AS lines. It also makes the query easier to read."
+/>
+
+<CommonMistake
+  title="Averaging at the wrong step"
+  wrong={'average AS (SELECT AVG(amount) FROM shipped_lines)'}
+  error="(no error) the 'average customer' is 22.23, so every customer looks above average"
+  cause="The average was taken over order lines, not over customers."
+  fix="Aggregate to the grain the question is about first (customer_spend), then average that."
+/>
+
+</Section>
+
+<Section kind="practice" title="Habits for multi-step queries">
+
+- **Write the steps in words first** ("lines, then per customer, then the average, then compare").
+- **One CTE per step**, named for what a row is (`customer_spend`, not `t2`).
+- **Check each step's row count and grain** before writing the next one.
+- **Keep scalar subqueries truly scalar** with an aggregate, even in SQLite.
+- **Prefer EXISTS for yes/no questions**, CTEs for pipelines, joins for side-by-side columns.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<SqlExercise exercise={exercise}>
+  The starter's CTE finds the highest price in each category. Finish the query so it returns the `category`,
+  `name` and `price` of the most expensive product in each category, ordered by category.
+</SqlExercise>
+
+</Section>
+
+<Section kind="summary">
+
+A subquery answers a smaller question inside a bigger one: a scalar subquery gives one value, a correlated one
+gives a value per outer row, and a subquery in FROM gives a table. When a question needs several such steps, a
+CTE names them and lists them in the order they happen, so each step reads the previous one like a table and can
+be checked on its own. Each step has a grain, and many wrong numbers come from aggregating at the wrong one. CTEs
+are mainly a readability tool; whether a step is computed once is the optimizer's choice.
+
+One special kind of CTE can read its own output, which lets SQL walk hierarchies and generate rows from nothing.
+
+Next: [Recursive CTEs: hierarchies and date spines](#/learn/sql/ctes/recursive-ctes).
+
+</Section>

@@ -131,3 +131,22 @@
 .rows tr[data-padded] td {
   background: var(--accent-soft);
 }
+.iterList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.iter {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr;
+  gap: var(--s-2);
+  align-items: center;
+}
+.iterRows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}

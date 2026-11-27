@@ -716,8 +716,8 @@ export const tracks: Track[] = [
         title: 'Subqueries and CTEs',
         level: 'intermediate',
         lessons: [
-          { id: 'sql/ctes/subqueries-ctes', status: 'outline' },
-          { id: 'sql/ctes/recursive-ctes', status: 'outline' },
+          { id: 'sql/ctes/subqueries-ctes', status: 'written' },
+          { id: 'sql/ctes/recursive-ctes', status: 'written' },
         ],
       },
       {

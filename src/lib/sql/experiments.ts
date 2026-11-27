@@ -2,6 +2,7 @@
 import type { ExperimentDef } from '../types';
 import { fanout, fanoutSql, type FanoutResult, type FanoutState } from './fanout';
 import { joinTables, type FilterPlace, type JoinKind, type JoinResult } from './joins';
+import { EMPLOYEES, recurse, type Direction, type RecursionResult } from './recursion';
 import { NULL_CONDITIONS, nullFilter, type NullFilterResult } from './nulls';
 import { groupedPipeline, groupedSql, plainPipeline, plainSql, type PipelineState, type Stage } from './pipeline';
 
@@ -119,6 +120,32 @@ export function fanoutExperiment(id: string): ExperimentDef<FanoutState, FanoutR
       { label: 'Rows after the joins', value: String(r.pairs.length) },
       { label: 'items_total reported (true)', value: `${r.reportedItems} (${r.trueItems})`, status: r.reportedItems === r.trueItems ? 'ok' : 'error' },
       { label: 'paid reported (true)', value: `${r.reportedPaid} (${r.truePaid})`, status: r.reportedPaid === r.truePaid ? 'ok' : 'error' },
+    ],
+  };
+}
+
+export function recursionExperiment(id: string): ExperimentDef<{ start: string; dir: Direction }, RecursionResult> {
+  return {
+    id,
+    initial: { start: 'Rosa', dir: 'down' },
+    controls: [
+      { kind: 'select', id: 'start', label: 'Anchor (start from)', options: EMPLOYEES.map((e) => ({ value: e.name, label: e.name })), get: (s) => s.start, set: (s, v) => ({ ...s, start: v }) },
+      {
+        kind: 'select',
+        id: 'dir',
+        label: 'Step',
+        options: [
+          { value: 'down', label: 'down: people who report to the last rows' },
+          { value: 'up', label: 'up: the manager of the last rows' },
+        ],
+        get: (s) => s.dir,
+        set: (s, v) => ({ ...s, dir: v as Direction }),
+      },
+    ],
+    compute: (s) => recurse(s.start, s.dir),
+    readout: (_s, r) => [
+      { label: 'Iterations (including the empty last one)', value: String(r.iterations.length) },
+      { label: 'Rows in the result', value: String(r.total) },
     ],
   };
 }

@@ -13,5 +13,10 @@ export default {
     'Guarantee a recursive query stops',
   ],
   prerequisites: ['sql/ctes/subqueries-ctes'],
-  concepts: [],
+  concepts: ['recursive-cte', 'date-spine', 'self-join', 'cte'],
+  references: [
+    { title: 'SQLite: Recursive common table expressions', url: 'https://www.sqlite.org/lang_with.html#recursive_common_table_expressions', version: '3.54' },
+    { title: 'SQLite: Date and time functions', url: 'https://www.sqlite.org/lang_datefunc.html', version: '3.54' },
+    { title: 'PostgreSQL: Recursive queries (SEARCH and CYCLE)', url: 'https://www.postgresql.org/docs/current/queries-with.html#QUERIES-WITH-RECURSIVE', version: '18' },
+  ],
 } satisfies LessonMeta;

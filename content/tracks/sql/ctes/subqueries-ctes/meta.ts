@@ -13,5 +13,10 @@ export default {
     'Debug a multi-step query by checking the row count and grain of every step',
   ],
   prerequisites: ['sql/joins/fanout-semi-anti'],
-  concepts: [],
+  concepts: ['subquery', 'correlated-subquery', 'cte', 'table-grain'],
+  references: [
+    { title: 'SQLite: The WITH clause', url: 'https://www.sqlite.org/lang_with.html', version: '3.54' },
+    { title: 'PostgreSQL: WITH queries (MATERIALIZED, NOT MATERIALIZED)', url: 'https://www.postgresql.org/docs/current/queries-with.html', version: '18' },
+    { title: 'PostgreSQL: Subquery expressions', url: 'https://www.postgresql.org/docs/current/functions-subquery.html', version: '18' },
+  ],
 } satisfies LessonMeta;

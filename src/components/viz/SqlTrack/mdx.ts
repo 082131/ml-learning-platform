@@ -3,6 +3,7 @@ import { FanOut } from './FanOut';
 import { JoinLab } from './JoinLab';
 import { NullFilter } from './NullFilter';
 import { QueryPipeline } from './QueryPipeline';
+import { RecursionTrace } from './RecursionTrace';
 import { SqlExercise } from './SqlExercise';
 import { SqlRunner } from './SqlRunner';
 
@@ -15,4 +16,5 @@ export default {
   NullFilter,
   JoinLab,
   FanOut,
+  RecursionTrace,
 };
