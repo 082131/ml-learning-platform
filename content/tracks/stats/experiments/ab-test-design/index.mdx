@@ -1,0 +1,207 @@
+import { assignRunner, design, sizeCode, tableRunner } from './code';
+import { questions, sizeExercise } from './quiz';
+
+<Section kind="intuition" title="The only fair comparison">
+
+Your team redesigned the checkout page. Conversions went up 6% the week it launched. Did the redesign do that? Maybe.
+Or maybe it was payday, or a competitor's outage, or a marketing email that went out the same week. Before-and-after
+comparisons cannot separate the change you made from everything else that changed at the same time.
+
+An <Term id="ab-test">A/B test</Term> fixes this by running both versions **at the same time**, and letting a coin
+flip decide which version each user sees. Group A gets the old page, group B the new one. Payday, outages and
+emails hit both groups equally, because the coin does not know about them. So if B converts better than A by more
+than chance can explain, the only thing left to explain it is the page. That is why randomized experiments are the
+gold standard for "did X cause Y": randomization turns a difference into a cause.
+
+Most of the statistics for analysing such a test you already have: a difference of two proportions, its standard
+error, a test and an interval. This lesson is about everything that has to be decided **before** the test starts,
+because most A/B tests that go wrong were broken at the design stage, not in the analysis.
+
+</Section>
+
+<Section kind="technical" title="Five decisions, made before any data">
+
+Here is the flow: **hypothesis → metric → randomization unit → sample size → duration**, all written down before
+launch. Each step depends on the one before.
+
+### 1. The hypothesis and the primary metric
+
+Start with one sentence: "The new checkout increases the share of visitors who complete an order." That sentence
+names the **primary metric**, the single number the decision rests on: orders per visitor. Choosing one in advance
+matters because, as the probability lesson showed, if you look at 20 metrics each with a 5% false alarm rate, at
+least one will "win" by chance about 64% of the time.
+
+Alongside it, choose a few <Term id="guardrail-metric">guardrail metrics</Term>: things that must not get worse,
+such as page load time, refund rate or revenue per visitor. A change that raises orders while doubling refunds is
+not a win, and the guardrails are how you notice.
+
+### 2. The randomization unit
+
+The <Term id="randomization-unit">randomization unit</Term> is what the coin is flipped for: a user, a session, a
+page view, a device. Usually it should be the **user**, for two reasons:
+
+- **Consistent experience.** A user flipped per page view would see the old checkout on one click and the new one on
+  the next, which is neither version.
+- **Independence.** The statistics assume independent units. Page views from one person are not independent (they
+  share that person's habits), so treating each view as a unit makes the standard error too small and results look
+  more certain than they are.
+
+The rule: randomize by the unit you will analyse by, and make sure units do not influence each other.
+
+### 3. The minimum detectable effect
+
+Before you can size the test, you must say how big an effect you want to be able to see. The
+<Term id="minimum-detectable-effect">minimum detectable effect</Term> (MDE) is the smallest lift that would change
+your decision. If a +2% lift would not justify the engineering cost of the new page, there is no point paying for a
+test sensitive enough to detect +2%.
+
+The MDE is a business choice, and it is the input that drives the cost of the test more than any other.
+
+### 4. The sample size
+
+Now the power lesson's formula, adapted to conversion rates. With baseline rate $p_1$ and the rate we want to detect
+$p_2 = p_1(1 + \text{MDE})$, the standard error of the difference between two groups of $n$ is
+
+$$
+\mathrm{SE}(\hat p_B - \hat p_A) = \sqrt{\frac{p_1(1-p_1) + p_2(1-p_2)}{n}}
+$$
+
+Each $p(1-p)/n$ is the variance of one group's conversion rate (a Bernoulli mean, from the distributions chapter), and
+the variances of the two independent groups add. We need the true difference to be $z_{1-\alpha/2} + z_{\text{power}}$
+standard errors (1.96 + 0.84 = 2.80 for the usual choices), and solving for $n$ gives
+
+$$
+n \text{ per group} = \frac{(z_{1-\alpha/2} + z_{\text{power}})^2 \,\big(p_1(1-p_1) + p_2(1-p_2)\big)}{(p_2 - p_1)^2}
+$$
+
+For a 5% baseline and a +10% relative MDE ($p_2 = 5.5\%$):
+$2.80^2 \times (0.0475 + 0.051975) / 0.005^2 \approx 31{,}231$ visitors per group. Two things drive it:
+
+- **The MDE, squared, in the denominator.** Half the lift, about four times the visitors.
+- **The baseline.** Rare actions are expensive to test: at a 1% baseline the same +10% lift needs 163,092 per group.
+
+### 5. The duration
+
+Divide the total, $2n$, by daily traffic. At 4,000 visitors a day, 62,462 visitors take 16 days. Then round **up to
+whole weeks**: weekday and weekend users often behave differently, and a test that covers Monday to Thursday only
+measures weekday users. Decide the end date now, and do not stop early because the numbers look good. The next
+lesson shows exactly how much damage early stopping does.
+
+### Assigning users
+
+In practice the coin flip is a hash: `hash(experiment name + user id)`, even or odd. A good hash behaves like a fair
+coin but is reproducible, so a returning user always sees the same version, and no assignment table needs to be
+stored. Including the experiment name (a "salt") gives each experiment an independent split, so the same users are
+not always in group B.
+
+</Section>
+
+<Section kind="visual" title="Try it: the price of a small lift">
+
+The curve shows visitors per group against the smallest relative lift you want to detect, for the baseline, α and
+power chosen. The red dot is your current choice.
+
+<Experiment def={design} title="Sample size planner">
+  <SampleSizeView />
+  <Readout title="Plan" />
+</Experiment>
+
+Things to try:
+
+- **Baseline 5%, MDE 10%**: 31,231 per group, 16 days at 4,000 visitors a day. **MDE 5%**: about 122,000 per group,
+  62 days. Halving the lift roughly quadrupled the test.
+- **Baseline 1%, MDE 10%**: 163,092 per group. Rare events need far more traffic. A common fix is a metric that
+  happens more often and is closer to the change, such as "clicked the new button".
+- **Power 90%**: about a third more visitors than at 80%. Power is cheap at first and expensive at the end.
+
+</Section>
+
+<Section kind="code" title="Sizing and assignment in code">
+
+The planner's calculation:
+
+<Experiment def={design} title="sample_size.py, linked to the planner" controls={false}>
+  <Code example={sizeCode} title="sample_size.py" />
+  <Readout title="Plan" />
+</Experiment>
+
+A table of sample sizes. Read across a row to see the cost of detecting smaller lifts, and down a column to see the
+cost of rarer actions.
+
+<PythonRunner example={tableRunner} title="size_table.py" />
+
+Deterministic assignment with a salted hash. The same user always lands in the same group; a different experiment
+splits users independently; and over 100,000 users the split is almost exactly even.
+
+<PythonRunner example={assignRunner} title="assign.py" />
+
+</Section>
+
+<Section kind="mistakes" title="Tests that were broken before they started">
+
+<CommonMistake
+  title="Comparing opt-in users with everyone else"
+  wrong={'lift = engagement[users.opted_in].mean() / engagement[~users.opted_in].mean() - 1'}
+  error="(no error) a large 'lift' that is mostly the difference between keen and casual users"
+  cause="Users chose their group, so the groups differed before the treatment. No amount of data fixes self-selection."
+  fix="Randomize who gets the feature. If you cannot, say clearly that the comparison is not causal."
+/>
+
+<CommonMistake
+  title="No sample size, no end date"
+  wrong={'# run it and stop when it is significant'}
+  error="(no error) false positive rates of 20 to 30% instead of 5% (next lesson)"
+  cause="The test's error rates assume one look at a sample size fixed in advance."
+  fix="Compute n from the MDE, α and power, convert it to whole weeks, and analyse once at the end (or use a sequential method designed for repeated looks)."
+/>
+
+<CommonMistake
+  title="Randomizing by request, analysing by user"
+  wrong={'group = "B" if random.random() < 0.5 else "A"   # per request'}
+  error="(no error) users see both versions, and the SE is computed as if requests were independent"
+  cause="The unit of randomization does not match the experience or the analysis."
+  fix="Hash the user id (salted with the experiment name) so each user gets one version, and analyse per user."
+/>
+
+</Section>
+
+<Section kind="practice" title="Where you will use this">
+
+- **Product and growth teams** run every change this way: write the hypothesis, metric, guardrails, MDE and duration
+  in a short pre-registration document before launch.
+- **ML model launches**: an online A/B test of a new ranking or recommendation model is the final check after offline
+  evaluation, because offline metrics do not always move business metrics. The randomization unit is usually the
+  user; for marketplaces, sometimes a whole region.
+- **Feature flags** use exactly the salted-hash assignment above to roll features out to a percentage of users.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={sizeExercise}>
+  Write the sample size formula for an A/B test and turn the answer into a duration.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+A before-and-after comparison cannot separate a change from everything else that happened at the same time; running
+both versions at once and letting a coin decide who sees which makes the change the only systematic difference, so a
+difference becomes a cause. The design then flows in order: a hypothesis names one primary metric and a few
+guardrails; the randomization unit (usually the user) keeps the experience consistent and the units independent; the
+minimum detectable effect says what is worth finding; the power formula turns MDE, baseline, α and power into
+visitors per group, where small lifts and rare actions are expensive; and traffic turns visitors into whole weeks. A
+salted hash flips the coin reproducibly.
+
+With the test designed and run, the data arrive. Next we analyse them, and look closely at the most common way a
+well-designed test is ruined at the last minute:
+[Analysing an A/B test: lift, intervals and the peeking trap](#/learn/stats/experiments/ab-test-analysis).
+
+</Section>
