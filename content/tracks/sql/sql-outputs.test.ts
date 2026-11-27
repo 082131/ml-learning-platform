@@ -151,6 +151,13 @@ const claims: Record<string, (sets: SqlValue[][][]) => void> = {
     expect(counts).toEqual([[74, 73]]);
   },
   'latest-version': ([rows]) => expect(rows!.map((r) => [r[0], r[3]])).toEqual([[1, 'pro'], [2, 'free'], [3, 'pro']]),
+  'naive-training-table': ([rows]) => {
+    expect(rows![2]).toEqual(['Chen', 2, 106, '2026-03-02', 1]);
+  },
+  'time-split': ([rows]) => expect(rows!.map((r) => [r[0], r[2], r[3]])).toEqual([['2026-01-15', 'train', 2], ['2026-02-01', 'drop: label not known on 2026-03-01', 3], ['2026-02-15', 'drop: label not known on 2026-03-01', 5], ['2026-03-01', 'test', 6]]),
+  'per-order-features': ([rows]) => {
+    expect(rows!.filter((r) => r[0] === 1).map((r) => [r[4], r[5], r[6]])).toEqual([[0, null, 1], [1, 14.5, 2], [2, 32.5, 3]]);
+  },
   'days-to-next': ([rows]) => {
     expect(rows!.filter((r) => r[0] === 1).map((r) => r[4])).toEqual([22, 25, null]);
     expect(rows!.length).toBe(11);
@@ -158,6 +165,16 @@ const claims: Record<string, (sets: SqlValue[][][]) => void> = {
 };
 
 describe('CTE walk-through claims', () => {
+  it('training table: 4 cutoffs, 16 spine rows, Ada 1, 2, 2, 3 orders with labels 1, 1, 1, 0', async () => {
+    const ex = ctes.find(([, e]) => e.id === 'training-table')![1];
+    const db = await openTestDb('shop');
+    const rows = (i?: number) => runScript(db, composeCte(ex, i)).statements[0]!.rows;
+    expect(rows(0).length).toBe(4);
+    expect([1, 2, 3].map((i) => rows(i).length)).toEqual([16, 16, 16]);
+    const final = rows();
+    expect(final.length).toBe(16);
+    expect(final.filter((r) => r[1] === 1).map((r) => [r[2], r[5]])).toEqual([[1, 1], [2, 1], [2, 1], [3, 0]]);
+  });
   it('sessionize: 22 session starts, 22 sessions, Ada 6 of them', async () => {
     const ex = ctes.find(([, e]) => e.id === 'sessionize')![1];
     const db = await openTestDb('shop');

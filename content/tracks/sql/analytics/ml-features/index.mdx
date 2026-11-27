@@ -1,0 +1,196 @@
+import { naiveTable, perOrderFeatures, timeSplit, trainingLab, trainingTable } from './code';
+import { exercise, questions } from './quiz';
+
+<Section kind="intuition" title="A training table is a set of pretend predictions">
+
+Suppose the shop wants a model that predicts, for each customer, "will they order in the next 30 days?". The
+model will be used like this: on some day, we take what we know about each customer up to that day, and the model
+outputs a probability. That sentence contains the whole difficulty of building training data: *what we know up
+to that day*. When the model runs for real, the future has not happened. When we build training data, the future
+is sitting right there in the same table, and one missing date filter lets it in.
+
+So a good training table is a collection of pretend predictions. Each row says: "it is the morning of this
+cutoff date; here is everything that was known about this customer at that moment (the features); and here is
+what actually happened afterwards (the label)". Building it means doing three things the earlier lessons already
+taught you, in a specific combination. A cross join builds one row per customer and cutoff. A LEFT JOIN with the
+date condition in ON collects the past without losing customers who have none. And the label looks at a window
+after the cutoff that must have fully ended, the same idea as the incomplete months in the cohort table.
+
+When the past and the future get mixed, the result is called <Term id="data-leakage">leakage</Term>, and it is
+the most expensive bug in applied machine learning, because everything looks wonderful until the model meets
+real data. This lesson is about building tables where it cannot happen, which is what
+<Term id="point-in-time-correctness">point-in-time correctness</Term> means.
+
+</Section>
+
+<Section kind="technical" title="Spine, features, label">
+
+**Start with the obvious table, and look at why it is wrong.** The first instinct is one row per customer, with
+features from the whole `orders` table and a label such as "ordered in February". Run it and read Chen's row:
+his last order is on 2 March, *after* the February label period. His `total_orders` counts the February order
+that the label is about. The features are not describing what we knew before February; they are describing
+February itself, and the model would learn to read the answer off them.
+
+<SqlRunner example={naiveTable} title="naive_training_table.sql" />
+
+**The fix is to make time an explicit part of every row.** Three pieces, always in this order:
+
+1. **The spine: which predictions are we pretending to make?** One row per (customer, cutoff). Only customers who
+   had signed up before the cutoff belong in it; a model cannot be asked about a customer who does not exist yet.
+   The spine fixes the table's grain before any feature exists, which is the "decide the grain first" habit from
+   the GROUP BY lesson.
+2. **Features: only what was known before the cutoff.** `o.order_date < s.cutoff`, strictly. That condition goes
+   in the LEFT JOIN's ON clause. In WHERE it would remove every customer with no past orders (their NULL-padded
+   order_date fails the test), and the training table would quietly forget that new customers exist.
+3. **The label: what happened in a fixed window after the cutoff.** Here, any order in the 30 days from the
+   cutoff (on or after the cutoff, before cutoff + 30 days). The boundaries matter: the feature window ends where
+   the label window begins, so an order on the cutoff date counts as label, never as both. A label window is
+   only final once it has ended, so every row carries `label_known_on`. This is the
+   <Term id="label-window">label window</Term>.
+
+Because time is a column, you can stack many cutoffs into one table. Each customer then appears several times,
+once per cutoff, and each copy only sees its own past. Four cutoffs give 16 rows.
+
+<CteSteps example={trainingTable} title="A point-in-time training table" />
+
+Read Ada's four rows top to bottom: her order count grows from 1 to 2 to 2 to 3 as the cutoff moves forward, and
+her label flips to 0 at the last cutoff because she did not order in March. The same person, described honestly
+at four moments.
+
+</Section>
+
+<Section kind="visual" title="Try it: see the future leak in">
+
+The explorer builds the table at one cutoff. Start with the leaky version (no date filter on the features) and
+look for values that could not have been known on the cutoff date.
+
+<Experiment def={trainingLab} title="Training table explorer">
+  <TrainingLab />
+  <Readout title="This table" />
+</Experiment>
+
+Things to try:
+
+- **Cutoff 2026-02-01, all orders.** All three customers have a *negative* days_since_last (Ada −21, Ben −10, Chen
+  −29): their "last order" is in the future. Every feature value of Chen, who had no orders yet, is invented.
+  And the readout shows that every row's features contain the very order its label is about.
+- **Switch to orders before the cutoff only.** Chen drops to 0 orders and NULL days, which is the truth on
+  1 February. Every leaked cell disappears, and the labels do not change at all: leakage lives in the features,
+  not in the label.
+- **Cutoff 2026-03-01, all orders.** The leaked cells are exactly the customers with label 1 (Chen, Dana and Fay,
+  the only March buyers). Leaky features do not add random noise; they add the answer, which is why leaky models
+  look brilliant in evaluation.
+
+</Section>
+
+<Section kind="code" title="Splitting by time, and features per event">
+
+**Split by time, not at random.** With a stacked table, a random train/test split puts Ada-at-15-February in
+training and Ada-at-1-February in the test set. The test row is then evaluated by a model that saw her later
+behaviour, so the score is too good. The split must mirror real use: the model is trained on the past and tested
+on a later cutoff it has never seen. That is a <Term id="temporal-split">time-based split</Term>.
+
+There is a second, subtler rule. If we pretend to train on 1 March, we may only use training rows whose labels
+were *known* on 1 March. The 15 February cutoff's label window runs until 17 March, so on 1 March those labels did
+not exist yet; using them would leak the first half of March, which is the test period. The query labels each
+cutoff accordingly:
+
+<SqlRunner example={timeSplit} title="time_split.sql" />
+
+Only the 15 January rows survive as training data here, because our history is short and the label windows are
+long compared with the gaps between cutoffs. With a year of history, the rows you lose to this gap are a small
+fraction, and keeping them out is what makes the test score believable.
+
+**Features as of each event.** Sometimes the prediction is made at each event rather than at a calendar cutoff:
+"at the moment of this order, how valuable is this customer?". A window frame expresses "everything before this
+row" directly. `ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING` stops one row short of the current one, so
+the features of an order never include the order itself. The `WINDOW before_me AS (...)` clause just names a
+window so two columns can share it.
+
+<SqlRunner example={perOrderFeatures} title="per_order_features.sql" />
+
+The last column shows the easy mistake: with the default frame (which ends at CURRENT ROW), Ada's first order
+already counts 1 previous order, itself. A feature that includes the event it is supposed to predict is leakage
+in its smallest form. Notice too that each customer's first order has `previous_spend` NULL, not 0: SUM over an
+empty frame is NULL, and whether to turn it into 0 is a modelling decision ("no history" can be its own signal).
+
+</Section>
+
+<Section kind="mistakes" title="Leakage and split mistakes">
+
+<CommonMistake
+  title="Features from the whole table"
+  wrong={'LEFT JOIN order_totals o ON o.customer_id = s.customer_id   -- no date condition'}
+  error="(no error) days_since_last is negative and the model scores near 100 percent offline"
+  cause="Orders after the cutoff, including the ones the label is about, feed the features."
+  fix="AND o.order_date < s.cutoff in the ON clause, so each row only sees its own past."
+/>
+
+<CommonMistake
+  title="The cutoff filter in WHERE"
+  wrong={'LEFT JOIN order_totals o ON o.customer_id = s.customer_id\nWHERE o.order_date < s.cutoff'}
+  error="(no error) customers with no past orders vanish from the training table"
+  cause="Their NULL-padded order_date makes the WHERE test UNKNOWN, so the row is dropped."
+  fix="Put conditions on the joined table in ON; keep WHERE for conditions on the spine."
+/>
+
+<CommonMistake
+  title="Training on labels that were not known yet"
+  wrong={"WHERE cutoff < '2026-03-01'   -- train set for a model trained on 1 March"}
+  error="(no error) the test score is higher than anything you will see in production"
+  cause="Cutoffs close to the training date have label windows that end after it."
+  fix="Keep training rows with date(cutoff, '+30 days') <= training date, and test on later cutoffs."
+/>
+
+<CommonMistake
+  title="A frame that includes the current event"
+  wrong={'COUNT(*) OVER (PARTITION BY customer_id ORDER BY order_date) AS previous_orders'}
+  error="(no error) every 'previous' count is one too high"
+  cause="The default frame ends at CURRENT ROW."
+  fix="ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING."
+/>
+
+</Section>
+
+<Section kind="practice" title="Habits for training data">
+
+- **Build the spine first**: one row per entity and prediction time, only for entities that existed.
+- **Every feature join has a time condition in ON**, strictly before the cutoff.
+- **Write the label window down** (start, end, what counts) and store when each label became known.
+- **Split by time**, with a gap so no training label overlaps the test period.
+- **Sanity-check for impossible values**: negative ages, recency below zero, features that predict "too well".
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<SqlExercise exercise={exercise}>
+  Build the training rows for the cutoff 2026-03-01: `customer_id`, `spend_30d` (their order totals in the 30
+  days before the cutoff, 0 if none) and `label` (1 if they ordered in the 30 days from the cutoff), one row per
+  customer who had signed up. The starter leaks. Compare its spend with its labels to see how.
+</SqlExercise>
+
+</Section>
+
+<Section kind="summary">
+
+A training table is a set of pretend predictions, so time must be part of every row. The spine fixes the grain
+(one row per entity and cutoff, for entities that existed), features come from a LEFT JOIN whose ON clause keeps
+only rows strictly before the cutoff, and the label comes from a fixed window after it, which is only usable once
+that window has ended. Leaky features do not add noise, they add the answer, which is why they show up as
+impossible values and suspiciously good scores. Evaluation must also respect time: train on earlier cutoffs whose
+labels were known, test on a later one, and use frames that end one row before the current event for per-event
+features.
+
+The next chapter turns from correctness to speed: what the database actually does with a query, and how indexes
+change it.
+
+Next: [Indexes and query plans](#/learn/sql/performance/indexes-plans).
+
+</Section>

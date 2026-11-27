@@ -1,6 +1,7 @@
 // Experiment definitions for the SQL track's visualizations. Logic lives in the pure modules they call.
 import type { ExperimentDef } from '../types';
 import { fanout, fanoutSql, type FanoutResult, type FanoutState } from './fanout';
+import { CUTOFFS, trainingRows, trainingSql, type TrainingRow, type TrainingSpec } from './mlfeatures';
 import { sessionize, sessionsSql, type SessionResult } from './sessions';
 import { USER_NAMES, funnel, funnelSql, WINDOW_LABEL, type FunnelResult, type FunnelSpec, type FunnelWindow } from './funnel';
 import { joinTables, type FilterPlace, type JoinKind, type JoinResult } from './joins';
@@ -291,5 +292,43 @@ export function sessionExperiment(id: string): ExperimentDef<SessionLabState, Se
       { label: 'Sessions with a purchase', value: `${r.purchaseSessions} (${r.conversion}%)` },
       { label: 'Abandoned carts (cart, no purchase)', value: String(r.abandonedCarts) },
     ],
+  };
+}
+
+export interface TrainingLabResult {
+  rows: TrainingRow[];
+  sql: string;
+}
+
+/** A training table at one cutoff, with point-in-time or leaky features. */
+export function trainingExperiment(id: string): ExperimentDef<TrainingSpec, TrainingLabResult> {
+  return {
+    id,
+    initial: { cutoff: '2026-02-01', features: 'leaky' },
+    controls: [
+      { kind: 'select', id: 'cutoff', label: 'Cutoff (predict from this date)', options: CUTOFFS.map((c) => ({ value: c, label: c })), get: (s) => s.cutoff, set: (s, v) => ({ ...s, cutoff: v as TrainingSpec['cutoff'] }) },
+      {
+        kind: 'select',
+        id: 'features',
+        label: 'Features use',
+        options: [
+          { value: 'leaky', label: 'all orders (no date filter)' },
+          { value: 'point-in-time', label: 'orders before the cutoff only' },
+        ],
+        get: (s) => s.features,
+        set: (s, v) => ({ ...s, features: v as TrainingSpec['features'] }),
+      },
+    ],
+    compute: (s) => ({ rows: trainingRows(s), sql: trainingSql(s) }),
+    readout: (_s, r) => {
+      const leaked = r.rows.reduce((a, x) => a + Number(x.leaked.orders) + Number(x.leaked.spend) + Number(x.leaked.days), 0);
+      const inside = r.rows.filter((x) => x.labelInFeatures).length;
+      return [
+        { label: 'Training rows (customers who existed)', value: String(r.rows.length) },
+        { label: 'Positive labels', value: `${r.rows.filter((x) => x.label === 1).length} of ${r.rows.length}` },
+        { label: 'Feature values that used the future', value: String(leaked), status: leaked ? 'error' : 'ok' },
+        { label: 'Rows whose features contain the labelled order', value: String(inside), status: inside ? 'error' : 'ok' },
+      ];
+    },
   };
 }

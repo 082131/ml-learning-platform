@@ -43,4 +43,18 @@ export default [
     introducedIn: 'sql/analytics/sessions-dedup',
     aliases: ['dedup', 'latest record per key'],
   },
+  {
+    id: 'label-window',
+    term: 'Label window',
+    short: 'The period after a cutoff that a label describes, such as "orders in the 30 days from the cutoff". The label is only final once the window has ended, so rows whose window is still open cannot be used for training yet.',
+    introducedIn: 'sql/analytics/ml-features',
+    aliases: ['prediction horizon', 'label maturity'],
+  },
+  {
+    id: 'temporal-split',
+    term: 'Time-based split',
+    short: 'Splitting training and test data by time (train on earlier cutoffs, test on a later one) instead of at random, so evaluation looks like real use: predicting a future the model has not seen.',
+    introducedIn: 'sql/analytics/ml-features',
+    aliases: ['temporal split', 'out-of-time validation'],
+  },
 ] satisfies GlossaryTerm[];
