@@ -1,0 +1,207 @@
+import { fitDemo, gpu, linkedCode, quotaCode } from './code';
+import { fitExercise, questions } from './quiz';
+
+<Section kind="intuition" title="The question is not 'how fast?' but 'does it fit?'">
+
+When people pick a GPU, they usually ask which one is fastest. For most ML jobs that is the second question. The
+first is simpler and stricter: **does the job fit in the GPU's memory?** A GPU can only work on what is in its own
+memory. If the model and everything that goes with it do not fit, the job does not run slowly; it crashes with
+`CUDA out of memory`.
+
+So choosing a GPU instance is like choosing a moving van: first you measure how much you have to carry, then you
+rule out every van that is too small, and only then do you compare the prices of the vans that are left. This
+lesson gives you the measuring rule, the names of the vans on AWS and Google Cloud, and the surprisingly important
+detail of whether you are even allowed to rent one.
+
+</Section>
+
+<Section kind="technical" title="Measure, rule out, then compare">
+
+**The big picture.** Model size (billions of parameters) × bytes per parameter for the job → GB of GPU memory needed
+→ rule out instances with less → among the rest compare price per hour, and then price per *job* → check that your
+account has quota for it.
+
+### Step 1: memory needed
+
+The rule of thumb is one multiplication. A parameter is one number in the model; a billion parameters stored at one
+byte each take one GB. So
+
+$$
+\text{GB needed} \approx \text{billions of parameters} \times \text{bytes per parameter} \times \text{headroom}.
+$$
+
+The bytes per parameter depend on the **job**, not the model, and this is the part people get wrong:
+
+| Job | Bytes per parameter | Why |
+| --- | --- | --- |
+| Serve in 16-bit | 2 | each weight is a 16-bit number |
+| Serve 4-bit quantized | 0.5 | each weight packed into 4 bits ([Deploy track](#/learn/deploy/quantization/llm-quantization)) |
+| <Term id="fine-tuning">Fine-tune</Term> with LoRA (16-bit frozen base) | 2 | the base model is frozen; only small adapter matrices train |
+| Fine-tune with QLoRA (4-bit frozen base) | 0.5 | as LoRA, with the frozen base quantized |
+| Full fine-tune, mixed precision with Adam | 16 | weights 2 + gradients 2 + fp32 master copy 4 + Adam's two averages 4 + 4 |
+
+The headroom (we use 1.2, i.e. 20% extra) covers what lives beside the weights: activations, the KV cache when
+serving, the CUDA context and fragmentation. The [Inference track's memory lesson](#/learn/inference/memory/memory-estimation)
+breaks that down properly; here a rough figure is enough to rule instances out.
+
+Work it through for an 8B model: serving in 16-bit needs 8 × 2 × 1.2 = **19.2 GB**; full fine-tuning needs
+8 × 16 × 1.2 = **153.6 GB**. Same model, eight times the memory, because training keeps gradients and optimizer
+state for every parameter. That single table explains why LoRA and QLoRA are so popular: they make fine-tuning fit
+on the hardware used for serving.
+
+### Step 2: reading instance names
+
+Cloud GPU instances bundle a number of GPUs with CPUs, RAM and network. The names encode what you get:
+
+| Instance | GPUs | GPU memory | Typical use |
+| --- | --- | --- | --- |
+| AWS `g4dn.xlarge` | 1 × T4 | 16 GB | small models, cheap inference |
+| AWS `g6.xlarge` / Google `g2-standard-4` | 1 × L4 | 24 GB | 7B-8B inference, LoRA on small models |
+| AWS `g5.xlarge` | 1 × A10G | 24 GB | inference and light fine-tuning |
+| AWS `g6e.xlarge` | 1 × L40S | 48 GB | larger inference, LoRA on 8B-13B |
+| AWS `p4d.24xlarge` | 8 × A100 40 GB | 320 GB | multi-GPU training |
+| Google `a2-ultragpu-1g` | 1 × A100 80 GB | 80 GB | single-GPU training of mid-size models |
+| AWS `p5.48xlarge` / Google `a3-highgpu-8g` | 8 × H100 | 640 GB | large training jobs |
+
+On AWS the letter is the family (g for graphics-and-inference GPUs, p for the large training GPUs), the digit its
+generation, and the size after the dot (`xlarge`, `12xlarge`, `48xlarge`) the share of the machine. On Google Cloud
+the GPU type is fixed by the machine series (G2 has L4s, A2 has A100s, A3 has H100s).
+
+When a job needs more memory than one GPU has, it must be **split across GPUs** with
+<Term id="tensor-parallelism">tensor parallelism</Term> or sharded data parallelism (FSDP, DeepSpeed ZeRO). That
+works best inside one multi-GPU instance, where the GPUs are linked by NVLink, much faster than the network between
+separate machines.
+
+### Step 3: price per hour, then price per job
+
+Among the instances that fit, the cheapest per hour is the obvious choice for serving, where the machine runs all
+month. For *training*, the bill is price per hour × hours, and faster GPUs finish sooner. An instance that costs
+twice as much per hour but finishes in a third of the time is cheaper per job. The honest way to compare is to run
+a short benchmark (a few hundred steps) on two candidates and extrapolate; the capstone uses exactly that number.
+
+### Step 4: are you allowed to rent it?
+
+New cloud accounts usually have a <Term id="gpu-quota">quota</Term> of zero, or close to it, for GPU instances. On
+AWS the limit is counted in vCPUs per family group (a `p5.48xlarge` uses 192 of them); on Google Cloud it is
+counted in GPUs per model per region. Increases are requests that a person reviews, which can take days. Even with
+quota, the newest GPUs are sometimes simply unavailable in a zone; reservations and AWS Capacity Blocks for ML let
+you book capacity ahead for a fixed window.
+
+<Callout kind="simplification">
+The 1.2 headroom is a planning figure. Training activations grow with batch size and sequence length and can exceed
+it by a lot (activation checkpointing trades compute to shrink them). Prices in the lab are illustrative round
+numbers, not quotes: GPU prices change often, differ by region, and dropped notably for some families in 2025.
+Check the pricing pages before you budget.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Try it: which GPU instances can hold it?">
+
+Pick a model size and a job. Every instance in the list is checked against the memory needed; the bar shows how
+much of its GPU memory the job would fill.
+
+<Experiment def={gpu} title="GPU memory fit">
+  <GpuFitView />
+  <Readout title="This job" />
+</Experiment>
+
+Things to try:
+
+- **8B, serve 16-bit**: 19.2 GB. The T4's 16 GB is out; the L4 instances are the cheapest that fit.
+- **Same model, full fine-tune**: 153.6 GB. Every single-GPU instance is out. You need eight GPUs in one box.
+- **Same model, QLoRA**: 4.8 GB. Fine-tuning now fits on the cheapest GPU in the list. That is the reason QLoRA
+  exists.
+- **70B, serve 4-bit**: 42 GB. A single L40S (48 GB) fits; in 16-bit (168 GB) you are back to multi-GPU machines.
+
+</Section>
+
+<Section kind="code" title="The estimate in Python, and checking quotas">
+
+The rule for four jobs on the same 8B model:
+
+<PythonRunner example={fitDemo} title="gpu_fit.py" />
+
+The lab's current choice as the same calculation:
+
+<Experiment def={gpu} title="need.py, linked to the lab" controls={false}>
+  <Code example={linkedCode} title="need.py" />
+  <Readout title="What it gives" />
+</Experiment>
+
+Before planning around an instance, check what your account may run:
+
+<Code example={quotaCode} title="quotas.sh (not run here)" />
+
+</Section>
+
+<Section kind="mistakes" title="GPU choices that fail on day one">
+
+<CommonMistake
+  title="Sizing for the weights only"
+  wrong={'# "7B in 16-bit is 14 GB, so a 16 GB T4 is enough"\ntrainer.train()'}
+  error="torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 172.00 MiB. GPU 0 has a total capacity of 14.57 GiB of which 98.25 MiB is free."
+  cause="The estimate left out headroom (activations, CUDA context), and the GPU's usable memory is less than its label."
+  fix="Plan with headroom (× 1.2 or more), use 4-bit or LoRA to shrink the job, or pick the next memory size up."
+/>
+
+<CommonMistake
+  title="Discovering the quota on launch day"
+  wrong={'$ aws ec2 run-instances --instance-type p5.48xlarge ...'}
+  error="VcpuLimitExceeded: You have requested more vCPU capacity than your current vCPU limit of 0 allows for the instance bucket that the specified instance type belongs to."
+  cause="GPU quotas start low and increases are reviewed by people."
+  fix="Request quota in the region you will use as soon as the project is planned, and check it with service-quotas."
+/>
+
+<CommonMistake
+  title="Comparing price per hour for a training job"
+  wrong={'# picked the $1.86/h GPU over the $5.07/h GPU "to save money"'}
+  error="(no error) the job took 30 hours instead of 9 and cost more"
+  cause="Training cost is price × hours, and faster GPUs need fewer hours."
+  fix="Benchmark a few hundred steps on each candidate and compare cost per job, not per hour."
+/>
+
+</Section>
+
+<Section kind="practice" title="How teams pick GPU instances">
+
+- **Write down the memory estimate** (params × bytes per job × headroom) before looking at instances.
+- **Shrink the job first** if it does not fit: quantize for serving, LoRA or QLoRA for fine-tuning.
+- **Keep multi-GPU jobs inside one instance** when you can; cross-machine training needs fast networking (EFA on
+  AWS, GPUDirect on Google Cloud).
+- **Benchmark, then extrapolate** cost per job for training; use the cheapest that fits for always-on serving.
+- **Secure quota and capacity early**, in the region where the data is.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={fitExercise}>
+  Pick the cheapest instance that fits, and its cost per job.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+Choosing a GPU starts with memory, because a job that does not fit does not run. The estimate is one line:
+billions of parameters × bytes per parameter for the job × headroom, and the job changes the bytes dramatically,
+from 0.5 for 4-bit serving to 16 for full fine-tuning with Adam. That is why LoRA and QLoRA let fine-tuning fit
+where only serving fitted before.
+
+With the number in hand, you rule out every instance with less GPU memory, splitting across the GPUs of one
+multi-GPU instance when no single GPU is enough. Among what is left, the cheapest per hour wins for serving, while
+for training the right comparison is price × hours from a short benchmark. And none of it matters until your account
+has quota for the instance in the region where your data lives.
+
+GPUs are expensive by the hour. The next lesson cuts that price by more than half, at the cost of being interrupted.
+
+Next: [Spot capacity and checkpoints](#/learn/cloud/compute/spot-checkpoints).
+
+</Section>

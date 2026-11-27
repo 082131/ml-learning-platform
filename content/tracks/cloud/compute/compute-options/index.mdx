@@ -1,0 +1,206 @@
+import { compute, computeDemo, linkedCode } from './code';
+import { questions, serverlessExercise } from './quiz';
+
+<Section kind="intuition" title="Renting a car, a taxi, or a ride by the minute">
+
+There are three ways to get across town. You can rent a car for the month: it is always there, you pay whether you
+drive or not, and you maintain it. You can take taxis: you pay per trip, nothing when you stay home, but each trip
+costs more per kilometre and you wait for one to arrive. Or something in between: a car-share that a service keeps
+fuelled and parked for you.
+
+Cloud compute comes in the same three shapes. A **virtual machine** is the monthly rental. A **serverless
+function** is the taxi: it runs only when a request arrives and you pay per request. **Container services** sit in
+between: you hand over a packaged application and the platform runs and scales it.
+
+None of them is "best". The right one depends on how steady your work is, how long each piece of work takes, and
+whether it needs a GPU. This lesson turns that into numbers you can compare.
+
+</Section>
+
+<Section kind="technical" title="The options, what they manage, and what they cost">
+
+**The big picture.** Describe the workload (how many requests or jobs, how long each runs, how much memory, GPU or
+not) → see which options can run it at all → price the ones that can for a month → and choose, checking limits
+such as cold starts and time limits.
+
+### The four shapes
+
+| Option | You hand over | The platform manages | You pay for | AWS / Google Cloud |
+| --- | --- | --- | --- | --- |
+| <Term id="virtual-machine">Virtual machine</Term> | an image and a size | hardware | every hour it runs | EC2 / Compute Engine |
+| Container service | a <Term id="container-image">container image</Term> | machines, scaling, restarts | running containers (per second) | ECS and Fargate / Cloud Run |
+| Managed <Term id="kubernetes">Kubernetes</Term> | Kubernetes manifests | the control plane | the cluster's machines | EKS / GKE |
+| <Term id="serverless-function">Serverless function</Term> | a function | everything, including scaling to zero | each request and its run time | Lambda / Cloud Run functions |
+
+Reading down the table, you manage less and control less. A VM lets you install any driver and keep a model in
+memory for days. A function hides the machine entirely, which is wonderful until you need something the platform
+does not offer. Kubernetes for models has its own track: see
+[Kubernetes for models](#/learn/deploy/kubernetes/k8s-for-models).
+
+### Why the billing shapes differ
+
+Each option charges for something different, and that is what decides the cost:
+
+- A **VM** charges per hour whether it is busy or idle. Its monthly cost is a staircase: flat until traffic needs
+  another machine, then a step up. You also keep a minimum (usually two, in two zones, for availability).
+- A **serverless function** charges per **GB-second**: memory × run time, summed over every request, plus a small
+  charge per request. Its cost is a straight line through zero: no traffic, no bill; double the traffic, double the
+  bill.
+
+With AWS Lambda's x86 list prices in US East ($0.0000166667 per GB-second, $0.20 per million requests), a million
+requests a month of 200 ms at 1 GB costs
+
+$$
+10^6 \times 0.2\,\text{s} \times 1\,\text{GB} \times \$0.0000166667 + 1 \times \$0.20 \approx \$3.53 .
+$$
+
+Two small always-on VMs at $0.10 an hour cost 2 × 730 × $0.10 = $146 for the same month (730 is the number of
+hours cloud price pages use for a month). The function wins by a factor of 40.
+
+### The break-even point
+
+Now the natural next question: does the function always win? No, because a line through zero eventually crosses a
+staircase. At 100 million requests a month the function costs about $353, while three VMs handle the peak for
+$219. The **break-even volume** is where the two costs meet, around 40 million requests a month in this example.
+Below it, pay per use; above it, keep machines busy. The lab finds it for any inputs.
+
+The deeper reason is **utilization**: how busy the VMs are on average. At a million requests a month, two VMs are
+busy well under 1% of the time, so you are paying for idle hours. At very high, steady traffic they are busy most of
+the time, and per-hour pricing becomes the cheaper way to buy the same work.
+
+### Limits that decide before price does
+
+Cost only matters among options that can run the workload. Serverless functions have hard limits that often rule
+them out for ML:
+
+- **No GPUs** on Lambda, and a maximum of 10,240 MB of memory and 15 minutes per invocation. (Cloud Run *services*
+  can attach NVIDIA L4 GPUs, a notable exception.)
+- <Term id="cold-start">Cold starts</Term>: when no warm instance exists, the platform must start one, download your
+  code and load your model before answering. For a 2 GB model this can take many seconds. Provisioned concurrency
+  or minimum instances remove cold starts, but then you pay for idle capacity again.
+- **Packages and model size**: deployment packages and images have size limits, and a large model loaded on every
+  cold start is slow.
+
+So a practical map for ML:
+
+| Workload | Usually best | Why |
+| --- | --- | --- |
+| Small preprocessing triggered by uploads | serverless function | spiky, short, CPU-only |
+| A light CPU model API with uneven traffic | container service that scales to zero | no idle cost, no 15-minute limit |
+| Nightly batch scoring | a batch job on VMs or a managed job | runs for an hour, then nothing |
+| LLM or GPU inference with steady traffic | GPU VMs or Kubernetes, or a managed endpoint | needs GPUs and warm models |
+| Training | GPU VMs or managed training jobs | long, GPU-heavy; covered next |
+
+<Callout kind="simplification">
+The model ignores free tiers, Lambda's ARM pricing (about 20% cheaper), load balancer and NAT costs, and request
+duration changing with memory size (more memory also means more CPU, so functions often run faster). VM capacity
+per instance is an input you should measure with a load test (see the
+[Inference track's load testing lesson](#/learn/inference/ops/monitoring-load-testing)).
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Try it: pay per request or pay per hour?">
+
+The lab starts with a million 200 ms requests a month at 1 GB, against two always-on $0.10/hour VMs.
+
+<Experiment def={compute} title="Serverless vs VMs">
+  <ComputeView />
+  <Readout title="This month" />
+</Experiment>
+
+Things to try:
+
+- **The start**: serverless about $3.53, VMs $146. The VMs are busy under 1% of the time.
+- **Step the volume up to 100 million**: the line crosses the staircase. VMs now win.
+- **At 10 million, raise time per request to 2,000 ms** (a slow model): serverless jumps to over $330. Longer work
+  favours machines you keep busy.
+- **Set VMs always running to 1**: cheaper, but now a single VM failure is an outage. That is a reliability
+  decision dressed as a cost decision.
+
+</Section>
+
+<Section kind="code" title="The comparison in Python">
+
+The two pricing shapes at four volumes:
+
+<PythonRunner example={computeDemo} title="compute.py" />
+
+The lab's current inputs as code. Change a control and the literals change.
+
+<Experiment def={compute} title="compare.py, linked to the lab" controls={false}>
+  <Code example={linkedCode} title="compare.py" />
+  <Readout title="What it gives" />
+</Experiment>
+
+</Section>
+
+<Section kind="mistakes" title="Choosing compute by habit">
+
+<CommonMistake
+  title="An always-on GPU VM for a demo nobody uses at night"
+  wrong={'# g5.xlarge running 24/7 for an internal demo used ~2 hours a day'}
+  error="(no error) about $735 a month for roughly 60 hours of real use"
+  cause="Per-hour billing charges idle hours exactly like busy ones."
+  fix="Schedule it off outside working hours, use a service that scales to zero, or start it on demand."
+/>
+
+<CommonMistake
+  title="Loading the model inside the handler"
+  wrong={'def handler(event, context):\n    model = joblib.load("/opt/model.pkl")   # every request\n    return model.predict(event["rows"])'}
+  error="(no error) every request takes 3 s and the GB-second bill is many times higher than it should be"
+  cause="The model is loaded on every invocation instead of once per warm instance."
+  fix="Load it at module level, outside the handler, so warm invocations reuse it; keep the model small or move to a container service."
+/>
+
+<CommonMistake
+  title="Putting a long job in a function"
+  wrong={'# Lambda function that retrains a model on new data'}
+  error="Task timed out after 900.00 seconds"
+  cause="Lambda invocations stop after 15 minutes, and training rarely fits."
+  fix="Use a batch job, a container task, or a managed training job, triggered by the function if you like."
+/>
+
+</Section>
+
+<Section kind="practice" title="How teams pick compute">
+
+- **Describe the workload first**: requests or jobs per month, duration, memory, GPU, latency target.
+- **Rule out options by their limits** (GPU, time limit, memory, cold starts) before comparing prices.
+- **Price both shapes** for your real traffic, including the minimum instances you need for availability.
+- **Prefer scale-to-zero for spiky, low-volume work**; prefer busy machines for steady, heavy work.
+- **Revisit as traffic grows**: the right answer at launch is often wrong a year later.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={serverlessExercise}>
+  Find the break-even volume yourself.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+Cloud compute comes in shapes that trade control for convenience: VMs, container services, managed Kubernetes and
+serverless functions. They also bill differently, and that difference decides cost. VMs charge per hour, busy or
+idle, as a staircase of whole machines with a minimum for availability; functions charge per GB-second, a straight
+line through zero.
+
+So at low or spiky volume the line sits far below the staircase and serverless wins; as steady volume grows the line
+crosses the staircase at the break-even point, and busy VMs win, because utilization is what you are really buying.
+Before price, though, limits decide: no GPUs on Lambda, 15-minute invocations and cold starts rule functions out of
+most model serving and all training.
+
+Training needs GPUs, so the next lesson chooses among GPU instances.
+
+Next: [GPU instances: memory, families and quotas](#/learn/cloud/compute/gpu-instances).
+
+</Section>

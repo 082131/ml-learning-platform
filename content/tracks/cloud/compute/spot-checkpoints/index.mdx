@@ -1,0 +1,207 @@
+import { loopCode, spot, spotMath } from './code';
+import { questions, spotExercise } from './quiz';
+
+<Section kind="intuition" title="A cheap seat that you might have to give up">
+
+Airlines sell standby tickets: much cheaper, but if the flight fills up you stay behind. Cloud providers do the same
+with spare machines. At any moment some of their GPUs are unused, so they rent them out at a large discount, as
+<Term id="spot-instance">spot capacity</Term>, on the condition that they can take them back when a full-price
+customer needs them.
+
+For training, that deal is very attractive and slightly dangerous. Attractive, because GPU hours are the biggest
+line on an ML bill, and spot can cut it by more than half. Dangerous, because if the machine disappears at hour 19
+of a 20-hour job and nothing was saved, you start again from zero.
+
+The tool that turns the danger into a small cost is the **checkpoint**: saving the training state regularly so an
+interruption loses only the work since the last save. This lesson works out how much an interruption really costs,
+how often to save, and how to write a training loop that shrugs interruptions off.
+
+</Section>
+
+<Section kind="technical" title="Interruptions, checkpoints and the best interval">
+
+**The big picture.** An interruption rate tells you how often you lose the machine → each loss costs the work since
+the last checkpoint plus a restart → checkpoints reduce that loss but cost time to write → the best interval balances
+the two → and the expected time × the spot price, compared with the on-demand cost, decides whether spot is worth it.
+
+### What spot is, exactly
+
+On AWS, Spot Instances are the same EC2 instance types at a price that moves with supply and demand; AWS says the
+discount can reach 90%, and for GPU families it is often around half. On Google Cloud, Spot VMs work the same way at
+a fixed discount. When the provider needs the capacity back, you get an <Term id="interruption-notice">interruption
+notice</Term>: **two minutes** on AWS (visible in the instance metadata and as an EventBridge event) and **30
+seconds** on Google Cloud. Then the machine is stopped or terminated.
+
+Interruptions are not evenly spread: some instance types and zones are interrupted rarely, the newest GPUs in busy
+regions more often. AWS publishes an interruption-frequency range per type (the Spot Instance Advisor). For
+planning, we describe it with one number: λ (lambda), the average number of interruptions per hour of running. With
+λ = 0.1, the *mean time between interruptions* is M = 1/λ = 10 hours.
+
+### Without checkpoints: why long jobs never finish
+
+Start with the worst case so the rest has something to fix. With no checkpoints, a W-hour job must run W hours in
+one go. For short jobs that is likely; for long ones it becomes almost impossible, because the chance of no
+interruption in W hours falls exponentially (it is e^(−λW)). The expected wall-clock time, including a restart of R
+hours after each interruption, is
+
+$$
+E[T] = \left(\tfrac{1}{\lambda} + R\right)\left(e^{\lambda W} - 1\right).
+$$
+
+With λ = 0.1, R = 10 minutes and W = 20 hours: (10 + 0.17)(e² − 1) ≈ **65 hours**. At 35% of the on-demand price,
+65 hours costs more than just paying for 20 hours on demand. For a 40-hour job the expectation is over 500 hours.
+Without checkpoints, spot is a trap for long training runs.
+
+### With checkpoints: two small costs instead of one huge one
+
+A <Term id="checkpoint">checkpoint</Term> here means everything needed to continue: model weights, optimizer state,
+the step number, and the data loader's position. Saving every τ hours of work changes the arithmetic into two
+simple costs:
+
+1. **The cost of saving.** Every τ hours you pause C hours to write the checkpoint, so even with no interruptions the
+   job takes W(1 + C/τ). Save every 30 minutes with a 3-minute save: 10% extra.
+2. **The cost of losing work.** An interruption lands, on average, halfway through a segment, so it loses
+   (τ + C)/2 plus the restart R. At λ interruptions per hour, the fraction of time wasted is λ((τ + C)/2 + R).
+
+Putting the two together, the expected time is
+
+$$
+T = \frac{W\,(1 + C/\tau)}{1 - \lambda\left(\frac{\tau + C}{2} + R\right)} .
+$$
+
+The numerator is "work plus saving"; the denominator shrinks the useful share of each hour by the waste. With
+τ = 30 min, C = 3 min, R = 10 min, λ = 0.1 and W = 20 h: 22 / (1 − 0.1 × (0.275 + 0.167)) ≈ **23 hours**. At 35% of
+an on-demand price of $1/hour, that is about $8 instead of $20.
+
+### Choosing the interval
+
+The two costs pull in opposite directions. Save very often and the first term dominates (you spend the run saving);
+save rarely and the second dominates (each interruption throws away hours). The best interval balances them. A
+classic result from 1974, **Young's rule**, gives it in one line:
+
+$$
+\tau^{*} \approx \sqrt{2\,C\,M} ,
+$$
+
+with C the time to save one checkpoint and M the mean time between interruptions. With C = 3 minutes and M = 10
+hours: √(2 × 0.05 × 10) = 1 hour. The useful insight is in the shape: a slow save (large C) or rare interruptions
+(large M) both mean save less often, and the total cost is flat near the best value, so "roughly right" is fine.
+
+<Callout kind="simplification">
+The model assumes interruptions arrive at a constant random rate and that the restart is instant once a machine is
+available. In reality capacity can be unavailable for a while after an interruption (the job waits, unbilled but
+late), and interruption rates change by hour and zone. Managed services help: SageMaker managed spot training
+copies `/opt/ml/checkpoints` to S3 and restarts the job for you, with a maximum wait time you set.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Try it: a training run on spot capacity">
+
+A 20-hour job at 0.1 interruptions per hour. The timeline is one random example run (change the seed for another);
+the readout shows the expected values from the formula.
+
+<Experiment def={spot} title="Spot and checkpoints">
+  <SpotView />
+  <Readout title="This plan" />
+</Experiment>
+
+Things to try:
+
+- **Set the checkpoint interval to 0 (never)**: the expected time jumps to 65 hours and spot costs more than
+  on-demand. Watch the example run's hatched "lost" segments grow.
+- **Try 10, 60 and 180 minutes**: 10 wastes time saving, 180 loses too much per interruption, and 60 (Young's
+  value) is cheapest. The readout shows the best interval for your settings.
+- **Raise the save time to 12 minutes**: the best interval grows to two hours. Slow saves mean save less often.
+- **Raise interruptions to 0.5 per hour**: even with checkpoints, a long interval now never finishes. Spot only
+  works when the work between saves is short compared with the time between interruptions.
+
+</Section>
+
+<Section kind="code" title="The arithmetic, and a loop that survives interruptions">
+
+The expected times for several intervals, and Young's rule:
+
+<PythonRunner example={spotMath} title="spot_math.py" />
+
+A training loop built for spot: it resumes from the last checkpoint, saves on a timer from the lab's interval, and
+saves once more when the platform sends SIGTERM.
+
+<Experiment def={spot} title="train.py, linked to the lab" controls={false}>
+  <Code example={loopCode} title="train.py (needs a GPU; not run here)" />
+  <Readout title="What the lab expects" />
+</Experiment>
+
+</Section>
+
+<Section kind="mistakes" title="How spot training goes wrong">
+
+<CommonMistake
+  title="Saving weights but not the optimizer"
+  wrong={'torch.save(model.state_dict(), "last.pt")   # resumes with a fresh Adam'}
+  error="(no error) after each interruption the loss jumps up, then recovers; the final model differs from an uninterrupted run"
+  cause="Adam's running averages restart from zero, so the first steps after a resume behave like the start of training."
+  fix="Save model, optimizer, scheduler, step and the data position together, and restore all of them."
+/>
+
+<CommonMistake
+  title="Overwriting the only checkpoint in place"
+  wrong={'torch.save(state, "/ckpt/last.pt")   # interrupted halfway through writing'}
+  error="RuntimeError: PytorchStreamReader failed reading zip archive: failed finding central directory"
+  cause="The interruption hit during the write, leaving a truncated file in place of the good one."
+  fix="Write to a temporary name and os.replace it into place, and keep the previous checkpoint until the new one is complete (and uploaded)."
+/>
+
+<CommonMistake
+  title="Checkpoints on the instance's own disk"
+  wrong={'CKPT = "/tmp/last.pt"   # on the spot instance'}
+  error="(no error) the job restarts on a new instance and finds no checkpoint"
+  cause="An interrupted instance's local disk goes with it."
+  fix="Copy each checkpoint to object storage (SageMaker does this for /opt/ml/checkpoints), and load from there when starting."
+/>
+
+</Section>
+
+<Section kind="practice" title="Spot training that teams rely on">
+
+- **Use spot for work that can resume**: training with checkpoints, hyperparameter sweeps, batch inference. Keep
+  serving and deadline-critical jobs on on-demand or reserved capacity.
+- **Checkpoint everything** needed to resume, atomically, to object storage.
+- **Pick the interval with Young's rule** from your measured save time and the interruption rate, then round.
+- **Handle the warning**: save on SIGTERM; two minutes on AWS is usually enough for one more save.
+- **Spread across instance types and zones** (capacity-optimized allocation on AWS) so one busy pool does not stop
+  you, and let managed spot training retry for you.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={spotExercise}>
+  Decide whether spot is worth it for a job, and with what interval.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+Spot capacity is spare cloud hardware at a deep discount that the provider can reclaim with a short warning: two
+minutes on AWS, 30 seconds on Google Cloud. Without checkpoints, long jobs on spot rarely finish, because the chance
+of an uninterrupted run falls exponentially with its length.
+
+Checkpoints replace that one huge risk with two small, predictable costs: the pause to save every τ hours, and,
+per interruption, half a segment of lost work plus a restart. The expected time is "work plus saving" divided by
+the useful share of each hour, and Young's rule, τ* ≈ √(2CM), balances the two costs. Multiply that time by the spot
+price and compare with on-demand to decide.
+
+You have now built training infrastructure by hand: storage, networks, GPUs, interruption handling. The next chapter
+looks at services that do much of this for you.
+
+Next: [Managed training: SageMaker and Vertex AI](#/learn/cloud/managed/managed-training).
+
+</Section>
