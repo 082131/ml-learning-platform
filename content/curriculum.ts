@@ -725,8 +725,8 @@ export const tracks: Track[] = [
         title: 'Window functions',
         level: 'intermediate',
         lessons: [
-          { id: 'sql/windows/ranking', status: 'outline' },
-          { id: 'sql/windows/frames-lag-lead', status: 'outline' },
+          { id: 'sql/windows/ranking', status: 'written' },
+          { id: 'sql/windows/frames-lag-lead', status: 'written' },
         ],
       },
       {

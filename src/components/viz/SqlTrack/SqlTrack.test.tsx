@@ -25,7 +25,7 @@ describe('SqlRunner', () => {
   it('lists the dataset tables on request', async () => {
     wrap(<SqlRunner example={{ id: 'q', dataset: 'shop', source: 'SELECT 1;' }} autoRun={false} />);
     await userEvent.click(screen.getByRole('button', { name: 'Show tables' }));
-    await waitFor(() => expect(screen.getAllByRole('table').length).toBe(9));
+    await waitFor(() => expect(screen.getAllByRole('table').length).toBe(10));
   });
 });
 

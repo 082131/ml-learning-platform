@@ -13,5 +13,10 @@ export default {
     'Write top-N-per-group queries and compare each row with its group’s total',
   ],
   prerequisites: ['sql/ctes/subqueries-ctes'],
-  concepts: [],
+  concepts: ['window-function', 'window-partition', 'ranking-functions', 'logical-query-order'],
+  references: [
+    { title: 'SQLite: Window functions', url: 'https://www.sqlite.org/windowfunctions.html', version: '3.54' },
+    { title: 'PostgreSQL: Window functions tutorial', url: 'https://www.postgresql.org/docs/current/tutorial-window.html', version: '18' },
+    { title: 'PostgreSQL: Window function calls', url: 'https://www.postgresql.org/docs/current/sql-expressions.html#SYNTAX-WINDOW-FUNCTIONS', version: '18' },
+  ],
 } satisfies LessonMeta;

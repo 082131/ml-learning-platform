@@ -1,0 +1,186 @@
+import { firstOrders, groupVsWindow, quartiles, rankingLab, threeRanks, topTwoPerCategory, windowInWhere } from './code';
+import { exercise, questions } from './quiz';
+
+<Section kind="intuition" title="Keep the detail and see the group at the same time">
+
+GROUP BY has a cost we have quietly accepted so far: it throws the detail away. Group the 12 orders by month and
+you get 3 rows with monthly totals, and the individual orders are gone. But many questions need both at once.
+"What share of its month's revenue was each order?" needs each order (the detail) and its month's total (the
+group). "What is each customer's biggest order?" needs to compare each order with the customer's other orders,
+and then keep the order itself.
+
+A <Term id="window-function">window function</Term> gives each row a view of the rows related to it, without
+merging them. Picture standing on one row and looking through a window at the other rows of the same month: you
+can add up their totals, count them, see where you rank among them, or peek at the row just before you. Then you
+write the answer into a new column of your own row. Every row does this, and all 12 rows stay.
+
+That one idea answers a whole family of questions that are awkward any other way: rankings and "top N per
+group", shares of a total, running totals, moving averages, and comparisons with the previous row. This lesson
+covers the window itself and ranking; the next one covers running totals and looking at neighbouring rows.
+
+</Section>
+
+<Section kind="technical" title="OVER, PARTITION BY and ORDER BY">
+
+From here on we use `order_totals`, a view in the shop database with one row per order and its total value (all
+orders, whatever their status). A view is a saved query you read like a table. Its 12 orders fall in 3 months:
+January (3 orders, 91.50), February (6 orders, 185) and March (3 orders, 132.50).
+
+**OVER turns a function into a window function.** `SUM(total)` alone is an aggregate and collapses rows.
+`SUM(total) OVER (...)` is a window function: it computes a sum for each row and keeps the row. What goes inside
+the brackets defines which rows each row's window contains.
+
+**PARTITION BY splits the rows into separate windows**, like GROUP BY splits them into buckets, but without
+collapsing. With <Term id="window-partition">PARTITION BY</Term> `month`, each January order sees only January
+orders. Without PARTITION BY, every row sees all 12 rows.
+
+Run the comparison below. The GROUP BY query returns 3 rows. The window query returns all 12, and each order now
+carries its month's revenue next to its own total, so the share is one division away: order 102 was 59 / 91.50 =
+64.5 percent of January.
+
+<SqlRunner example={groupVsWindow} title="group_vs_window.sql" />
+
+**ORDER BY inside OVER puts each window in order.** For a sum of the whole partition, order does not matter. For
+"what position am I in?", it is the whole point. `ROW_NUMBER() OVER (ORDER BY total DESC)` numbers the rows from
+the biggest total down. This ORDER BY only orders the window; the result's display order still comes from the
+query's own ORDER BY at the end.
+
+**Ranking functions differ only in how they treat ties.** Orders 102 and 106 both total exactly 59.00, so
+"which is second?" has no single answer, and the three <Term id="ranking-functions">ranking functions</Term>
+answer differently:
+
+| Function | Tied rows | Next row after a tie | 74, 59, 59, 41 become |
+| --- | --- | --- | --- |
+| `ROW_NUMBER()` | different numbers, in an unspecified order | continues counting | 1, 2, 3, 4 |
+| `RANK()` | the same number | skips the used places | 1, 2, 2, 4 |
+| `DENSE_RANK()` | the same number | does not skip | 1, 2, 2, 3 |
+
+A way to remember RANK: it is "how many rows are strictly bigger than me, plus one". For order 107 (41.00),
+three rows are bigger (74 and the two 59s), so it is 3 + 1 = 4th. DENSE_RANK instead counts how many *different
+values* are bigger: 74 and 59, two values, so 107 is 2 + 1 = 3rd.
+
+<SqlRunner example={threeRanks} title="three_ranks.sql" />
+
+</Section>
+
+<Section kind="visual" title="Try it: one window per row">
+
+Pick a function and a partition. Then select a row: its window is highlighted, and with PARTITION BY month the
+rows of other months fade, because that row cannot see them.
+
+<Experiment def={rankingLab} title="Window explorer: ranking">
+  <WindowLab />
+  <Readout title="This window" />
+</Experiment>
+
+Things to try:
+
+- **RANK, no partition.** Order 110 (74.00) is 1st, the two 59.00 orders share 2nd, and order 107 (41.00) is
+  4th. Switch to DENSE_RANK: 107 becomes 3rd. Switch to ROW_NUMBER: the tie is broken, and the explorer breaks it by
+  id; SQL itself promises nothing about which of the two gets 2.
+- **RANK, PARTITION BY month.** Now each month has its own podium: 102 is 1st in January and 106 is 1st in
+  February. The tie disappears because the two orders are no longer in the same window.
+- **SUM per partition.** Every January row shows 91.50, every February row 185. Same numbers as GROUP BY, still
+  12 rows.
+
+The readout makes the key fact explicit: rows in equal rows out. A window function never changes the number of
+rows; it only adds a column.
+
+</Section>
+
+<Section kind="code" title="Top N per group, first events, and buckets">
+
+**Top N per group** is the classic window question: "the 2 most expensive products in each category". Number the
+products within each category (PARTITION BY category, ORDER BY price DESC), then keep numbers 1 and 2. The
+filtering has to happen outside, in a CTE or subquery, for a reason we have met twice already: the logical
+order. Window functions are computed in the SELECT stage, which comes after WHERE, so WHERE cannot see them yet.
+
+<SqlRunner example={topTwoPerCategory} title="top_two_per_category.sql" />
+
+<SqlRunner example={windowInWhere} title="window_in_where.sql" />
+
+The error is the same idea as the alias-in-WHERE rule from the first lesson and the aggregate-in-WHERE rule from
+GROUP BY. Some warehouses (Snowflake, BigQuery, DuckDB) add a QUALIFY clause that filters on window results;
+SQLite and PostgreSQL do not have it, so the CTE pattern is the portable one.
+
+**The first event per entity** is top N with N = 1: number each customer's orders by date and keep number 1.
+Adding `id` to the window's ORDER BY makes the numbering deterministic if a customer ever has two orders on the
+same day.
+
+<SqlRunner example={firstOrders} title="first_orders.sql" />
+
+**Buckets.** `NTILE(4)` cuts the ordered rows into 4 groups of nearly equal size: with 12 orders, 3 per bucket.
+It is a quick way to label quartiles (top 25 percent of orders, and so on). Notice it splits by position, not by
+value, so the two tied 59.00 orders land in the same bucket here only because they are next to each other.
+
+<SqlRunner example={quartiles} title="quartiles.sql" />
+
+</Section>
+
+<Section kind="mistakes" title="Window function mistakes">
+
+<CommonMistake
+  title="Filtering on a window function in WHERE"
+  wrong={'SELECT name FROM products WHERE ROW_NUMBER() OVER (ORDER BY price DESC) <= 2;'}
+  error="misuse of window function ROW_NUMBER()"
+  cause="WHERE runs before the SELECT stage computes window functions."
+  fix="Compute the number in a CTE (WITH ranked AS (...)) and filter WHERE rn <= 2 outside it."
+/>
+
+<CommonMistake
+  title="ROW_NUMBER when ties matter"
+  wrong={'WHERE ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY total DESC) = 1   -- inside a CTE'}
+  error="(no error) one of Ben's two 59.00 orders disappears, a different one on another day"
+  cause="ROW_NUMBER breaks ties in an unspecified order."
+  fix="Use RANK or DENSE_RANK to keep ties, or add a tiebreaker column to ORDER BY (total DESC, id) so the choice is deliberate and repeatable."
+/>
+
+<CommonMistake
+  title="Expecting OVER (ORDER BY ...) to sort the result"
+  wrong={'SELECT id, RANK() OVER (ORDER BY total DESC) AS r FROM order_totals;'}
+  error="(no error) the ranks are right but the rows come back in another order"
+  cause="The ORDER BY inside OVER orders the window, not the output."
+  fix="Add the query's own ORDER BY at the end: ORDER BY r."
+/>
+
+</Section>
+
+<Section kind="practice" title="Habits for window functions">
+
+- **Ask "GROUP BY or window?"**: if the answer needs the detail rows, it is a window.
+- **Say the window out loud**: "for each order, among orders of the same month, by total descending".
+- **Choose the ranking function by its tie behaviour**, and add a tiebreaker when you need a unique number.
+- **Filter on window results outside**, in a CTE.
+- **Rows in equals rows out**: if your row count changed, something other than the window did it.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<SqlExercise exercise={exercise}>
+  Return each known customer's biggest order (`customer_id`, `id`, `total`) from `order_totals`. When a customer's
+  biggest orders tie, return all of them. The starter drops one of Ben's orders.
+</SqlExercise>
+
+</Section>
+
+<Section kind="summary">
+
+A window function computes a value for each row from a window of related rows and keeps every row, which is what
+separates it from GROUP BY. PARTITION BY decides which rows share a window; ORDER BY inside OVER puts the window in
+order for functions that care about position. ROW_NUMBER, RANK and DENSE_RANK differ only in ties: unique numbers
+in an unspecified order, shared numbers with gaps, or shared numbers without gaps. Window functions are computed
+in the SELECT stage, so "top N per group" numbers rows in a CTE and filters outside it.
+
+So far each window was a whole partition. Next, the window moves with the row: running totals, moving averages and
+looking at the previous row.
+
+Next: [Running totals, frames, LAG and LEAD](#/learn/sql/windows/frames-lag-lead).
+
+</Section>

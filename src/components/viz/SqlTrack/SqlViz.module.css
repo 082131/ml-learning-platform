@@ -150,3 +150,24 @@
   flex-wrap: wrap;
   gap: var(--s-2);
 }
+.rowBtn {
+  min-width: 3.5rem;
+  padding: 2px var(--s-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+.rowBtn[aria-pressed='true'] {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+}
+.rows tr[data-outside] td {
+  color: var(--ink-2);
+  opacity: 0.75;
+}
+.rows tr[data-picked] td {
+  font-weight: 600;
+}

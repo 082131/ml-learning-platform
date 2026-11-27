@@ -53,6 +53,8 @@ export interface SqlExample {
   /** Tables loaded before the example runs (src/lib/sql/datasets.ts). */
   dataset: DatasetId;
   source: string;
+  /** The SQLite error this example is meant to show (checked by the content tests). */
+  expectError?: string;
 }
 
 export type DatasetId = 'shop' | 'shop-big' | 'none';

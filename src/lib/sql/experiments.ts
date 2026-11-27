@@ -3,6 +3,7 @@ import type { ExperimentDef } from '../types';
 import { fanout, fanoutSql, type FanoutResult, type FanoutState } from './fanout';
 import { joinTables, type FilterPlace, type JoinKind, type JoinResult } from './joins';
 import { EMPLOYEES, recurse, type Direction, type RecursionResult } from './recursion';
+import { computeWindow, windowSql, type WindowFn, type WindowRow, type WindowSpec } from './window';
 import { NULL_CONDITIONS, nullFilter, type NullFilterResult } from './nulls';
 import { groupedPipeline, groupedSql, plainPipeline, plainSql, type PipelineState, type Stage } from './pipeline';
 
@@ -146,6 +147,79 @@ export function recursionExperiment(id: string): ExperimentDef<{ start: string; 
     readout: (_s, r) => [
       { label: 'Iterations (including the empty last one)', value: String(r.iterations.length) },
       { label: 'Rows in the result', value: String(r.total) },
+    ],
+  };
+}
+
+export interface WindowResult {
+  rows: WindowRow[];
+  sql: string;
+  spec: WindowSpec;
+}
+
+const FN_LABEL: Record<WindowFn, string> = {
+  row_number: 'ROW_NUMBER()',
+  rank: 'RANK()',
+  dense_rank: 'DENSE_RANK()',
+  partition_sum: 'SUM(total) per partition',
+  running_sum: 'running SUM(total)',
+  moving_avg: 'moving AVG(total)',
+  lag: 'LAG(total)',
+  lead: 'LEAD(total)',
+};
+
+/** `ranking`: ranking functions ordered by total. `frames`: running sums, moving averages, LAG and LEAD in time order. */
+export function windowExperiment(id: string, mode: 'ranking' | 'frames'): ExperimentDef<WindowSpec, WindowResult> {
+  const fns: WindowFn[] = mode === 'ranking' ? ['row_number', 'rank', 'dense_rank', 'partition_sum'] : ['running_sum', 'moving_avg', 'lag', 'lead'];
+  const controls: ExperimentDef<WindowSpec, WindowResult>['controls'] = [
+    { kind: 'select', id: 'fn', label: 'Function', options: fns.map((f) => ({ value: f, label: FN_LABEL[f] })), get: (s) => s.fn, set: (s, v) => ({ ...s, fn: v as WindowFn }) },
+    {
+      kind: 'select',
+      id: 'partition',
+      label: 'PARTITION BY',
+      options: [
+        { value: 'none', label: '(none: one window for all rows)' },
+        { value: 'month', label: 'month' },
+      ],
+      get: (s) => s.partition,
+      set: (s, v) => ({ ...s, partition: v as WindowSpec['partition'] }),
+    },
+  ];
+  if (mode === 'frames')
+    controls.push(
+      {
+        kind: 'select',
+        id: 'order',
+        label: 'ORDER BY',
+        options: [
+          { value: 'order_date', label: 'order_date (every value different)' },
+          { value: 'month', label: 'month (ties within a month)' },
+        ],
+        get: (s) => s.orderKey,
+        set: (s, v) => ({ ...s, orderKey: v as WindowSpec['orderKey'] }),
+      },
+      {
+        kind: 'select',
+        id: 'frame',
+        label: 'Running sum frame',
+        options: [
+          { value: 'range', label: 'RANGE (the default: ties count together)' },
+          { value: 'rows', label: 'ROWS (one row at a time)' },
+        ],
+        get: (s) => s.frame,
+        set: (s, v) => ({ ...s, frame: v as WindowSpec['frame'] }),
+      },
+      { kind: 'slider', id: 'preceding', label: 'Moving average: n PRECEDING', min: 1, max: 3, step: 1, get: (s) => s.preceding, set: (s, v) => ({ ...s, preceding: v }) },
+    );
+  return {
+    id,
+    initial: mode === 'ranking' ? { fn: 'rank', partition: 'none', orderKey: 'total', frame: 'range', preceding: 2 } : { fn: 'running_sum', partition: 'none', orderKey: 'order_date', frame: 'range', preceding: 2 },
+    controls,
+    compute: (s) => ({ rows: computeWindow(s), sql: windowSql(s), spec: s }),
+    readout: (_s, r) => [
+      { label: 'Rows in and rows out', value: `${r.rows.length} and ${r.rows.length}` },
+      { label: 'Partitions', value: String(new Set(r.rows.map((x) => x.partitionKey)).size) },
+      { label: 'NULL values (no row to look at)', value: String(r.rows.filter((x) => x.value === null).length) },
     ],
   };
 }

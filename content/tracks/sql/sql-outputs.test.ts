@@ -30,7 +30,7 @@ describe('SQL track examples run in SQLite', () => {
   for (const [file, ex] of examples)
     it(`${file}: ${ex.id}`, async () => {
       const r = await runExample(ex);
-      expect(r.message ?? '', ex.source).toBe('');
+      expect(r.message ?? '', ex.source).toBe(ex.expectError ?? '');
     }, 30_000);
   for (const [file, ex] of ctes)
     it(`${file}: ${ex.id} (every step)`, async () => {
@@ -121,6 +121,31 @@ const claims: Record<string, (sets: SqlValue[][][]) => void> = {
     expect(rows!.filter((r) => r[1] !== 0).length).toBe(6);
   },
   'runaway-guard': ([rows]) => expect(rows).toEqual([[1000, 1000]]),
+  'group-vs-window': ([grouped, windowed]) => {
+    expect(grouped).toEqual([['2026-01', 3, 91.5], ['2026-02', 6, 185], ['2026-03', 3, 132.5]]);
+    expect(windowed!.length).toBe(12);
+    expect(windowed![1]).toEqual([102, '2026-01', 59, 91.5, 64.5]);
+  },
+  'three-ranks': ([rows]) => expect(rows!.slice(0, 4).map((r) => r.slice(2))).toEqual([[1, 1, 1], [2, 2, 2], [3, 2, 2], [4, 4, 3]]),
+  'top-two-per-category': ([rows]) => expect(rows!.map((r) => r[1])).toEqual(['Headphones', 'Charger', 'Desk lamp', 'Poster', 'Pen set', 'Notebook']),
+  'first-orders': ([rows]) => expect(rows!.map((r) => r[1])).toEqual([101, 102, 104, 105, 107, 111]),
+  'quartiles': ([rows]) => expect(rows!.map((r) => r[2])).toEqual([1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4]),
+  'running-total': ([rows]) => {
+    expect(rows!.map((r) => r[3]).slice(0, 3)).toEqual([14.5, 73.5, 91.5]);
+    expect(rows![5]![3]).toBe(213.5);
+    expect(rows![11]![3]).toBe(409);
+  },
+  'range-vs-rows': ([rows]) => {
+    expect(rows!.slice(0, 3).map((r) => [r[3], r[4]])).toEqual([[91.5, 14.5], [91.5, 73.5], [91.5, 91.5]]);
+    expect(rows!.slice(3, 9).map((r) => r[3])).toEqual([276.5, 276.5, 276.5, 276.5, 276.5, 276.5]);
+    expect(rows!.slice(3, 6).map((r) => r[4])).toEqual([123.5, 154.5, 213.5]);
+  },
+  'moving-average': ([rows]) => expect(rows!.map((r) => r[3])).toEqual([14.5, 36.75, 30.5, 36.33, 27, 40.67, 43.67, 37.67, 21, 32, 34.33, 44.17]),
+  'month-over-month': ([rows]) => expect(rows).toEqual([['2026-01', 91.5, null, null], ['2026-02', 185, 91.5, 102.2], ['2026-03', 132.5, 185, -28.4]]),
+  'days-to-next': ([rows]) => {
+    expect(rows!.filter((r) => r[0] === 1).map((r) => r[4])).toEqual([22, 25, null]);
+    expect(rows!.length).toBe(11);
+  },
 };
 
 describe('CTE walk-through claims', () => {

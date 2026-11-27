@@ -13,5 +13,10 @@ export default {
     'Calculate period-over-period growth safely, including the first period and division by zero',
   ],
   prerequisites: ['sql/windows/ranking'],
-  concepts: [],
+  concepts: ['window-frame', 'running-total', 'lag-lead', 'window-function'],
+  references: [
+    { title: 'SQLite: Window functions (frame specifications, LAG, LEAD)', url: 'https://www.sqlite.org/windowfunctions.html', version: '3.54' },
+    { title: 'PostgreSQL: Window function calls (frame clause)', url: 'https://www.postgresql.org/docs/current/sql-expressions.html#SYNTAX-WINDOW-FUNCTIONS', version: '18' },
+    { title: 'SQLite: Date and time functions (julianday)', url: 'https://www.sqlite.org/lang_datefunc.html', version: '3.54' },
+  ],
 } satisfies LessonMeta;

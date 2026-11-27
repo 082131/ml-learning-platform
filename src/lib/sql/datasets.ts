@@ -192,6 +192,14 @@ INSERT INTO events VALUES
   (73, 4, '2026-04-01 10:00:00', 'visit'),
   (74, 3, '2026-04-06 18:00:00', 'visit');
 
+-- One row per order with its total value (all statuses), used from the window functions chapter on.
+CREATE VIEW order_totals AS
+SELECT o.id, o.customer_id, substr(o.order_date, 1, 7) AS month, o.order_date, o.status,
+       SUM(oi.quantity * oi.unit_price) AS total
+FROM orders AS o
+JOIN order_items AS oi ON oi.order_id = o.id
+GROUP BY o.id;
+
 CREATE TABLE customer_updates (
   customer_id INTEGER NOT NULL REFERENCES customers (id),
   updated_at  TEXT NOT NULL,
@@ -242,7 +250,7 @@ export const DATASETS: Record<DatasetId, { title: string; sql: string; tables: s
   shop: {
     title: 'Shop tables',
     sql: SHOP_SQL,
-    tables: ['customers', 'products', 'orders', 'order_items', 'payments', 'employees', 'events', 'customer_updates', 'logins'],
+    tables: ['customers', 'products', 'orders', 'order_items', 'payments', 'employees', 'events', 'customer_updates', 'logins', 'order_totals'],
   },
   'shop-big': { title: 'Shop tables plus big_orders', sql: SHOP_SQL + SHOP_BIG_SQL, tables: ['big_orders'] },
   none: { title: 'Empty database', sql: '', tables: [] },

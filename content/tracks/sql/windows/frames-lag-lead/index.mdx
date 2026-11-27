@@ -1,0 +1,222 @@
+import { daysToNext, framesLab, monthOverMonth, movingAverage, rangeVsRows, runningTotal } from './code';
+import { exercise, questions } from './quiz';
+
+<Section kind="intuition" title="A window that moves with the row">
+
+In the last lesson every row looked at its whole partition. Each January order saw all three January orders, so
+every January row got the same monthly total, and RANK compared each order with every other order in its window.
+That answers "how does this row compare with its group?". It does not answer questions about *time*: "how much
+revenue had we made by this date?", "is the trend going up?", "how much did this month change compared with last
+month?", "how long until this customer came back?".
+
+Those questions have something in common. Each row cares about the rows *before* it (or right after it), not the
+whole group. On 11 February the question "revenue so far" should include January and the first part of
+February, but not the orders still to come. So the window has to move: as we walk down the rows in date order,
+each row's window grows by one, or slides forward by one, or points at the single row next door.
+
+SQL gives you two tools for this. A <Term id="window-frame">frame</Term> chooses which rows *inside* the
+partition an aggregate like SUM or AVG uses for the current row, so it can say "from the start up to me" (a
+<Term id="running-total">running total</Term>) or "me and the two rows before me" (a moving average). And
+<Term id="lag-lead">LAG and LEAD</Term> skip the arithmetic entirely and simply fetch a value from the previous
+or next row, which is what every "compared with last time" question needs.
+
+</Section>
+
+<Section kind="technical" title="Partition, order, then frame">
+
+It helps to see the window clause as three questions asked in order, each narrowing the previous answer:
+
+1. **PARTITION BY: which rows can this row see at all?** Without it, all 12 orders. With `PARTITION BY month`,
+   only the orders of the same month.
+2. **ORDER BY: in what order are those rows lined up?** Only once the rows are in a line do "before me" and
+   "after me" mean anything.
+3. **The frame: which part of that line goes into this row's calculation?** Written as `ROWS BETWEEN ... AND
+   ...`, with bounds such as `UNBOUNDED PRECEDING` (the start of the partition), `2 PRECEDING` (two rows back),
+   `CURRENT ROW`, and `UNBOUNDED FOLLOWING` (the end).
+
+**A running total is a SUM with a growing frame.** `SUM(total) OVER (ORDER BY order_date)` lines the orders up by
+date and, for each one, adds up everything from the first order to the current one. Order 101 sees only itself
+(14.50). Order 102 sees 101 and 102 (14.50 + 59 = 73.50). Order 103 adds 18 and reaches 91.50, which is January's
+revenue, because 103 is the last January order. The last row, order 112, has every order in its frame, so its
+running total, 409, is the shop's total revenue. A running total always ends at the grand total; if it does not,
+something is filtering rows.
+
+<SqlRunner example={runningTotal} title="running_total.sql" />
+
+Notice that we never wrote a frame. That is the first thing to understand properly about frames: **when OVER has
+an ORDER BY and no frame clause, SQL fills in a default**, and that default is
+`RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`. "From the start up to me" is exactly what a running total
+needs, which is why the short version works. With no ORDER BY at all, the default frame is the whole partition,
+which is why last lesson's `SUM(total) OVER (PARTITION BY month)` gave every row the full month.
+
+**RANGE and ROWS differ only when the ORDER BY has ties.** ROWS counts physical rows: "the current row" is this
+one row. RANGE counts by value: "the current row" means this row *and every row with the same ORDER BY value*,
+called its peers. When every order has a different date, the two are identical. But order by `month` instead, and
+three orders share `2026-01`. Under RANGE, each January order's frame runs "up to the current month", so all three
+get 91.50. Under ROWS, they get 14.50, 73.50 and 91.50, a running total inside the month.
+
+<SqlRunner example={rangeVsRows} title="range_vs_rows.sql" />
+
+Which one is right depends on the question. "Revenue up to the end of this month", repeated on each order of the
+month, is RANGE. "Revenue up to and including this order" is ROWS, but then the order of tied rows decides the
+numbers, and SQL does not fix that order. That is the same trap as ROW_NUMBER with ties from the last lesson, and
+the same cure: add a tiebreaker to the ORDER BY (`ORDER BY month, id`) so the line-up is deliberate.
+
+**LAG and LEAD fetch a neighbour.** `LAG(revenue) OVER (ORDER BY month)` returns the `revenue` of the row one
+step earlier in that order; `LEAD` returns the one a step later. They take an optional offset (`LAG(x, 2)` is two
+rows back) and an optional default for when there is no such row. Without a default, the first row's LAG and the
+last row's LEAD are NULL, because there is nothing there. Like the ranking functions, LAG and LEAD ignore the
+frame; they only use the partition and the order.
+
+</Section>
+
+<Section kind="visual" title="Try it: watch the frame move">
+
+Pick a function, then select a row. The rows in its frame are highlighted; for LAG and LEAD, the one row it reads
+is highlighted. With PARTITION BY month, the other months fade, because the row cannot see them at all.
+
+<Experiment def={framesLab} title="Window explorer: frames, LAG and LEAD">
+  <WindowLab />
+  <Readout title="This window" />
+</Experiment>
+
+Things to try:
+
+- **Running sum, no partition, ORDER BY order_date.** Select order 106: its frame is the six orders from 101 to
+  106, which add up to 213.50. Select 112: the frame is everything, 409.
+- **Add PARTITION BY month.** The running sum restarts at each month boundary: order 104, the first February
+  order, drops from 123.50 to 32, because January is no longer in its window. The last row of each month now
+  shows that month's revenue (91.50, 185, 132.50).
+- **ORDER BY month, then switch between RANGE and ROWS.** With RANGE every February row shows 276.50, the
+  revenue up to the end of February, because all six are peers. With ROWS they climb one order at a time:
+  123.50, 154.50, 213.50 and so on. Nothing else changed; only the meaning of "current row".
+- **Moving average, and change n PRECEDING.** With 2 preceding, most rows average 3 orders, but the first row
+  averages only itself and the second only 2 orders: the frame cannot reach rows that do not exist. A bigger n
+  smooths more and reacts more slowly.
+- **LAG, then PARTITION BY month.** Without a partition only the first row is NULL. With it, the first order of
+  each month is NULL, 3 in all, because LAG cannot look across the partition edge into the previous month.
+
+As in the ranking explorer, the readout repeats the rule: rows in equals rows out. Frames change *which values*
+go into each row's calculation, never how many rows come back.
+
+</Section>
+
+<Section kind="code" title="Moving averages, period-over-period change and gaps between events">
+
+**Moving averages.** Daily numbers are noisy: one big order makes a spike. A moving average replaces each value
+with the average of a few recent values, so the spike is shared with its neighbours and the trend becomes
+visible. `ROWS BETWEEN 2 PRECEDING AND CURRENT ROW` means "this row and the two before it". The first value is
+14.50 (only one row exists), the second (14.50 + 59) / 2 = 36.75, and from the third on it is a true 3-order
+average: (14.50 + 59 + 18) / 3 = 30.50.
+
+<SqlRunner example={movingAverage} title="moving_average.sql" />
+
+Use ROWS here, not RANGE. "The two previous rows" is a count of rows, and in a table with several orders on one
+day RANGE would pull in all of that day's orders and the frame would no longer be 3 rows. Also notice that this
+is a moving average over *orders*, not over days: if there was no order for a week, the "previous 2 rows" may be
+a week old. For a true 7-day average, first build one row per day with a date spine (recursive CTE lesson), then
+take the moving average over those rows.
+
+**Period-over-period change.** "How did revenue change from last month?" needs this month and last month on the
+same row, and LAG puts them there. The CTE first changes the grain to one row per month (91.50, 185, 132.50),
+then LAG brings the previous month alongside. February grew by (185 − 91.50) / 91.50 = 102.2 percent; March fell
+by 28.4 percent.
+
+<SqlRunner example={monthOverMonth} title="month_over_month.sql" />
+
+Three details are worth copying. The month total is computed *before* LAG, in its own step, because LAG over the
+raw orders would compare each order with the previous order, not each month with the previous month. The first
+month's growth is NULL, which is the truthful answer: there is no previous month to grow from. And `NULLIF(...,
+0)` protects the division: if a previous month had zero revenue, growth is undefined, and NULLIF turns the
+zero into NULL so the result is NULL instead of a misleading number.
+
+**Gaps between a customer's events.** LEAD with PARTITION BY customer_id lines up each customer's orders by date
+and fetches the next one. The partition is essential: without it, "the next order" would be whoever ordered next
+in the whole shop. `julianday` turns a date into a day number in SQLite, so subtracting gives days. Ada ordered
+again after 22 days and then after 25; her last order has no next one, so LEAD is NULL.
+
+<SqlRunner example={daysToNext} title="days_to_next_order.sql" />
+
+This is the building block for retention and churn questions ("how many customers came back within 30 days?") and
+for sessions (a new session starts when the gap since the previous event is long), both in the analytics chapter.
+
+</Section>
+
+<Section kind="mistakes" title="Frame and neighbour mistakes">
+
+<CommonMistake
+  title="Forgetting the default frame has RANGE semantics"
+  wrong={'SUM(total) OVER (ORDER BY month) AS running_total'}
+  error="(no error) every order of a month shows the same 'running' total"
+  cause="With ORDER BY and no frame, the frame is RANGE ... CURRENT ROW, which includes all rows tied with the current one."
+  fix="Say what you mean: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW, with a tiebreaker in ORDER BY (month, id)."
+/>
+
+<CommonMistake
+  title="A running total that runs across groups"
+  wrong={'SUM(total) OVER (ORDER BY order_date) AS lifetime   -- meant per customer'}
+  error="(no error) each customer's 'lifetime value' includes everyone else's orders"
+  cause="Without PARTITION BY the whole result is one window."
+  fix="SUM(total) OVER (PARTITION BY customer_id ORDER BY order_date)."
+/>
+
+<CommonMistake
+  title="LAG over the wrong grain"
+  wrong={'SELECT month, total, LAG(total) OVER (ORDER BY month) FROM order_totals'}
+  error="(no error) the 'previous month' is just the previous order"
+  cause="LAG steps one row back, and here a row is an order."
+  fix="Aggregate to one row per month in a CTE first, then apply LAG to that."
+/>
+
+<CommonMistake
+  title="Hiding the first period's NULL"
+  wrong={'COALESCE(revenue - LAG(revenue) OVER (ORDER BY month), 0) AS change'}
+  error="(no error) the first month reports 'no change', which nobody measured"
+  cause="LAG returns NULL when there is no previous row, and COALESCE turns 'unknown' into 0."
+  fix="Leave it NULL (or label it), and use NULLIF on the divisor to keep divisions by zero NULL too."
+/>
+
+</Section>
+
+<Section kind="practice" title="Habits for frames, LAG and LEAD">
+
+- **Say the frame out loud**: "for each order, by date, from the first order up to this one".
+- **Write ROWS explicitly** whenever you mean rows, and add a tiebreaker to ORDER BY.
+- **Check a running total's last value** against the plain SUM of the same rows.
+- **Aggregate to the period first**, then LAG, for period-over-period change.
+- **Partition by the entity** (customer, user, device) before looking at "the next event".
+- **Treat the edge rows on purpose**: the first LAG, the last LEAD and the short first frames of a moving average.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<SqlExercise exercise={exercise}>
+  For every order of a known customer, return `customer_id`, `id`, `order_date`, `total` and `lifetime`, the
+  customer's running total up to and including that order, sorted by customer and then date. The starter's
+  running total ignores who placed the order.
+</SqlExercise>
+
+</Section>
+
+<Section kind="summary">
+
+A window has three layers: PARTITION BY decides which rows a row can see, ORDER BY lines them up, and the frame
+picks the slice of that line that an aggregate uses for the current row. A growing frame (from UNBOUNDED
+PRECEDING to CURRENT ROW) makes a running total, and a sliding frame (n PRECEDING to CURRENT ROW) makes a moving
+average. The default frame with ORDER BY is RANGE, which treats tied rows as one step, so write ROWS when you mean
+rows. LAG and LEAD ignore the frame and fetch the previous or next row's value, which turns "compared with last
+time" and "time until the next event" into one column, as long as you aggregate to the right grain and partition
+by the right entity first.
+
+The next chapter uses all of this on real analytics questions: funnels, cohort retention and sessions.
+
+Next: [Funnels and cohort retention](#/learn/sql/analytics/funnels-cohorts).
+
+</Section>
