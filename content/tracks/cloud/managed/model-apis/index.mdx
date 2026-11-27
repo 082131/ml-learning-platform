@@ -1,0 +1,244 @@
+import { api, apiDemo, bedrockCode, vertexCode } from './code';
+import { apiExercise, questions } from './quiz';
+
+<Section kind="intuition" title="A taxi or a car of your own">
+
+If you drive twice a month, owning a car is absurd: you pay for it every day, park it, insure it and service it, so
+each trip costs a fortune. A taxi charges only for the trips. If you drive four hours every day, the sums flip: the
+car's fixed costs are spread over so many trips that each one becomes cheap, and the taxi meter becomes the expensive
+choice.
+
+Language models on the cloud offer the same choice. A <Term id="model-api">model API</Term>, such as Amazon Bedrock
+or Vertex AI, is the taxi: you send a request and pay for the tokens in and out, nothing when nobody calls. Running
+an <Term id="open-weight-model">open-weight model</Term> on your own GPUs is the car: you pay for the GPUs every hour
+of the month, plus the people who keep the service running, whether the requests come or not.
+
+The previous lesson showed how a managed job removes idle hours from training. This lesson asks the same question
+for serving: at what volume does owning the GPUs start to pay off, why that volume is usually much higher than
+people expect, and what lies between the two extremes.
+
+</Section>
+
+<Section kind="technical" title="Two cost shapes, and where they cross">
+
+**The big picture.** An API's cost grows in proportion to traffic → self-hosting starts from a floor (at least one
+GPU all month, plus the people) and then grows in steps sized for the busiest hour → so self-hosted GPUs sit mostly
+idle → the two lines cross at a break-even volume → and the services in between (batch, provisioned throughput,
+managed endpoints) move that crossing, as do data, latency and control requirements.
+
+### Three ways to get an answer from a model on the cloud
+
+| Option | You provide | You pay | Examples |
+| --- | --- | --- | --- |
+| **Hosted model API** | Requests | Per input and output token | Amazon Bedrock, Gemini and partner models on Vertex AI |
+| **<Term id="managed-endpoint">Managed endpoint</Term>** | The model (weights + serving container) | Per instance-hour, or per use for serverless | SageMaker real-time and serverless endpoints, Vertex AI endpoints |
+| **Your own servers** | Everything: GPUs, serving engine, scaling, monitoring | Per GPU-hour + engineering time | GPU VMs, or Kubernetes with vLLM ([Deploy track](#/learn/deploy/llm-serving/vllm-kserve)) |
+
+Moving down the table, you gain control (any model, your own fine-tune, your own batching and quantization) and you
+take on fixed costs and work. The cost comparison below sets the top row against the bottom one, because that is where
+the difference is largest; a managed endpoint has the bottom row's cost shape with less of the work.
+
+### The API: cost proportional to traffic
+
+Per request you pay input tokens × the input price plus output tokens × the output price, quoted per million tokens.
+The [AI Engineer track](#/learn/ai/ops/latency-cost-security) works through the per-request levers (prompt caching,
+shorter outputs, smaller models); here we only need the monthly total:
+
+$$
+\text{API} = 30 \times \text{requests per day} \times \frac{t_{in}\,p_{in} + t_{out}\,p_{out}}{10^6}.
+$$
+
+With 1,000 input and 300 output tokens at illustrative prices of \$0.50 and \$1.50 per million, a request costs
+\$0.00095. At 10,000 requests a day that is **\$285 a month**. Halve the traffic and the bill halves; stop it and the
+bill is zero. That proportionality is the whole appeal.
+
+### Self-hosting: a floor, then steps sized for the peak
+
+On your own GPUs the question is not "how many tokens" but "how many GPUs must be running". Work it through in a
+chain:
+
+1. **Average load.** 10,000 requests × 300 output tokens ÷ 86,400 seconds = **34.7 output tokens per second** on
+   average.
+2. **Peak load.** Traffic is not flat: it rises during working hours and falls at night. The
+   <Term id="peak-to-average-ratio">peak-to-average ratio</Term> (here 3) says the busiest hour needs about
+   104 tokens per second, and users at the busiest hour must still be served.
+3. **GPUs.** One GPU with a batching engine sustains, say, 400 output tokens per second for this model. 104 ÷ 400
+   rounds up to **1 GPU**, and you can never run fewer than one.
+4. **Cost.** 1 GPU × 730 hours × \$1 = \$730, plus 10 engineer-hours at \$100 for upgrades, monitoring and on-call:
+   **\$1,730 a month**, six times the API.
+
+Now look at how busy that GPU is: 34.7 ÷ 400 = **9%**. You pay for 100% of the hours and use 9% of them. Even at very
+high traffic, where the fleet is large and the one-GPU floor no longer matters, a fleet sized for a peak three times
+the average is busy at most a third of the time on average. Autoscaling down at night raises that share (the
+[autoscaling lesson](#/learn/deploy/kubernetes/autoscaling-rollouts) shows how), but GPUs with large models start
+slowly, so most teams keep a buffer. An API provider faces the same physics but pools thousands of customers whose
+peaks fall at different times, and that pooling is what you buy with each token.
+
+### The break-even: where the lines cross
+
+Put the two together. The API line rises smoothly from zero. The self-hosted line starts at \$1,730 and climbs in
+\$730 steps each time the peak needs another GPU. They cross when the API bill catches up with the step you are on.
+With these numbers, a request costs \$0.0285 a month on the API (\$0.00095 × 30), and at 3 GPUs self-hosting costs
+\$3,190, so the API stops winning near 3,190 ÷ 0.0285 ≈ **112,000 requests a day**.
+
+The three inputs that move the crossing most are worth knowing by heart:
+
+- **The people cost.** It is fixed and the API has none. Raise it from 10 to 40 hours a month and the break-even
+  quadruples to about 457,000 a day. It is the most underestimated term in real plans.
+- **The token price.** A larger model at \$10 per million output tokens costs the API \$1,050 a month at the default
+  volume, and self-hosting wins from about 17,000 requests a day. Expensive models make owning GPUs attractive sooner.
+- **Serving speed.** A faster engine (1,500 instead of 400 tokens per second) changes nothing at low volume, where
+  you pay for the one-GPU floor anyway, but it delays the second GPU and pulls the crossing down to about 62,000 a day.
+
+### Between the extremes
+
+Hosted services offer more than one price shape, and each matches a traffic pattern:
+
+- **<Term id="batch-inference">Batch inference</Term>** (Bedrock batch inference, Vertex AI batch prediction): you
+  upload a file of requests and get results within hours. For supported models both providers list it at around half
+  the on-demand price. Nightly jobs, evaluations and backfills belong here.
+- **<Term id="provisioned-throughput">Provisioned throughput</Term>**: you buy capacity on a hosted model by the hour
+  or month. It guarantees a rate and is sometimes required for custom (fine-tuned or imported) models, but like your
+  own GPUs it bills during quiet hours too.
+- **Managed endpoints**: your own model, served and scaled by the platform. SageMaker serverless and asynchronous
+  endpoints can scale to zero for spiky or occasional traffic, at the cost of cold starts (the compute-options
+  lesson's trade-off again).
+
+### It is not only cost
+
+The cheapest line on the chart is not always the right answer. Four other questions often decide:
+
+1. **Data and networking.** Bedrock and Vertex AI process requests in the region you call, authenticate with the
+   same IAM roles and service accounts as the rest of your account (no API keys to leak), and can be reached through
+   private endpoints (AWS PrivateLink, Private Service Connect) so prompts never cross the public internet. Read the
+   provider's data-use terms, but strict data rules do not by themselves force self-hosting.
+2. **Limits.** Hosted models have quotas in requests and tokens per minute, per model and region. A launch that
+   needs ten times the default quota must request it early, exactly like the GPU quotas in the GPU lesson.
+3. **Latency and control.** Your own servers let you pick the model, the quantization and the batching, and keep a
+   fine-tuned model; an API gives you the provider's choices and its shared capacity.
+4. **Lock-in.** Bedrock's Converse API and OpenAI-compatible endpoints give many models one request shape, so
+   switching models (or moving to self-hosting later) is a configuration change rather than a rewrite.
+
+<Callout kind="simplification">
+All prices in this lesson are illustrative, not quotes: token prices differ by model, region and provider, and GPU
+prices by instance type. The self-hosting model assumes a fixed throughput per GPU, a fleet sized for the peak hour
+with no autoscaling, and 730 hours a month; the API side ignores caching and batch discounts. Real throughput
+depends on prompt lengths, batch sizes and the serving engine, so measure it with a load test (the
+[Inference track](#/learn/inference/serving/apis-containers) shows how) before trusting a break-even figure.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Try it: API or your own GPUs?">
+
+A support assistant with 1,000 input and 300 output tokens per request, a busiest hour three times the average, and
+GPUs at an illustrative \$1 per hour.
+
+<Experiment def={api} title="Model API versus self-hosting">
+  <ApiView />
+  <Readout title="This month" />
+</Experiment>
+
+Things to try:
+
+- **Start with the defaults.** At 10,000 requests a day the API costs \$285 and self-hosting \$1,730, with the one
+  GPU 9% busy. The break-even is about 112,000 a day.
+- **Raise the volume to 1,000,000 a day.** Self-hosting now wins (\$20,710 against \$28,500), but the 27 GPUs are only
+  about a third busy: that is the peak-to-average ratio, not waste you can tune away.
+- **Set engineer hours to 0, then 40.** The break-even moves from about 26,000 to about 457,000 a day. The people
+  cost decides more often than the GPU price.
+- **Set the API output price to \$10.** A larger hosted model makes self-hosting win from about 17,000 a day, if you
+  can serve an equivalent open-weight model.
+
+</Section>
+
+<Section kind="code" title="The comparison, and the same request on two clouds">
+
+The two cost shapes in a few lines, with the lab's defaults:
+
+<PythonRunner example={apiDemo} title="apis.py" />
+
+A request to an open-weight model through Amazon Bedrock's Converse API. `maxTokens` follows the lab's output length:
+
+<Experiment def={api} title="ask_bedrock.py, linked to the lab" controls={false}>
+  <Code example={bedrockCode} title="ask_bedrock.py (needs an AWS account; not run here)" />
+  <Readout title="What the lab expects at this volume" />
+</Experiment>
+
+The same kind of call through Vertex AI with the Google Gen AI SDK:
+
+<Code example={vertexCode} title="ask_vertex.py (needs a Google Cloud project; not run here)" />
+
+</Section>
+
+<Section kind="mistakes" title="How API-versus-GPU decisions go wrong">
+
+<CommonMistake
+  title="Comparing the token price with the GPU price at full use"
+  wrong={'gpu_cost_per_token = 1.00 / (400 * 3600)   # assumes the GPU is busy every second'}
+  error="(no error) the plan says self-hosting is 4× cheaper; the real bill is several times higher"
+  cause="GPUs are paid for every hour but sized for the busiest one, so they run far below capacity on average, and the people cost is left out."
+  fix="Size the fleet for the peak, bill all 730 hours, add the monthly engineering time, and compare whole months."
+/>
+
+<CommonMistake
+  title="Forgetting the tokens-per-minute quota"
+  wrong={'# launch day: traffic is 20x the test load'}
+  error="botocore.errorfactory.ThrottlingException: An error occurred (ThrottlingException) when calling the Converse operation: Too many tokens, please wait before trying again."
+  cause="Hosted models have per-model, per-region quotas on requests and tokens per minute; the default may be far below launch traffic."
+  fix="Check the quotas for the model and region before launch, request increases early, and retry throttled calls with backoff (the automation track's retry lesson)."
+/>
+
+<CommonMistake
+  title="Keeping provisioned capacity for a nightly job"
+  wrong={'# provisioned throughput bought for a job that runs 2 hours a night'}
+  error="(no error) the monthly bill shows 730 hours of capacity for 60 hours of use"
+  cause="Provisioned throughput, like your own GPUs, bills whether it is used or not."
+  fix="Use batch inference for work with a deadline in hours, and keep provisioned capacity for steady, latency-sensitive traffic."
+/>
+
+</Section>
+
+<Section kind="practice" title="Choosing how to serve a model">
+
+- **Start on an API** for a new feature: there is no fixed cost, so it is the cheapest way to learn the real traffic.
+- **Log tokens per request and requests per hour** from day one. They are the inputs of the break-even, measured.
+- **Price self-hosting as a whole month**: peak-sized fleet × 730 hours + the people, and a load-tested throughput.
+- **Move steady overnight work to batch inference** before thinking about owning GPUs.
+- **Keep the request shape portable** (Converse or an OpenAI-compatible endpoint) so changing model or host later is
+  configuration.
+- **Self-host when volume, data rules, a fine-tuned model or latency control clearly justify it**, and review the
+  sums each quarter as prices fall.
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={apiExercise}>
+  Compute a month of API cost and of self-hosted cost from the traffic.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+A model API and your own GPUs have different cost shapes. The API grows in proportion to traffic and is zero when
+nobody calls. Self-hosting starts from a floor, at least one GPU all month plus the people who run it, and then grows
+in GPU-sized steps chosen for the busiest hour. Because the fleet is sized for the peak, it is busy on average only
+about average ÷ peak of the time, which is why the break-even volume is usually much higher than a naive "price per
+token" comparison suggests.
+
+The crossing moves with three inputs above all: the people cost (fixed, and often decisive), the token price of the
+model you would replace, and serving speed (which matters only once you need more than one GPU). Between the
+extremes, batch inference trades latency for price, provisioned throughput and managed endpoints trade flexibility
+for capacity, and data location, quotas, control and lock-in can outweigh the cost line.
+
+Next: [Cost control: tags, budgets and the usual leaks](#/learn/cloud/operations/cost-control).
+
+</Section>

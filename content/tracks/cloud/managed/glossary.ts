@@ -30,4 +30,31 @@ export default [
     introducedIn: 'cloud/managed/managed-training',
     aliases: ['use_spot_instances', 'max_wait'],
   },
+  {
+    id: 'open-weight-model',
+    term: 'Open-weight model',
+    short: 'A model whose trained weights you can download and run yourself (Llama, Mistral, Qwen, Gemma), so the same model can be called through a hosted API or served on your own GPUs.',
+    introducedIn: 'cloud/managed/model-apis',
+    aliases: ['open model', 'open weights'],
+  },
+  {
+    id: 'peak-to-average-ratio',
+    term: 'Peak-to-average ratio',
+    short: 'Traffic in the busiest hour divided by the average hour. A fleet sized for the peak is busy on average at most 1 ÷ this ratio of the time, unless it scales down.',
+    introducedIn: 'cloud/managed/model-apis',
+    aliases: ['peak factor'],
+  },
+  {
+    id: 'provisioned-throughput',
+    term: 'Provisioned throughput',
+    short: 'Capacity on a hosted model bought by the hour or month (Bedrock model units, Vertex AI provisioned throughput) instead of per token: a guaranteed rate at a fixed price, between on-demand APIs and your own GPUs.',
+    introducedIn: 'cloud/managed/model-apis',
+  },
+  {
+    id: 'managed-endpoint',
+    term: 'Managed endpoint',
+    short: 'A model you supply, served by the cloud on instances it runs and scales (SageMaker real-time, serverless or asynchronous endpoints, Vertex AI endpoints). Billed per instance-hour, or per use for serverless.',
+    introducedIn: 'cloud/managed/model-apis',
+    aliases: ['SageMaker endpoint', 'Vertex AI endpoint'],
+  },
 ] satisfies GlossaryTerm[];

@@ -47,21 +47,21 @@ Each option charges for something different, and that is what decides the cost:
   charge per request. Its cost is a straight line through zero: no traffic, no bill; double the traffic, double the
   bill.
 
-With AWS Lambda's x86 list prices in US East ($0.0000166667 per GB-second, $0.20 per million requests), a million
+With AWS Lambda's x86 list prices in US East (\$0.0000166667 per GB-second, \$0.20 per million requests), a million
 requests a month of 200 ms at 1 GB costs
 
 $$
 10^6 \times 0.2\,\text{s} \times 1\,\text{GB} \times \$0.0000166667 + 1 \times \$0.20 \approx \$3.53 .
 $$
 
-Two small always-on VMs at $0.10 an hour cost 2 × 730 × $0.10 = $146 for the same month (730 is the number of
+Two small always-on VMs at \$0.10 an hour cost 2 × 730 × \$0.10 = \$146 for the same month (730 is the number of
 hours cloud price pages use for a month). The function wins by a factor of 40.
 
 ### The break-even point
 
 Now the natural next question: does the function always win? No, because a line through zero eventually crosses a
-staircase. At 100 million requests a month the function costs about $353, while three VMs handle the peak for
-$219. The **break-even volume** is where the two costs meet, around 40 million requests a month in this example.
+staircase. At 100 million requests a month the function costs about \$353, while three VMs handle the peak for
+\$219. The **break-even volume** is where the two costs meet, around 40 million requests a month in this example.
 Below it, pay per use; above it, keep machines busy. The lab finds it for any inputs.
 
 The deeper reason is **utilization**: how busy the VMs are on average. At a million requests a month, two VMs are
@@ -102,7 +102,7 @@ per instance is an input you should measure with a load test (see the
 
 <Section kind="visual" title="Try it: pay per request or pay per hour?">
 
-The lab starts with a million 200 ms requests a month at 1 GB, against two always-on $0.10/hour VMs.
+The lab starts with a million 200 ms requests a month at 1 GB, against two always-on \$0.10/hour VMs.
 
 <Experiment def={compute} title="Serverless vs VMs">
   <ComputeView />
@@ -111,9 +111,9 @@ The lab starts with a million 200 ms requests a month at 1 GB, against two alway
 
 Things to try:
 
-- **The start**: serverless about $3.53, VMs $146. The VMs are busy under 1% of the time.
+- **The start**: serverless about \$3.53, VMs \$146. The VMs are busy under 1% of the time.
 - **Step the volume up to 100 million**: the line crosses the staircase. VMs now win.
-- **At 10 million, raise time per request to 2,000 ms** (a slow model): serverless jumps to over $330. Longer work
+- **At 10 million, raise time per request to 2,000 ms** (a slow model): serverless jumps to over \$330. Longer work
   favours machines you keep busy.
 - **Set VMs always running to 1**: cheaper, but now a single VM failure is an outage. That is a reliability
   decision dressed as a cost decision.

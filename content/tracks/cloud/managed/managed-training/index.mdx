@@ -150,7 +150,7 @@ question: when is a hosted model API cheaper than any server you run?
 
 <Section kind="visual" title="Try it: the same run, managed and by hand">
 
-The same 3-hour fine-tune on one g6e.xlarge at an illustrative $1.86 per hour, with a 200 GB dataset copied at
+The same 3-hour fine-tune on one g6e.xlarge at an illustrative \$1.86 per hour, with a 200 GB dataset copied at
 500 MB/s. The first timeline is a SageMaker job, the second a VM you run yourself; phases marked “not billed” cost
 nothing.
 
@@ -161,10 +161,10 @@ nothing.
 
 Things to try:
 
-- **Start with the defaults.** The managed job bills 3.12 instance-hours ($5.80) and the VM 17.87 ($33.24). Almost
+- **Start with the defaults.** The managed job bills 3.12 instance-hours (\$5.80) and the VM 17.87 (\$33.24). Almost
   all of the gap is the 14 hours nobody stopped the VM, not the setup.
-- **Set the VM's idle hours to 0.** The VM now costs $7.20, still more than the job because of the 45 minutes of
-  setup, but the gap shrinks to $1.40. The managed job's real advantage is discipline, not a cheaper GPU.
+- **Set the VM's idle hours to 0.** The VM now costs \$7.20, still more than the job because of the 45 minutes of
+  setup, but the gap shrinks to \$1.40. The managed job's real advantage is discipline, not a cheaper GPU.
 - **Raise the dataset to 2,000 GB in File mode.** The download grows to 67 minutes, all billed. Switch to FastFile
   and it disappears (if, as the lesson warned, your files are large and read in order).
 - **Use 4 instances.** Every billed minute now counts four times, including four full downloads with the default

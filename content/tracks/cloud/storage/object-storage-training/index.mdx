@@ -68,8 +68,8 @@ min(1, throughput / need). Small images: 75 / 600 = **12.5%** busy, so you pay f
 
 ### Two more costs of small files
 
-- **Request charges.** S3 Standard charges $0.0004 per 1,000 GET requests (US East). A 500 GB dataset of 100 KB
-  images is 5 million objects: $2 per epoch in requests alone, against less than a tenth of a cent for 1,954 shards.
+- **Request charges.** S3 Standard charges \$0.0004 per 1,000 GET requests (US East). A 500 GB dataset of 100 KB
+  images is 5 million objects: \$2 per epoch in requests alone, against less than a tenth of a cent for 1,954 shards.
 - **Request-rate limits.** S3 supports at least 5,500 GET requests per second per
   <Term id="request-rate-prefix">prefix</Term> (the part of the key before the object name) and scales by
   partitioning busy prefixes. A very parallel small-file loader can hit that and get `503 Slow Down` until S3

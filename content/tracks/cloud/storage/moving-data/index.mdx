@@ -28,9 +28,9 @@ Cloud providers charge for data by the route it takes. With AWS's US East list p
 | --- | --- |
 | Into the cloud from the internet | free |
 | From S3 to an instance in the same region | free |
-| Between two instances in different zones of one region | $0.01 each way |
-| Between regions | $0.02 (varies by region pair) |
-| Out to the internet (<Term id="egress">egress</Term>), first 10 TB a month | $0.09 |
+| Between two instances in different zones of one region | \$0.01 each way |
+| Between regions | \$0.02 (varies by region pair) |
+| Out to the internet (<Term id="egress">egress</Term>), first 10 TB a month | \$0.09 |
 
 The shape matters more than the cents: getting data *in* is free, keeping it *next to* the compute is free, and
 every hop *away* costs more. Google Cloud's network pricing has the same shape with its own numbers. So the cost of
@@ -44,9 +44,9 @@ $$
 
 This is where the expensive mistake hides. Training reads the whole dataset once per epoch, and a team runs several
 experiments a month. A 2 TB dataset read for 10 epochs in 2 runs is 20 full reads: **40 TB** moved, not 2. Across
-regions at $0.02 that is $800 a month; out of another cloud at $0.09 it is $3,600.
+regions at \$0.02 that is \$800 a month; out of another cloud at \$0.09 it is \$3,600.
 
-If instead you **copy once** to storage next to the GPUs, only 2 TB crosses the boundary ($40 or $180), and the 20
+If instead you **copy once** to storage next to the GPUs, only 2 TB crosses the boundary (\$40 or \$180), and the 20
 reads happen locally for free. Same training, the bill divided by the number of reads.
 
 ### Step 3: how long it takes
@@ -99,10 +99,10 @@ The lab starts with a 2 TB dataset in another region, read 20 times a month, str
 
 Things to try:
 
-- **The start**: 40,000 GB moved, $800 a month, and 18 hours of transfer time spread over the month's runs.
-- **Turn on "copy once"**: 2,000 GB moved, $40, and each later read comes from fast local storage.
-- **Move the data outside the cloud**: the same 20 reads cost $3,600. Copying once costs $180.
-- **Put the data in the GPUs' region**: $0 either way. Caching still helps speed, but no longer the bill.
+- **The start**: 40,000 GB moved, \$800 a month, and 18 hours of transfer time spread over the month's runs.
+- **Turn on "copy once"**: 2,000 GB moved, \$40, and each later read comes from fast local storage.
+- **Move the data outside the cloud**: the same 20 reads cost \$3,600. Copying once costs \$180.
+- **Put the data in the GPUs' region**: \$0 either way. Caching still helps speed, but no longer the bill.
 - **Raise reads to 60** with the data remote: the bill triples, which is the data gravity argument in one slider.
 
 </Section>
