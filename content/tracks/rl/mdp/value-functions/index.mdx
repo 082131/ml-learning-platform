@@ -1,0 +1,224 @@
+import { evaluatePy, evaluation, yourPolicy } from './code';
+import { evaluateExercise, questions } from './quiz';
+
+<Section kind="intuition" title="A price tag on every cell">
+
+Imagine you are dropped into the slippery grid and someone hands you a policy: "follow these arrows". Before you
+start walking, you would like to know: *standing here, following these arrows, how well will I do?* Some cells are
+great places to be (one step from the goal, nowhere near the pit). Others are bad (beside the pit, or far away).
+
+A **value function** puts a price tag on every cell. The price is the return you can expect from that cell if you
+keep following the policy. Once every cell has a price, two things become easy:
+
+- **Comparing policies.** A policy whose cells are worth more is better.
+- **Choosing actions.** From any cell, prefer the move that tends to land you on high-priced cells. That idea becomes
+  the whole of the next lesson.
+
+So the question of this lesson is narrow and concrete: *given a fixed policy, how do we compute the price tag of every
+cell?* The answer is one equation, the Bellman equation, and a simple way to solve it.
+
+</Section>
+
+<Section kind="technical" title="From returns to values to the Bellman equation">
+
+### The big picture
+
+We know the **return** of one episode (lesson 2) → but the slippery grid makes episodes random, so we take the
+**average return** over all ways an episode can go, per starting cell: that is the **value** → the return's
+recursion ("next reward + γ × return from the next step") becomes the **Bellman equation** for values → we solve it
+by **sweeping** it over the grid until the numbers stop changing.
+
+### Step 1: values are expected returns
+
+The <Term id="state-value">state value</Term> of a cell under policy $\pi$ is
+
+$$
+V^\pi(s) = \mathbb{E}_\pi\bigl[\, G_t \mid S_t = s \,\bigr]
+$$
+
+In words: start in state $s$, follow $\pi$, and average the return $G_t$ over everything that could happen. The
+$\mathbb{E}$ means "expected value", the probability-weighted average you used in the probability lesson. The little
+$\pi$ says that the average assumes you act according to $\pi$. A value only makes sense *for a particular policy*:
+the same cell is worth a lot under a good policy and little under a bad one.
+
+There is a second, closely related number. The <Term id="action-value">action value</Term> $Q^\pi(s, a)$ is the
+expected return if you take action $a$ in $s$ **first** and follow $\pi$ afterwards. $V$ asks "how good is it to be
+here?"; $Q$ asks "how good is it to make this particular move from here?". Keep them apart:
+
+| | $V^\pi(s)$ | $Q^\pi(s, a)$ |
+| --- | --- | --- |
+| Question | how good is this state, if I follow π? | how good is this action here, then following π? |
+| Inputs | a state | a state and an action |
+| Size of the table | one number per state | one number per state and action |
+| Used for | judging policies, planning | choosing actions without a model (lesson 8) |
+
+They are tied together in both directions:
+
+- $V^\pi(s) = \sum_a \pi(a \mid s)\, Q^\pi(s, a)$: the value of a state is the average of its action values, weighted by
+  how often $\pi$ takes each action.
+- $Q^\pi(s, a) = \sum_{s'} P(s' \mid s, a) \bigl[ r + \gamma V^\pi(s') \bigr]$: the value of an action is, for each
+  place it can land, the reward plus the discounted value of landing there, averaged over the landing
+  probabilities. (If $s'$ is terminal, its value is 0: there is nothing left to collect.)
+
+### Step 2: the Bellman expectation equation
+
+Put the two lines together and you get the <Term id="bellman-equation">Bellman equation</Term> for $V^\pi$:
+
+$$
+V^\pi(s) = \sum_a \pi(a \mid s) \sum_{s'} P(s' \mid s, a)\, \bigl[\, r(s, a, s') + \gamma\, V^\pi(s') \,\bigr]
+$$
+
+It looks dense, but it is lesson 2's recursion with two averages wrapped around it. Read it from the inside out:
+
+1. $r + \gamma V^\pi(s')$: "the reward of this step plus the discounted value of where I land". That is exactly
+   $G_t = r_{t+1} + \gamma G_{t+1}$, with the unknown future return replaced by its average, the value.
+2. $\sum_{s'} P(s' \mid s, a)\,[\ldots]$: average over where the action might land (the environment's randomness).
+3. $\sum_a \pi(a \mid s)\,[\ldots]$: average over which action the policy picks (the policy's randomness).
+
+The equation says something that sounds obvious once you hear it: **a cell is worth what you get for leaving it plus
+what the cell you land on is worth**. But it is powerful, because it links every value to its neighbours' values.
+There is one such equation per state, and together they pin all the values down.
+
+### Step 3: solving it by sweeping
+
+The catch: $V^\pi$ appears on both sides. To know (0,2) you need (1,2); to know (1,2) you need (0,2) again. We break
+the circle the same way you would solve "x = 0.5x + 1" by guessing: start with a guess, plug it into the right-hand
+side, get a better guess, repeat.
+
+This is <Term id="policy-evaluation">policy evaluation</Term>:
+
+1. Start with $V(s) = 0$ for every state.
+2. **Sweep**: compute a new value for every state from the Bellman equation, using the old values on the right.
+3. Repeat until the largest change in a sweep is tiny.
+
+Why does it work? After one sweep, each value counts exactly one step of reward. After two sweeps, two steps, and so
+on: **after $k$ sweeps, $V$ is the expected return of the first $k$ steps**. The steps further out matter less and
+less (because of $\gamma$, or because the episode has probably ended by then), so the values settle. You can watch
+this below: the goal's +1 shows up first in (0,2), then spreads one cell further back with every sweep, like ink
+soaking into paper.
+
+Using estimates of other states' values to update a state's value is called
+<Term id="bootstrapping">bootstrapping</Term>, from "pulling yourself up by your own bootstraps". It is the trick
+behind dynamic programming here and TD learning in lesson 7.
+
+### A worked backup
+
+Take the safe policy, sweep 1, cell (0,2), whose arrow says "right". All values are still 0. The three outcomes:
+
+- 0.8: right into the goal. Reward $-0.04 + 1 = 0.96$, and the goal is terminal, so no future value. Contributes
+  $0.8 \times 0.96 = 0.768$.
+- 0.1: slip up into the edge and stay. Reward −0.04, plus $\gamma \times V(0,2) = 0$. Contributes −0.004.
+- 0.1: slip down to (1,2). Reward −0.04 plus $V(1,2) = 0$. Contributes −0.004.
+
+New $V(0,2) = 0.768 - 0.004 - 0.004 = 0.76$. The explorer shows exactly this breakdown for whichever cell you choose.
+
+### What the converged values tell us
+
+For the safe policy the values settle after 22 sweeps: 0.705 at the start, rising to 0.918 next to the goal. These are
+the numbers in Russell and Norvig's textbook for this grid, which is a good check that our equations are right.
+
+Now evaluate the **shortcut** policy, which walks along the bottom and goes up beside the pit. Its intended route is
+shorter, yet the start is worth only 0.508. The reason is the expectation: every step beside the pit has a 10% chance
+of slipping in for −1, and averaging in those disasters costs more than the saved moves gain. The value function has
+just told us, with a number, that the safe route is better.
+
+</Section>
+
+<Section kind="visual" title="Try it: watch values spread from the goal">
+
+Choose a policy, then drag "sweeps done" from 0 upwards. The panel on the right works out the backup for one cell
+(pick it with "cell to explain"), using the values from the previous sweep.
+
+<Experiment def={evaluation} title="Policy evaluation explorer">
+  <RlEvalGrid />
+  <Readout title="Policy evaluation" />
+</Experiment>
+
+Things to try:
+
+- **Safe policy, sweeps 0 → 5**: after one sweep only (0,2) is clearly positive (0.76). Each sweep pushes the good news
+  one cell further along the arrows. By sweep 5 it reaches the start, whose value turns positive (0.128).
+- **Explain cell (0,2) at sweep 1**: the panel shows the 0.768 − 0.004 − 0.004 from the worked example.
+- **Shortcut policy, 40 sweeps**: compare the start, 0.508, with the safe policy's 0.705. Then set slip to 0: with
+  no slipping the shortcut is no longer risky, and the two policies are worth about the same from the start. The risk
+  was the whole difference.
+- **Random policy**: every value is negative and it takes about 169 sweeps to settle, because a random walker wanders
+  for a long time.
+- **γ = 0.9** with the safe policy: every value drops, most of all far from the goal, because the +1 is further in
+  the future there.
+
+</Section>
+
+<Section kind="code" title="Policy evaluation in Python">
+
+The grid's transition model from the last lesson, a `q_value` that computes the inner part of the Bellman equation,
+and `evaluate`, which sweeps until nothing moves by more than 0.0001. Run it: the safe policy's numbers match the
+visual and the textbook.
+
+<PythonRunner example={evaluatePy} title="evaluate.py" />
+
+The explorer's settings as a call:
+
+<Experiment def={evaluation} title="your evaluation as code" controls={false}>
+  <Code example={yourPolicy} title="settings.py" />
+</Experiment>
+
+</Section>
+
+<Section kind="mistakes" title="Policy evaluation mistakes">
+
+<CommonMistake
+  title="Giving terminal states a future"
+  wrong={'q += p * (r + gamma * V[n])   # V[GOAL] keeps growing'}
+  error="(no error) values creep upward every sweep and never settle, or settle too high"
+  cause="If the goal's own value is updated and added after the +1, the reward is counted again and again."
+  fix="Add no future value after a terminal transition: r + (0 if done else gamma * V[n])."
+/>
+
+<CommonMistake
+  title="Mixing old and new values by accident"
+  wrong={'for s in STATES:\n    V[s] = backup(V, s)   # later states already see this sweep\'s values'}
+  error="(no error) the numbers after k sweeps differ from the explanation and from the visual"
+  cause="Updating V in place makes later states in the same sweep use fresh values. That also converges (it is called Gauss–Seidel or in-place evaluation), but sweep k no longer means 'k steps of the future'."
+  fix="Build the new table from the old one (a synchronous sweep), or know that you chose the in-place variant."
+/>
+
+<CommonMistake
+  title="Reading a value as a reward"
+  wrong="V(0,2) = 0.918, so moving into (0,2) earns 0.918."
+  error="(misconception) values are expected returns from a state onward, not rewards for entering it"
+  cause="V sums everything that follows, discounted and averaged, under one specific policy."
+  fix="Say 'from (0,2), following this policy, I expect a return of 0.918'."
+/>
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={evaluateExercise}>
+  Write policy evaluation for any small MDP given as dictionaries.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+The chain of this lesson: because episodes are random, a cell's worth is its **expected return** under a policy, its
+**value** $V^\pi(s)$; the per-action version is $Q^\pi(s, a)$, and $V$ is $\pi$'s average over $Q$. Taking lesson 2's
+recursion "reward + γ × return from the next step" and averaging it over actions and landing cells gives the
+**Bellman expectation equation**. Values appear on both sides, so we **sweep** from zeros, and each sweep adds one
+more step of the future, which is why the goal's reward spreads backwards one cell per sweep. The converged values let
+us compare policies: the shortcut is worth less than the safe route because of the slips into the pit.
+
+But we only *evaluated* policies someone gave us. The obvious next question is: which policy is the best one, and
+can the values themselves tell us? They can, and the next lesson shows how.
+
+Next: [Finding the best policy: value iteration](#/learn/rl/mdp/value-iteration).
+
+</Section>

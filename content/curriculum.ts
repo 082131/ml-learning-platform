@@ -703,7 +703,7 @@ export const tracks: Track[] = [
         level: 'intermediate',
         lessons: [
           { id: 'rl/mdp/markov-decision-processes', status: 'written' },
-          { id: 'rl/mdp/value-functions', status: 'outline' },
+          { id: 'rl/mdp/value-functions', status: 'written' },
           { id: 'rl/mdp/value-iteration', status: 'outline' },
         ],
       },
