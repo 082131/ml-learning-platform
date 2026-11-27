@@ -1,0 +1,167 @@
+import { brief, capstone, checkDemo, layout } from './code';
+import { capstoneExercise, questions } from './quiz';
+
+<Section kind="intuition" title="One plan, every lesson">
+
+Each lesson in this track answered one question: where machines live, who may do what, how traffic flows, how data
+reaches the GPUs, which GPU fits, how to survive spot interruptions, when to let a managed service run the job, when a
+hosted API beats your own GPUs, where the money goes, and how to build all of it from code. Real projects ask all of
+those questions at once, and the answers constrain each other: the cheapest GPU may be too small, the cheapest
+capacity may miss the deadline, the quickest network setup may be open to the internet.
+
+This capstone gives you one realistic request and asks for a plan that satisfies all of it, then for the plan built
+and run. The request: **fine-tune an 8-billion-parameter open-weight model with LoRA four times a month, each run
+finished within 30 hours, serve it to an internal application, and keep the whole thing under \$2,500 a month, with no
+long-lived keys and nothing reachable from the internet.**
+
+</Section>
+
+<Section kind="technical" title="From requirements to decisions, one check at a time">
+
+**The big picture.** Each requirement becomes a check with a number → each check comes from one earlier lesson →
+the decisions interact (instance → hours → spot → deadline → cost) → so you settle them in order of how hard they
+constrain → and the plan passes when every check passes with a figure you can show.
+
+| Requirement | The check | Lesson |
+| --- | --- | --- |
+| The fine-tune fits | GPU memory estimate ≤ GPU memory | [GPU instances](#/learn/cloud/compute/gpu-instances) |
+| Within 30 hours | expected wall-clock time on the chosen capacity | [Spot and checkpoints](#/learn/cloud/compute/spot-checkpoints) |
+| Under \$2,500 a month | the month as named lines | [Cost control](#/learn/cloud/operations/cost-control) |
+| No long-lived keys | jobs and endpoints use roles | [IAM](#/learn/cloud/foundations/iam-permissions) |
+| Nothing open to the internet | no reachable path from a stranger | [Networking](#/learn/cloud/foundations/networking) |
+| Data next to the GPUs | same region, no transfer per read | [Moving data](#/learn/cloud/storage/moving-data) |
+
+### 1. Memory decides which instances are even candidates
+
+Start with the hardest constraint, because nothing else matters if the model does not fit. LoRA keeps the base
+weights frozen in 16-bit precision, about 2 bytes per parameter, and adds small trainable adapters; with the GPU
+lesson's 20% headroom that is 8 × 2 × 1.2 = **19.2 GB**. The 16 GB T4 (g4dn.xlarge) is out; every 24 GB card or larger
+is in. (4-bit QLoRA would fit the T4, at some cost in speed and a small one in quality: a valid alternative if you
+write down why.)
+
+### 2. Measured hours, then capacity, decide the deadline
+
+You cannot plan a deadline from a guess. Run the real script for 30 minutes on the candidate instance, read the steps
+per second, and extrapolate to the full run: here, **20 hours on g6.xlarge** (one L4). Hours belong to an instance, so
+switching instances means measuring again.
+
+Twenty hours fits in thirty on demand. On spot, the spot lesson's formula decides. With 0.05 interruptions per hour
+and **no checkpoints**, the run needs 20 uninterrupted hours, and the expected wall-clock time is 34.7 hours: the
+deadline fails. With a checkpoint every **60 minutes**, the expected time is 21.8 hours: it passes, at 35% of the
+price. Young's rule puts the best interval at √(2 × 0.05 h × 20 h) ≈ 1.4 hours; because the total is flat near the
+best value, an hour costs almost nothing extra and keeps each loss small.
+
+On a managed job this is two settings plus a script that resumes: `use_spot_instances`, `checkpoint_s3_uri`, and a
+`max_wait` with room for capacity waits (the managed-training lesson).
+
+### 3. The month, line by line
+
+Now the bill. Training: 21.8 hours × \$0.28 (the L4 at 65% off) × 4 runs ≈ **\$24**. Serving: an endpoint with one 24 GB
+GPU at \$0.80 an hour. Two always-on instances cost \$1,168 a month; autoscaling between 1 and 3, averaging 1.4,
+costs **\$818**. Data in the same region costs nothing to read. Total: about **\$842**, a third of the budget.
+
+The shape of that total is the lesson of the whole track in one line: the part people worry about (GPU training) is
+3% of the bill, and the part that runs all month (serving) is 97%. Effort goes where the money is. The model-APIs
+lesson's question is worth asking here too: at your expected traffic, would a hosted model API serving a similar
+model cost less than \$818 a month? If traffic is low, it may, and the fine-tune would then need a provider that hosts
+custom adapters.
+
+### 4. Security and placement are not optional extras
+
+Three checks have no price but fail the plan just the same:
+
+- **Credentials.** The training job and the endpoint run as IAM roles with exactly the bucket prefixes they need.
+  Access keys in a config file never expire and leak with the image or the repository.
+- **Network.** Training and serving live in private subnets, S3 is reached through a gateway endpoint, and the
+  endpoint is reachable only from inside the VPC. A public subnet with port 8888 open is reachable from anywhere.
+- **Data placement.** The 200 GB dataset sits in the GPUs' region. In another region each of the 12 monthly reads
+  costs transfer, runs slower, and may move data where it is not allowed.
+
+### 5. Build it from code, and prove it
+
+The plan is then built as Terraform (network, roles, buckets, endpoint, budget), run as a managed spot job, and
+proved: one deliberate interruption that resumes from the last checkpoint, a smoke test of the endpoint, a budget with
+forecast alerts, a bill compared with the estimate, and a clean `terraform destroy`.
+
+<Callout kind="simplification">
+The checker uses the track's illustrative prices and assumptions: a fixed interruption rate of 0.05 per hour, 3-minute
+checkpoints, 10-minute restarts, a 65% spot discount, a serving instance at \$0.80 an hour and an autoscaled average
+of 1.4 instances. Training hours are an input you would measure. Real interruption rates, discounts and prices vary
+by instance type, region and hour, so the numbers in your DESIGN.md should come from your own benchmark, the current
+price pages and your provider's spot advisor.
+</Callout>
+
+</Section>
+
+<Section kind="visual" title="Try it: make the plan pass">
+
+The starting plan was written in a hurry. It fails five of the six checks. Change one decision at a time and watch
+which checks turn green, and what each change does to the others.
+
+<Experiment def={capstone} title="Capstone plan checker">
+  <CapstoneView />
+  <Readout title="Plan" />
+</Experiment>
+
+Things to try:
+
+- **Start with the instance.** The T4's 16 GB cannot hold 19.2 GB. Pick g6.xlarge (L4, 24 GB): the memory check
+  passes.
+- **Look at the deadline.** On spot with no checkpoints it expects 34.7 hours. Set checkpoints every 60 minutes: 21.8
+  hours, a pass. Now try 180 minutes: still a pass, but closer to the line.
+- **Fix the three free checks**: an IAM role, the private subnet with an S3 endpoint, and data in the same region.
+- **Switch the endpoint to autoscaling.** The bill drops by \$350 to about \$842. Compare that with the whole month of
+  training.
+- **Try g6e.xlarge on demand**, keeping 20 hours. Everything passes at \$966, but the hours were measured on an L4:
+  the GPU lesson's question is whether the faster L40S finishes sooner enough to be worth its price.
+
+</Section>
+
+<Section kind="code" title="The checks as code, and a project layout">
+
+The passing plan's three numeric checks:
+
+<PythonRunner example={checkDemo} title="check_plan.py" />
+
+A suggested layout for the project, with infrastructure, training, serving and cost tracking side by side:
+
+<Code example={layout} title="finetune-and-serve/" />
+
+</Section>
+
+<Section kind="practice" title="The brief">
+
+<Project brief={brief} />
+
+</Section>
+
+<Section kind="check">
+
+<KnowledgeCheck questions={questions} />
+
+</Section>
+
+<Section kind="exercise">
+
+<MiniExercise exercise={capstoneExercise}>
+  Compute the capstone plan's expected wall-clock time and monthly bill.
+</MiniExercise>
+
+</Section>
+
+<Section kind="summary">
+
+A cloud plan for ML is a chain of checks, and each link comes from one lesson. Memory decides which GPUs are
+candidates; a benchmark on the chosen instance gives the hours; the spot formula with checkpoints turns those hours
+into an expected wall-clock time against the deadline; the bill, written as named lines, shows that serving rather
+than training usually dominates; and roles, private networking and data placement are checks that cost nothing and
+fail the plan just as surely as a missed deadline.
+
+Built from code, run as a managed spot job, served behind an autoscaling private endpoint and watched by a budget,
+the plan becomes something a reviewer can verify with the same arithmetic you used, and something you can tear
+down and rebuild in an afternoon. That is what "cloud for ML" means in practice: not knowing every service, but
+knowing which question each decision answers, and checking it with a number.
+
+Back to the [Cloud for ML track](#/learn/cloud), or test yourself with the [Cloud for ML certification exam](#/exam/cloud).
+
+</Section>

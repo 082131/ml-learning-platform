@@ -17,12 +17,6 @@ export default [
     aliases: ['Lambda', 'FaaS'],
   },
   {
-    id: 'cold-start',
-    term: 'Cold start',
-    short: 'The extra delay when a serverless platform must start a new instance (and load your code and model) before answering, typically after idle periods.',
-    introducedIn: 'cloud/compute/compute-options',
-  },
-  {
     id: 'gpu-instance',
     term: 'GPU instance',
     short: 'A VM with one or more GPUs attached, such as AWS g6.xlarge (1 × L4) or p5.48xlarge (8 × H100). The GPU memory is usually the first constraint.',
